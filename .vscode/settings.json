@@ -1,0 +1,23 @@
+{
+    "deno.enable": false,
+    "deno.enablePaths": [
+        "supabase/functions"
+    ],
+    "java.compile.nullAnalysis.mode": "automatic",
+    "java.configuration.updateBuildConfiguration": "automatic",
+    "java.import.gradle.enabled": false,
+    "java.import.exclusions": [
+        "**/node_modules/**"
+    ],
+    "java.project.resourceFilters": [
+        "node_modules",
+        ".expo",
+        ".git"
+    ],
+    "files.exclude": {
+        "**/node_modules": true
+    },
+    "files.watcherExclude": {
+        "**/node_modules/**": true
+    }
+}

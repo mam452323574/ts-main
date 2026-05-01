@@ -1,0 +1,247 @@
+import {
+  buildSocialAdminModerationQueueResponse,
+  normalizeSocialAdminModerationItem,
+} from '@/supabase/functions/_shared/phase2SocialAdmin';
+
+function createItems() {
+  return [
+    {
+      content_type: 'comment' as const,
+      content_id: 'reported-comment',
+      author_id: 'author-4',
+      author_username: 'dave',
+      category: null,
+      content_text: 'Needs review because of reports',
+      asset_url: null,
+      moderation_state: 'approved' as const,
+      moderation_reason: null,
+      moderation_provider: null,
+      created_at: '2026-04-14T07:00:00.000Z',
+      open_reports: 4,
+      total_reports_24h: 4,
+      unique_reporters_24h: 4,
+      reason_codes: ['harassment'],
+      last_reported_at: '2026-04-14T08:00:00.000Z',
+      moderation_queued_at: '2026-04-14T07:10:00.000Z',
+      moderation_claimed_at: null,
+      moderation_completed_at: '2026-04-14T08:10:00.000Z',
+      moderation_attempt_count: 0,
+      moderation_last_error: null,
+    },
+    {
+      content_type: 'post' as const,
+      content_id: 'pending-post',
+      author_id: 'author-1',
+      author_username: 'alice',
+      category: 'food' as const,
+      content_text: 'Pending first',
+      asset_url: null,
+      moderation_state: 'pending' as const,
+      moderation_reason: null,
+      moderation_provider: null,
+      created_at: '2026-04-14T06:00:00.000Z',
+      open_reports: 1,
+      total_reports_24h: 1,
+      unique_reporters_24h: 1,
+      reason_codes: ['spam_repeat'],
+      last_reported_at: '2026-04-14T06:10:00.000Z',
+      moderation_queued_at: '2026-04-14T06:05:00.000Z',
+      moderation_claimed_at: null,
+      moderation_completed_at: null,
+      moderation_attempt_count: 0,
+      moderation_last_error: null,
+    },
+    {
+      content_type: 'post' as const,
+      content_id: 'flagged-post',
+      author_id: 'author-2',
+      author_username: 'bob',
+      category: 'physique' as const,
+      content_text: 'Flagged second',
+      asset_url: null,
+      moderation_state: 'flagged' as const,
+      moderation_reason: 'manual_review_required',
+      moderation_provider: 'manual_review',
+      created_at: '2026-04-14T05:00:00.000Z',
+      open_reports: 2,
+      total_reports_24h: 2,
+      unique_reporters_24h: 2,
+      reason_codes: ['harassment'],
+      last_reported_at: '2026-04-14T05:10:00.000Z',
+      moderation_queued_at: '2026-04-14T05:05:00.000Z',
+      moderation_claimed_at: null,
+      moderation_completed_at: null,
+      moderation_attempt_count: 0,
+      moderation_last_error: null,
+    },
+    {
+      content_type: 'post' as const,
+      content_id: 'approved-clean',
+      author_id: 'author-3',
+      author_username: 'charlie',
+      category: 'before_after' as const,
+      content_text: 'Already handled',
+      asset_url: null,
+      moderation_state: 'approved' as const,
+      moderation_reason: null,
+      moderation_provider: null,
+      created_at: '2026-04-14T04:00:00.000Z',
+      open_reports: 0,
+      total_reports_24h: 0,
+      unique_reporters_24h: 0,
+      reason_codes: [],
+      last_reported_at: null,
+      moderation_queued_at: '2026-04-14T04:05:00.000Z',
+      moderation_claimed_at: null,
+      moderation_completed_at: '2026-04-14T09:30:00.000Z',
+      moderation_attempt_count: 1,
+      moderation_last_error: null,
+    },
+    {
+      content_type: 'post' as const,
+      content_id: 'removed-post',
+      author_id: 'author-5',
+      author_username: 'eve',
+      category: 'food' as const,
+      content_text: 'Removed later',
+      asset_url: null,
+      moderation_state: 'removed' as const,
+      moderation_reason: 'admin_remove',
+      moderation_provider: 'admin',
+      created_at: '2026-04-14T03:00:00.000Z',
+      open_reports: 1,
+      total_reports_24h: 1,
+      unique_reporters_24h: 1,
+      reason_codes: ['spam_repeat'],
+      last_reported_at: '2026-04-14T03:10:00.000Z',
+      moderation_queued_at: '2026-04-14T03:05:00.000Z',
+      moderation_claimed_at: null,
+      moderation_completed_at: '2026-04-14T08:45:00.000Z',
+      moderation_attempt_count: 1,
+      moderation_last_error: null,
+    },
+  ].map((item) => ({
+    ...item,
+    unique_viewer_count: 0,
+    raw_like_count: 0,
+    raw_dislike_count: 0,
+    admin_like_adjustment: 0,
+    admin_dislike_adjustment: 0,
+    effective_like_count: 0,
+    effective_dislike_count: 0,
+    author_active_bans: [],
+  }));
+}
+
+describe('phase2 social admin moderation helpers', () => {
+  it('normalizes queue rows defensively and rejects invalid categories without fallback', () => {
+    expect(
+      normalizeSocialAdminModerationItem({
+        content_type: 'post',
+        content_id: 'post-1',
+        author_id: 'author-1',
+        author_username: 'alice',
+        category: 'invalid-category',
+        content_text: 'Fresh meal',
+        asset_url: 'https://cdn.example.com/post-1.jpg',
+        moderation_state: 'flagged',
+        moderation_reason: 'manual_review_required',
+        moderation_provider: 'manual_review',
+        created_at: '2026-04-14T08:00:00.000Z',
+        open_reports: 2,
+        total_reports_24h: 3,
+        unique_reporters_24h: 2,
+        unique_viewer_count: 14,
+        reason_codes: ['harassment', '', null, 'spam_repeat'],
+        last_reported_at: '2026-04-14T09:00:00.000Z',
+        moderation_queued_at: '2026-04-14T08:10:00.000Z',
+        moderation_claimed_at: null,
+        moderation_completed_at: null,
+        moderation_attempt_count: 1,
+        moderation_last_error: null,
+        raw_like_count: 4,
+        raw_dislike_count: 2,
+        admin_like_adjustment: -6,
+        admin_dislike_adjustment: 1,
+        effective_like_count: 0,
+        effective_dislike_count: 3,
+        author_active_bans: [{ scope: 'avatar', ends_at: null, reason: 'policy' }],
+      }),
+    ).toEqual({
+      content_type: 'post',
+      content_id: 'post-1',
+      author_id: 'author-1',
+      author_username: 'alice',
+      category: null,
+      content_text: 'Fresh meal',
+      asset_url: 'https://cdn.example.com/post-1.jpg',
+      moderation_state: 'flagged',
+      moderation_reason: 'manual_review_required',
+      moderation_provider: 'manual_review',
+      created_at: '2026-04-14T08:00:00.000Z',
+      open_reports: 2,
+      total_reports_24h: 3,
+      unique_reporters_24h: 2,
+      unique_viewer_count: 14,
+      reason_codes: ['harassment', 'spam_repeat'],
+      last_reported_at: '2026-04-14T09:00:00.000Z',
+      moderation_queued_at: '2026-04-14T08:10:00.000Z',
+      moderation_claimed_at: null,
+      moderation_completed_at: null,
+      moderation_attempt_count: 1,
+      moderation_last_error: null,
+      raw_like_count: 4,
+      raw_dislike_count: 2,
+      admin_like_adjustment: -6,
+      admin_dislike_adjustment: 1,
+      effective_like_count: 0,
+      effective_dislike_count: 3,
+      author_active_bans: [{ scope: 'avatar', ends_at: null, reason: 'policy' }],
+    });
+  });
+
+  it('returns needs review items and counters for the selected bucket', () => {
+    const response = buildSocialAdminModerationQueueResponse(
+      createItems(),
+      'needs_review',
+    );
+
+    expect(response.items.map((item) => item.content_id)).toEqual([
+      'pending-post',
+      'flagged-post',
+    ]);
+    expect(response).toMatchObject({
+      success: true,
+      pending_count: 1,
+      flagged_count: 1,
+      reported_count: 2,
+      needs_review_count: 2,
+      processed_count: 3,
+    });
+  });
+
+  it('returns reported items sorted by report urgency', () => {
+    const response = buildSocialAdminModerationQueueResponse(
+      createItems(),
+      'reported',
+    );
+
+    expect(response.items.map((item) => item.content_id)).toEqual([
+      'reported-comment',
+      'removed-post',
+    ]);
+  });
+
+  it('returns processed items sorted by moderation completion date descending', () => {
+    const response = buildSocialAdminModerationQueueResponse(
+      createItems(),
+      'processed',
+    );
+
+    expect(response.items.map((item) => item.content_id)).toEqual([
+      'approved-clean',
+      'removed-post',
+      'reported-comment',
+    ]);
+  });
+});

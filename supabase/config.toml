@@ -1,0 +1,98 @@
+[functions.check-and-record-scan]
+verify_jwt = true
+
+[functions.cancel-scan-reservation]
+verify_jwt = true
+
+[functions.delete-scan]
+verify_jwt = true
+
+[functions.analyze-scan]
+verify_jwt = true
+
+[functions.fridge-scan-submit]
+verify_jwt = true
+
+[functions.fridge-scan-complete]
+verify_jwt = false
+
+[functions.coach-generate-response]
+verify_jwt = true
+
+[functions.coach-quota-status]
+verify_jwt = true
+
+[functions.social-reserve-upload]
+verify_jwt = true
+
+[functions.social-create-post]
+verify_jwt = true
+
+[functions.social-delete-post]
+verify_jwt = true
+
+[functions.social-create-comment]
+verify_jwt = true
+
+[functions.social-update-comment]
+verify_jwt = true
+
+[functions.social-delete-comment]
+verify_jwt = true
+
+[functions.social-set-reaction]
+verify_jwt = true
+
+[functions.social-set-comment-like]
+verify_jwt = true
+
+[functions.social-record-impressions]
+verify_jwt = true
+
+[functions.social-record-post-views]
+verify_jwt = true
+
+[functions.social-report-content]
+verify_jwt = true
+
+[functions.social-list-moderation-queue]
+verify_jwt = true
+
+[functions.social-moderate-content]
+verify_jwt = true
+
+[functions.social-reclassify-post]
+verify_jwt = true
+
+[functions.social-process-moderation-queue]
+verify_jwt = false
+
+[functions.sync-subscription-status]
+verify_jwt = true
+
+[functions.revenuecat-webhook]
+verify_jwt = false
+
+[functions.check-ip-signup]
+verify_jwt = false
+
+[functions.check-signup-eligibility]
+verify_jwt = false
+
+[functions.send-verification-email]
+verify_jwt = true
+
+[functions.verify-email-code]
+verify_jwt = true
+
+[functions.cleanup-orphan-user]
+verify_jwt = true
+
+[functions.social-admin-moderate-user]
+verify_jwt = true
+
+[functions.social-admin-eradicate-user]
+verify_jwt = true
+
+[functions.social-admin-adjust-post-reactions]
+verify_jwt = true

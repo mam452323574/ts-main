@@ -1,0 +1,79 @@
+# dependencies
+node_modules/
+
+# expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+coverage/
+recipe-artifacts/
+
+# native
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.log
+*_out.txt
+*_output.txt
+test-results*.json
+test-results*.txt
+test_output*.json
+test_output*.txt
+jest_err*.txt
+failures*.txt
+results.txt
+test_result*.json
+test_result*.txt
+test_results*.json
+test_results*.txt
+test_failures*.txt
+jest_results*.json
+login.json
+login_parsed.txt
+coverage-*.txt
+gradle_err*.txt
+expo-build-log.txt
+check_*.txt
+url*.json
+url*.txt
+tmp_*.sql
+tmp_*.json
+supabase/.temp/
+_done.txt
+/*-check.png
+/playwright-*.png
+/static-root.png
+/parse_login.js
+/parse_results*.js
+/extract-failures.js
+/test.js
+/inject_tabs.js
+
+# macos
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+.env
+
+# typescript
+*.tsbuildinfo
+
+# claude code worktrees
+.claude/worktrees/
+
+# local image backups (pre-compression originals)
+.image-backup-*/

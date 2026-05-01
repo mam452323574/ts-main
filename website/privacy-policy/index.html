@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    >
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'"
+    >
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta name="referrer" content="no-referrer">
+    <title>Privacy Policy / Politique de confidentialite | Health Scan</title>
+    <meta
+      name="description"
+      content="Health Scan privacy policy in French and English."
+    >
+    <link rel="canonical" href="https://healthscan.cloud/privacy-policy">
+    <style>
+      :root {
+        --bg: #f4efe6;
+        --paper: #fffdf8;
+        --ink: #1f2a24;
+        --muted: #5f6f65;
+        --line: #d8d0c3;
+        --brand: #1e5a43;
+        --brand-soft: #dfeee7;
+        --accent: #a86d2d;
+        --shadow: 0 18px 40px rgba(31, 42, 36, 0.08);
+        --radius: 22px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        font-family: Georgia, "Times New Roman", serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(168, 109, 45, 0.14), transparent 26%),
+          linear-gradient(180deg, #efe5d7 0%, var(--bg) 36%, #f8f5ef 100%);
+      }
+
+      a {
+        color: var(--brand);
+      }
+
+      .page {
+        width: min(1100px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 32px 0 56px;
+      }
+
+      .hero {
+        background: linear-gradient(135deg, rgba(30, 90, 67, 0.96), rgba(17, 43, 33, 0.96));
+        color: #f8f7f2;
+        border-radius: 28px;
+        padding: 36px 28px;
+        box-shadow: var(--shadow);
+        overflow: hidden;
+        position: relative;
+      }
+
+      .hero::after {
+        content: "";
+        position: absolute;
+        inset: auto -80px -80px auto;
+        width: 220px;
+        height: 220px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .eyebrow {
+        display: inline-block;
+        margin: 0 0 14px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.12);
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        line-height: 1.1;
+      }
+
+      .hero h1 {
+        font-size: clamp(34px, 6vw, 56px);
+        max-width: 12ch;
+      }
+
+      .hero p {
+        max-width: 720px;
+        margin: 16px 0 0;
+        font-size: 18px;
+        line-height: 1.65;
+      }
+
+      .hero-grid {
+        display: grid;
+        gap: 16px;
+        margin-top: 24px;
+      }
+
+      .hero-card {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 18px;
+        padding: 16px 18px;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      .hero-card strong {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 13px;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      .hero-card span,
+      .hero-card a {
+        font-size: 15px;
+        color: #f8f7f2;
+        word-break: break-word;
+      }
+
+      .content {
+        display: grid;
+        gap: 22px;
+        margin-top: 28px;
+      }
+
+      .policy-card {
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 28px 24px;
+        box-shadow: var(--shadow);
+      }
+
+      .policy-header {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 18px;
+      }
+
+      .locale-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 48px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: var(--brand-soft);
+        color: var(--brand);
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .policy-card h2 {
+        font-size: clamp(28px, 4vw, 40px);
+      }
+
+      .last-updated {
+        margin: 14px 0 0;
+        color: var(--muted);
+        font-style: italic;
+        font-size: 15px;
+      }
+
+      .intro {
+        margin: 18px 0 0;
+        font-size: 17px;
+        line-height: 1.7;
+      }
+
+      .section {
+        padding-top: 18px;
+        margin-top: 18px;
+        border-top: 1px solid var(--line);
+      }
+
+      .section h3 {
+        font-size: 22px;
+        margin-bottom: 12px;
+      }
+
+      .section p,
+      .section li {
+        margin: 0 0 12px;
+        font-size: 16px;
+        line-height: 1.72;
+      }
+
+      .section ul {
+        margin: 0;
+        padding-left: 22px;
+      }
+
+      .footer-note {
+        margin-top: 28px;
+        text-align: center;
+        color: var(--muted);
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 14px;
+      }
+
+      .footer-note a {
+        color: var(--accent);
+      }
+
+      @media (min-width: 860px) {
+        .hero-grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .content {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          align-items: start;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .page {
+          width: min(100% - 20px, 1000px);
+          padding-top: 20px;
+          padding-bottom: 28px;
+        }
+
+        .hero,
+        .policy-card {
+          border-radius: 22px;
+          padding: 24px 18px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <p class="eyebrow">Health Scan</p>
+        <h1>Privacy Policy / Politique de confidentialite</h1>
+        <p>
+          This public page is available without sign-in and describes how Health Scan
+          collects, uses, stores, and protects the data required to run AI-assisted
+          health scans.
+        </p>
+        <div class="hero-grid">
+          <div class="hero-card">
+            <strong>Public URL</strong>
+            <a href="https://healthscan.cloud/privacy-policy">https://healthscan.cloud/privacy-policy</a>
+          </div>
+          <div class="hero-card">
+            <strong>Privacy contact</strong>
+            <a href="mailto:privacy@healthscan.cloud">privacy@healthscan.cloud</a>
+          </div>
+          <div class="hero-card">
+            <strong>Support contact</strong>
+            <a href="mailto:support@healthscan.cloud">support@healthscan.cloud</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="content">
+        <article class="policy-card" lang="fr">
+          <div class="policy-header">
+            <span class="locale-badge">FR</span>
+            <h2>Politique de confidentialite</h2>
+          </div>
+          <p class="last-updated">Derniere mise a jour : 18 mars 2026</p>
+          <p class="intro">
+            Cette page explique comment Health Scan collecte, utilise et protege
+            les donnees necessaires a l'analyse des scans sante et au
+            fonctionnement du service.
+          </p>
+
+          <section class="section">
+            <h3>1. Responsable et portee</h3>
+            <p>
+              Health Scan fournit des fonctionnalites de scan photo et de suivi
+              sante. Cette politique couvre l'application mobile, cette page
+              publique de politique de confidentialite et les services techniques
+              relies a votre compte.
+            </p>
+            <p>
+              Si vous utilisez Health Scan, vous acceptez que nous traitions les
+              donnees decrites ci-dessous pour fournir les scans, l'historique,
+              la facturation et la securite du compte.
+            </p>
+          </section>
+
+          <section class="section">
+            <h3>2. Donnees collectees</h3>
+            <p>Nous collectons uniquement les categories de donnees necessaires au service.</p>
+            <ul>
+              <li>Informations de compte : adresse email, nom utilisateur et photo de profil si vous en ajoutez une.</li>
+              <li>Donnees de scan : photos de visage, corps ou repas, resultats d'analyse, scores et historique de scans.</li>
+              <li>Donnees techniques : identifiant d'appareil, informations de session et journaux necessaires a la securite et a l'authentification.</li>
+              <li>Donnees d'usage : preferences de langue, etat d'abonnement et interactions utiles au fonctionnement du produit.</li>
+            </ul>
+          </section>
+
+          <section class="section">
+            <h3>3. Utilisation de la camera et des photos</h3>
+            <p>
+              La camera est utilisee pour capturer des photos que vous choisissez
+              de soumettre a un scan. Ces photos peuvent aussi etre choisies
+              depuis la galerie lorsque vous utilisez le selecteur de photos du
+              systeme.
+            </p>
+            <p>
+              Les images sont televersees de maniere securisee vers notre
+              backend, stockees dans <strong>Supabase Storage</strong>, puis
+              transmises a notre infrastructure d'analyse accessible via
+              <strong>n8n.basedjew.com</strong> pour produire les resultats
+              affiches dans l'application.
+            </p>
+          </section>
+
+          <section class="section">
+            <h3>4. Finalites du traitement</h3>
+            <p>Nous utilisons vos donnees pour :</p>
+            <ul>
+              <li>executer les scans et generer des resultats d'analyse sante par IA ;</li>
+              <li>afficher votre historique et vos scores dans l'application ;</li>
+              <li>gerer l'authentification, la securite du compte et les abonnements ;</li>
+              <li>ameliorer la fiabilite du service et resoudre les incidents techniques.</li>
+            </ul>
+          </section>
+
+          <section class="section">
+            <h3>5. Prestataires et partage des donnees</h3>
+            <p>Nous ne vendons pas vos donnees personnelles.</p>
+            <p>
+              Nous partageons les donnees uniquement avec des prestataires
+              techniques necessaires a la fourniture du service, notamment
+              Supabase pour l'authentification, la base de donnees et le
+              stockage, ainsi que notre infrastructure d'analyse accessible via
+              n8n.basedjew.com pour traiter les scans que vous envoyez.
+            </p>
+            <p>
+              Nous pouvons aussi divulguer certaines donnees si la loi l'exige
+              ou pour proteger nos droits et la securite du service.
+            </p>
+          </section>
+
+          <section class="section">
+            <h3>6. Conservation et securite</h3>
+            <p>
+              Les donnees de compte et l'historique de scans sont conserves tant
+              que votre compte reste actif ou jusqu'a reception d'une demande de
+              suppression valide.
+            </p>
+            <p>
+              Les communications entre l'application et nos services utilisent
+              HTTPS. L'acces aux donnees est restreint aux besoins du service et
+              des operations de support.
+            </p>
+          </section>
+
+          <section class="section">
+            <h3>7. Vos droits</h3>
+            <p>Selon la legislation applicable, vous pouvez demander :</p>
+            <ul>
+              <li>l'acces a vos donnees ;</li>
+              <li>la rectification de donnees inexactes ;</li>
+              <li>la suppression de votre compte et des donnees associees ;</li>
+              <li>l'export de certaines donnees lorsque cela est techniquement possible ;</li>
+              <li>le retrait de votre consentement lorsque ce traitement repose sur votre consentement.</li>
+            </ul>
+          </section>
+
+          <section class="section">
+            <h3>8. Suppression des donnees</h3>
+            <p>
+              Health Scan ne propose pas actuellement de suppression complete
+              self-service dans l'application.
+            </p>
+            <p>
+              Pour demander la suppression de votre compte ou de vos donnees,
+              ecrivez a
+              <a href="mailto:privacy@healthscan.cloud">privacy@healthscan.cloud</a>
+              depuis l'adresse associee a votre compte.
+            </p>
+          </section>
+
+          <section class="section">
+            <h3>9. Mineurs et mises a jour</h3>
+            <p>Health Scan n'est pas destine aux personnes de moins de 16 ans.</p>
+            <p>
+              Nous pouvons mettre a jour cette politique pour refleter des
+              evolutions legales, techniques ou produit. La date de mise a jour
+              la plus recente est indiquee en haut de cette page.
+            </p>
+          </section>
+
+          <section class="section">
+            <h3>10. Contact</h3>
+            <p>
+              Pour toute question relative a la vie privee, a la suppression de
+              donnees ou a cette politique, contactez
+              <a href="mailto:privacy@healthscan.cloud">privacy@healthscan.cloud</a>.
+            </p>
+            <p>
+              Pour le support produit general, contactez
+              <a href="mailto:support@healthscan.cloud">support@healthscan.cloud</a>.
+            </p>
+          </section>
+        </article>
+
+        <article class="policy-card" lang="en">
+          <div class="policy-header">
+            <span class="locale-badge">EN</span>
+            <h2>Privacy Policy</h2>
+          </div>
+          <p class="last-updated">Last updated: March 18, 2026</p>
+          <p class="intro">
+            This page explains how Health Scan collects, uses, and protects the
+            data required to run health scans and the service itself.
+          </p>
+
+          <section class="section">
+            <h3>1. Controller and scope</h3>
+            <p>
+              Health Scan provides photo scan and health tracking features. This
+              policy applies to the mobile app, this public privacy policy page,
+              and the technical services connected to your account.
+            </p>
+            <p>
+              If you use Health Scan, you agree that we process the data
+              described below to provide scans, history, billing, and account
+              security.
+            </p>
+          </section>
+
+          <section class="section">
+            <h3>2. Data we collect</h3>
+            <p>We only collect categories of data that are necessary to operate the service.</p>
+            <ul>
+              <li>Account information: email address, username, and profile photo if you add one.</li>
+              <li>Scan data: face, body, or food photos, analysis results, scores, and scan history.</li>
+              <li>Technical data: device identifier, session information, and logs required for security and authentication.</li>
+              <li>Usage data: language preference, subscription state, and interactions required for product operation.</li>
+            </ul>
+          </section>
+
+          <section class="section">
+            <h3>3. Camera and photo use</h3>
+            <p>
+              The camera is used to capture photos that you choose to submit for
+              a scan. Photos may also be selected from the gallery when you use
+              the system photo picker.
+            </p>
+            <p>
+              Images are uploaded securely to our backend, stored in
+              <strong>Supabase Storage</strong>, and then sent to our analysis
+              infrastructure reachable via <strong>n8n.basedjew.com</strong> to
+              produce the results shown in the app.
+            </p>
+          </section>
+
+          <section class="section">
+            <h3>4. Why we process data</h3>
+            <p>We use your data to:</p>
+            <ul>
+              <li>run scans and generate AI health analysis results;</li>
+              <li>show your history and scores inside the app;</li>
+              <li>manage authentication, account security, and subscriptions;</li>
+              <li>improve service reliability and resolve technical incidents.</li>
+            </ul>
+          </section>
+
+          <section class="section">
+            <h3>5. Service providers and data sharing</h3>
+            <p>We do not sell your personal data.</p>
+            <p>
+              We only share data with technical providers needed to operate the
+              service, including Supabase for authentication, database, and
+              storage, and our scan analysis infrastructure reachable via
+              n8n.basedjew.com to process the scans you submit.
+            </p>
+            <p>
+              We may also disclose certain data if required by law or to protect
+              our rights and service security.
+            </p>
+          </section>
+
+          <section class="section">
+            <h3>6. Retention and security</h3>
+            <p>
+              Account data and scan history are retained while your account
+              remains active or until we receive a valid deletion request.
+            </p>
+            <p>
+              Communications between the app and our services use HTTPS. Access
+              to data is limited to what is required to operate and support the
+              service.
+            </p>
+          </section>
+
+          <section class="section">
+            <h3>7. Your rights</h3>
+            <p>Depending on applicable law, you may request:</p>
+            <ul>
+              <li>access to your data;</li>
+              <li>correction of inaccurate data;</li>
+              <li>deletion of your account and associated data;</li>
+              <li>export of certain data where technically feasible;</li>
+              <li>withdrawal of consent where processing depends on consent.</li>
+            </ul>
+          </section>
+
+          <section class="section">
+            <h3>8. Data deletion</h3>
+            <p>
+              Health Scan does not currently provide a full self-service account
+              deletion flow inside the app.
+            </p>
+            <p>
+              To request deletion of your account or data, email
+              <a href="mailto:privacy@healthscan.cloud">privacy@healthscan.cloud</a>
+              from the address linked to your account.
+            </p>
+          </section>
+
+          <section class="section">
+            <h3>9. Children and updates</h3>
+            <p>Health Scan is not intended for people under 16 years old.</p>
+            <p>
+              We may update this policy to reflect legal, technical, or product
+              changes. The latest revision date appears at the top of this page.
+            </p>
+          </section>
+
+          <section class="section">
+            <h3>10. Contact</h3>
+            <p>
+              For privacy, deletion, or policy questions, contact
+              <a href="mailto:privacy@healthscan.cloud">privacy@healthscan.cloud</a>.
+            </p>
+            <p>
+              For general product support, contact
+              <a href="mailto:support@healthscan.cloud">support@healthscan.cloud</a>.
+            </p>
+          </section>
+        </article>
+      </section>
+
+      <p class="footer-note">
+        Public policy URL:
+        <a href="https://healthscan.cloud/privacy-policy">https://healthscan.cloud/privacy-policy</a>
+      </p>
+    </main>
+  </body>
+</html>
