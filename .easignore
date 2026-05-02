@@ -1,0 +1,76 @@
+# EAS Build ignore — files NOT shipped to the EAS build server.
+#
+# When this file exists it FULLY OVERRIDES .gitignore (EAS doesn't fall back).
+# So we re-list everything from .gitignore here PLUS the extras at the bottom.
+
+# === re-list .gitignore ===
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+coverage/
+recipe-artifacts/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+.metro-health-check*
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.log
+*_out.txt
+*_output.txt
+test-results*.json
+.env
+.env*.local
+.DS_Store
+*.pem
+.idea
+.vscode
+ios/Pods/
+ios/build/
+android/app/build/
+android/build/
+.cxx/
+*.iml
+*.hprof
+
+# === extras NOT needed for mobile build ===
+
+# Orphan asset with non-ASCII filename — accent (é) breaks tar extraction
+# on EAS Linux build servers when uploaded from Windows. The actual chef
+# assets live at assets/images/chef/chef-dietetique.png — this root file
+# is a typo'd duplicate that's never imported.
+diétettique.png
+
+# Debug/test screenshots at root — not used by app
+visual-chef-debug.png
+visual-chef-iphone-initial.png
+visual-chef-iphone-review.png
+
+# Documentation files — not needed at runtime, just bloat the upload
+*.md
+!app.json
+
+# Tests — not bundled in production build
+__tests__/
+__mocks__/
+jest.config.js
+
+# Supabase backend (server-side, deployed separately via supabase CLI)
+supabase/
+
+# Shannon pentest workspace (if any local artifacts)
+.shannon/
+
+# Translations / migration scripts (dev tooling)
+check_translations.js
+check_translations2.js
+deploy_functions.ps1
+
+# n8n workflow definitions (server-side)
+n8n/
