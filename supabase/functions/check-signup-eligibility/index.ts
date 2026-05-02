@@ -26,6 +26,25 @@ function extractEmailDomain(email: string): string | null {
   return match ? match[1] : null;
 }
 
+// AUTH-VULN-02 fix (Wave 3.6): subdomain matching. The previous
+// `.eq('domain', exact_match)` lookup let attackers bypass the disposable
+// email filter via subdomains: `evil.tempmail.com` would PASS even if
+// `tempmail.com` was on the blocklist.
+//
+// Now we generate every parent suffix of the user's email domain and look
+// up ANY match. Example: for `attacker@evil.foo.tempmail.com` we check
+// `evil.foo.tempmail.com`, `foo.tempmail.com`, `tempmail.com`, and `com`
+// (we exclude bare TLDs from the lookup itself, but they're cheap to test).
+function getDomainSuffixes(domain: string): string[] {
+  const parts = domain.toLowerCase().split('.');
+  const suffixes: string[] = [];
+  // Skip i = parts.length - 1 (bare TLD like "com") — never on blocklist.
+  for (let i = 0; i < parts.length - 1; i++) {
+    suffixes.push(parts.slice(i).join('.'));
+  }
+  return suffixes;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return handleCorsPreflightRequest(req);
@@ -61,19 +80,20 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const suffixes = getDomainSuffixes(domain);
     const client = createServiceRoleClient();
     const { data, error } = await client
       .from('disposable_email_domains')
       .select('domain')
-      .eq('domain', domain)
+      .in('domain', suffixes)
       .eq('active', true)
-      .maybeSingle();
+      .limit(1);
 
     if (error) {
       throw error;
     }
 
-    if (data) {
+    if (data && data.length > 0) {
       return jsonResponse(
         req,
         { allowed: false, reason: 'disposable_email' },

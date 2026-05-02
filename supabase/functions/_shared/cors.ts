@@ -35,12 +35,20 @@ function isOriginAllowed(origin: string): boolean {
   return allowedOrigins.includes(origin);
 }
 
+// AUTH-VULN-04 fix: explicit cache-prevention on every Edge Function response.
+// Without these headers, intermediate corporate proxies / ISP caches / browser
+// caches can store JWT-bearing responses (Cloudflare's `cf-cache-status: DYNAMIC`
+// is non-binding for non-Cloudflare caches). Strict-Transport-Security upgraded
+// to include `preload` to match the headers GoTrue itself returns.
 const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
-  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
   'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
   'Referrer-Policy': 'no-referrer',
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+  'Pragma': 'no-cache',
+  'Expires': '0',
 };
 
 function applySecurityHeaders(headers: Headers | Record<string, string>) {

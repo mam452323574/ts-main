@@ -1,4 +1,5 @@
 import { Phase2HttpError } from './phase2Errors.ts';
+import { validateWebhookUrl } from './webhookHostAllowlist.ts';
 
 const DEFAULT_REVENUECAT_API_BASE_URL = 'https://api.revenuecat.com';
 const PHASE2_WEBHOOK_AUTH_HEADER_NAME_PATTERN =
@@ -238,7 +239,25 @@ export function getPhase2WebhookAuthConfig(): Phase2WebhookAuthConfig {
 }
 
 export function getOptionalWebhookUrl(envName: string) {
-  return readOptionalServerEnv(envName) ?? '';
+  const raw = readOptionalServerEnv(envName) ?? '';
+  if (!raw) return '';
+
+  // SSRF defense-in-depth (post-pentest 2026-05): every webhook URL must
+  // pass the WEBHOOK_ALLOWED_HOSTS allowlist. If the allowlist isn't
+  // configured we LOG and FAIL CLOSED (return ''), forcing the operator
+  // to either set the allowlist or accept that the webhook is disabled.
+  // This closes the gap that the SSRF Shannon analysis flagged on the
+  // coach + social-report webhook env vars.
+  const result = validateWebhookUrl(raw);
+  if (!result.ok) {
+    console.warn('[phase2Env] webhook URL validation failed', {
+      env: envName,
+      reason: result.reason,
+      details: result.details,
+    });
+    return '';
+  }
+  return raw;
 }
 
 export function getOptionalSocialModerationWorkerHmacSecret() {
@@ -252,9 +271,19 @@ export function requireWebhookUrl(
     message?: string;
   } = {},
 ) {
-  return requireServerEnv(envName, {
+  const url = requireServerEnv(envName, {
     status: 503,
     code: options.code ?? 'missing_webhook_url',
     message: options.message ?? `${envName} is not configured`,
   });
+
+  // SSRF defense-in-depth (post-pentest 2026-05): same allowlist gate as
+  // getOptionalWebhookUrl, but throws so callers requiring a webhook can't
+  // silently fall back to an unvalidated URL.
+  const result = validateWebhookUrl(url);
+  if (!result.ok) {
+    throw new Phase2HttpError(503, options.code ?? 'webhook_url_not_allowed',
+      `${envName} did not pass webhook host allowlist (${result.reason})`);
+  }
+  return url;
 }

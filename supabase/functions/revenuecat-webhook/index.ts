@@ -1,5 +1,5 @@
 import { handleCorsPreflightRequest, jsonResponse } from '../_shared/cors.ts';
-import { createServiceRoleClient } from '../_shared/phase2Auth.ts';
+import { createServiceRoleClient, timingSafeEqual } from '../_shared/phase2Auth.ts';
 import { getRevenueCatServerConfig } from '../_shared/phase2Env.ts';
 import { Phase2HttpError, toPhase2ErrorPayload } from '../_shared/phase2Errors.ts';
 import {
@@ -59,8 +59,14 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const authorizationHeader = req.headers.get('Authorization');
-    if (authorizationHeader !== webhookAuthorization) {
+    // AUTH-VULN-06 fix: timing-safe comparison of the bearer token. The
+    // previous `!==` operator leaked length-prefix and byte-by-byte timing,
+    // which could in theory let a co-located attacker brute-force the token
+    // character-by-character. Network jitter masks the signal in practice
+    // today, but using `timingSafeEqual` removes the entire vulnerability
+    // class regardless of network position.
+    const authorizationHeader = req.headers.get('Authorization') ?? '';
+    if (!timingSafeEqual(authorizationHeader, webhookAuthorization)) {
       throw new Phase2HttpError(
         401,
         'invalid_webhook_authorization',

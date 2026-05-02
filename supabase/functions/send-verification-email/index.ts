@@ -190,7 +190,25 @@ Deno.serve(async (req: Request) => {
       .eq('type', 'signup')
       .is('verified_at', null);
 
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    // AUTH-VULN-05 fix: use crypto-strong RNG. Math.random() is xorshift128+
+    // (V8 implementation), which is deterministic given enough output samples
+    // and could in theory let an attacker predict future codes from observed
+    // ones (PRNG state reconstruction). crypto.getRandomValues() reads from
+    // the OS CSPRNG.
+    //
+    // Range: a uniformly distributed integer in [0, 900000) added to 100000
+    // gives [100000, 1000000), i.e. always 6 digits. We reject + retry on
+    // values from the bias zone (modulo bias is negligible at this size but
+    // we use rejection sampling to be exact).
+    const codeBuf = new Uint32Array(1);
+    let codeNumeric: number;
+    do {
+      crypto.getRandomValues(codeBuf);
+      // 0xFFFFFFFF + 1 = 4_294_967_296. Largest multiple of 900_000 ≤ that = 4_294_700_000.
+      // Reject anything in [4_294_700_000, 4_294_967_296) to avoid modulo bias.
+    } while (codeBuf[0] >= 4_294_700_000);
+    codeNumeric = 100_000 + (codeBuf[0] % 900_000);
+    const code = codeNumeric.toString();
     const codeHash = await hashVerificationCode({
       userId: user.id,
       email,

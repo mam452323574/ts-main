@@ -28,6 +28,7 @@ Shannon found **7 authentication-class vulnerabilities** (1 Critical, 4 High, 2 
 | 0.2 | Create this tracking file | malo | [x] |
 | 0.3 | **MANUAL:** Delete 5 pentest accounts in Supabase dashboard (see "Manual actions" below) | malo | [ ] |
 | 0.4 | **MANUAL:** Verify Supabase plan is Pro+ (needed for Auth Hooks) | malo | [ ] |
+| 0.5 | **MANUAL:** Add coach + social-report N8N hosts to `WEBHOOK_ALLOWED_HOSTS` env var (Wave 3.4 made this strict) | malo | [ ] |
 
 ---
 
@@ -35,14 +36,14 @@ Shannon found **7 authentication-class vulnerabilities** (1 Critical, 4 High, 2 
 
 | # | Task | Severity | Files | Owner | Status |
 |---|------|----------|-------|-------|--------|
-| 1.1 | Set `mailer_autoconfirm = false` in `supabase/config.toml` | High (misconfig) | `supabase/config.toml` | malo | [ ] |
+| 1.1 | Set `mailer_autoconfirm = false` in `supabase/config.toml` | High (misconfig) | `supabase/config.toml` | malo | [x] |
 | 1.1b | **MANUAL:** Mirror change in Supabase dashboard → Authentication → Email | High | dashboard | malo | [ ] |
-| 1.2a | Migration: `login_attempts` table | Critical | `supabase/migrations/20260502_010000_login_attempts_table.sql` | malo | [ ] |
-| 1.2b | Migration: `login_lockouts` table | Critical | `supabase/migrations/20260502_010100_login_lockouts_table.sql` | malo | [ ] |
-| 1.2c | Migration: `record_login_attempt()` + `check_login_locked()` RPCs | Critical | `supabase/migrations/20260502_010200_pre_login_hook_rpc.sql` | malo | [ ] |
-| 1.2d | Edge Function: `auth-pre-login` | Critical | `supabase/functions/auth-pre-login/index.ts` | malo | [ ] |
-| 1.2e | **MANUAL:** Enable `password_grant_pre_login` HTTP hook in Supabase dashboard pointing to `auth-pre-login` | Critical | dashboard | malo | [ ] |
-| 1.3 | Document MFA accepted residual risk | High (accepted) | `TRUST_BOUNDARIES.md`, `SECURITY_AUDIT_SUPABASE.md`, `supabase/functions/_shared/phase2Auth.ts` | malo | [ ] |
+| 1.2a | Migration: `login_attempts` table | Critical | `supabase/migrations/20260502010000_login_attempts_table.sql` | malo | [x] |
+| 1.2b | Migration: `login_lockouts` table | Critical | `supabase/migrations/20260502010100_login_lockouts_table.sql` | malo | [x] |
+| 1.2c | Migration: `record_login_attempt()` + `check_login_locked()` RPCs | Critical | `supabase/migrations/20260502010200_pre_login_hook_rpc.sql` | malo | [x] |
+| 1.2d | Edge Function: `auth-pre-login` | Critical | `supabase/functions/auth-pre-login/index.ts` | malo | [x] |
+| 1.2e | **MANUAL:** Enable `Password Verification Attempt` HTTP hook in Supabase dashboard pointing to `auth-pre-login` (set `AUTH_HOOK_SECRET` env var) | Critical | dashboard | malo | [ ] |
+| 1.3 | Document MFA accepted residual risk | High (accepted) | `TRUST_BOUNDARIES.md`, `supabase/functions/_shared/phase2Auth.ts` | malo | [x] |
 
 **Wave 1 closure criteria:**
 - [ ] 6 wrong-password POSTs to `/auth/v1/token` → 6th rejected
@@ -74,12 +75,12 @@ Shannon found **7 authentication-class vulnerabilities** (1 Critical, 4 High, 2 
 
 | # | Task | Severity | Files | Owner | Status |
 |---|------|----------|-------|-------|--------|
-| 3.1 | Add Cache-Control headers to `SECURITY_HEADERS` | Medium | `supabase/functions/_shared/cors.ts:38-44` | malo | [ ] |
-| 3.2 | Replace `Math.random()` with `crypto.randomInt()` (8-digit code) | Medium | `supabase/functions/send-verification-email/index.ts:193` | malo | [ ] |
-| 3.3 | Use `timingSafeEqual()` for webhook bearer comparison | High (potential) | `supabase/functions/revenuecat-webhook/index.ts:63` | malo | [ ] |
-| 3.4 | Apply `validateWebhookUrl()` to coach + social-report webhooks (defense-in-depth) | Info | `supabase/functions/_shared/coachWebhook.ts`, `supabase/functions/social-report-content/index.ts` | malo | [ ] |
-| 3.5 | Document version-disclosure decision (`/auth/v1/health`) | Low | `SECURITY_AUDIT_SUPABASE.md` | malo | [ ] |
-| 3.6 | Fix subdomain matching in disposable email check | High | `supabase/functions/check-signup-eligibility/index.ts` (and `secure-signup`) | malo | [ ] |
+| 3.1 | Add Cache-Control headers to `SECURITY_HEADERS` | Medium | `supabase/functions/_shared/cors.ts` | malo | [x] |
+| 3.2 | Replace `Math.random()` with `crypto.getRandomValues()` (rejection-sampled, no modulo bias) | Medium | `supabase/functions/send-verification-email/index.ts` | malo | [x] |
+| 3.3 | Use `timingSafeEqual()` for webhook bearer comparison | High (potential) | `supabase/functions/revenuecat-webhook/index.ts`, `supabase/functions/_shared/phase2Auth.ts` (export) | malo | [x] |
+| 3.4 | Apply `validateWebhookUrl()` to ALL webhook URL env vars (centralized in `getOptionalWebhookUrl` + `requireWebhookUrl`) | Info | `supabase/functions/_shared/phase2Env.ts` | malo | [x] |
+| 3.5 | Document version-disclosure decision (`/auth/v1/health`) | Low | `TRUST_BOUNDARIES.md` (covered in §"GoTrue version disclosure") | malo | [x] |
+| 3.6 | Fix subdomain matching in disposable email check | High | `supabase/functions/check-signup-eligibility/index.ts` | malo | [x] |
 
 ---
 

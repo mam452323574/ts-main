@@ -190,7 +190,10 @@ export async function createSocialModerationWorkerSignature(options: {
   );
 }
 
-function timingSafeEqual(left: string, right: string) {
+// Constant-time string comparison. Now exported (AUTH-VULN-06 fix) so
+// other Edge Functions (e.g. revenuecat-webhook) can avoid the timing-unsafe
+// `===` / `!==` operators when comparing secrets / bearer tokens.
+export function timingSafeEqual(left: string, right: string) {
   const maxLength = Math.max(left.length, right.length);
   let mismatch = left.length ^ right.length;
 
