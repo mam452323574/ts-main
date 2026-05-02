@@ -42,7 +42,8 @@ Shannon found **7 authentication-class vulnerabilities** (1 Critical, 4 High, 2 
 | 1.2b | Migration: `login_lockouts` table | Critical | `supabase/migrations/20260502010100_login_lockouts_table.sql` | malo | [x] |
 | 1.2c | Migration: `record_login_attempt()` + `check_login_locked()` RPCs | Critical | `supabase/migrations/20260502010200_pre_login_hook_rpc.sql` | malo | [x] |
 | 1.2d | Edge Function: `auth-pre-login` | Critical | `supabase/functions/auth-pre-login/index.ts` | malo | [x] |
-| 1.2e | **MANUAL:** Enable `Password Verification Attempt` HTTP hook in Supabase dashboard pointing to `auth-pre-login` (set `AUTH_HOOK_SECRET` env var) | Critical | dashboard | malo | [ ] |
+| 1.2d-bis | **(Free-plan only)** Edge Function: `secure-login` wrapper as best-effort substitute for the unavailable Auth Hook | Critical | `supabase/functions/secure-login/index.ts` + `contexts/AuthContext.tsx signIn()` | malo | [x] |
+| 1.2e | **MANUAL (Pro+ only):** Enable `Password Verification Attempt` HTTP hook in Supabase dashboard pointing to `auth-pre-login` (set `AUTH_HOOK_SECRET` env var) | Critical | dashboard | malo | [ ] |
 | 1.3 | Document MFA accepted residual risk | High (accepted) | `TRUST_BOUNDARIES.md`, `supabase/functions/_shared/phase2Auth.ts` | malo | [x] |
 
 **Wave 1 closure criteria:**

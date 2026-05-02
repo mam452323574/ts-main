@@ -109,6 +109,13 @@ verify_jwt = false
 [functions.auth-pre-login]
 verify_jwt = false
 
+# Free-plan substitute for the Auth Hook above. Client-callable wrapper that
+# performs lockout pre-check + signInWithPassword + record_login_attempt.
+# Becomes redundant when Pro+ Auth Hooks are enabled. See
+# DEPLOYMENT_PLAN_2026_05.md Phase 0.
+[functions.secure-login]
+verify_jwt = false
+
 # === Auth configuration ===
 # NOTE: This [auth] section primarily affects local dev (`supabase start`).
 # Managed deployment is governed by the Supabase dashboard — these values

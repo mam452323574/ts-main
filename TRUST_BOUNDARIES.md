@@ -69,7 +69,7 @@ MFA / second-factor auth was removed from the product. The check `assertAal2Bear
 
 To make the password-only flow as hard to compromise as possible, these controls are mandatory and tested as part of the security regression suite (`__tests__/security/`):
 
-1. **Per-account login lockout** — `auth-pre-login` Edge Function + `record_login_attempt()` RPC. 5 fails / 15min from same (email,ip) → 30-min lock with exponential backoff.
+1. **Per-account login lockout** — `auth-pre-login` Edge Function + `record_login_attempt()` RPC. 5 fails / 15min from same (email,ip) → 30-min lock with exponential backoff. **NOTE (Free plan):** until upgraded to Supabase Pro+, the lockout is enforced via the client-side wrapper `secure-login` (called from `AuthContext.signIn()`). An attacker calling `/auth/v1/token` directly with the public anon key bypasses the wrapper. This is an accepted residual risk pending Pro+ upgrade.
 2. **Server-side HIBP enforcement** — `secure-signup` Edge Function + `auth.enforce_signup_nonce` trigger. Direct `/auth/v1/signup` calls bypassing the wrapper are rejected at the Postgres layer.
 3. **Email verification gate** — `mailer_autoconfirm = false`. New accounts are not usable until `verify-email-code` succeeds.
 4. **Password policy** — minimum 12 characters, mixed case + digit + symbol (enforced in `secure-signup` AND in dashboard).

@@ -1216,13 +1216,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: string,
     password: string
   ): Promise<{ nextStep: AuthNextStep; userId: string }> => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+    // Phase 0 (post-pentest, Free-plan path): route login through the
+    // server-side `secure-login` Edge Function so the per-account lockout
+    // (AUTH-VULN-03) actually fires for app traffic. On Pro+ this would be
+    // enforced by the `password_verification_attempt` Auth Hook instead.
+    // Direct `/auth/v1/token` calls with the public anon key still bypass
+    // the lockout — accepted residual risk on Free, see TRUST_BOUNDARIES.md.
+    const secureResponse = await fetch(
+      getSupabaseFunctionUrl('secure-login'),
+      {
+        method: 'POST',
+        headers: getFunctionHeaders(null, { allowAnon: true }),
+        body: JSON.stringify({ email, password }),
+      },
+    );
+
+    const secureBody = await secureResponse.json().catch(() => ({}));
+
+    if (!secureResponse.ok || !secureBody?.ok || !secureBody?.session) {
+      // Throw a shape compatible with what callers used to expect from
+      // `signInWithPassword`'s error: a generic Error. Account-locked is
+      // distinguishable via the code so callers can show a custom UI.
+      const errorCode = secureBody?.code ?? 'invalid_credentials';
+      const error = new Error(secureBody?.error ?? 'Invalid email or password.');
+      (error as Error & { code?: string }).code = errorCode;
+      throw error;
+    }
+
+    // secure-login does the actual signInWithPassword on the server. We
+    // need to set the session on the local client so subsequent supabase
+    // calls work. setSession persists the access + refresh tokens.
+    const { data, error: setErr } = await supabase.auth.setSession({
+      access_token: secureBody.session.access_token,
+      refresh_token: secureBody.session.refresh_token,
     });
 
-    if (error) {
-      throw error;
+    if (setErr || !data?.user) {
+      logOperationalError('[SignIn] failed to install session locally', setErr, {});
+      throw new Error('Login session could not be installed. Please try again.');
     }
 
     const userId = data.user.id;
