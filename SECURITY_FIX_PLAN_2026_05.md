@@ -5,6 +5,12 @@
 > **Owner:** @malo
 > **Target completion:** J+11 from kickoff
 
+> **POST-DEPLOY ADJUSTMENT 2026-05** — password policy in `secure-signup` was
+> relaxed after the original deploy (12 chars + 4-class complexity + HIBP →
+> 8 chars + lower+digit + no HIBP) per product UX decision. AUTH-VULN-01 is
+> now an accepted residual risk; see TRUST_BOUNDARIES.md for the full list of
+> compensating controls. Dashboard items below reflect the relaxed policy.
+
 ---
 
 ## Executive summary
@@ -37,7 +43,9 @@ Shannon found **7 authentication-class vulnerabilities** (1 Critical, 4 High, 2 
 | # | Task | Severity | Files | Owner | Status |
 |---|------|----------|-------|-------|--------|
 | 1.1 | Set `mailer_autoconfirm = false` in `supabase/config.toml` | High (misconfig) | `supabase/config.toml` | malo | [x] |
-| 1.1b | **MANUAL:** Mirror change in Supabase dashboard → Authentication → Email | High | dashboard | malo | [ ] |
+| 1.1b | **MANUAL:** Mirror in dashboard → Authentication → Email → "Auto-confirm users" = OFF | High | dashboard | malo | [ ] |
+| 1.1c | **MANUAL:** Dashboard → Authentication → Password requirements → Min length = **8**, Required = **lowercase + digit** (only) | Medium | dashboard | malo | [ ] |
+| 1.1d | **MANUAL:** Dashboard → Authentication → Password protection → "Leaked password protection" = **OFF** (HIBP disabled per product decision) | Info | dashboard | malo | [ ] |
 | 1.2a | Migration: `login_attempts` table | Critical | `supabase/migrations/20260502010000_login_attempts_table.sql` | malo | [x] |
 | 1.2b | Migration: `login_lockouts` table | Critical | `supabase/migrations/20260502010100_login_lockouts_table.sql` | malo | [x] |
 | 1.2c | Migration: `record_login_attempt()` + `check_login_locked()` RPCs | Critical | `supabase/migrations/20260502010200_pre_login_hook_rpc.sql` | malo | [x] |

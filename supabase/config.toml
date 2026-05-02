@@ -117,19 +117,26 @@ verify_jwt = false
 verify_jwt = false
 
 # === Auth configuration ===
-# NOTE: This [auth] section primarily affects local dev (`supabase start`).
-# Managed deployment is governed by the Supabase dashboard — these values
-# MUST be mirrored at https://supabase.com/dashboard/project/<id>/auth/providers
-# (Authentication → Email).
-[auth]
-# AUTH-VULN-02 / MISCONFIG-01 fix: require email verification before account
-# is usable. Previously `mailer_autoconfirm = true` made signups instantly
-# active, bypassing email-verification gating.
-enable_signup = true
-enable_confirmations = true     # equivalent to mailer_autoconfirm = false
-
-# AUTH-VULN-01 fix: enable Supabase's built-in HIBP check as a defense-in-depth
-# layer in addition to the server-side check in `secure-signup`.
-# Mirror this in dashboard: Authentication → Policies → "Leaked password protection".
-password_min_length = 12
-# password_required_characters: lower+upper+digit+symbol (mirror in dashboard)
+# NOTE: managed deployment is governed by the Supabase dashboard — these
+# settings are documentation-only and MUST be mirrored at
+# https://supabase.com/dashboard/project/<id>/auth/providers
+# (Authentication → Email and Authentication → Password requirements).
+#
+# Required dashboard configuration (post-pentest 2026-05):
+#
+#   AUTH-VULN-02 / MISCONFIG-01 fix:
+#     - Authentication → Email → "Auto-confirm users" = OFF
+#       (previously ON; allowed disposable email signups to be auto-confirmed)
+#
+#   AUTH-VULN-01 fix (RELAXED 2026-05 by product decision):
+#     - Authentication → Password requirements → Min length = 8 (was 12)
+#     - Authentication → Password requirements → Required: lowercase + digit only
+#       (uppercase and symbol no longer required)
+#     - Authentication → Password protection → "Leaked password protection" = OFF
+#       (HIBP check disabled per product decision; see secure-signup/index.ts)
+#
+#   AUTH-VULN-03 fix (Pro+ only):
+#     - Authentication → Hooks → Add HTTP hook
+#       Type: Password Verification Attempt
+#       URL:  https://<project>.supabase.co/functions/v1/auth-pre-login
+#       Secret: must match AUTH_HOOK_SECRET env var on the function

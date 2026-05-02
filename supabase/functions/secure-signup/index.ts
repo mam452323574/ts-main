@@ -36,7 +36,10 @@ import {
   jsonResponse,
   validateCorsOrigin,
 } from '../_shared/cors.ts';
-import { checkPasswordBreachedCount } from '../_shared/hibp.ts';
+// HIBP check disabled 2026-05 — keep import commented (not removed) so
+// re-enabling is a one-line change. The helper still exists in
+// _shared/hibp.ts and is still used by before-user-created/index.ts.
+// import { checkPasswordBreachedCount } from '../_shared/hibp.ts';
 import { createServiceRoleClient } from '../_shared/phase2Auth.ts';
 import { Phase2HttpError } from '../_shared/phase2Errors.ts';
 
@@ -45,7 +48,10 @@ import { Phase2HttpError } from '../_shared/phase2Errors.ts';
 const EMAIL_PATTERN = /^[^\s@]+@([^\s@]+\.[^\s@]+)$/;
 const MAX_EMAIL_LENGTH = 254;
 const MAX_PASSWORD_LENGTH = 128;
-const MIN_PASSWORD_LENGTH = 12;
+// Relaxed 2026-05 (post-deploy adjustment): originally 12 to compensate for
+// no-MFA. Reduced to 8 per product UX decision. See TRUST_BOUNDARIES.md
+// §"Accepted residual risk: relaxed password policy".
+const MIN_PASSWORD_LENGTH = 8;
 
 // Generic responses used for ALL rejection paths. Don't tell the client
 // which specific check failed — that's an enumeration leak.
@@ -81,12 +87,12 @@ function getDomainSuffixes(domain: string): string[] {
 function isPasswordPolicyOk(password: string): boolean {
   if (password.length < MIN_PASSWORD_LENGTH) return false;
   if (password.length > MAX_PASSWORD_LENGTH) return false;
-  // Require at least one of each: lowercase, uppercase, digit, symbol.
+  // Reduced policy 2026-05 (post-deploy adjustment): require lower + digit
+  // only. Previously required all 4 classes (lower+upper+digit+symbol).
+  // Tradeoff documented in TRUST_BOUNDARIES.md.
   const hasLower = /[a-z]/.test(password);
-  const hasUpper = /[A-Z]/.test(password);
   const hasDigit = /\d/.test(password);
-  const hasSymbol = /[^A-Za-z0-9]/.test(password);
-  return hasLower && hasUpper && hasDigit && hasSymbol;
+  return hasLower && hasDigit;
 }
 
 function generateNonce(): string {
@@ -220,13 +226,17 @@ Deno.serve(async (req: Request) => {
       return rejectGeneric(req);
     }
 
-    // 6. HIBP. Fail-OPEN inside checkPasswordBreachedCount on network errors;
-    //    if it returns leaked=true we ALWAYS reject.
-    const hibp = await checkPasswordBreachedCount(password);
-    if (hibp.leaked) {
-      await constantishDelay();
-      return rejectGeneric(req);
-    }
+    // 6. HIBP — DISABLED 2026-05 by product decision. AUTH-VULN-01 is now
+    //    an accepted residual risk (see TRUST_BOUNDARIES.md). The lockout
+    //    + email-verify + disposable-email controls remain. To re-enable:
+    //    1) uncomment the block below; 2) re-deploy this function;
+    //    3) re-enable "Leaked password protection" in the Supabase dashboard.
+    //
+    // const hibp = await checkPasswordBreachedCount(password);
+    // if (hibp.leaked) {
+    //   await constantishDelay();
+    //   return rejectGeneric(req);
+    // }
 
     // 7. Password policy.
     if (!isPasswordPolicyOk(password)) {

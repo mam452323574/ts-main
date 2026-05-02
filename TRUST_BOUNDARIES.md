@@ -72,7 +72,7 @@ To make the password-only flow as hard to compromise as possible, these controls
 1. **Per-account login lockout** — `auth-pre-login` Edge Function + `record_login_attempt()` RPC. 5 fails / 15min from same (email,ip) → 30-min lock with exponential backoff. **NOTE (Free plan):** until upgraded to Supabase Pro+, the lockout is enforced via the client-side wrapper `secure-login` (called from `AuthContext.signIn()`). An attacker calling `/auth/v1/token` directly with the public anon key bypasses the wrapper. This is an accepted residual risk pending Pro+ upgrade.
 2. **Server-side HIBP enforcement** — `secure-signup` Edge Function + `auth.enforce_signup_nonce` trigger. Direct `/auth/v1/signup` calls bypassing the wrapper are rejected at the Postgres layer.
 3. **Email verification gate** — `mailer_autoconfirm = false`. New accounts are not usable until `verify-email-code` succeeds.
-4. **Password policy** — minimum 12 characters, mixed case + digit + symbol (enforced in `secure-signup` AND in dashboard).
+4. **Password policy (RELAXED 2026-05)** — minimum 8 characters, requires lowercase + digit only. HIBP check disabled per product decision. This re-opens AUTH-VULN-01 by design — accepted residual risk because the lockout, email-verify, disposable-email, and IP rate-limit controls remain in place. To re-enable HIBP: uncomment the block in `supabase/functions/secure-signup/index.ts` and toggle "Leaked password protection" ON in the Supabase dashboard.
 5. **Server-side disposable-email filter** — folded into `secure-signup`, blocks subdomain bypasses.
 
 ### When to re-evaluate
