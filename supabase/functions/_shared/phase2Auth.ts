@@ -105,6 +105,28 @@ function assertAal2BearerToken(_token: string) {
   // niveau maximum atteignable et ce check ferait crasher toutes les Edge
   // Functions qui l'appellent. On neutralise sans supprimer la fonction pour
   // garder requireAuthenticatedUser fonctionnelle sans toucher aux call-sites.
+  //
+  // ┌─────────────────────────────────────────────────────────────────────┐
+  // │ ACCEPTED RISK 2026-05 (post-Shannon pentest, finding AUTH-VULN-07): │
+  // │ This no-op means any password-only (AAL1) session can access ALL    │
+  // │ 34 authenticated Edge Functions, including health-data and billing  │
+  // │ surfaces. The pentest proved a brute-force-to-takeover chain in     │
+  // │ ≤8 attempts against any known account email.                        │
+  // │                                                                     │
+  // │ This is documented as an accepted residual risk in:                 │
+  // │   - TRUST_BOUNDARIES.md §"Accepted residual risk: AAL1-only"        │
+  // │   - SECURITY_AUDIT_SUPABASE.md §"MFA disabled"                      │
+  // │                                                                     │
+  // │ Compensating controls (Waves 1-3 of SECURITY_FIX_PLAN_2026_05.md):  │
+  // │   - Per-account login lockout (auth-pre-login hook + RPCs)          │
+  // │   - HIBP enforcement on signup (secure-signup wrapper + trigger)    │
+  // │   - Email verification gate (mailer_autoconfirm = false)            │
+  // │   - 12-char password policy w/ complexity                           │
+  // │                                                                     │
+  // │ Re-enabling MFA: restore the AAL2 check (decoded JWT.aal === 'aal2')│
+  // │ here, then audit Edge Functions for which ones legitimately need to │
+  // │ accept AAL1 (e.g. login-flow itself).                               │
+  // └─────────────────────────────────────────────────────────────────────┘
 }
 
 function arrayBufferToHex(buffer: ArrayBuffer) {

@@ -96,3 +96,33 @@ verify_jwt = true
 
 [functions.social-admin-adjust-post-reactions]
 verify_jwt = true
+
+# === New Edge Functions added in security/post-pentest-fixes-2026-05 ===
+
+# Server-side signup wrapper: HIBP + disposable email + IP rate limit + nonce.
+# Public (no JWT) — caller is unauthenticated by definition (signing up).
+[functions.secure-signup]
+verify_jwt = false
+
+# Auth Hook handler for `password_grant_pre_login` — checks login_lockouts table.
+# Public (no JWT) — Supabase calls it server-to-server, validates via shared secret.
+[functions.auth-pre-login]
+verify_jwt = false
+
+# === Auth configuration ===
+# NOTE: This [auth] section primarily affects local dev (`supabase start`).
+# Managed deployment is governed by the Supabase dashboard — these values
+# MUST be mirrored at https://supabase.com/dashboard/project/<id>/auth/providers
+# (Authentication → Email).
+[auth]
+# AUTH-VULN-02 / MISCONFIG-01 fix: require email verification before account
+# is usable. Previously `mailer_autoconfirm = true` made signups instantly
+# active, bypassing email-verification gating.
+enable_signup = true
+enable_confirmations = true     # equivalent to mailer_autoconfirm = false
+
+# AUTH-VULN-01 fix: enable Supabase's built-in HIBP check as a defense-in-depth
+# layer in addition to the server-side check in `secure-signup`.
+# Mirror this in dashboard: Authentication → Policies → "Leaked password protection".
+password_min_length = 12
+# password_required_characters: lower+upper+digit+symbol (mirror in dashboard)

@@ -54,3 +54,35 @@
 - Email templates (Edge Functions) interpolate values exclusively through `escapeHtml` and `assertSafeNumericCode`. Raw string-concat into HTML is forbidden.
 - Edge Function responses always include `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Content-Security-Policy: default-src 'none'`, `Strict-Transport-Security`, and `Referrer-Policy: no-referrer`.
 - Any future feature that introduces a WebView, web client, server-rendered HTML, Markdown rendering, or PDF export must re-validate this trust model and add an output-side escaper / sanitizer (e.g. DOMPurify) before shipping.
+
+## Accepted residual risk: AAL1-only sessions (no MFA)
+
+> **Source:** Shannon pentest 2026-05-01, finding AUTH-VULN-07. Decision: keep MFA disabled (product call).
+
+MFA / second-factor auth was removed from the product. The check `assertAal2BearerToken()` in `supabase/functions/_shared/phase2Auth.ts` is intentionally a no-op. Consequence:
+
+- Any password-only session (JWT claim `aal: "aal1"`) is accepted by ALL 34 authenticated Edge Functions, including health-data and billing surfaces.
+- An attacker who obtains a user's password (via credential stuffing, phishing, brute force, or breach) gains full account access with no second-factor barrier.
+- This means **the password is the single point of failure for account security**.
+
+### Compensating controls (must remain in place)
+
+To make the password-only flow as hard to compromise as possible, these controls are mandatory and tested as part of the security regression suite (`__tests__/security/`):
+
+1. **Per-account login lockout** — `auth-pre-login` Edge Function + `record_login_attempt()` RPC. 5 fails / 15min from same (email,ip) → 30-min lock with exponential backoff.
+2. **Server-side HIBP enforcement** — `secure-signup` Edge Function + `auth.enforce_signup_nonce` trigger. Direct `/auth/v1/signup` calls bypassing the wrapper are rejected at the Postgres layer.
+3. **Email verification gate** — `mailer_autoconfirm = false`. New accounts are not usable until `verify-email-code` succeeds.
+4. **Password policy** — minimum 12 characters, mixed case + digit + symbol (enforced in `secure-signup` AND in dashboard).
+5. **Server-side disposable-email filter** — folded into `secure-signup`, blocks subdomain bypasses.
+
+### When to re-evaluate
+
+Restore MFA enforcement (re-implement `assertAal2BearerToken()` to require `aal: "aal2"`) if any of the following becomes true:
+- A real-world account takeover incident occurs.
+- The compensating controls above are weakened or removed.
+- The product onboards regulated data (HIPAA, GDPR Article 9) requiring 2FA by compliance.
+- Insurance/audit requirement.
+
+## Accepted residual risk: GoTrue version disclosure
+
+`GET /auth/v1/health` returns the GoTrue server version unauthenticated. Supabase does not expose a way to disable this on the managed product. Risk accepted because (a) Supabase keeps GoTrue patched on its release schedule, (b) the version is also discoverable through behavioral fingerprinting, and (c) blocking it would require fronting GoTrue with Cloudflare which adds cost/complexity.
