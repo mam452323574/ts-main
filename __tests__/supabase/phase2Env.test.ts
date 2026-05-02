@@ -48,12 +48,35 @@ describe('phase2 env helpers', () => {
 
   it('returns trimmed optional webhook URLs and an empty string when unset', () => {
     env.N8N_SCAN_ANALYZE_WEBHOOK_URL = '  https://hooks.example.com/analyze  ';
+    // Post-pentest 2026-05: getOptionalWebhookUrl now requires the URL to
+    // pass `validateWebhookUrl`. Configure the allowlist so the test URL
+    // passes; otherwise the SSRF defense-in-depth gate would correctly
+    // reject `hooks.example.com` and we'd get an empty string back.
+    env.WEBHOOK_ALLOWED_HOSTS = 'hooks.example.com';
 
     const { getOptionalWebhookUrl } = loadPhase2Env();
 
     expect(getOptionalWebhookUrl('N8N_SCAN_ANALYZE_WEBHOOK_URL')).toBe(
-      'https://hooks.example.com/analyze'
+      'https://hooks.example.com/analyze',
     );
     expect(getOptionalWebhookUrl('MISSING_WEBHOOK_URL')).toBe('');
+  });
+
+  it('returns empty string when WEBHOOK_ALLOWED_HOSTS is unconfigured (fail-closed)', () => {
+    env.N8N_SCAN_ANALYZE_WEBHOOK_URL = 'https://hooks.example.com/analyze';
+    // No WEBHOOK_ALLOWED_HOSTS — getOptionalWebhookUrl must fail-closed.
+
+    const { getOptionalWebhookUrl } = loadPhase2Env();
+
+    expect(getOptionalWebhookUrl('N8N_SCAN_ANALYZE_WEBHOOK_URL')).toBe('');
+  });
+
+  it('returns empty string when URL host is not on the allowlist', () => {
+    env.N8N_SCAN_ANALYZE_WEBHOOK_URL = 'https://attacker.com/analyze';
+    env.WEBHOOK_ALLOWED_HOSTS = 'hooks.example.com';
+
+    const { getOptionalWebhookUrl } = loadPhase2Env();
+
+    expect(getOptionalWebhookUrl('N8N_SCAN_ANALYZE_WEBHOOK_URL')).toBe('');
   });
 });
