@@ -1301,27 +1301,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: string,
     password: string
   ): Promise<{ userId: string; email: string }> => {
-    await checkIpEligibility();
+    // Wave 2.5 (post-pentest 2026-05) — instead of calling
+    // `supabase.auth.signUp()` directly, route the signup through the
+    // server-side `secure-signup` Edge Function. It enforces HIBP, the
+    // disposable-email blocklist (with subdomain matching), the IP rate
+    // limit, and the password policy in one bypass-proof place. The
+    // companion DB trigger (migration 20260502020100) refuses any direct
+    // `/auth/v1/signup` call once activated in production.
+    //
+    // Note: secure-signup also handles IP rate limiting + recording, so we
+    // no longer call `checkIpEligibility()` or `recordIpSignup()` here.
+    const secureResponse = await fetch(
+      getSupabaseFunctionUrl('secure-signup'),
+      {
+        method: 'POST',
+        headers: getFunctionHeaders(null, { allowAnon: true }),
+        body: JSON.stringify({ email, password }),
+      },
+    );
 
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
+    const secureBody = await secureResponse.json().catch(() => ({}));
 
-    if (error) {
-      throw error;
-    }
-
-    if (!data.user) {
+    if (!secureResponse.ok || !secureBody?.ok || !secureBody?.user_id) {
+      // secure-signup returns a generic, enumeration-safe error for ALL
+      // rejection paths (HIBP, disposable, rate limit, policy, email taken,
+      // etc.). We surface a generic UI error to match.
+      logOperationalError('[SignUp] secure-signup rejected', null, {
+        status: secureResponse.status,
+        code: secureBody?.code,
+      });
       throw new Error(t('auth.error_account_creation'));
     }
+
+    const newUserId = secureBody.user_id as string;
 
     const { error: profileError } = await supabase
       .from('user_profiles')
       .insert(
         buildInitialProfileInsert({
-          id: data.user.id,
-          email: data.user.email || email,
+          id: newUserId,
+          email,
         })
       );
 
@@ -1329,44 +1348,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // U2-α Phase 3 — l'insert profile a échoué : on a un compte
       // `auth.users` orphelin. On déclenche le cleanup via Edge Function
       // (`cleanup-orphan-user`) qui supprime auth.users + nettoie sessions.
-      // Si le cleanup échoue aussi, on log et on raise pour ne pas laisser
-      // l'utilisateur croire que son compte est créé.
       logOperationalError('[SignUp] Failed to create initial profile', profileError, {
-        user_id: data.user.id,
+        user_id: newUserId,
       });
       try {
-        await cleanupOrphanUser(data.user.id);
+        await cleanupOrphanUser(newUserId);
       } catch (cleanupError) {
         logOperationalError('[SignUp] Orphan cleanup failed after profile insert error', cleanupError, {
-          user_id: data.user.id,
+          user_id: newUserId,
         });
       }
       throw new Error(t('auth.error_account_creation'));
     }
 
-    // Sous flowType: 'pkce', supabase.auth.signUp peut renvoyer data.session = null
-    // car PKCE attend un échange de code. Avec "Confirm email" OFF côté Supabase Auth,
-    // on a besoin d'une session active immédiatement pour appeler les Edge Functions
-    // (sendVerificationEmail). Si signUp ne nous a pas donné de session, on force
-    // un signInWithPassword pour la créer.
-    let activeSession = data.session ?? null;
-    if (!activeSession) {
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+    // secure-signup uses admin.createUser which does NOT return a session.
+    // We need an active session to drive the email-verification flow
+    // (sendVerificationEmail), so sign in immediately. The new auth-pre-login
+    // hook will not block this because there are zero prior failed attempts.
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (signInError || !signInData.session) {
+      logOperationalError('[SignUp] Auto signIn after signUp failed', signInError, {
+        user_id: newUserId,
       });
-      if (signInError || !signInData.session) {
-        logOperationalError('[SignUp] Auto signIn after signUp failed', signInError, {
-          user_id: data.user.id,
-        });
-      } else {
-        activeSession = signInData.session;
-      }
     }
 
-    void recordIpSignup(data.user.id, activeSession?.access_token);
-
-    return { userId: data.user.id, email: data.user.email || email };
+    return { userId: newUserId, email };
   };
 
   const completeSignUp = async (

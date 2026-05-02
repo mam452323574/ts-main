@@ -31,72 +31,12 @@ import {
   validateCorsOrigin,
 } from '../_shared/cors.ts';
 import { Phase2HttpError } from '../_shared/phase2Errors.ts';
-
-const HIBP_RANGE_URL = 'https://api.pwnedpasswords.com/range/';
-const HIBP_TIMEOUT_MS = 5000;
-
-const textEncoder = new TextEncoder();
-
-async function sha1HexUppercase(input: string): Promise<string> {
-  const buffer = await crypto.subtle.digest('SHA-1', textEncoder.encode(input));
-  return Array.from(new Uint8Array(buffer))
-    .map((byte) => byte.toString(16).padStart(2, '0').toUpperCase())
-    .join('');
-}
-
-export interface HibpCheckResult {
-  leaked: boolean;
-  count: number;
-}
-
-export async function checkPasswordBreachedCount(
-  password: string,
-  fetchImpl: typeof fetch = fetch,
-): Promise<HibpCheckResult> {
-  const hash = await sha1HexUppercase(password);
-  const prefix = hash.slice(0, 5);
-  const suffix = hash.slice(5);
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), HIBP_TIMEOUT_MS);
-
-  try {
-    const response = await fetchImpl(`${HIBP_RANGE_URL}${prefix}`, {
-      method: 'GET',
-      headers: {
-        // Add-Padding hides the actual count of returned suffixes from any
-        // network observer (HIBP pads the response to a fixed-ish size).
-        'Add-Padding': 'true',
-      },
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      // Fail-open on non-2xx upstream — better to allow signup than to break
-      // the funnel because of a HIBP outage.
-      return { leaked: false, count: 0 };
-    }
-
-    const body = await response.text();
-
-    for (const line of body.split('\r\n')) {
-      const colonIndex = line.indexOf(':');
-      if (colonIndex < 0) continue;
-
-      const lineSuffix = line.slice(0, colonIndex).trim();
-      if (lineSuffix !== suffix) continue;
-
-      const count = Number.parseInt(line.slice(colonIndex + 1).trim(), 10);
-      if (Number.isFinite(count) && count > 0) {
-        return { leaked: true, count };
-      }
-    }
-
-    return { leaked: false, count: 0 };
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
+// Wave 2.1 (post-pentest): HIBP implementation moved to `_shared/hibp.ts`
+// so the new bypass-proof `secure-signup` wrapper can share it. We re-export
+// here for backward compat with any caller importing from this module.
+import { checkPasswordBreachedCount, type HibpCheckResult } from '../_shared/hibp.ts';
+export { checkPasswordBreachedCount };
+export type { HibpCheckResult };
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {

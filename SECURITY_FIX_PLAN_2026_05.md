@@ -55,14 +55,15 @@ Shannon found **7 authentication-class vulnerabilities** (1 Critical, 4 High, 2 
 
 | # | Task | Severity | Files | Owner | Status |
 |---|------|----------|-------|-------|--------|
-| 2.1 | Extract HIBP into `_shared/hibp.ts` | refactor | `supabase/functions/_shared/hibp.ts` (new), `before-user-created/index.ts` (use it) | malo | [ ] |
-| 2.2 | Migration: `signup_attestations` + `consume_signup_attestation()` | Critical | `supabase/migrations/20260502_020000_signup_attestations.sql` | malo | [ ] |
-| 2.3 | Edge Function: `secure-signup` (HIBP + disposable + IP rate + nonce) | High | `supabase/functions/secure-signup/index.ts` | malo | [ ] |
-| 2.4 | Migration: `auth.enforce_signup_nonce()` trigger (ship DISABLED) | Critical | `supabase/migrations/20260502_020100_signup_nonce_trigger.sql` | malo | [ ] |
-| 2.5 | Migrate `AuthContext.tsx` to call `secure-signup` instead of direct `supabase.auth.signUp()` | High | `contexts/AuthContext.tsx` (lines 1219, 1241, 1304, 1306, 1568), `app/signup.tsx`, tests | malo | [ ] |
+| 2.1 | Extract HIBP into `_shared/hibp.ts` | refactor | `supabase/functions/_shared/hibp.ts` (new), `before-user-created/index.ts` (re-exports) | malo | [x] |
+| 2.2 | Migration: `signup_attestations` + `consume_signup_attestation()` | Critical | `supabase/migrations/20260502020000_signup_attestations.sql` | malo | [x] |
+| 2.3 | Edge Function: `secure-signup` (HIBP + disposable + IP rate + nonce + policy + enumeration-safe responses) | High | `supabase/functions/secure-signup/index.ts` | malo | [x] |
+| 2.4 | Migration: `auth.enforce_signup_nonce()` trigger (ship DISABLED) | Critical | `supabase/migrations/20260502020100_signup_nonce_trigger.sql` | malo | [x] |
+| 2.5 | Migrate `AuthContext.tsx` `signUp()` to call `secure-signup` instead of direct `supabase.auth.signUp()` | High | `contexts/AuthContext.tsx` | malo | [x] |
 | 2.6 | **MANUAL:** Push OTA update + force-update old binaries (wait for <1% legacy traffic) | High | Expo dashboard | malo | [ ] |
 | 2.7 | **MANUAL:** Activate trigger: `ALTER TABLE auth.users ENABLE TRIGGER enforce_signup_nonce_trigger;` | Critical | Supabase SQL editor | malo | [ ] |
 | 2.8 | Cleanup: deprecate `before-user-created`, `check-signup-eligibility`, `check-ip-signup` after 30 days stable | refactor | `active-edge-functions.json` | malo | [ ] |
+| 2.9 | **TODO:** update existing tests in `__tests__/` for new signup flow + add `__tests__/security/` regression suite | High | various | malo | [ ] |
 
 **Wave 2 closure criteria:**
 - [ ] Direct `curl POST /auth/v1/signup` with breached password → HTTP 4xx (trigger blocks)
