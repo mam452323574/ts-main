@@ -21,9 +21,14 @@ CREATE TABLE IF NOT EXISTS public.login_lockouts (
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Plain B-tree index (not partial). A partial `WHERE locked_until > now()`
+-- predicate is rejected by Postgres because `now()` is STABLE, not IMMUTABLE.
+-- The hot path query (`SELECT ... WHERE email_lower = $1 AND locked_until > now()`)
+-- already filters by the unique `email_lower` PK first, so the index on
+-- `locked_until` is mostly used for the (rare) cleanup scans — a non-partial
+-- index is fine.
 CREATE INDEX IF NOT EXISTS idx_login_lockouts_locked_until
-  ON public.login_lockouts (locked_until)
-  WHERE locked_until > now();
+  ON public.login_lockouts (locked_until);
 
 ALTER TABLE public.login_lockouts ENABLE ROW LEVEL SECURITY;
 -- No policies = service_role only (deny-by-default for anon/authenticated).
