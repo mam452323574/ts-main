@@ -22,7 +22,12 @@
 --   - The nonce is stripped from `raw_user_meta_data` after consumption so
 --     it never persists on the user row.
 
-CREATE OR REPLACE FUNCTION auth.enforce_signup_nonce()
+-- NOTE: function lives in `public` schema (not `auth`). Managed Supabase
+-- denies CREATE on the auth schema, but triggers ON auth.users tables are
+-- allowed when the trigger function is in public — this is the same pattern
+-- as the official "handle_new_user" example in Supabase docs.
+
+CREATE OR REPLACE FUNCTION public.enforce_signup_nonce()
   RETURNS TRIGGER
   LANGUAGE plpgsql
   SECURITY DEFINER
@@ -71,9 +76,15 @@ BEGIN
 END;
 $$;
 
--- The function owner is the table owner of `auth.users` (typically
--- `supabase_auth_admin`). Ensure SECURITY DEFINER doesn't widen privileges.
-COMMENT ON FUNCTION auth.enforce_signup_nonce() IS
+REVOKE ALL ON FUNCTION public.enforce_signup_nonce() FROM PUBLIC, anon, authenticated;
+-- supabase_auth_admin needs EXECUTE because the trigger fires under the
+-- table owner's role context for SECURITY INVOKER triggers; we use SECURITY
+-- DEFINER so the function runs as its definer (postgres) which already has
+-- the rights to call public.consume_signup_attestation. Granting EXECUTE
+-- to authenticator (the umbrella role) keeps things simple.
+GRANT EXECUTE ON FUNCTION public.enforce_signup_nonce() TO authenticator, service_role;
+
+COMMENT ON FUNCTION public.enforce_signup_nonce() IS
   'AUTH-VULN-01/02: rejects auth.users INSERTs that did not pre-create a signup_attestation via secure-signup.';
 
 -- Drop any prior version (re-run safety).
@@ -82,7 +93,7 @@ DROP TRIGGER IF EXISTS enforce_signup_nonce_trigger ON auth.users;
 CREATE TRIGGER enforce_signup_nonce_trigger
   BEFORE INSERT ON auth.users
   FOR EACH ROW
-  EXECUTE FUNCTION auth.enforce_signup_nonce();
+  EXECUTE FUNCTION public.enforce_signup_nonce();
 
 -- *** ROLLOUT SAFETY: install DISABLED. ***
 -- The operator MUST run `ALTER TABLE auth.users ENABLE TRIGGER ...` only
