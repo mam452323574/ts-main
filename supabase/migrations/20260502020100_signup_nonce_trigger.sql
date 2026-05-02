@@ -129,18 +129,23 @@ GRANT EXECUTE ON FUNCTION public.enforce_signup_nonce() TO authenticator, servic
 COMMENT ON FUNCTION public.enforce_signup_nonce() IS
   'AUTH-VULN-01/02: rejects auth.users INSERTs that did not pre-create a signup_attestation via secure-signup.';
 
--- Drop any prior version (re-run safety).
-DROP TRIGGER IF EXISTS enforce_signup_nonce_trigger ON auth.users;
-
-CREATE TRIGGER enforce_signup_nonce_trigger
-  BEFORE INSERT ON auth.users
-  FOR EACH ROW
-  EXECUTE FUNCTION public.enforce_signup_nonce();
-
--- The trigger is created in the ENABLED state (managed Supabase doesn't
--- grant the migration role permission to ALTER TABLE auth.users). The
--- enforcement is gated by the public.security_feature_flags row above —
--- with `enforce_signup_nonce.enabled = FALSE` (the seeded default) the
--- trigger is a no-op.
-COMMENT ON TRIGGER enforce_signup_nonce_trigger ON auth.users IS
-  'Wave 2.4: gated by public.security_feature_flags.enforce_signup_nonce. No-op until flag is TRUE.';
+-- Trigger creation. Managed Supabase doesn't grant the migration role
+-- permission to DROP TRIGGER on auth.users either, so we can't safely
+-- DROP IF EXISTS + CREATE. Instead we use a DO block that creates the
+-- trigger only if it's missing — the function it calls (above) already
+-- got CREATE OR REPLACE'd to the latest version, so an existing trigger
+-- will automatically pick up the new feature-flag-gated logic on its
+-- next invocation.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'enforce_signup_nonce_trigger'
+      AND tgrelid = 'auth.users'::regclass
+  ) THEN
+    CREATE TRIGGER enforce_signup_nonce_trigger
+      BEFORE INSERT ON auth.users
+      FOR EACH ROW
+      EXECUTE FUNCTION public.enforce_signup_nonce();
+  END IF;
+END $$;
