@@ -687,7 +687,7 @@ export const EN_TRANSLATIONS = {
     no_active_guidance_title: 'No active guidance yet',
     no_active_guidance_body:
       'Pick a guidance type below to generate a fresh response for this coach personality.',
-    prompt_selection_hint: 'Choose a short, clear format.',
+    prompt_selection_hint: 'Choose a short, actionable coach question.',
     generate_cta: 'Ask for this guidance',
     expand_cta: 'Read more',
     collapse_cta: 'Collapse',
@@ -777,45 +777,45 @@ export const EN_TRANSLATIONS = {
     },
     prompts: {
       latest_scan: {
-        title: 'Latest scan',
-        subtitle: 'Turn your newest result into a short action plan.',
+        title: "Today's priority",
+        subtitle: 'What should I adjust first after my latest scan?',
       },
       weekly_plan: {
-        title: 'Weekly plan',
-        subtitle: 'Build a calm plan from your last seven days of scans.',
+        title: '7-day plan',
+        subtitle: 'Which 3 realistic habits should I follow this week?',
       },
       nutrition_focus: {
-        title: 'Nutrition focus',
-        subtitle: 'Get a food-focused nudge from your latest nutrition scan.',
+        title: 'Next meal',
+        subtitle: 'What small tweak should I make to my next plate?',
       },
       body_focus: {
-        title: 'Body focus',
-        subtitle: 'Translate your latest body scan into practical habits.',
+        title: 'Useful movement',
+        subtitle:
+          'What simple move could help posture, fitness, or consistency?',
       },
       face_focus: {
-        title: 'Face focus',
-        subtitle:
-          'Review skin, glow, and recovery cues from your latest face scan.',
+        title: 'Skin & fatigue',
+        subtitle: 'What do my visual cues say today?',
       },
       hydration_focus: {
-        title: 'Hydration',
-        subtitle: 'Water and balance signals for today.',
+        title: 'Hydration ritual',
+        subtitle: 'What simple hydration reflex should I try today?',
       },
       sleep_coach: {
-        title: 'Sleep',
-        subtitle: 'Rest and recovery cues across your scans.',
+        title: 'Evening recovery',
+        subtitle: 'What light routine could help me tonight?',
       },
       risk_watch: {
-        title: 'Watch out',
-        subtitle: 'Careful read after a full health scan.',
+        title: 'Worth watching',
+        subtitle: 'Which signal deserves attention without alarm?',
       },
       trend_review: {
-        title: 'Trend',
-        subtitle: 'Look at the last 2–4 weeks.',
+        title: 'What changed',
+        subtitle: 'What is really improving, stable, or slipping?',
       },
       recovery_plan: {
-        title: 'Recovery plan',
-        subtitle: 'Bounce back after a dip.',
+        title: 'Quick reset',
+        subtitle: 'How can I get back on track from my recent signals?',
       },
     },
     sections: {
@@ -846,7 +846,7 @@ export const EN_TRANSLATIONS = {
     },
     context_strip: {
       persona_prefix: 'With',
-      mode_prefix: 'Mode',
+      mode_prefix: 'Question',
       status_prefix: 'Status',
     },
     selection_summary: {
@@ -899,11 +899,11 @@ export const EN_TRANSLATIONS = {
     },
     settings: {
       title: 'Settings',
-      subtitle: 'Pick a coach and an advice type, then tap apply.',
+      subtitle: 'Pick a coach and a question, then request your guidance.',
     },
     options_sheet: {
       persona_label: 'Coach',
-      mode_label: 'Mode',
+      mode_label: 'Coach question',
       apply_label: 'Apply',
       close_a11y: 'Close settings',
     },
@@ -1390,7 +1390,7 @@ export const EN_TRANSLATIONS = {
     signup_link: 'Sign Up',
     signup_title: 'Create Account',
     signup_subtitle: 'Join to scan and improve health',
-    password_min_placeholder: 'Password (min. 6 chars)',
+    password_min_placeholder: 'Password (8+ chars, lowercase + number)',
     password_confirm_placeholder: 'Confirm password',
     verification_note: "We'll send you a verification code.",
     signup_btn: 'Sign Up',
@@ -1399,7 +1399,8 @@ export const EN_TRANSLATIONS = {
     error_email_required: 'Email is required',
     error_password_required: 'Password is required',
     error_passwords_match: 'Passwords do not match',
-    error_password_length: 'Password must be at least 6 characters',
+    error_password_length:
+      'Password must be at least 8 characters and include a lowercase letter and a number',
     error_login_generic: 'Login failed',
     error_ip_limit_reached:
       'Account creation limit reached for this network. Please try again later.',
@@ -1442,7 +1443,8 @@ export const EN_TRANSLATIONS = {
       fill_all: 'Please fill all fields',
       invalid_email: 'Invalid email',
       password_mismatch: 'Passwords do not match',
-      password_short: 'Password must be at least 6 characters',
+      password_short:
+        'Password must be at least 8 characters and include a lowercase letter and a number',
       disposable_email: 'Disposable emails are not allowed',
       email_in_use: 'This email is already in use',
       general_error: 'An error occurred',
@@ -1740,6 +1742,23 @@ export const EN_TRANSLATIONS = {
     super_scan_score_subtitle: 'Global Risk Score',
     legend_score: 'Score (0-100)',
     legend_body_fat: 'Body Fat %',
+    metric_tabs: {
+      score: 'Score',
+      skin_quality: 'Skin Quality',
+      symmetry: 'Symmetry',
+      energy: 'Glow',
+      hydration: 'Hydration',
+      collagen: 'Collagen',
+      body_fat: 'Body Fat',
+      strength: 'Strength',
+      posture: 'Posture',
+      metabolic_age: 'Metabolic Age',
+      calories: 'Calories',
+      protein: 'Protein',
+      carbs: 'Carbs',
+      fats: 'Fats',
+      satiety: 'Satiety',
+    },
   },
   super_scan_features: {
     premium_alert_title: 'Super Scan Premium',

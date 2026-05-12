@@ -68,7 +68,11 @@ jest.mock('@/components/LoadingSpinner', () => ({
 }));
 
 jest.mock('@/components/ErrorMessage', () => ({
-  ErrorMessage: ({ message }: { message: string }) => `ErrorMessage: ${message}`,
+  ErrorMessage: ({ message }: { message: string }) => {
+    const ReactLocal = jest.requireActual('react');
+    const { Text } = jest.requireActual('react-native');
+    return ReactLocal.createElement(Text, null, `ErrorMessage: ${message}`);
+  },
 }));
 
 jest.mock('expo-localization', () => ({
@@ -79,6 +83,14 @@ jest.mock('expo-localization', () => ({
 jest.mock('@/hooks/queries', () => ({
   useAnalytics: (period: string) => mockUseAnalytics(period),
 }));
+
+const EMPTY_STATE_TEXT = 'Commencez à scanner pour voir vos progrès ici !';
+const PERIOD_LABELS = {
+  days7: '7j',
+  days30: '30j',
+  months3: '3 Mois',
+  year1: '1 An',
+} as const;
 
 const periodToDays: Record<string, number> = {
   '7days': 7,
@@ -119,12 +131,27 @@ const makeAnalyticsData = (days: number) => {
       date,
       bodyScore: 58 + (index % 28),
       bodyFatPercentage: 20,
+      strengthIndex: 61 + (index % 16),
+      postureScore: 6 + (index % 4),
+      bodySymmetry: 70 + (index % 12),
+      metabolicAge: 29 + (index % 5),
     })),
-    faceScoreHistory: [],
+    faceScoreHistory: dates.map((date, index) => ({
+      date,
+      faceScore: 60 + (index % 24),
+      skinQualityScore: 62 + (index % 20),
+      symmetryPercentage: 74 + (index % 10),
+      energyScore: 5 + (index % 4),
+      hydrationLevel: 68 + (index % 12),
+      collagenLevel: 63 + (index % 11),
+    })),
     nutritionHistory: dates.map((date, index) => ({
       date,
       caloriesEstimate: 500 + index,
       proteinGrams: 20,
+      carbsGrams: 35 + (index % 9),
+      fatGrams: 14 + (index % 6),
+      satietyIndex: 6 + (index % 3),
       nutritionScore: 62 + (index % 25),
     })),
     superScanHistory: dates.map((date, index) => ({
@@ -184,7 +211,8 @@ describe('AnalyticsScreen', () => {
 
     render(<AnalyticsScreen />);
 
-    expect(screen.getAllByText('analytics.empty_state')).toHaveLength(3);
+    expect(screen.getByText('ErrorMessage: Failed to load analytics')).toBeTruthy();
+    expect(screen.getAllByText(EMPTY_STATE_TEXT)).toHaveLength(3);
   });
 
   it('renders empty state when no data', () => {
@@ -204,7 +232,7 @@ describe('AnalyticsScreen', () => {
 
     render(<AnalyticsScreen />);
 
-    expect(screen.getAllByText('analytics.empty_state')).toHaveLength(4);
+    expect(screen.getAllByText(EMPTY_STATE_TEXT)).toHaveLength(4);
   });
 
   it('renders period selector buttons', () => {
@@ -212,10 +240,10 @@ describe('AnalyticsScreen', () => {
 
     render(<AnalyticsScreen />);
 
-    expect(screen.getByText('analytics.periods.days_7')).toBeTruthy();
-    expect(screen.getByText('analytics.periods.days_30')).toBeTruthy();
-    expect(screen.getByText('analytics.periods.months_3')).toBeTruthy();
-    expect(screen.getByText('analytics.periods.year_1')).toBeTruthy();
+    expect(screen.getByText(PERIOD_LABELS.days7)).toBeTruthy();
+    expect(screen.getByText(PERIOD_LABELS.days30)).toBeTruthy();
+    expect(screen.getByText(PERIOD_LABELS.months3)).toBeTruthy();
+    expect(screen.getByText(PERIOD_LABELS.year1)).toBeTruthy();
   });
 
   it('renders charts when data is available', () => {
@@ -223,10 +251,13 @@ describe('AnalyticsScreen', () => {
 
     render(<AnalyticsScreen />);
 
-    expect(screen.getByText('analytics.health_score')).toBeTruthy();
-    expect(screen.getByText('analytics.physical_evolution')).toBeTruthy();
-    expect(screen.getByText('analytics.nutrition_score')).toBeTruthy();
-    expect(screen.queryByText('analytics.super_scan_score')).toBeNull();
+    expect(screen.getByText('Score Santé')).toBeTruthy();
+    expect(screen.getByText('Évolution Physique')).toBeTruthy();
+    expect(screen.getByText('Score Nutrition')).toBeTruthy();
+    expect(screen.getByTestId('analytics-health-metric-score')).toBeTruthy();
+    expect(screen.getByTestId('analytics-body-metric-score')).toBeTruthy();
+    expect(screen.getByTestId('analytics-nutrition-metric-score')).toBeTruthy();
+    expect(screen.queryByText('Super Scan')).toBeNull();
     expect(screen.getAllByTestId('mock-line-chart')).toHaveLength(3);
   });
 
@@ -235,7 +266,7 @@ describe('AnalyticsScreen', () => {
 
     render(<AnalyticsScreen />);
 
-    fireEvent.press(screen.getByText('analytics.periods.days_30'));
+    fireEvent.press(screen.getByText(PERIOD_LABELS.days30));
 
     expect(mockUseAnalytics).toHaveBeenCalledWith('30days');
   });
@@ -245,13 +276,15 @@ describe('AnalyticsScreen', () => {
 
     render(<AnalyticsScreen />);
 
-    fireEvent.press(screen.getByText('analytics.periods.months_3'));
+    fireEvent.press(screen.getByText(PERIOD_LABELS.months3));
 
-    expect(screen.getByText('premium.subscription_page.contextual_analytics_title')).toBeTruthy();
-    expect(screen.getByText('premium.subscription_page.contextual_analytics_body')).toBeTruthy();
-    expect(screen.getByText('premium.subscription_page.contextual_cta')).toBeTruthy();
-    expect(screen.queryByText('Suivez votre évolution santé')).toBeNull();
-    expect(screen.queryByText('Débloquez les graphiques 3 mois et 1 an pour suivre vos progrès.')).toBeNull();
+    expect(screen.getByText('Suivez votre progression santé')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Débloquez les graphiques 3 mois et 1 an pour suivre votre évolution complète.',
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText('Voir les offres')).toBeTruthy();
   });
 
   it('uses non-dense X label layout on 7days', () => {
@@ -279,7 +312,7 @@ describe('AnalyticsScreen', () => {
 
     render(<AnalyticsScreen />);
 
-    fireEvent.press(screen.getByText('analytics.periods.months_3'));
+    fireEvent.press(screen.getByText(PERIOD_LABELS.months3));
 
     await waitFor(() => {
       expect(mockUseAnalytics).toHaveBeenLastCalledWith('3months');
@@ -311,7 +344,7 @@ describe('AnalyticsScreen', () => {
 
     render(<AnalyticsScreen />);
 
-    fireEvent.press(screen.getByText('analytics.periods.year_1'));
+    fireEvent.press(screen.getByText(PERIOD_LABELS.year1));
 
     await waitFor(() => {
       expect(mockUseAnalytics).toHaveBeenLastCalledWith('1year');

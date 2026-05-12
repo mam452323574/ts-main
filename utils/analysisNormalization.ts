@@ -5,6 +5,8 @@ import {
   FatDistributionPriorityZone,
   FatDistributionScanResult,
   LegacyDetectedCondition,
+  ScanAnalysisLimitationFlag,
+  ScanAnalysisMeta,
   ScanBodyResult,
   ScanCatalogKey,
   ScanFaceResult,
@@ -158,6 +160,13 @@ const FAT_DISTRIBUTION_DISCLAIMER_FIELDS = [
   'disclaimer_text_i18n',
   'disclaimer_text',
 ] as const;
+const ANALYSIS_META_LIMITATION_FLAGS: readonly ScanAnalysisLimitationFlag[] = [
+  'blur',
+  'low_light',
+  'partial_subject',
+  'occlusion',
+  'portion_uncertain',
+];
 
 export function isSuperAnalysisType(value: unknown): value is SuperAnalysisType {
   return (
@@ -212,6 +221,76 @@ function readOptionalNumber(value: unknown) {
 
 function readBoolean(value: unknown) {
   return typeof value === 'boolean' ? value : null;
+}
+
+function readOptionalBoundedNumber(
+  value: unknown,
+  min: number,
+  max: number,
+) {
+  const parsed = readOptionalNumber(value);
+  if (parsed === null) {
+    return null;
+  }
+
+  return Math.min(Math.max(parsed, min), max);
+}
+
+function isAnalysisLimitationFlag(
+  value: unknown,
+): value is ScanAnalysisLimitationFlag {
+  return (
+    typeof value === 'string' &&
+    ANALYSIS_META_LIMITATION_FLAGS.includes(
+      value as ScanAnalysisLimitationFlag,
+    )
+  );
+}
+
+function normalizeAnalysisMeta(value: unknown): ScanAnalysisMeta | null {
+  if (!isPlainObject(value)) {
+    return null;
+  }
+
+  const limitationFlagsSource = Array.isArray(value.limitation_flags)
+    ? value.limitation_flags
+    : Array.isArray(value.limitationFlags)
+      ? value.limitationFlags
+      : [];
+  const limitationFlags = Array.from(
+    new Set(
+      limitationFlagsSource
+        .map((item) => readString(item))
+        .filter((item): item is ScanAnalysisLimitationFlag =>
+          isAnalysisLimitationFlag(item)
+        )
+    )
+  );
+  const analysisMeta = {
+    confidence_score: readOptionalBoundedNumber(
+      value.confidence_score ?? value.confidenceScore,
+      0,
+      100,
+    ),
+    image_quality_score: readOptionalBoundedNumber(
+      value.image_quality_score ?? value.imageQualityScore,
+      0,
+      100,
+    ),
+    metric_coverage_score: readOptionalBoundedNumber(
+      value.metric_coverage_score ?? value.metricCoverageScore,
+      0,
+      100,
+    ),
+    limitation_flags: limitationFlags,
+  } satisfies ScanAnalysisMeta;
+
+  return analysisMeta.confidence_score !== null ||
+    analysisMeta.image_quality_score !== null ||
+    analysisMeta.metric_coverage_score !== null ||
+    analysisMeta.limitation_flags.length > 0
+    ? analysisMeta
+    : null;
 }
 
 function normalizeToken(value: string) {
@@ -541,8 +620,9 @@ function normalizeFaceResult(raw: Record<string, unknown>): ScanFaceResult {
   const metrics = isPlainObject(raw.metrics) ? raw.metrics : null;
 
   return {
-    schema_version: 3,
+    schema_version: 4,
     scan_type: 'face',
+    analysis_meta: normalizeAnalysisMeta(raw.analysis_meta ?? raw.analysisMeta),
     face_score: readNumber(raw.face_score),
     perceived_age: readNumber(raw.perceived_age),
     skin_quality_score: readNumber(raw.skin_quality_score),
@@ -577,8 +657,9 @@ function normalizeBodyResult(raw: Record<string, unknown>): ScanBodyResult {
   );
 
   return {
-    schema_version: 3,
+    schema_version: 4,
     scan_type: 'body',
+    analysis_meta: normalizeAnalysisMeta(raw.analysis_meta ?? raw.analysisMeta),
     body_score: readNumber(raw.body_score),
     body_fat_percentage: readNumber(raw.body_fat_percentage),
     muscle_mass_key: normalizeAlias('muscle_mass', explicitMuscleMassKey ?? muscleMassText),
@@ -605,8 +686,9 @@ function normalizeNutritionResult(raw: Record<string, unknown>): ScanNutritionRe
   const ingredientQualityText = resolveText(raw.ingredient_quality_i18n ?? raw.ingredient_quality);
 
   return {
-    schema_version: 3,
+    schema_version: 4,
     scan_type: 'nutrition',
+    analysis_meta: normalizeAnalysisMeta(raw.analysis_meta ?? raw.analysisMeta),
     plate_health_score: readNumber(raw.plate_health_score),
     calories_estimate: readNumber(raw.calories_estimate),
     protein_grams: readNumber(raw.protein_grams),
@@ -896,7 +978,7 @@ export function isNormalizedAnalysisResult(
 
   if (
     scanType !== 'fat_distribution_scan_v2' &&
-    ![2, 3].includes(Number(value.schema_version))
+    ![2, 3, 4].includes(Number(value.schema_version))
   ) {
     return false;
   }

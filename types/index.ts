@@ -22,6 +22,8 @@ export type {
   CoachMetricInterpretation,
   CoachMetricMagnitude,
   CoachPrimaryMetricDelta,
+  CoachProfileUpdateFocus,
+  CoachProfileUpdateStructured,
   CoachResponseVersion,
   CoachStructuredContent,
 } from '@/shared/coachContent';
@@ -73,18 +75,29 @@ export interface BodyScoreHistoryItem {
   date: string;
   bodyScore: number;
   bodyFatPercentage: number;
+  strengthIndex: number;
+  postureScore: number;
+  bodySymmetry: number;
+  metabolicAge: number;
 }
 
 export interface FaceScoreHistoryItem {
   date: string;
   faceScore: number;
   skinQualityScore: number;
+  symmetryPercentage: number;
+  energyScore: number;
+  hydrationLevel: number;
+  collagenLevel: number;
 }
 
 export interface NutritionHistoryItem {
   date: string;
   caloriesEstimate: number;
   proteinGrams: number;
+  carbsGrams: number;
+  fatGrams: number;
+  satietyIndex: number;
   nutritionScore: number;
 }
 
@@ -207,6 +220,7 @@ export interface UserProfile {
   updated_at: string;
   language_code?: string | null;
   country_code?: string | null;
+  inferred_persona?: PersistedInferredPersona | null;
 }
 
 export interface OAuthConnection {
@@ -336,7 +350,7 @@ export interface PremiumPotentialInputs {
 
 // Types pour les résultats d'analyse ChatGPT (visage, corps, plat)
 // Types pour les résultats d'analyse ChatGPT (visage, corps, plat)
-export type NormalizedAnalysisSchemaVersion = 3;
+export type NormalizedAnalysisSchemaVersion = 3 | 4;
 
 export interface NormalizedAnalysisBase {
   schema_version: NormalizedAnalysisSchemaVersion;
@@ -344,6 +358,20 @@ export interface NormalizedAnalysisBase {
 
 export interface LegacyNormalizedAnalysisBase {
   schema_version: 2;
+}
+
+export type ScanAnalysisLimitationFlag =
+  | 'blur'
+  | 'low_light'
+  | 'partial_subject'
+  | 'occlusion'
+  | 'portion_uncertain';
+
+export interface ScanAnalysisMeta {
+  confidence_score: number | null;
+  image_quality_score: number | null;
+  metric_coverage_score: number | null;
+  limitation_flags: ScanAnalysisLimitationFlag[];
 }
 
 export type ScanCatalogKey = string;
@@ -361,6 +389,7 @@ export type AnalysisType = 'face' | 'body' | 'nutrition' | SuperAnalysisType;
 export interface LegacyScanFaceResult {
   scan_type: 'face';
   analysis_locale?: SupportedLocale | string;
+  analysis_meta?: ScanAnalysisMeta | null;
   face_score: number;
   perceived_age: number;
   skin_quality_score: number;
@@ -378,6 +407,7 @@ export interface LegacyScanFaceResult {
 
 export interface LegacyNormalizedScanFaceResult extends LegacyNormalizedAnalysisBase {
   scan_type: 'face';
+  analysis_meta?: ScanAnalysisMeta | null;
   face_score: number;
   perceived_age: number;
   skin_quality_score: number;
@@ -394,6 +424,7 @@ export interface LegacyNormalizedScanFaceResult extends LegacyNormalizedAnalysis
 
 export interface ScanFaceResult extends NormalizedAnalysisBase {
   scan_type: 'face';
+  analysis_meta?: ScanAnalysisMeta | null;
   face_score: number;
   perceived_age: number;
   skin_quality_score: number;
@@ -405,11 +436,27 @@ export interface ScanFaceResult extends NormalizedAnalysisBase {
   collagen_level: number;
   hydration_level: number;
   photogenic_score: number;
+  skin_clarity_score?: number | null;
+  under_eye_shadow_score?: number | null;
+  under_eye_volume_score?: number | null;
+  eye_openness_score?: number | null;
+  complexion_redness_score?: number | null;
+  pore_visibility_score?: number | null;
+  skin_evenness_score?: number | null;
+  skin_radiance_score?: number | null;
+  lip_dryness_score?: number | null;
+  forehead_smoothness_score?: number | null;
+  t_zone_oiliness_score?: number | null;
+  perceived_sex_key?: ScanCatalogKey | null;
+  perceived_age_range_key?: ScanCatalogKey | null;
+  perceived_stress_level?: number | null;
+  perceived_sleep_quality?: number | null;
 }
 
 export interface LegacyScanBodyResult {
   scan_type: 'body';
   analysis_locale?: SupportedLocale | string;
+  analysis_meta?: ScanAnalysisMeta | null;
   body_score: number;
   body_fat_percentage: number;
   muscle_mass_label?: LocalizedTextValue;
@@ -428,6 +475,7 @@ export interface LegacyScanBodyResult {
 
 export interface LegacyNormalizedScanBodyResult extends LegacyNormalizedAnalysisBase {
   scan_type: 'body';
+  analysis_meta?: ScanAnalysisMeta | null;
   body_score: number;
   body_fat_percentage: number;
   muscle_mass_key: ScanCatalogKey;
@@ -444,6 +492,7 @@ export interface LegacyNormalizedScanBodyResult extends LegacyNormalizedAnalysis
 
 export interface ScanBodyResult extends NormalizedAnalysisBase {
   scan_type: 'body';
+  analysis_meta?: ScanAnalysisMeta | null;
   body_score: number;
   body_fat_percentage: number;
   muscle_mass_key: ScanCatalogKey;
@@ -454,11 +503,27 @@ export interface ScanBodyResult extends NormalizedAnalysisBase {
   body_symmetry: number;
   bmi_estimate: number;
   metabolic_age: number;
+  muscle_definition_score?: number | null;
+  midsection_definition_score?: number | null;
+  shoulder_alignment_score?: number | null;
+  recovery_readiness_score?: number | null;
+  upper_body_definition_score?: number | null;
+  lower_body_definition_score?: number | null;
+  arm_definition_score?: number | null;
+  v_taper_score?: number | null;
+  body_tension_indicator_score?: number | null;
+  perceived_sex_key?: ScanCatalogKey | null;
+  perceived_age_range_key?: ScanCatalogKey | null;
+  estimated_height_range_key?: ScanCatalogKey | null;
+  estimated_weight_range_key?: ScanCatalogKey | null;
+  body_frame_key?: ScanCatalogKey | null;
+  perceived_fitness_level_key?: ScanCatalogKey | null;
 }
 
 export interface LegacyScanNutritionResult {
   scan_type: 'nutrition';
   analysis_locale?: SupportedLocale | string;
+  analysis_meta?: ScanAnalysisMeta | null;
   plate_health_score: number;
   calories_estimate: number;
   protein_grams: number;
@@ -479,6 +544,7 @@ export interface LegacyScanNutritionResult {
 
 export interface LegacyNormalizedScanNutritionResult extends LegacyNormalizedAnalysisBase {
   scan_type: 'nutrition';
+  analysis_meta?: ScanAnalysisMeta | null;
   plate_health_score: number;
   calories_estimate: number;
   protein_grams: number;
@@ -495,6 +561,7 @@ export interface LegacyNormalizedScanNutritionResult extends LegacyNormalizedAna
 
 export interface ScanNutritionResult extends NormalizedAnalysisBase {
   scan_type: 'nutrition';
+  analysis_meta?: ScanAnalysisMeta | null;
   plate_health_score: number;
   calories_estimate: number;
   protein_grams: number;
@@ -505,6 +572,25 @@ export interface ScanNutritionResult extends NormalizedAnalysisBase {
   satiety_index: number;
   ingredient_quality_key: ScanCatalogKey;
   main_vitamin_keys: ScanVitaminKey[];
+  fiber_grams_estimate?: number | null;
+  sugar_grams_estimate?: number | null;
+  processing_level_score?: number | null;
+  hydration_contribution_score?: number | null;
+  sodium_level_score?: number | null;
+  meal_balance_score?: number | null;
+  inflammation_index_score?: number | null;
+  meal_type_key?: ScanCatalogKey | null;
+  portion_size_key?: ScanCatalogKey | null;
+  color_diversity_score?: number | null;
+  vegetable_portion_ratio?: number | null;
+  protein_visibility_score?: number | null;
+  whole_grain_indicator_score?: number | null;
+  meal_freshness_score?: number | null;
+  cuisine_type_key?: ScanCatalogKey | null;
+  meat_type_key?: ScanCatalogKey | null;
+  cooking_method_key?: ScanCatalogKey | null;
+  meal_dietary_pattern_key?: ScanCatalogKey | null;
+  allergen_visibility_keys?: ScanCatalogKey[];
 }
 
 export type AnalysisResult = ScanFaceResult | ScanBodyResult | ScanNutritionResult;
@@ -760,7 +846,40 @@ export type CoachRelevantFlag =
   | 'low_protein'
   | 'high_risk_scan'
   | 'urgent_attention_flag'
-  | 'new_condition_detected';
+  | 'new_condition_detected'
+  | 'low_confidence_scan'
+  | 'image_quality_limited'
+  | 'partial_metric_coverage'
+  | 'low_skin_clarity'
+  | 'high_under_eye_shadow'
+  | 'high_under_eye_volume'
+  | 'low_eye_openness'
+  | 'high_complexion_redness'
+  | 'low_muscle_definition'
+  | 'low_midsection_definition'
+  | 'low_shoulder_alignment'
+  | 'low_recovery_readiness'
+  | 'low_fiber'
+  | 'high_sugar_intake'
+  | 'high_sodium_intake'
+  | 'high_processing_level'
+  | 'low_meal_balance'
+  | 'high_inflammation_index'
+  | 'high_pore_visibility'
+  | 'low_skin_evenness'
+  | 'low_skin_radiance'
+  | 'high_lip_dryness'
+  | 'low_upper_body_definition'
+  | 'low_lower_body_definition'
+  | 'low_arm_definition'
+  | 'low_v_taper'
+  | 'high_body_tension'
+  | 'low_color_diversity'
+  | 'low_vegetable_portion'
+  | 'low_protein_visibility'
+  | 'high_perceived_stress'
+  | 'low_perceived_sleep_quality'
+  | 'allergen_visible';
 
 export type CoachMetricInterpretationHint =
   | 'higher_is_better'
@@ -779,6 +898,21 @@ export interface CoachFaceKeyMetrics {
   collagen_level: number;
   hydration_level: number;
   photogenic_score: number;
+  skin_clarity_score: number | null;
+  under_eye_shadow_score: number | null;
+  under_eye_volume_score: number | null;
+  eye_openness_score: number | null;
+  complexion_redness_score: number | null;
+  pore_visibility_score: number | null;
+  skin_evenness_score: number | null;
+  skin_radiance_score: number | null;
+  lip_dryness_score: number | null;
+  forehead_smoothness_score: number | null;
+  t_zone_oiliness_score: number | null;
+  perceived_sex_key: ScanCatalogKey | null;
+  perceived_age_range_key: ScanCatalogKey | null;
+  perceived_stress_level: number | null;
+  perceived_sleep_quality: number | null;
 }
 
 export interface CoachBodyKeyMetrics {
@@ -792,6 +926,21 @@ export interface CoachBodyKeyMetrics {
   body_symmetry: number;
   bmi_estimate: number;
   metabolic_age: number;
+  muscle_definition_score: number | null;
+  midsection_definition_score: number | null;
+  shoulder_alignment_score: number | null;
+  recovery_readiness_score: number | null;
+  upper_body_definition_score: number | null;
+  lower_body_definition_score: number | null;
+  arm_definition_score: number | null;
+  v_taper_score: number | null;
+  body_tension_indicator_score: number | null;
+  perceived_sex_key: ScanCatalogKey | null;
+  perceived_age_range_key: ScanCatalogKey | null;
+  estimated_height_range_key: ScanCatalogKey | null;
+  estimated_weight_range_key: ScanCatalogKey | null;
+  body_frame_key: ScanCatalogKey | null;
+  perceived_fitness_level_key: ScanCatalogKey | null;
 }
 
 export interface CoachNutritionKeyMetrics {
@@ -805,6 +954,25 @@ export interface CoachNutritionKeyMetrics {
   satiety_index: number;
   ingredient_quality_key: ScanCatalogKey;
   main_vitamin_keys: ScanVitaminKey[];
+  fiber_grams_estimate: number | null;
+  sugar_grams_estimate: number | null;
+  processing_level_score: number | null;
+  hydration_contribution_score: number | null;
+  sodium_level_score: number | null;
+  meal_balance_score: number | null;
+  inflammation_index_score: number | null;
+  meal_type_key: ScanCatalogKey | null;
+  portion_size_key: ScanCatalogKey | null;
+  color_diversity_score: number | null;
+  vegetable_portion_ratio: number | null;
+  protein_visibility_score: number | null;
+  whole_grain_indicator_score: number | null;
+  meal_freshness_score: number | null;
+  cuisine_type_key: ScanCatalogKey | null;
+  meat_type_key: ScanCatalogKey | null;
+  cooking_method_key: ScanCatalogKey | null;
+  meal_dietary_pattern_key: ScanCatalogKey | null;
+  allergen_visibility_keys: ScanCatalogKey[];
 }
 
 export interface CoachSuperKeyMetrics {
@@ -827,6 +995,7 @@ export interface CoachScanRichContext {
   normalized_scan_type: CoachScanDigest['normalized_scan_type'];
   captured_at: string;
   analysis_result_normalized: AnalysisResult | SuperScanResult;
+  analysis_meta: ScanAnalysisMeta | null;
   key_metrics: CoachKeyMetrics;
   raw_fallback_fields: Record<string, unknown> | null;
   coach_relevant_flags: CoachRelevantFlag[];
@@ -859,6 +1028,207 @@ export interface CoachTrendSummary {
   metric_trends: CoachTrendMetric[];
 }
 
+export type InferredPersonaConfidence = 'low' | 'medium' | 'high';
+export type CoachEngagementLevel = 'low' | 'medium' | 'high';
+export type PersonaFieldSourceKind = 'declare' | 'infere';
+
+export interface CoachDataReliabilityComponents {
+  sample_size_percent: number;
+  recency_percent: number;
+  consistency_percent: number;
+  image_quality_percent: number;
+  coverage_percent: number;
+}
+
+export interface CoachDataReliability {
+  overall_percent: number;
+  components: CoachDataReliabilityComponents;
+  caveats: string[];
+}
+
+export type CoachScanFrequencyLabel =
+  | 'sporadic'
+  | 'regular'
+  | 'daily'
+  | 'unknown';
+
+export type CoachPreferredTimeOfDay =
+  | 'morning'
+  | 'afternoon'
+  | 'evening'
+  | 'night'
+  | 'mixed'
+  | 'unknown';
+
+export type CoachWeekdayWeekendBalance =
+  | 'weekday_heavy'
+  | 'weekend_heavy'
+  | 'balanced'
+  | 'unknown';
+
+export type CoachDormancyRiskLevel = 'low' | 'medium' | 'high';
+
+export interface CoachTemporalPatterns {
+  last_scan_days_ago: number | null;
+  scans_last_7d: number;
+  scans_last_30d: number;
+  scan_frequency_label: CoachScanFrequencyLabel;
+  preferred_time_of_day_key: CoachPreferredTimeOfDay;
+  weekday_weekend_balance: CoachWeekdayWeekendBalance;
+  longest_streak_days: number;
+  current_streak_days: number;
+  dormancy_risk_level: CoachDormancyRiskLevel;
+}
+
+export type CoachPrimaryGoalKey =
+  | 'weight_loss'
+  | 'muscle_gain'
+  | 'skin_health'
+  | 'sleep_recovery'
+  | 'general_wellness'
+  | 'sport_performance'
+  | 'unclear';
+
+export interface CoachGoalInference {
+  primary_goal_key: CoachPrimaryGoalKey;
+  confidence: InferredPersonaConfidence | null;
+  motivation_indicators: string[];
+}
+
+export type CoachLifestyleArchetypeKey =
+  | 'active_athlete'
+  | 'wellness_seeker'
+  | 'aesthetic_focused'
+  | 'health_recovery'
+  | 'casual_explorer'
+  | 'unclear';
+
+export interface CoachLifestyleSignature {
+  archetype_key: CoachLifestyleArchetypeKey;
+  stress_indicator_aggregate: number | null;
+  sleep_indicator_aggregate: number | null;
+  hydration_indicator_aggregate: number | null;
+  recovery_indicator_aggregate: number | null;
+}
+
+export interface CoachNutritionProfile {
+  dietary_diversity_score: number | null;
+  cuisine_preference_keys: string[];
+  cooking_method_preference_keys: string[];
+  dominant_meat_type_key: string | null;
+  meal_timing_distribution: Record<string, number>;
+  processing_level_average: number | null;
+  sugar_intake_average_grams: number | null;
+  fiber_intake_average_grams: number | null;
+  protein_intake_average_grams: number | null;
+}
+
+export type CoachTrajectoryDirection =
+  | 'improving'
+  | 'stable'
+  | 'declining'
+  | 'unknown';
+
+export interface CoachTrajectoryEntry {
+  metric: string;
+  scan_type: ScanType;
+  direction: CoachTrajectoryDirection;
+  delta: number | null;
+  sample_count: number;
+}
+
+export interface CoachTrajectoryMap {
+  body_score: CoachTrajectoryEntry;
+  face_score: CoachTrajectoryEntry;
+  plate_health_score: CoachTrajectoryEntry;
+  body_fat_percentage: CoachTrajectoryEntry;
+  hydration_level: CoachTrajectoryEntry;
+  fatigue_level: CoachTrajectoryEntry;
+  muscle_definition_score: CoachTrajectoryEntry;
+}
+
+export type CoachRiskLevel = 'low' | 'moderate' | 'elevated' | 'unknown';
+
+export interface CoachRiskSignals {
+  cardiovascular_risk_level_key: CoachRiskLevel;
+  cardiovascular_risk_drivers: string[];
+  metabolic_risk_level_key: CoachRiskLevel;
+  metabolic_risk_drivers: string[];
+  inflammation_risk_level_key: CoachRiskLevel;
+  inflammation_risk_drivers: string[];
+}
+
+export type CoachRecommendationTone =
+  | 'supportive_gentle'
+  | 'direct_motivating'
+  | 'neutral_informative'
+  | 'celebratory'
+  | 'cautious';
+
+export interface CoachRecommendations {
+  recommended_emphasis: string[];
+  topics_to_avoid: string[];
+  suggested_tone_key: CoachRecommendationTone;
+  next_scan_focus_suggestion_key: ScanType | null;
+}
+
+export interface CoachInferredMetricSignal {
+  metric: string;
+  scan_type: ScanType;
+  average_value: number;
+  sample_count: number;
+  interpretation_hint: CoachMetricInterpretationHint;
+}
+
+export interface CoachInferredPersonaField<T = string> {
+  value: T | null;
+  source: PersonaFieldSourceKind;
+  confidence: InferredPersonaConfidence | null;
+  sample_count: number;
+}
+
+export interface CoachInferredPersona {
+  apparent_sex: CoachInferredPersonaField;
+  apparent_age_range: CoachInferredPersonaField;
+  apparent_height_range: CoachInferredPersonaField;
+  apparent_weight_range: CoachInferredPersonaField;
+  apparent_body_frame: CoachInferredPersonaField;
+  apparent_fitness_level: CoachInferredPersonaField;
+  dominant_scan_focus: CoachInferredPersonaField<ScanType>;
+  dietary_signals: string[];
+  recurring_allergen_signals: string[];
+  engagement_level: CoachEngagementLevel;
+  weak_metrics: CoachInferredMetricSignal[];
+  strong_metrics: CoachInferredMetricSignal[];
+  scan_count_total: number;
+  inferred_confidence: InferredPersonaConfidence;
+  data_reliability: CoachDataReliability;
+  temporal_patterns: CoachTemporalPatterns;
+  goal_inference: CoachGoalInference;
+  lifestyle_signature: CoachLifestyleSignature;
+  nutrition_profile: CoachNutritionProfile;
+  trajectories: CoachTrajectoryMap;
+  risk_signals: CoachRiskSignals;
+  anomalies: string[];
+  coach_recommendations: CoachRecommendations;
+}
+
+export interface CoachProfileUpdate {
+  detected_diet_signals: string[];
+  detected_strong_focus: ScanType | null;
+  suggested_goals: string[];
+  suggested_persona_key: CoachPersonaKey | null;
+}
+
+export interface PersistedInferredPersona {
+  detected_diet_signals: string[];
+  detected_strong_focus: ScanType | null;
+  suggested_goals: string[];
+  suggested_persona_key: CoachPersonaKey | null;
+  last_updated_at: string;
+  update_count: number;
+}
+
 export interface CoachGuidancePayload {
   payload_version: 2;
   prompt_type: CoachPromptType;
@@ -872,6 +1242,7 @@ export interface CoachGuidancePayload {
   latest_by_type: Record<ScanType, CoachScanRichContext | null>;
   comparison_to_previous: CoachComparisonToPrevious;
   trend_summary: CoachTrendSummary;
+  inferred_persona: CoachInferredPersona | null;
 }
 
 export interface SocialPost {

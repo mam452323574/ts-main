@@ -122,6 +122,7 @@ export interface ScanResultViewModel {
   typeLabel: string;
   scoreLabel: string;
   score: number;
+  analysisQualityLabel?: string | null;
   quickStats: ResultQuickStatViewModel[];
   metrics: ResultMetricViewModel[];
   premiumMetrics: ResultMetricViewModel[];
@@ -237,6 +238,53 @@ function resolvePremiumMetricRenderState(options: {
   return isFieldLocked(options.scanType, options.fieldKey, false)
     ? 'locked'
     : 'unlocked';
+}
+
+function resolveAnalysisQualityLabel(options: {
+  analysisData: AnalysisResult;
+  t: TranslateFn;
+}) {
+  const analysisMeta = options.analysisData.analysis_meta;
+
+  if (!analysisMeta) {
+    return null;
+  }
+
+  if (
+    analysisMeta.metric_coverage_score !== null &&
+    analysisMeta.metric_coverage_score < 70
+  ) {
+    return options.t('common.results.analysis_quality.partial');
+  }
+
+  if (
+    analysisMeta.image_quality_score !== null &&
+    analysisMeta.image_quality_score < 55
+  ) {
+    return options.t('common.results.analysis_quality.limited');
+  }
+
+  if (
+    analysisMeta.confidence_score !== null &&
+    analysisMeta.confidence_score < 60
+  ) {
+    return options.t('common.results.analysis_quality.review');
+  }
+
+  if (analysisMeta.limitation_flags.includes('portion_uncertain')) {
+    return options.t('common.results.analysis_quality.partial');
+  }
+
+  if (
+    analysisMeta.limitation_flags.includes('blur') ||
+    analysisMeta.limitation_flags.includes('low_light') ||
+    analysisMeta.limitation_flags.includes('partial_subject') ||
+    analysisMeta.limitation_flags.includes('occlusion')
+  ) {
+    return options.t('common.results.analysis_quality.limited');
+  }
+
+  return null;
 }
 
 function resolvePremiumMetricValue(options: {
@@ -383,6 +431,7 @@ export function buildScanResultViewModel(options: {
         typeLabel: t('scan.face.type_label'),
         scoreLabel: t('scan.face.score_label'),
         score: safeGaugeScore(analysisData.face_score),
+        analysisQualityLabel: resolveAnalysisQualityLabel({ analysisData, t }),
         quickStats: [
           quickStat(
             'face',
@@ -510,6 +559,7 @@ export function buildScanResultViewModel(options: {
         typeLabel: t('scan.body.type_label'),
         scoreLabel: t('scan.body.score_label'),
         score: safeGaugeScore(analysisData.body_score),
+        analysisQualityLabel: resolveAnalysisQualityLabel({ analysisData, t }),
         quickStats: [
           quickStat(
             'body',
@@ -647,6 +697,7 @@ export function buildScanResultViewModel(options: {
         typeLabel: t('scan.nutrition.type_label'),
         scoreLabel: t('scan.nutrition.score_label'),
         score: safeGaugeScore(analysisData.plate_health_score),
+        analysisQualityLabel: resolveAnalysisQualityLabel({ analysisData, t }),
         quickStats: [
           quickStat(
             'nutrition',

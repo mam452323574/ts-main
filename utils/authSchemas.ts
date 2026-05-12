@@ -7,13 +7,15 @@ import { isCommonPassword } from '@/utils/passwordBlacklist';
 // Supabase Auth reste le validateur final. Ces schémas servent à :
 //   1. Bornes de longueur (anti-DoS sur password ≥ 128 char).
 //   2. Format email RFC 5322 minimal pour échouer vite avant un round-trip.
-//   3. Refus immédiat des passwords notoirement compromis (top-80 list locale).
+//   3. Alignement avec la policy signup serveur (8+ chars, minuscule + chiffre).
+//   4. Refus immédiat des passwords notoirement compromis (top-80 list locale).
 // Toutes les erreurs renvoient un message générique en cas de failure pour
 // éviter l'enumeration d'emails (cf. P1-4 Phase 1).
 
 const EMAIL_MAX_LENGTH = 254; // RFC 5321
-const PASSWORD_MIN_LENGTH = 6;
+const PASSWORD_MIN_LENGTH = 8;
 const PASSWORD_MAX_LENGTH = 128;
+const SIGNUP_PASSWORD_POLICY_PATTERN = /^(?=.*[a-z])(?=.*\d).+$/;
 
 export const EmailSchema = z
   .string()
@@ -37,6 +39,9 @@ export const SignUpCredentialsSchema = z
       .string()
       .min(PASSWORD_MIN_LENGTH)
       .max(PASSWORD_MAX_LENGTH)
+      .refine((value) => SIGNUP_PASSWORD_POLICY_PATTERN.test(value), {
+        message: 'password_policy',
+      })
       // U2-δ Phase 3 — refuse les mots de passe trivialement compromis.
       .refine((value) => !isCommonPassword(value), {
         message: 'password_too_common',

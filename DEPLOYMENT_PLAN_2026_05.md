@@ -126,10 +126,10 @@ curl -X POST https://qpogulljnnacrxdjbwiz.supabase.co/functions/v1/secure-signup
   -d '{"email":"deploy-smoke-test+1@gmail.com","password":"DeploySmokeP@ss!2026"}'
 # Expected: 201 + {ok: true, user_id: "..."}
 
-# secure-signup must reject HIBP-leaked password
+# secure-signup must reject a password that misses the relaxed policy
 curl -X POST https://qpogulljnnacrxdjbwiz.supabase.co/functions/v1/secure-signup \
   -H "Content-Type: application/json" \
-  -d '{"email":"deploy-smoke-test+2@gmail.com","password":"password123"}'
+  -d '{"email":"deploy-smoke-test+2@gmail.com","password":"password"}'
 # Expected: 422 + signup_failed
 
 # secure-signup must reject @mailinator.com
@@ -150,9 +150,9 @@ Order matters; do them in this sequence:
 | # | Action | Where | Why |
 |---|--------|-------|-----|
 | 4.1 | Disable "Auto-confirm users" | Dashboard → Authentication → Email | Mirror config.toml change. **REQUIRED** for AUTH-VULN-02 fix. |
-| 4.2 | Enable "Leaked password protection" (HIBP) | Dashboard → Authentication → Password protection | Defense-in-depth. Free plan: this should be available. |
-| 4.3 | Set min password length = 12 | Dashboard → Authentication → Password requirements | Mirrors `secure-signup` policy. |
-| 4.4 | Enable required character classes (lower+upper+digit+symbol) | Same panel | Same. |
+| 4.2 | Keep "Leaked password protection" (HIBP) OFF | Dashboard → Authentication → Password protection | Mirrors the accepted residual-risk decision in `TRUST_BOUNDARIES.md`. |
+| 4.3 | Set min password length = 8 | Dashboard → Authentication → Password requirements | Mirrors `secure-signup` policy. |
+| 4.4 | Enable required character classes: lowercase + digit only | Same panel | Same. |
 | 4.5 | Delete 5 pentest accounts | Dashboard → Authentication → Users (search `sectest_*`, `pentest_*`, `victim_bruteforce_*`, `attacker_*@mailinator.com`) | Production data hygiene. |
 | 4.6 | (When you upgrade to Pro+) Add HTTP Auth Hook → Password Verification Attempt → URL `https://qpogulljnnacrxdjbwiz.supabase.co/functions/v1/auth-pre-login` → Secret = the value you saved from step 3.2 | Dashboard → Authentication → Hooks | Activates AUTH-VULN-03 server-side lockout. |
 

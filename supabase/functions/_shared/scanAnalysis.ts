@@ -79,6 +79,13 @@ const FAT_DISTRIBUTION_AREA_NUMBER_FIELDS = [
   'definition_percent',
   'confidence',
 ] as const;
+const STANDARD_ANALYSIS_META_LIMITATION_FLAGS = [
+  'blur',
+  'low_light',
+  'partial_subject',
+  'occlusion',
+  'portion_uncertain',
+] as const;
 
 function readString(value: unknown) {
   return typeof value === 'string' && value.trim().length > 0
@@ -170,10 +177,10 @@ function readScanPayloadCandidate(payload: Record<string, unknown>) {
   );
 }
 
-function normalizeSchemaVersion(value: unknown) {
-  return typeof value === 'number' && (value === 2 || value === 3)
+function normalizeSchemaVersion(value: unknown, fallbackVersion = 3) {
+  return typeof value === 'number' && (value === 2 || value === 3 || value === 4)
     ? value
-    : 3;
+    : fallbackVersion;
 }
 
 function isAcceptedSuperProviderScanType(
@@ -198,6 +205,439 @@ function findArrayFieldValue(
   }
 
   return null;
+}
+
+function isStandardProviderScanType(
+  value: unknown,
+): value is Exclude<SupportedProviderScanType, 'fat_distribution_scan_v2'> {
+  return value === 'face' || value === 'body' || value === 'nutrition';
+}
+
+function readBoundedNumber(
+  value: unknown,
+  min: number,
+  max: number,
+) {
+  const parsed = readNumber(value);
+  if (parsed === null) {
+    return null;
+  }
+
+  return Math.min(Math.max(parsed, min), max);
+}
+
+function sanitizeStandardAnalysisMeta(value: unknown) {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const limitationFlagsSource = Array.isArray(value.limitation_flags)
+    ? value.limitation_flags
+    : Array.isArray(value.limitationFlags)
+      ? value.limitationFlags
+      : [];
+  const limitationFlags = Array.from(
+    new Set(
+      limitationFlagsSource
+        .map((item) => readString(item))
+        .filter(
+          (
+            item,
+          ): item is (typeof STANDARD_ANALYSIS_META_LIMITATION_FLAGS)[number] =>
+            !!item &&
+            STANDARD_ANALYSIS_META_LIMITATION_FLAGS.includes(
+              item as (typeof STANDARD_ANALYSIS_META_LIMITATION_FLAGS)[number],
+            ),
+        ),
+    ),
+  );
+
+  const analysisMeta = {
+    confidence_score: readBoundedNumber(
+      value.confidence_score ?? value.confidenceScore,
+      0,
+      100,
+    ),
+    image_quality_score: readBoundedNumber(
+      value.image_quality_score ?? value.imageQualityScore,
+      0,
+      100,
+    ),
+    metric_coverage_score: readBoundedNumber(
+      value.metric_coverage_score ?? value.metricCoverageScore,
+      0,
+      100,
+    ),
+    limitation_flags: limitationFlags,
+  };
+
+  return analysisMeta.confidence_score !== null ||
+    analysisMeta.image_quality_score !== null ||
+    analysisMeta.metric_coverage_score !== null ||
+    analysisMeta.limitation_flags.length > 0
+    ? analysisMeta
+    : null;
+}
+
+const EXTENDED_MEAL_TYPE_KEYS = [
+  'breakfast',
+  'lunch',
+  'dinner',
+  'snack',
+  'dessert',
+  'other',
+] as const;
+
+const EXTENDED_PORTION_SIZE_KEYS = [
+  'small',
+  'medium',
+  'large',
+  'oversized',
+] as const;
+
+const EXTENDED_CUISINE_TYPE_KEYS = [
+  'mediterranean',
+  'asian',
+  'western',
+  'middle_eastern',
+  'latin',
+  'african',
+  'mixed',
+  'other',
+] as const;
+
+const EXTENDED_MEAT_TYPE_KEYS = [
+  'red_meat',
+  'poultry',
+  'fish',
+  'seafood',
+  'plant_protein',
+  'dairy',
+  'none',
+] as const;
+
+const EXTENDED_COOKING_METHOD_KEYS = [
+  'fried',
+  'baked',
+  'grilled',
+  'raw',
+  'steamed',
+  'boiled',
+  'sauteed',
+  'other',
+] as const;
+
+const PERSONA_SEX_KEYS = [
+  'male_presenting',
+  'female_presenting',
+  'neutral_or_unclear',
+] as const;
+
+const PERSONA_AGE_RANGE_KEYS = [
+  'under_18',
+  '18_24',
+  '25_34',
+  '35_44',
+  '45_54',
+  '55_64',
+  '65_plus',
+] as const;
+
+const PERSONA_HEIGHT_RANGE_KEYS = [
+  'under_150cm',
+  '150_160cm',
+  '160_170cm',
+  '170_180cm',
+  '180_190cm',
+  '190_plus',
+] as const;
+
+const PERSONA_WEIGHT_RANGE_KEYS = [
+  'under_50kg',
+  '50_60kg',
+  '60_70kg',
+  '70_80kg',
+  '80_90kg',
+  '90_100kg',
+  '100_plus',
+] as const;
+
+const PERSONA_BODY_FRAME_KEYS = ['small', 'medium', 'large'] as const;
+
+const PERSONA_FITNESS_LEVEL_KEYS = [
+  'sedentary',
+  'lightly_active',
+  'moderately_active',
+  'very_active',
+  'athletic',
+] as const;
+
+const PERSONA_DIETARY_PATTERN_KEYS = [
+  'omnivore',
+  'vegetarian_compatible',
+  'vegan_compatible',
+  'pescetarian_compatible',
+  'keto_compatible',
+  'mediterranean_compatible',
+  'unclear',
+] as const;
+
+const PERSONA_ALLERGEN_VISIBILITY_KEYS = [
+  'gluten_likely',
+  'dairy_likely',
+  'nuts_likely',
+  'shellfish_likely',
+  'eggs_likely',
+  'soy_likely',
+  'seafood_likely',
+] as const;
+
+function sanitizeExtendedEnumArray<T extends readonly string[]>(
+  value: unknown,
+  allowed: T,
+): T[number][] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const result: T[number][] = [];
+  for (const item of value) {
+    const normalized = sanitizeExtendedEnumKey(item, allowed);
+    if (normalized && !seen.has(normalized)) {
+      seen.add(normalized);
+      result.push(normalized);
+    }
+  }
+  return result;
+}
+
+function sanitizeExtendedEnumKey<T extends readonly string[]>(
+  value: unknown,
+  allowed: T,
+): T[number] | null {
+  const text = readString(value);
+  if (!text) return null;
+  const lowered = text.toLowerCase();
+  return (allowed as readonly string[]).includes(lowered)
+    ? (lowered as T[number])
+    : null;
+}
+
+function sanitizeExtendedFaceFields(candidate: Record<string, unknown>) {
+  return {
+    skin_clarity_score: readBoundedNumber(candidate.skin_clarity_score, 0, 100),
+    under_eye_shadow_score: readBoundedNumber(
+      candidate.under_eye_shadow_score,
+      0,
+      100,
+    ),
+    under_eye_volume_score: readBoundedNumber(
+      candidate.under_eye_volume_score,
+      0,
+      100,
+    ),
+    eye_openness_score: readBoundedNumber(candidate.eye_openness_score, 0, 100),
+    complexion_redness_score: readBoundedNumber(
+      candidate.complexion_redness_score,
+      0,
+      100,
+    ),
+    pore_visibility_score: readBoundedNumber(candidate.pore_visibility_score, 0, 100),
+    skin_evenness_score: readBoundedNumber(candidate.skin_evenness_score, 0, 100),
+    skin_radiance_score: readBoundedNumber(candidate.skin_radiance_score, 0, 100),
+    lip_dryness_score: readBoundedNumber(candidate.lip_dryness_score, 0, 100),
+    forehead_smoothness_score: readBoundedNumber(
+      candidate.forehead_smoothness_score,
+      0,
+      100,
+    ),
+    t_zone_oiliness_score: readBoundedNumber(
+      candidate.t_zone_oiliness_score,
+      0,
+      100,
+    ),
+    perceived_sex_key: sanitizeExtendedEnumKey(
+      candidate.perceived_sex_key,
+      PERSONA_SEX_KEYS,
+    ),
+    perceived_age_range_key: sanitizeExtendedEnumKey(
+      candidate.perceived_age_range_key,
+      PERSONA_AGE_RANGE_KEYS,
+    ),
+    perceived_stress_level: readBoundedNumber(
+      candidate.perceived_stress_level,
+      0,
+      100,
+    ),
+    perceived_sleep_quality: readBoundedNumber(
+      candidate.perceived_sleep_quality,
+      0,
+      100,
+    ),
+  };
+}
+
+function sanitizeExtendedBodyFields(candidate: Record<string, unknown>) {
+  return {
+    muscle_definition_score: readBoundedNumber(
+      candidate.muscle_definition_score,
+      0,
+      100,
+    ),
+    midsection_definition_score: readBoundedNumber(
+      candidate.midsection_definition_score,
+      0,
+      100,
+    ),
+    shoulder_alignment_score: readBoundedNumber(
+      candidate.shoulder_alignment_score,
+      0,
+      100,
+    ),
+    recovery_readiness_score: readBoundedNumber(
+      candidate.recovery_readiness_score,
+      0,
+      100,
+    ),
+    upper_body_definition_score: readBoundedNumber(
+      candidate.upper_body_definition_score,
+      0,
+      100,
+    ),
+    lower_body_definition_score: readBoundedNumber(
+      candidate.lower_body_definition_score,
+      0,
+      100,
+    ),
+    arm_definition_score: readBoundedNumber(
+      candidate.arm_definition_score,
+      0,
+      100,
+    ),
+    v_taper_score: readBoundedNumber(candidate.v_taper_score, 0, 100),
+    body_tension_indicator_score: readBoundedNumber(
+      candidate.body_tension_indicator_score,
+      0,
+      100,
+    ),
+    perceived_sex_key: sanitizeExtendedEnumKey(
+      candidate.perceived_sex_key,
+      PERSONA_SEX_KEYS,
+    ),
+    perceived_age_range_key: sanitizeExtendedEnumKey(
+      candidate.perceived_age_range_key,
+      PERSONA_AGE_RANGE_KEYS,
+    ),
+    estimated_height_range_key: sanitizeExtendedEnumKey(
+      candidate.estimated_height_range_key,
+      PERSONA_HEIGHT_RANGE_KEYS,
+    ),
+    estimated_weight_range_key: sanitizeExtendedEnumKey(
+      candidate.estimated_weight_range_key,
+      PERSONA_WEIGHT_RANGE_KEYS,
+    ),
+    body_frame_key: sanitizeExtendedEnumKey(
+      candidate.body_frame_key,
+      PERSONA_BODY_FRAME_KEYS,
+    ),
+    perceived_fitness_level_key: sanitizeExtendedEnumKey(
+      candidate.perceived_fitness_level_key,
+      PERSONA_FITNESS_LEVEL_KEYS,
+    ),
+  };
+}
+
+function sanitizeExtendedNutritionFields(candidate: Record<string, unknown>) {
+  return {
+    fiber_grams_estimate: readBoundedNumber(
+      candidate.fiber_grams_estimate,
+      0,
+      100,
+    ),
+    sugar_grams_estimate: readBoundedNumber(
+      candidate.sugar_grams_estimate,
+      0,
+      300,
+    ),
+    processing_level_score: readBoundedNumber(
+      candidate.processing_level_score,
+      0,
+      100,
+    ),
+    hydration_contribution_score: readBoundedNumber(
+      candidate.hydration_contribution_score,
+      0,
+      10,
+    ),
+    sodium_level_score: readBoundedNumber(candidate.sodium_level_score, 0, 10),
+    meal_balance_score: readBoundedNumber(candidate.meal_balance_score, 0, 100),
+    inflammation_index_score: readBoundedNumber(
+      candidate.inflammation_index_score,
+      0,
+      100,
+    ),
+    meal_type_key: sanitizeExtendedEnumKey(
+      candidate.meal_type_key,
+      EXTENDED_MEAL_TYPE_KEYS,
+    ),
+    portion_size_key: sanitizeExtendedEnumKey(
+      candidate.portion_size_key,
+      EXTENDED_PORTION_SIZE_KEYS,
+    ),
+    color_diversity_score: readBoundedNumber(
+      candidate.color_diversity_score,
+      0,
+      10,
+    ),
+    vegetable_portion_ratio: readBoundedNumber(
+      candidate.vegetable_portion_ratio,
+      0,
+      100,
+    ),
+    protein_visibility_score: readBoundedNumber(
+      candidate.protein_visibility_score,
+      0,
+      100,
+    ),
+    whole_grain_indicator_score: readBoundedNumber(
+      candidate.whole_grain_indicator_score,
+      0,
+      100,
+    ),
+    meal_freshness_score: readBoundedNumber(
+      candidate.meal_freshness_score,
+      0,
+      100,
+    ),
+    cuisine_type_key: sanitizeExtendedEnumKey(
+      candidate.cuisine_type_key,
+      EXTENDED_CUISINE_TYPE_KEYS,
+    ),
+    meat_type_key: sanitizeExtendedEnumKey(
+      candidate.meat_type_key,
+      EXTENDED_MEAT_TYPE_KEYS,
+    ),
+    cooking_method_key: sanitizeExtendedEnumKey(
+      candidate.cooking_method_key,
+      EXTENDED_COOKING_METHOD_KEYS,
+    ),
+    meal_dietary_pattern_key: sanitizeExtendedEnumKey(
+      candidate.meal_dietary_pattern_key,
+      PERSONA_DIETARY_PATTERN_KEYS,
+    ),
+    allergen_visibility_keys: sanitizeExtendedEnumArray(
+      candidate.allergen_visibility_keys,
+      PERSONA_ALLERGEN_VISIBILITY_KEYS,
+    ),
+  };
+}
+
+function sanitizeExtendedScanFields(
+  candidate: Record<string, unknown>,
+  scanType: string,
+) {
+  if (scanType === 'face') return sanitizeExtendedFaceFields(candidate);
+  if (scanType === 'body') return sanitizeExtendedBodyFields(candidate);
+  if (scanType === 'nutrition') return sanitizeExtendedNutritionFields(candidate);
+  return {};
 }
 
 function normalizeStringArray(value: unknown) {
@@ -691,9 +1131,20 @@ export function resolveNormalizedScanAnalysisPayload(
     );
   }
 
+  if (isStandardProviderScanType(analysisType)) {
+    return {
+      ...candidate,
+      ...sanitizeExtendedScanFields(candidate, analysisType),
+      schema_version: 4,
+      analysis_meta: sanitizeStandardAnalysisMeta(
+        candidate.analysis_meta ?? candidate.analysisMeta,
+      ),
+    };
+  }
+
   return {
     ...candidate,
-    schema_version: normalizeSchemaVersion(candidate.schema_version),
+    schema_version: normalizeSchemaVersion(candidate.schema_version, 3),
   };
 }
 

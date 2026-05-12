@@ -119,9 +119,9 @@ function assertAal2BearerToken(_token: string) {
   // │                                                                     │
   // │ Compensating controls (Waves 1-3 of SECURITY_FIX_PLAN_2026_05.md):  │
   // │   - Per-account login lockout (auth-pre-login hook + RPCs)          │
-  // │   - HIBP enforcement on signup (secure-signup wrapper + trigger)    │
-  // │   - Email verification gate (mailer_autoconfirm = false)            │
-  // │   - 12-char password policy w/ complexity                           │
+  // │   - secure-signup wrapper + nonce trigger for signup controls       │
+  // │   - App email verification gate (user_profiles.email_verified)      │
+  // │   - relaxed 8-char password policy requiring lowercase + digit       │
   // │                                                                     │
   // │ Re-enabling MFA: restore the AAL2 check (decoded JWT.aal === 'aal2')│
   // │ here, then audit Edge Functions for which ones legitimately need to │

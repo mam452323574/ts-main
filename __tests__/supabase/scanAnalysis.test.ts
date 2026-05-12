@@ -40,9 +40,76 @@ describe('scan analysis helpers', () => {
         'health',
       ),
     ).toEqual({
-      schema_version: 3,
+      schema_version: 4,
       scan_type: 'face',
       face_score: 84,
+      analysis_meta: null,
+      skin_clarity_score: null,
+      under_eye_shadow_score: null,
+      under_eye_volume_score: null,
+      eye_openness_score: null,
+      complexion_redness_score: null,
+      pore_visibility_score: null,
+      skin_evenness_score: null,
+      skin_radiance_score: null,
+      lip_dryness_score: null,
+      forehead_smoothness_score: null,
+      t_zone_oiliness_score: null,
+      perceived_sex_key: null,
+      perceived_age_range_key: null,
+      perceived_stress_level: null,
+      perceived_sleep_quality: null,
+    });
+  });
+
+  it('sanitizes standard analysis_meta for coach-facing standard scans', () => {
+    expect(
+      resolveNormalizedScanAnalysisPayload(
+        {
+          success: true,
+          data: {
+            schema_version: 3,
+            scan_type: 'nutrition',
+            plate_health_score: 79,
+            analysis_meta: {
+              confidence_score: '105',
+              imageQualityScore: '-2',
+              metric_coverage_score: 68,
+              limitation_flags: ['portion_uncertain', 'invalid_flag', 'portion_uncertain'],
+            },
+          },
+        },
+        'nutrition',
+      ),
+    ).toEqual({
+      schema_version: 4,
+      scan_type: 'nutrition',
+      plate_health_score: 79,
+      analysis_meta: {
+        confidence_score: 100,
+        image_quality_score: 0,
+        metric_coverage_score: 68,
+        limitation_flags: ['portion_uncertain'],
+      },
+      fiber_grams_estimate: null,
+      sugar_grams_estimate: null,
+      processing_level_score: null,
+      hydration_contribution_score: null,
+      sodium_level_score: null,
+      meal_balance_score: null,
+      inflammation_index_score: null,
+      meal_type_key: null,
+      portion_size_key: null,
+      color_diversity_score: null,
+      vegetable_portion_ratio: null,
+      protein_visibility_score: null,
+      whole_grain_indicator_score: null,
+      meal_freshness_score: null,
+      cuisine_type_key: null,
+      meat_type_key: null,
+      cooking_method_key: null,
+      meal_dietary_pattern_key: null,
+      allergen_visibility_keys: [],
     });
   });
 

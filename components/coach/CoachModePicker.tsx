@@ -15,6 +15,7 @@ interface CoachModePickerProps {
   busyPromptType?: CoachPromptType | null;
   onSelect: (prompt: CoachPromptType) => void;
   promptTitle: (prompt: CoachPromptType) => string;
+  promptSubtitle?: (prompt: CoachPromptType) => string;
   isPromptLocked?: (prompt: CoachPromptType) => boolean;
   lockedBadgeLabel?: string;
   lockedHint?: string;
@@ -28,6 +29,7 @@ export function CoachModePicker({
   busyPromptType,
   onSelect,
   promptTitle,
+  promptSubtitle,
   isPromptLocked,
   lockedBadgeLabel,
   lockedHint,
@@ -49,6 +51,7 @@ export function CoachModePicker({
             <CoachPromptCard
               promptType={prompt}
               title={promptTitle(prompt)}
+              subtitle={promptSubtitle?.(prompt)}
               onPress={() => onSelect(prompt)}
               variant="compact"
               mode="selector"

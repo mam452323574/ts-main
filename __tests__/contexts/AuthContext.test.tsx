@@ -13,6 +13,7 @@ const mockLoadPurchasesModule = jest.fn();
 const mockMarkStartup = jest.fn();
 const mockTrackFailureEvent = jest.fn();
 const mockLogOperationalError = jest.fn();
+const mockCreateOAuthState = jest.fn(() => 'oauth-state-1');
 
 jest.mock('@/utils/runtimeCapabilities', () => ({
   getRuntimeCapabilities: () => mockGetRuntimeCapabilities(),
@@ -43,6 +44,10 @@ jest.mock('@/services/analytics', () => ({
   trackFailureEvent: (...args: unknown[]) => mockTrackFailureEvent(...args),
 }));
 
+jest.mock('@/utils/oauthState', () => ({
+  createOAuthState: () => mockCreateOAuthState(),
+}));
+
 jest.mock('@/utils/observability', () => ({
   logOperationalError: (...args: unknown[]) => mockLogOperationalError(...args),
 }));
@@ -62,9 +67,12 @@ const { supabase } = jest.requireMock('@/services/supabase') as {
   supabase: {
     auth: {
       getSession: jest.Mock;
+      setSession: jest.Mock;
       onAuthStateChange: jest.Mock;
       startAutoRefresh: jest.Mock;
       stopAutoRefresh: jest.Mock;
+      signInWithOAuth: jest.Mock;
+      exchangeCodeForSession: jest.Mock;
       signOut: jest.Mock;
     };
     from: jest.Mock;
@@ -83,6 +91,7 @@ const user = {
 
 const session = {
   access_token: 'session-token-1',
+  refresh_token: 'refresh-token-1',
   user,
 };
 
@@ -134,6 +143,18 @@ const mockProfileEq = jest.fn(() => ({
 const mockProfileSelect = jest.fn(() => ({
   eq: mockProfileEq,
 }));
+const mockTableInsert = jest.fn().mockResolvedValue({ data: null, error: null });
+const mockTableDeleteEq = jest.fn().mockResolvedValue({ data: null, error: null });
+const mockTableDelete = jest.fn(() => ({
+  eq: mockTableDeleteEq,
+}));
+const mockTableUpdateEq = jest.fn().mockResolvedValue({ data: null, error: null });
+const mockTableUpdate = jest.fn(() => ({
+  eq: mockTableUpdateEq,
+}));
+const { openAuthSessionAsync } = jest.requireMock('expo-web-browser') as {
+  openAuthSessionAsync: jest.Mock;
+};
 
 const renderProvider = (onAuthRender: jest.Mock = jest.fn()) =>
   render(
@@ -149,6 +170,8 @@ function AuthStateProbe({ onRender }: { onRender: jest.Mock }) {
     session: auth.session,
     userProfile: auth.userProfile,
     loading: auth.loading,
+    signUp: auth.signUp,
+    signInWithOAuth: auth.signInWithOAuth,
   });
   return <Text testID="auth-child">ready</Text>;
 }
@@ -170,6 +193,11 @@ function getLastAuthRender(onAuthRender: jest.Mock) {
         session: typeof session | null;
         userProfile: typeof userProfile | null;
         loading: boolean;
+        signUp: (email: string, password: string) => Promise<{
+          userId: string;
+          email: string;
+        }>;
+        signInWithOAuth: (provider: 'google' | 'apple') => Promise<void>;
       }
     | undefined;
 }
@@ -219,8 +247,23 @@ describe('AuthProvider RevenueCat startup behavior', () => {
         };
       },
     );
+    supabase.auth.setSession.mockResolvedValue({
+      data: { user, session },
+      error: null,
+    });
+    supabase.auth.signInWithOAuth.mockResolvedValue({
+      data: { url: 'https://oauth.example/authorize' },
+      error: null,
+    });
+    supabase.auth.exchangeCodeForSession.mockResolvedValue({
+      data: { user, session },
+      error: null,
+    });
     supabase.from.mockImplementation(() => ({
       select: mockProfileSelect,
+      insert: mockTableInsert,
+      delete: mockTableDelete,
+      update: mockTableUpdate,
     }));
     supabase.rpc.mockResolvedValue({ data: null, error: null });
     mockProfileMaybeSingle.mockResolvedValue({
@@ -230,6 +273,10 @@ describe('AuthProvider RevenueCat startup behavior', () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: jest.fn().mockResolvedValue({ success: true }),
+    });
+    openAuthSessionAsync.mockResolvedValue({
+      type: 'success',
+      url: 'exp://oauth/callback?code=oauth-code&state=oauth-state-1',
     });
   });
 
@@ -515,6 +562,502 @@ describe('AuthProvider RevenueCat startup behavior', () => {
       '[Auth] Failed to repair missing user profile',
       expect.anything(),
       expect.anything(),
+    );
+  });
+
+  it('turns secure-signup rate limits into IpLimitError with request_id telemetry', async () => {
+    mockGetRuntimeCapabilities.mockReturnValue({
+      platform: 'ios',
+      appOwnership: 'expo',
+      isExpoGo: true,
+      canUseNativePurchases: false,
+      canUseLocalNotifications: true,
+      canRegisterForPushNotifications: false,
+    });
+    const onAuthRender = jest.fn();
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      json: jest.fn().mockResolvedValue({
+        error: 'Account creation limit reached for this network.',
+        code: 'signup_rate_limited',
+        request_id: 'req-limit-1',
+      }),
+    });
+
+    renderProvider(onAuthRender);
+
+    await waitFor(() => {
+      expect(getLastAuthRender(onAuthRender)?.loading).toBe(false);
+    });
+
+    const signUp = getLastAuthRender(onAuthRender)?.signUp;
+    await expect(
+      signUp?.('fresh@example.com', 'StrongerPass42!'),
+    ).rejects.toMatchObject({
+      name: 'IpLimitError',
+      code: 'signup_rate_limited',
+      status: 429,
+      requestId: 'req-limit-1',
+    });
+
+    expect(mockLogOperationalError).toHaveBeenCalledWith(
+      '[SignUp] secure-signup rate limited',
+      null,
+      {
+        status: 429,
+        code: 'signup_rate_limited',
+        request_id: 'req-limit-1',
+      },
+    );
+  });
+
+  it('logs secure-signup generic rejections with request_id', async () => {
+    mockGetRuntimeCapabilities.mockReturnValue({
+      platform: 'ios',
+      appOwnership: 'expo',
+      isExpoGo: true,
+      canUseNativePurchases: false,
+      canRegisterForPushNotifications: false,
+      canUseLocalNotifications: true,
+    });
+    const onAuthRender = jest.fn();
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 422,
+      json: jest.fn().mockResolvedValue({
+        error: 'Signup not allowed. Please try a different email or password.',
+        code: 'signup_failed',
+        request_id: 'req-signup-422',
+      }),
+    });
+
+    renderProvider(onAuthRender);
+
+    await waitFor(() => {
+      expect(getLastAuthRender(onAuthRender)?.loading).toBe(false);
+    });
+
+    const signUp = getLastAuthRender(onAuthRender)?.signUp;
+    await expect(
+      signUp?.('fresh@example.com', 'StrongerPass42!'),
+    ).rejects.toThrow('Erreur lors de la création du compte');
+
+    expect(mockLogOperationalError).toHaveBeenCalledWith(
+      '[SignUp] secure-signup rejected',
+      null,
+      {
+        status: 422,
+        code: 'signup_failed',
+        request_id: 'req-signup-422',
+      },
+    );
+  });
+
+  it('bootstraps the session and repairs the profile after secure-signup without raw profile insert', async () => {
+    mockGetRuntimeCapabilities.mockReturnValue({
+      platform: 'ios',
+      appOwnership: 'expo',
+      isExpoGo: true,
+      canUseNativePurchases: false,
+      canRegisterForPushNotifications: false,
+      canUseLocalNotifications: true,
+    });
+    const onAuthRender = jest.fn();
+    const createdUser = {
+      id: 'new-user-1',
+      email: 'fresh@example.com',
+      user_metadata: {},
+    };
+    const createdSession = {
+      access_token: 'session-token-new',
+      refresh_token: 'refresh-token-new',
+      user: createdUser,
+    };
+
+    supabase.auth.getSession
+      .mockResolvedValueOnce({ data: { session: null } })
+      .mockResolvedValueOnce({ data: { session: createdSession } });
+    supabase.auth.setSession.mockResolvedValueOnce({
+      data: { user: createdUser, session: createdSession },
+      error: null,
+    });
+    supabase.rpc.mockImplementation((name: string) => {
+      if (name === 'repair_missing_user_profile') {
+        return Promise.resolve({
+          data: {
+            ...userProfile,
+            id: createdUser.id,
+            email: createdUser.email,
+            email_verified: false,
+          },
+          error: null,
+        });
+      }
+
+      return Promise.resolve({ data: null, error: null });
+    });
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: jest.fn().mockResolvedValue({
+          ok: true,
+          user_id: createdUser.id,
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({
+          ok: true,
+          session: createdSession,
+        }),
+      });
+
+    renderProvider(onAuthRender);
+
+    await waitFor(() => {
+      expect(getLastAuthRender(onAuthRender)?.loading).toBe(false);
+    });
+
+    const signUp = getLastAuthRender(onAuthRender)?.signUp;
+    await expect(
+      signUp?.('fresh@example.com', 'StrongerPass42!'),
+    ).resolves.toEqual({
+      userId: createdUser.id,
+      email: 'fresh@example.com',
+    });
+
+    expect(supabase.auth.setSession).toHaveBeenCalledWith({
+      access_token: createdSession.access_token,
+      refresh_token: createdSession.refresh_token,
+    });
+    expect(supabase.rpc).toHaveBeenCalledWith('repair_missing_user_profile', {
+      p_avatar_url: null,
+    });
+    expect(supabase.from).not.toHaveBeenCalledWith('user_profiles');
+  });
+
+  it('logs and skips orphan cleanup when session bootstrap fails after secure-signup', async () => {
+    mockGetRuntimeCapabilities.mockReturnValue({
+      platform: 'ios',
+      appOwnership: 'expo',
+      isExpoGo: true,
+      canUseNativePurchases: false,
+      canRegisterForPushNotifications: false,
+      canUseLocalNotifications: true,
+    });
+    const onAuthRender = jest.fn();
+    const createdUserId = 'new-user-2';
+    const createdSession = {
+      access_token: 'session-token-new-2',
+      refresh_token: 'refresh-token-new-2',
+      user: {
+        id: createdUserId,
+        email: 'fresh@example.com',
+        user_metadata: {},
+      },
+    };
+
+    supabase.auth.getSession.mockResolvedValueOnce({ data: { session: null } });
+    supabase.auth.setSession.mockResolvedValueOnce({
+      data: { user: null, session: null },
+      error: new Error('session install failed'),
+    });
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: jest.fn().mockResolvedValue({
+          ok: true,
+          user_id: createdUserId,
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({
+          ok: true,
+          session: createdSession,
+        }),
+      });
+
+    renderProvider(onAuthRender);
+
+    await waitFor(() => {
+      expect(getLastAuthRender(onAuthRender)?.loading).toBe(false);
+    });
+
+    const signUp = getLastAuthRender(onAuthRender)?.signUp;
+    await expect(
+      signUp?.('fresh@example.com', 'StrongerPass42!'),
+    ).rejects.toThrow('Erreur lors de la création du compte');
+
+    expect(mockLogOperationalError).toHaveBeenCalledWith(
+      '[SignUp] Failed to install session after secure-signup',
+      expect.any(Error),
+      {
+        user_id: createdUserId,
+      },
+    );
+    expect(mockLogOperationalError).toHaveBeenCalledWith(
+      '[Cleanup] Skipped orphan cleanup because no session',
+      null,
+      {
+        user_id: createdUserId,
+      },
+    );
+    expect(supabase.rpc).not.toHaveBeenCalledWith(
+      'repair_missing_user_profile',
+      expect.anything(),
+    );
+    expect(mockFetch).not.toHaveBeenCalledWith(
+      'https://example.supabase.co/functions/v1/cleanup-orphan-user',
+      expect.anything(),
+    );
+  });
+
+  it('maps secure-login invalid_credentials after secure-signup to a generic signup failure', async () => {
+    mockGetRuntimeCapabilities.mockReturnValue({
+      platform: 'ios',
+      appOwnership: 'expo',
+      isExpoGo: true,
+      canUseNativePurchases: false,
+      canRegisterForPushNotifications: false,
+      canUseLocalNotifications: true,
+    });
+    const onAuthRender = jest.fn();
+    const createdUserId = 'new-user-invalid-login';
+
+    supabase.auth.getSession.mockResolvedValueOnce({ data: { session: null } });
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: jest.fn().mockResolvedValue({
+          ok: true,
+          user_id: createdUserId,
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: jest.fn().mockResolvedValue({
+          code: 'invalid_credentials',
+          error: 'Invalid email or password.',
+        }),
+      });
+
+    renderProvider(onAuthRender);
+
+    await waitFor(() => {
+      expect(getLastAuthRender(onAuthRender)?.loading).toBe(false);
+    });
+
+    const signUp = getLastAuthRender(onAuthRender)?.signUp;
+    await expect(
+      signUp?.('fresh@example.com', 'StrongerPass42!'),
+    ).rejects.toThrow('Erreur lors de la création du compte');
+
+    expect(supabase.auth.setSession).not.toHaveBeenCalled();
+    expect(mockLogOperationalError).toHaveBeenCalledWith(
+      '[SignUp] Failed to install session after secure-signup',
+      expect.objectContaining({
+        code: 'invalid_credentials',
+        status: 401,
+      }),
+      {
+        user_id: createdUserId,
+      },
+    );
+    expect(mockLogOperationalError).toHaveBeenCalledWith(
+      '[Cleanup] Skipped orphan cleanup because no session',
+      null,
+      {
+        user_id: createdUserId,
+      },
+    );
+    expect(mockFetch).not.toHaveBeenCalledWith(
+      'https://example.supabase.co/functions/v1/cleanup-orphan-user',
+      expect.anything(),
+    );
+  });
+
+  it('cleans up the orphan when profile repair fails after session install', async () => {
+    mockGetRuntimeCapabilities.mockReturnValue({
+      platform: 'ios',
+      appOwnership: 'expo',
+      isExpoGo: true,
+      canUseNativePurchases: false,
+      canRegisterForPushNotifications: false,
+      canUseLocalNotifications: true,
+    });
+    const onAuthRender = jest.fn();
+    const createdUserId = 'new-user-3';
+    const createdUser = {
+      id: createdUserId,
+      email: 'fresh@example.com',
+      user_metadata: {},
+    };
+    const createdSession = {
+      access_token: 'session-token-new-3',
+      refresh_token: 'refresh-token-new-3',
+      user: createdUser,
+    };
+
+    supabase.auth.getSession
+      .mockResolvedValueOnce({ data: { session: null } })
+      .mockResolvedValueOnce({ data: { session: createdSession } })
+      .mockResolvedValueOnce({ data: { session: createdSession } });
+    supabase.auth.setSession.mockResolvedValueOnce({
+      data: { user: createdUser, session: createdSession },
+      error: null,
+    });
+    supabase.rpc.mockImplementation((name: string) => {
+      if (name === 'repair_missing_user_profile') {
+        return Promise.resolve({
+          data: null,
+          error: new Error('repair failed'),
+        });
+      }
+
+      return Promise.resolve({ data: null, error: null });
+    });
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: jest.fn().mockResolvedValue({
+          ok: true,
+          user_id: createdUserId,
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({
+          ok: true,
+          session: createdSession,
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({ success: true }),
+      });
+
+    renderProvider(onAuthRender);
+
+    await waitFor(() => {
+      expect(getLastAuthRender(onAuthRender)?.loading).toBe(false);
+    });
+
+    const signUp = getLastAuthRender(onAuthRender)?.signUp;
+    await expect(
+      signUp?.('fresh@example.com', 'StrongerPass42!'),
+    ).rejects.toThrow('Erreur lors de la création du compte');
+
+    expect(mockLogOperationalError).toHaveBeenCalledWith(
+      '[SignUp] Failed to repair initial profile after session install',
+      null,
+      {
+        user_id: createdUserId,
+      },
+    );
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://example.supabase.co/functions/v1/cleanup-orphan-user',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${createdSession.access_token}`,
+        }),
+      }),
+    );
+    expect(supabase.auth.signOut).toHaveBeenCalled();
+  });
+
+  it('uses profile repair RPC instead of raw insert for OAuth bootstrap when profile is missing', async () => {
+    mockGetRuntimeCapabilities.mockReturnValue({
+      platform: 'ios',
+      appOwnership: 'expo',
+      isExpoGo: true,
+      canUseNativePurchases: false,
+      canRegisterForPushNotifications: false,
+      canUseLocalNotifications: true,
+    });
+    const onAuthRender = jest.fn();
+    const oauthUser = {
+      id: 'oauth-user-1',
+      email: 'oauth@example.com',
+      user_metadata: {
+        avatar_url: 'https://avatar.example/profile.png',
+        sub: 'google-sub-1',
+      },
+    };
+    const oauthSession = {
+      access_token: 'oauth-session-token',
+      refresh_token: 'oauth-refresh-token',
+      user: oauthUser,
+    };
+
+    supabase.auth.getSession
+      .mockResolvedValueOnce({ data: { session: null } })
+      .mockResolvedValue({ data: { session: oauthSession } });
+    supabase.auth.exchangeCodeForSession.mockResolvedValueOnce({
+      data: { user: oauthUser, session: oauthSession },
+      error: null,
+    });
+    mockProfileMaybeSingle
+      .mockResolvedValueOnce({
+        data: null,
+        error: null,
+      })
+      .mockResolvedValue({
+        data: {
+          ...userProfile,
+          id: oauthUser.id,
+          email: oauthUser.email,
+        },
+        error: null,
+      });
+    supabase.rpc.mockImplementation((name: string) => {
+      if (name === 'repair_missing_user_profile') {
+        return Promise.resolve({
+          data: {
+            ...userProfile,
+            id: oauthUser.id,
+            email: oauthUser.email,
+          },
+          error: null,
+        });
+      }
+
+      return Promise.resolve({ data: null, error: null });
+    });
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: jest.fn().mockResolvedValue({
+        disposable: false,
+        success: true,
+      }),
+    });
+
+    renderProvider(onAuthRender);
+
+    await waitFor(() => {
+      expect(getLastAuthRender(onAuthRender)?.loading).toBe(false);
+    });
+
+    const signInWithOAuth = getLastAuthRender(onAuthRender)?.signInWithOAuth;
+    await expect(signInWithOAuth?.('google')).resolves.toBeUndefined();
+
+    expect(supabase.rpc).toHaveBeenCalledWith('repair_missing_user_profile', {
+      p_avatar_url: 'https://avatar.example/profile.png',
+    });
+    expect(supabase.auth.exchangeCodeForSession).toHaveBeenCalledWith(
+      'oauth-code',
     );
   });
 });

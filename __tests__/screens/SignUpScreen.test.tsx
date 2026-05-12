@@ -111,6 +111,9 @@ const mockSignUp = jest.fn();
 const mockSendVerificationEmail = jest.fn();
 const mockIsDisposableEmail = jest.fn();
 const mockCreatePreparedAvatarLocalUri = jest.fn();
+const passwordPlaceholder = 'Mot de passe (8+ car., minuscule + chiffre)';
+const confirmPasswordPlaceholder = 'Confirmez le mot de passe';
+const signUpButtonLabel = "S'inscrire";
 
 jest.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
@@ -207,7 +210,7 @@ describe('SignUpScreen friendly flow', () => {
     fireEvent.press(screen.getByTestId('signup-avatar-skip'));
     expect(await screen.findByText('Creez votre compte')).toBeTruthy();
     expect(screen.getByPlaceholderText('Votre email')).toBeTruthy();
-    expect(screen.getByPlaceholderText('Minimum 6 caracteres')).toBeTruthy();
+    expect(screen.getByPlaceholderText(passwordPlaceholder)).toBeTruthy();
   });
 
   it('creates the account only on the account step and never stores the password', async () => {
@@ -219,9 +222,9 @@ describe('SignUpScreen friendly flow', () => {
     fireEvent.press(await screen.findByTestId('signup-avatar-skip'));
 
     fireEvent.changeText(await screen.findByPlaceholderText('Votre email'), 'test@example.com');
-    fireEvent.changeText(screen.getByPlaceholderText('Minimum 6 caracteres'), 'StrongerPass42!');
-    fireEvent.changeText(screen.getByPlaceholderText('Retapez votre mot de passe'), 'StrongerPass42!');
-    fireEvent.press(screen.getByText('Continuer'));
+    fireEvent.changeText(screen.getByPlaceholderText(passwordPlaceholder), 'StrongerPass42!');
+    fireEvent.changeText(screen.getByPlaceholderText(confirmPasswordPlaceholder), 'StrongerPass42!');
+    fireEvent.press(screen.getByText(signUpButtonLabel));
 
     await waitFor(() => {
       expect(mockSignUp).toHaveBeenCalledWith('test@example.com', 'StrongerPass42!');
@@ -243,6 +246,27 @@ describe('SignUpScreen friendly flow', () => {
     expect(storedValues).not.toContain('StrongerPass42!');
   });
 
+  it('blocks passwords that would be rejected by secure-signup', async () => {
+    render(<SignUpScreen />);
+
+    fireEvent.press(await screen.findByText('Suivant'));
+    fireEvent.changeText(screen.getByTestId('signup-username-input'), 'testuser');
+    fireEvent.press(screen.getByText('Suivant'));
+    fireEvent.press(await screen.findByTestId('signup-avatar-skip'));
+
+    fireEvent.changeText(await screen.findByPlaceholderText('Votre email'), 'test@example.com');
+    fireEvent.changeText(screen.getByPlaceholderText(passwordPlaceholder), 'longenough');
+    fireEvent.changeText(screen.getByPlaceholderText(confirmPasswordPlaceholder), 'longenough');
+    fireEvent.press(screen.getByText(signUpButtonLabel));
+
+    expect(
+      await screen.findByText(
+        'Le mot de passe doit faire au moins 8 caractères et contenir une minuscule et un chiffre',
+      ),
+    ).toBeTruthy();
+    expect(mockSignUp).not.toHaveBeenCalled();
+  });
+
   it('continues to verification when the initial email send fails', async () => {
     const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     mockSendVerificationEmail.mockRejectedValueOnce(new Error('resend failed'));
@@ -255,9 +279,9 @@ describe('SignUpScreen friendly flow', () => {
     fireEvent.press(await screen.findByTestId('signup-avatar-skip'));
 
     fireEvent.changeText(await screen.findByPlaceholderText('Votre email'), 'test@example.com');
-    fireEvent.changeText(screen.getByPlaceholderText('Minimum 6 caracteres'), 'StrongerPass42!');
-    fireEvent.changeText(screen.getByPlaceholderText('Retapez votre mot de passe'), 'StrongerPass42!');
-    fireEvent.press(screen.getByText('Continuer'));
+    fireEvent.changeText(screen.getByPlaceholderText(passwordPlaceholder), 'StrongerPass42!');
+    fireEvent.changeText(screen.getByPlaceholderText(confirmPasswordPlaceholder), 'StrongerPass42!');
+    fireEvent.press(screen.getByText(signUpButtonLabel));
 
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith({
@@ -307,7 +331,7 @@ describe('SignUpScreen friendly flow', () => {
   it('keeps the existing login link behavior', async () => {
     render(<SignUpScreen />);
 
-    const loginText = await screen.findByText(/Deja un compte/);
+    const loginText = await screen.findByText(/Déjà un compte/);
     fireEvent.press(loginText.parent!);
 
     expect(mockBack).toHaveBeenCalled();

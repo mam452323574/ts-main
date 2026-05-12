@@ -2,6 +2,7 @@ import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   BackHandler,
+  Image,
   Platform,
   Pressable,
   StyleSheet,
@@ -9,6 +10,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import type { ImageSourcePropType } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -37,6 +39,10 @@ import {
   mixColors,
   withAlpha,
 } from '@/constants/theme';
+import {
+  getOnboardingPromoAsset,
+  type OnboardingPromoSlideKey,
+} from '@/constants/onboardingPromoAssets';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -61,7 +67,7 @@ import { getMinimumBottomInsetPadding } from '@/utils/mobileLayout';
 const TOTAL_SLIDES = 5;
 
 interface SlideContent {
-  key: string;
+  key: OnboardingPromoSlideKey;
   eyebrow: string;
   title: string;
   subtitle: string;
@@ -74,7 +80,7 @@ export default function PostSignupOnboardingScreen() {
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const { colors, isDark } = useTheme();
-  const { t } = useLanguage();
+  const { locale, t } = useLanguage();
   const {
     user,
     userProfile,
@@ -112,13 +118,22 @@ export default function PostSignupOnboardingScreen() {
         isDark,
         onboardingPalette,
         isCompactAndroidLayout,
+        windowHeight,
       ),
-    [colors, insets, isCompactAndroidLayout, isDark, onboardingPalette],
+    [
+      colors,
+      insets,
+      isCompactAndroidLayout,
+      isDark,
+      onboardingPalette,
+      windowHeight,
+    ],
   );
   const gradientColors = useMemo<[string, string, string]>(
     () => onboardingPalette.backgroundGradient,
     [onboardingPalette.backgroundGradient],
   );
+  const onboardingThemeVariant = isDark ? 'dark' : 'light';
   const topWashColors = useMemo<[string, string, string]>(
     () =>
       [
@@ -424,17 +439,47 @@ export default function PostSignupOnboardingScreen() {
     }
   };
 
-  const renderSlide = (slide: SlideContent) => (
-    <View key={slide.key} style={styles.pageShell}>
-      <OnboardingSlide
-        eyebrow={slide.eyebrow}
-        title={slide.title}
-        subtitle={slide.subtitle}
-        bullets={slide.bullets}
-        visual={<PhoneMockup>{slide.preview}</PhoneMockup>}
-      />
-    </View>
-  );
+  const renderSlide = (slide: SlideContent) => {
+    const promoAsset = getOnboardingPromoAsset(
+      onboardingThemeVariant,
+      locale,
+      slide.key,
+    );
+
+    return (
+      <View
+        key={slide.key}
+        style={[
+          styles.pageShell,
+          promoAsset ? styles.pageShellPromo : null,
+        ]}
+      >
+        {promoAsset ? (
+          <PromoHeroSlide
+            slide={slide}
+            source={promoAsset}
+            colors={colors}
+            isDark={isDark}
+            palette={onboardingPalette}
+            styles={styles}
+          />
+        ) : (
+          <View
+            style={styles.fallbackSlideWrap}
+            testID={`post-signup-fallback-slide-${slide.key}`}
+          >
+            <OnboardingSlide
+              eyebrow={slide.eyebrow}
+              title={slide.title}
+              subtitle={slide.subtitle}
+              bullets={slide.bullets}
+              visual={<PhoneMockup>{slide.preview}</PhoneMockup>}
+            />
+          </View>
+        )}
+      </View>
+    );
+  };
 
   const renderAvatarStep = () => (
     <View style={styles.stepWrap} testID="post-signup-avatar-step">
@@ -523,8 +568,20 @@ export default function PostSignupOnboardingScreen() {
         />
 
         <View style={styles.content} testID="post-signup-content">
-          <View style={styles.header}>
-            <Text style={styles.brand}>HEALTH SCAN</Text>
+          <View
+            style={[
+              styles.header,
+              !isAvatarStage ? styles.headerSlides : null,
+            ]}
+          >
+            <Text
+              style={[
+                styles.brand,
+                !isAvatarStage ? styles.brandSlides : null,
+              ]}
+            >
+              HEALTH SCAN
+            </Text>
             {!isAvatarStage && currentPage < TOTAL_SLIDES - 1 ? (
               <Pressable
                 onPress={handleSkipSlides}
@@ -537,7 +594,12 @@ export default function PostSignupOnboardingScreen() {
                 testID="post-signup-skip-slides"
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Text style={styles.skipSlidesLabel}>
+                <Text
+                  style={[
+                    styles.skipSlidesLabel,
+                    styles.skipSlidesLabelSlides,
+                  ]}
+                >
                   {t('common.skip')}
                 </Text>
               </Pressable>
@@ -550,7 +612,12 @@ export default function PostSignupOnboardingScreen() {
             {isAvatarStage ? renderAvatarStep() : renderSlidesStep()}
           </View>
 
-          <View style={styles.footer}>
+          <View
+            style={[
+              styles.footer,
+              !isAvatarStage ? styles.footerSlides : null,
+            ]}
+          >
             {!isAvatarStage ? (
               <View style={styles.progressRow}>
                 {slides.map((slide, index) => (
@@ -605,6 +672,146 @@ export default function PostSignupOnboardingScreen() {
       </LinearGradient>
     </AppScreen>
   );
+}
+
+interface PromoHeroSlideProps {
+  slide: SlideContent;
+  source: ImageSourcePropType;
+  colors: any;
+  isDark: boolean;
+  palette: OnboardingPalette;
+  styles: ReturnType<typeof createStyles>;
+}
+
+function PromoHeroSlide({
+  slide,
+  source,
+  colors,
+  isDark,
+  palette,
+  styles,
+}: PromoHeroSlideProps) {
+  const accentColor = getPromoHeroAccent(slide.key, colors);
+  const assetMetadata = Image.resolveAssetSource(source);
+  const assetRatio =
+    assetMetadata?.width && assetMetadata?.height
+      ? assetMetadata.width / assetMetadata.height
+      : 0.56;
+  const heroImageScale = assetRatio >= 0.63 ? 1.025 : 1.045;
+  const topFadeColors: [string, string, string] = isDark
+    ? [
+        withAlpha(palette.background, 0.74),
+        withAlpha(palette.background, 0.32),
+        withAlpha(palette.background, 0),
+      ]
+    : [
+        withAlpha(palette.background, 0.52),
+        withAlpha(palette.background, 0.18),
+        withAlpha(palette.background, 0),
+      ];
+  const bottomFadeColors: [string, string, string] = isDark
+    ? [
+        withAlpha(palette.background, 0),
+        withAlpha(palette.background, 0.54),
+        withAlpha(palette.background, 0.88),
+      ]
+    : [
+        withAlpha(palette.background, 0),
+        withAlpha(palette.background, 0.38),
+        withAlpha(palette.background, 0.72),
+      ];
+
+  return (
+    <View
+      style={styles.promoHeroWrap}
+      testID={`post-signup-promo-slide-${slide.key}`}
+    >
+      <Image
+        source={source}
+        resizeMode="cover"
+        blurRadius={34}
+        style={[
+          styles.promoHeroBackdropImage,
+          { opacity: isDark ? 0.3 : 0.22 },
+        ]}
+      />
+      <View
+        style={[
+          styles.promoHeroGlow,
+          {
+            backgroundColor: withAlpha(accentColor, isDark ? 0.28 : 0.16),
+          },
+        ]}
+      />
+      <LinearGradient
+        colors={[
+          withAlpha(accentColor, isDark ? 0.2 : 0.12),
+          withAlpha(palette.background, 0),
+        ]}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={styles.promoHeroAmbientGradient}
+      />
+
+      <View style={styles.promoHeroStage}>
+        <Image
+          source={source}
+          resizeMode="cover"
+          testID={`post-signup-promo-hero-image-${slide.key}`}
+          style={[
+            styles.promoHeroImage,
+            { transform: [{ scale: heroImageScale }] },
+          ]}
+        />
+        <LinearGradient
+          colors={topFadeColors}
+          locations={[0, 0.58, 1]}
+          style={styles.promoHeroTopFade}
+        />
+        <LinearGradient
+          colors={bottomFadeColors}
+          locations={[0, 0.52, 1]}
+          style={styles.promoHeroBottomFade}
+        />
+        <View style={styles.promoHeroCopy}>
+          <Text style={[styles.promoHeroEyebrow, { color: accentColor }]}>
+            {slide.eyebrow}
+          </Text>
+          <Text
+            style={styles.promoHeroTitle}
+            numberOfLines={2}
+            adjustsFontSizeToFit
+            minimumFontScale={0.82}
+          >
+            {slide.title}
+          </Text>
+          <Text style={styles.promoHeroSubtitle} numberOfLines={2}>
+            {slide.subtitle}
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function getPromoHeroAccent(slideKey: OnboardingPromoSlideKey, colors: any) {
+  switch (slideKey) {
+    case 'coach':
+      return colors.secondary;
+    case 'social':
+      return colors.accentGreen;
+    case 'analytics':
+      return colors.secondary;
+    case 'fridge':
+      return colors.warning;
+    case 'scanner':
+    default:
+      return colors.primary;
+  }
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
 }
 
 interface PreviewProps {
@@ -819,7 +1026,7 @@ function FridgePreview({ colors, isDark, palette }: PreviewProps) {
       sectionLabel="FRIDGE"
     >
       <View style={styles.fridgeIllustrationShell}>
-        <FridgeScanIllustration size={104} colors={colors} isDark />
+        <FridgeScanIllustration size={104} colors={colors} isDark={isDark} />
       </View>
       <View style={styles.recipeRow}>
         <View style={styles.recipeThumb} />
@@ -846,8 +1053,44 @@ const createStyles = (
   isDark: boolean,
   palette: OnboardingPalette,
   isCompactAndroidLayout: boolean,
-) =>
-  StyleSheet.create({
+  windowHeight: number,
+) => {
+  const contentTopPadding =
+    insets.top + (isCompactAndroidLayout ? SPACING.lg : SPACING.xl);
+  const contentBottomPadding =
+    getMinimumBottomInsetPadding(insets.bottom, SPACING.sm) +
+    (isCompactAndroidLayout ? SPACING.lg : SPACING.xl);
+  const headerHeight = 32;
+  const headerSlideMargin = isCompactAndroidLayout ? SPACING.xs : SPACING.sm;
+  const footerSlidesPaddingTop = isCompactAndroidLayout ? SPACING.sm : SPACING.md;
+  const footerSlidesGap = isCompactAndroidLayout ? SPACING.sm : SPACING.md;
+  const footerEstimatedHeight =
+    footerSlidesPaddingTop + 3 + footerSlidesGap + 60;
+  const heroSafetyGap = isCompactAndroidLayout ? SPACING.xs : SPACING.sm;
+  const availableHeroHeight = Math.max(
+    280,
+    windowHeight -
+      contentTopPadding -
+      contentBottomPadding -
+      headerHeight -
+      headerSlideMargin -
+      footerEstimatedHeight -
+      heroSafetyGap,
+  );
+  const promoHeroMinHeight = Math.min(
+    Math.round(windowHeight * (isCompactAndroidLayout ? 0.46 : 0.5)),
+    availableHeroHeight,
+  );
+  const promoHeroMaxHeight = Math.round(
+    windowHeight * (isCompactAndroidLayout ? 0.68 : 0.72),
+  );
+  const promoHeroTargetHeight = clampNumber(
+    Math.round(availableHeroHeight),
+    promoHeroMinHeight,
+    promoHeroMaxHeight,
+  );
+
+  return StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: palette.background,
@@ -882,10 +1125,8 @@ const createStyles = (
     },
     content: {
       flex: 1,
-      paddingTop: insets.top + (isCompactAndroidLayout ? SPACING.lg : SPACING.xl),
-      paddingBottom:
-        getMinimumBottomInsetPadding(insets.bottom, SPACING.sm) +
-        (isCompactAndroidLayout ? SPACING.lg : SPACING.xl),
+      paddingTop: contentTopPadding,
+      paddingBottom: contentBottomPadding,
       paddingHorizontal: isCompactAndroidLayout ? SPACING.lg : SPACING.xl,
     },
     header: {
@@ -895,11 +1136,17 @@ const createStyles = (
       marginBottom: SPACING.lg,
       minHeight: 32,
     },
+    headerSlides: {
+      marginBottom: isCompactAndroidLayout ? SPACING.xs : SPACING.sm,
+    },
     brand: {
       fontSize: SIZES.text12,
       fontWeight: '700',
       letterSpacing: 3,
       color: palette.textSecondary,
+    },
+    brandSlides: {
+      opacity: 0.72,
     },
     headerSpacer: {
       width: 1,
@@ -919,6 +1166,9 @@ const createStyles = (
       letterSpacing: 0.5,
       color: palette.textSecondary,
     },
+    skipSlidesLabelSlides: {
+      opacity: 0.82,
+    },
     pagerWrap: {
       flex: 1,
       minHeight: 0,
@@ -936,6 +1186,113 @@ const createStyles = (
     pageShell: {
       flex: 1,
       paddingTop: isCompactAndroidLayout ? SPACING.xs : SPACING.md,
+    },
+    pageShellPromo: {
+      paddingTop: 0,
+    },
+    promoHeroWrap: {
+      flex: 1,
+      minHeight: 0,
+      marginHorizontal: isCompactAndroidLayout ? -SPACING.md : -SPACING.lg,
+      paddingTop: isCompactAndroidLayout ? 0 : SPACING.xs,
+      alignItems: 'center',
+      justifyContent: 'flex-start',
+      overflow: 'hidden',
+    },
+    promoHeroBackdropImage: {
+      position: 'absolute',
+      top: -72,
+      right: -48,
+      bottom: -56,
+      left: -48,
+      transform: [{ scale: 1.14 }],
+    },
+    promoHeroGlow: {
+      position: 'absolute',
+      top: '9%',
+      left: '12%',
+      width: '76%',
+      height: '58%',
+      borderRadius: 999,
+      transform: [{ scaleX: 1.16 }],
+    },
+    promoHeroAmbientGradient: {
+      position: 'absolute',
+      top: -12,
+      right: 0,
+      left: 0,
+      height: '64%',
+      opacity: isDark ? 0.9 : 0.72,
+    },
+    promoHeroStage: {
+      width: '100%',
+      height: promoHeroTargetHeight,
+      minHeight: promoHeroMinHeight,
+      maxHeight: '100%',
+      borderRadius: isCompactAndroidLayout ? 18 : 22,
+      borderWidth: 0,
+      backgroundColor: palette.surface,
+      overflow: 'hidden',
+      ...SHADOWS.soft,
+      shadowColor: palette.accent,
+      shadowOpacity: isDark ? 0.08 : 0.04,
+      shadowRadius: isCompactAndroidLayout ? 8 : 12,
+      shadowOffset: { width: 0, height: 5 },
+      elevation: isDark ? 2 : 1,
+    },
+    promoHeroImage: {
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+      width: '100%',
+      height: '100%',
+    },
+    promoHeroTopFade: {
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      left: 0,
+      height: '34%',
+    },
+    promoHeroBottomFade: {
+      position: 'absolute',
+      right: 0,
+      bottom: 0,
+      left: 0,
+      height: '42%',
+    },
+    promoHeroCopy: {
+      position: 'absolute',
+      right: isCompactAndroidLayout ? SPACING.lg : SPACING.xl,
+      bottom: isCompactAndroidLayout ? SPACING.lg : SPACING.xl,
+      left: isCompactAndroidLayout ? SPACING.lg : SPACING.xl,
+      gap: isCompactAndroidLayout ? SPACING.xs : SPACING.sm,
+    },
+    promoHeroEyebrow: {
+      fontSize: SIZES.text12,
+      lineHeight: 16,
+      fontWeight: '800',
+      letterSpacing: 2,
+      textTransform: 'uppercase',
+    },
+    promoHeroTitle: {
+      fontSize: isCompactAndroidLayout ? 28 : 32,
+      lineHeight: isCompactAndroidLayout ? 32 : 36,
+      fontWeight: '800',
+      color: palette.textPrimary,
+      letterSpacing: 0,
+    },
+    promoHeroSubtitle: {
+      fontSize: isCompactAndroidLayout ? SIZES.sm : SIZES.md,
+      lineHeight: isCompactAndroidLayout ? 19 : 22,
+      fontWeight: '500',
+      color: palette.textSecondary,
+      maxWidth: 420,
+    },
+    fallbackSlideWrap: {
+      flex: 1,
     },
     profileCard: {
       flex: 1,
@@ -989,17 +1346,24 @@ const createStyles = (
       gap: isCompactAndroidLayout ? SPACING.md : SPACING.lg,
       paddingTop: isCompactAndroidLayout ? SPACING.md : SPACING.lg,
     },
+    footerSlides: {
+      gap: isCompactAndroidLayout ? SPACING.sm : SPACING.md,
+      paddingTop: isCompactAndroidLayout ? SPACING.sm : SPACING.md,
+    },
     progressRow: {
       flexDirection: 'row',
-      gap: SPACING.sm,
+      justifyContent: 'center',
+      alignSelf: 'center',
+      gap: 6,
     },
     progressDot: {
-      flex: 1,
-      height: 4,
+      width: 14,
+      height: 3,
       borderRadius: 999,
       backgroundColor: palette.inactive,
     },
     progressDotActive: {
+      width: 26,
       backgroundColor: palette.accent,
     },
     errorContainer: {
@@ -1016,6 +1380,7 @@ const createStyles = (
       textAlign: 'center',
     },
   });
+};
 
 const createPreviewStyles = (
   colors: any,

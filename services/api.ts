@@ -2,7 +2,8 @@ import { supabase } from './supabase';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { decode } from 'base64-arraybuffer';
 import { Platform } from 'react-native';
-import { DashboardData, AnalyticsData, AnalyticsPeriod, ScanType, ScanEligibilityResponse, AnalysisResult, ScanBodyResult, ScanFaceResult, ScanNutritionResult, SuperScanResult, BodyScoreHistoryItem, FaceScoreHistoryItem, NutritionHistoryItem, SuperScanHistoryItem, PremiumPotentialHistoryPoint, PremiumPotentialInputs, Scan, GamificationData } from '@/types';
+import { DashboardData, AnalyticsData, AnalyticsPeriod, ScanType, ScanEligibilityResponse, AnalysisResult, ScanBodyResult, ScanFaceResult, ScanNutritionResult, SuperScanResult, BodyScoreHistoryItem, FaceScoreHistoryItem, NutritionHistoryItem, SuperScanHistoryItem, PremiumPotentialHistoryPoint, PremiumPotentialInputs, Scan, GamificationData, CoachProfileUpdate, PersistedInferredPersona } from '@/types';
+import type { CoachPersonaKey } from '@/shared/coachPersonas';
 import { resolveGamification } from '@/constants/gamification';
 import { STORAGE_BUCKET_NAME } from '@/constants/scan';
 import {
@@ -15,6 +16,10 @@ import {
 } from '@/utils/analysisNormalization';
 import { resolveFaceGlowScore } from '@/utils/faceGlow';
 import { logOperationalError } from '@/utils/observability';
+import {
+  extractMissingColumnFromPgrstError,
+  isPostgrestSchemaCacheMissError,
+} from '@/utils/postgrestErrors';
 import {
   AuthenticatedStorageSessionError,
   uploadAuthenticatedStorageObject,
@@ -692,6 +697,45 @@ async function rollbackReservedScanAfterUploadFailure(scanId: string, scanType: 
   }
 }
 
+function mergeCoachProfileUpdates(
+  previous: PersistedInferredPersona | null,
+  updates: CoachProfileUpdate,
+  nowIso: string,
+): PersistedInferredPersona {
+  const dietSignals = new Set<string>(previous?.detected_diet_signals ?? []);
+  for (const signal of updates.detected_diet_signals) {
+    if (typeof signal === 'string' && signal.trim().length > 0) {
+      dietSignals.add(signal.trim());
+    }
+  }
+
+  const goals = new Set<string>(previous?.suggested_goals ?? []);
+  for (const goal of updates.suggested_goals) {
+    if (typeof goal === 'string' && goal.trim().length > 0) {
+      goals.add(goal.trim());
+    }
+  }
+
+  return {
+    detected_diet_signals: Array.from(dietSignals).slice(0, 8),
+    detected_strong_focus: updates.detected_strong_focus ?? previous?.detected_strong_focus ?? null,
+    suggested_goals: Array.from(goals).slice(0, 6),
+    suggested_persona_key:
+      updates.suggested_persona_key ?? previous?.suggested_persona_key ?? null,
+    last_updated_at: nowIso,
+    update_count: (previous?.update_count ?? 0) + 1,
+  };
+}
+
+function profileUpdateHasContent(updates: CoachProfileUpdate): boolean {
+  return (
+    updates.detected_diet_signals.length > 0 ||
+    updates.suggested_goals.length > 0 ||
+    updates.detected_strong_focus !== null ||
+    updates.suggested_persona_key !== null
+  );
+}
+
 export class ApiService {
   static async getDashboard(): Promise<DashboardData> {
     const { data: { user } } = await supabase.auth.getUser();
@@ -781,7 +825,9 @@ export class ApiService {
       // Requête 2: scan_metrics (nouvelles données)
       supabase
         .from('scan_metrics')
-        .select('recorded_at, scan_type, body_score, body_fat_percentage, face_score, skin_quality_score, plate_health_score, calories_estimate, protein_grams, global_risk_score')
+        .select(
+          'recorded_at, scan_type, body_score, body_fat_percentage, body_strength_index, body_posture_score, body_symmetry_score, body_metabolic_age, face_score, skin_quality_score, face_symmetry_percentage, face_energy_score, face_hydration_level, face_collagen_level, plate_health_score, calories_estimate, protein_grams, nutrition_carbs_grams, nutrition_fat_grams, nutrition_satiety_index, global_risk_score'
+        )
         .eq('user_id', user.id)
         .gte('recorded_at', localStartDateStr)
         .order('recorded_at', { ascending: true })
@@ -862,8 +908,19 @@ export class ApiService {
         date: m.recorded_at.split('T')[0],
         bodyScore: m.body_score,
         bodyFatPercentage: m.body_fat_percentage || 0,
+        strengthIndex: m.body_strength_index || 0,
+        postureScore: m.body_posture_score || 0,
+        bodySymmetry: m.body_symmetry_score || 0,
+        metabolicAge: m.body_metabolic_age || 0,
       }),
-      { bodyScore: 'body_score', bodyFatPercentage: 'body_fat_percentage' }
+      {
+        bodyScore: 'body_score',
+        bodyFatPercentage: 'body_fat_percentage',
+        strengthIndex: 'body_strength_index',
+        postureScore: 'body_posture_score',
+        bodySymmetry: 'body_symmetry_score',
+        metabolicAge: 'body_metabolic_age',
+      }
     ).filter(x => x.bodyScore !== null && x.bodyScore !== undefined);
 
     const faceScoreHistory: FaceScoreHistoryItem[] = aggregateDailyData<FaceScoreHistoryItem>(
@@ -873,8 +930,19 @@ export class ApiService {
         date: m.recorded_at.split('T')[0],
         faceScore: m.face_score,
         skinQualityScore: m.skin_quality_score || 0,
+        symmetryPercentage: m.face_symmetry_percentage || 0,
+        energyScore: m.face_energy_score || 0,
+        hydrationLevel: m.face_hydration_level || 0,
+        collagenLevel: m.face_collagen_level || 0,
       }),
-      { faceScore: 'face_score', skinQualityScore: 'skin_quality_score' }
+      {
+        faceScore: 'face_score',
+        skinQualityScore: 'skin_quality_score',
+        symmetryPercentage: 'face_symmetry_percentage',
+        energyScore: 'face_energy_score',
+        hydrationLevel: 'face_hydration_level',
+        collagenLevel: 'face_collagen_level',
+      }
     ).filter(x => x.faceScore !== null && x.faceScore !== undefined);
 
     const nutritionHistory: NutritionHistoryItem[] = aggregateDailyData<NutritionHistoryItem>(
@@ -884,9 +952,19 @@ export class ApiService {
         date: m.recorded_at.split('T')[0],
         caloriesEstimate: m.calories_estimate,
         proteinGrams: m.protein_grams || 0,
+        carbsGrams: m.nutrition_carbs_grams || 0,
+        fatGrams: m.nutrition_fat_grams || 0,
+        satietyIndex: m.nutrition_satiety_index || 0,
         nutritionScore: m.plate_health_score || 0,
       }),
-      { caloriesEstimate: 'calories_estimate', proteinGrams: 'protein_grams', nutritionScore: 'plate_health_score' }
+      {
+        caloriesEstimate: 'calories_estimate',
+        proteinGrams: 'protein_grams',
+        carbsGrams: 'nutrition_carbs_grams',
+        fatGrams: 'nutrition_fat_grams',
+        satietyIndex: 'nutrition_satiety_index',
+        nutritionScore: 'plate_health_score',
+      }
     ).filter(x => x.caloriesEstimate !== null && x.caloriesEstimate !== undefined);
 
     const superScanHistory: SuperScanHistoryItem[] = aggregateDailyData<SuperScanHistoryItem>(
@@ -950,14 +1028,82 @@ export class ApiService {
       // Mapper le scan_type au type d'analyse
       const resultType = getAnalysisResultScanType(analysisResult);
 
+      const roundOrNull = (value: unknown): number | null => {
+        if (value === null || value === undefined) return null;
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? Math.round(parsed) : null;
+      };
+      const pickEnumOrNull = (
+        value: unknown,
+        allowed: readonly string[],
+      ): string | null => {
+        if (typeof value !== 'string') return null;
+        const lowered = value.trim().toLowerCase();
+        return allowed.includes(lowered) ? lowered : null;
+      };
+
       if (resultType === 'body') {
         const bodyResult = analysisResult as ScanBodyResult;
         metricsData.scan_type = 'body';
         metricsData.body_score = Math.round(Number(bodyResult.body_score) || 0);
         metricsData.body_fat_percentage = Math.round(Number(bodyResult.body_fat_percentage) || 0);
         metricsData.waist_estimation_cm = Math.round(Number(bodyResult.waist_estimation_cm) || 0);
+        metricsData.body_posture_score = Math.round(Number(bodyResult.posture_score) || 0);
+        metricsData.body_symmetry_score = Math.round(Number(bodyResult.body_symmetry) || 0);
         metricsData.body_metabolic_age = Math.round(Number(bodyResult.metabolic_age) || 0);
         metricsData.body_strength_index = Math.round(Number(bodyResult.strength_index) || 0);
+        metricsData.body_muscle_definition_score = roundOrNull(bodyResult.muscle_definition_score);
+        metricsData.body_midsection_definition_score = roundOrNull(bodyResult.midsection_definition_score);
+        metricsData.body_shoulder_alignment_score = roundOrNull(bodyResult.shoulder_alignment_score);
+        metricsData.body_recovery_readiness_score = roundOrNull(bodyResult.recovery_readiness_score);
+        metricsData.body_upper_body_definition_score = roundOrNull(bodyResult.upper_body_definition_score);
+        metricsData.body_lower_body_definition_score = roundOrNull(bodyResult.lower_body_definition_score);
+        metricsData.body_arm_definition_score = roundOrNull(bodyResult.arm_definition_score);
+        metricsData.body_v_taper_score = roundOrNull(bodyResult.v_taper_score);
+        metricsData.body_tension_indicator_score = roundOrNull(bodyResult.body_tension_indicator_score);
+        metricsData.body_perceived_sex_key = pickEnumOrNull(bodyResult.perceived_sex_key, [
+          'male_presenting',
+          'female_presenting',
+          'neutral_or_unclear',
+        ]);
+        metricsData.body_perceived_age_range_key = pickEnumOrNull(bodyResult.perceived_age_range_key, [
+          'under_18',
+          '18_24',
+          '25_34',
+          '35_44',
+          '45_54',
+          '55_64',
+          '65_plus',
+        ]);
+        metricsData.body_estimated_height_range_key = pickEnumOrNull(bodyResult.estimated_height_range_key, [
+          'under_150cm',
+          '150_160cm',
+          '160_170cm',
+          '170_180cm',
+          '180_190cm',
+          '190_plus',
+        ]);
+        metricsData.body_estimated_weight_range_key = pickEnumOrNull(bodyResult.estimated_weight_range_key, [
+          'under_50kg',
+          '50_60kg',
+          '60_70kg',
+          '70_80kg',
+          '80_90kg',
+          '90_100kg',
+          '100_plus',
+        ]);
+        metricsData.body_frame_key = pickEnumOrNull(bodyResult.body_frame_key, [
+          'small',
+          'medium',
+          'large',
+        ]);
+        metricsData.body_perceived_fitness_level_key = pickEnumOrNull(bodyResult.perceived_fitness_level_key, [
+          'sedentary',
+          'lightly_active',
+          'moderately_active',
+          'very_active',
+          'athletic',
+        ]);
       } else if (resultType === 'face') {
         const faceResult = analysisResult as ScanFaceResult;
         metricsData.scan_type = 'face';
@@ -965,15 +1111,128 @@ export class ApiService {
         metricsData.skin_quality_score = Math.round(Number(faceResult.skin_quality_score) || 0);
         metricsData.fatigue_level = Math.round(Number(faceResult.fatigue_level) || 0);
         metricsData.face_symmetry_percentage = Math.round(Number(faceResult.symmetry_percentage) || 0);
+        metricsData.face_hydration_level = Math.round(Number(faceResult.hydration_level) || 0);
+        metricsData.face_collagen_level = Math.round(Number(faceResult.collagen_level) || 0);
         const energyScore = resolveFaceGlowScore(faceResult);
         metricsData.face_energy_score = energyScore != null ? Math.round(Number(energyScore)) : null;
+        metricsData.face_skin_clarity_score = roundOrNull(faceResult.skin_clarity_score);
+        metricsData.face_under_eye_shadow_score = roundOrNull(faceResult.under_eye_shadow_score);
+        metricsData.face_under_eye_volume_score = roundOrNull(faceResult.under_eye_volume_score);
+        metricsData.face_eye_openness_score = roundOrNull(faceResult.eye_openness_score);
+        metricsData.face_complexion_redness_score = roundOrNull(faceResult.complexion_redness_score);
+        metricsData.face_pore_visibility_score = roundOrNull(faceResult.pore_visibility_score);
+        metricsData.face_skin_evenness_score = roundOrNull(faceResult.skin_evenness_score);
+        metricsData.face_skin_radiance_score = roundOrNull(faceResult.skin_radiance_score);
+        metricsData.face_lip_dryness_score = roundOrNull(faceResult.lip_dryness_score);
+        metricsData.face_forehead_smoothness_score = roundOrNull(faceResult.forehead_smoothness_score);
+        metricsData.face_t_zone_oiliness_score = roundOrNull(faceResult.t_zone_oiliness_score);
+        metricsData.face_perceived_sex_key = pickEnumOrNull(faceResult.perceived_sex_key, [
+          'male_presenting',
+          'female_presenting',
+          'neutral_or_unclear',
+        ]);
+        metricsData.face_perceived_age_range_key = pickEnumOrNull(faceResult.perceived_age_range_key, [
+          'under_18',
+          '18_24',
+          '25_34',
+          '35_44',
+          '45_54',
+          '55_64',
+          '65_plus',
+        ]);
+        metricsData.face_perceived_stress_level = roundOrNull(faceResult.perceived_stress_level);
+        metricsData.face_perceived_sleep_quality = roundOrNull(faceResult.perceived_sleep_quality);
       } else if (resultType === 'nutrition') {
         const nutritionResult = analysisResult as ScanNutritionResult;
         metricsData.scan_type = 'nutrition';
         metricsData.plate_health_score = Math.round(Number(nutritionResult.plate_health_score) || 0);
         metricsData.calories_estimate = Math.round(Number(nutritionResult.calories_estimate) || 0);
         metricsData.protein_grams = Math.round(Number(nutritionResult.protein_grams) || 0);
+        metricsData.nutrition_carbs_grams = Math.round(Number(nutritionResult.carbs_grams) || 0);
+        metricsData.nutrition_fat_grams = Math.round(Number(nutritionResult.fat_grams) || 0);
         metricsData.nutrition_satiety_index = Math.round(Number(nutritionResult.satiety_index) || 0);
+        metricsData.nutrition_fiber_grams_estimate = roundOrNull(nutritionResult.fiber_grams_estimate);
+        metricsData.nutrition_sugar_grams_estimate = roundOrNull(nutritionResult.sugar_grams_estimate);
+        metricsData.nutrition_processing_level_score = roundOrNull(nutritionResult.processing_level_score);
+        metricsData.nutrition_hydration_contribution_score = roundOrNull(nutritionResult.hydration_contribution_score);
+        metricsData.nutrition_sodium_level_score = roundOrNull(nutritionResult.sodium_level_score);
+        metricsData.nutrition_meal_balance_score = roundOrNull(nutritionResult.meal_balance_score);
+        metricsData.nutrition_inflammation_index_score = roundOrNull(nutritionResult.inflammation_index_score);
+        metricsData.nutrition_meal_type_key = pickEnumOrNull(nutritionResult.meal_type_key, [
+          'breakfast',
+          'lunch',
+          'dinner',
+          'snack',
+          'dessert',
+          'other',
+        ]);
+        metricsData.nutrition_portion_size_key = pickEnumOrNull(nutritionResult.portion_size_key, [
+          'small',
+          'medium',
+          'large',
+          'oversized',
+        ]);
+        metricsData.nutrition_color_diversity_score = roundOrNull(nutritionResult.color_diversity_score);
+        metricsData.nutrition_vegetable_portion_ratio = roundOrNull(nutritionResult.vegetable_portion_ratio);
+        metricsData.nutrition_protein_visibility_score = roundOrNull(nutritionResult.protein_visibility_score);
+        metricsData.nutrition_whole_grain_indicator_score = roundOrNull(nutritionResult.whole_grain_indicator_score);
+        metricsData.nutrition_meal_freshness_score = roundOrNull(nutritionResult.meal_freshness_score);
+        metricsData.nutrition_cuisine_type_key = pickEnumOrNull(nutritionResult.cuisine_type_key, [
+          'mediterranean',
+          'asian',
+          'western',
+          'middle_eastern',
+          'latin',
+          'african',
+          'mixed',
+          'other',
+        ]);
+        metricsData.nutrition_meat_type_key = pickEnumOrNull(nutritionResult.meat_type_key, [
+          'red_meat',
+          'poultry',
+          'fish',
+          'seafood',
+          'plant_protein',
+          'dairy',
+          'none',
+        ]);
+        metricsData.nutrition_cooking_method_key = pickEnumOrNull(nutritionResult.cooking_method_key, [
+          'fried',
+          'baked',
+          'grilled',
+          'raw',
+          'steamed',
+          'boiled',
+          'sauteed',
+          'other',
+        ]);
+        metricsData.nutrition_meal_dietary_pattern_key = pickEnumOrNull(nutritionResult.meal_dietary_pattern_key, [
+          'omnivore',
+          'vegetarian_compatible',
+          'vegan_compatible',
+          'pescetarian_compatible',
+          'keto_compatible',
+          'mediterranean_compatible',
+          'unclear',
+        ]);
+        const allergenAllowed = [
+          'gluten_likely',
+          'dairy_likely',
+          'nuts_likely',
+          'shellfish_likely',
+          'eggs_likely',
+          'soy_likely',
+          'seafood_likely',
+        ];
+        metricsData.nutrition_allergen_visibility_keys = Array.isArray(nutritionResult.allergen_visibility_keys)
+          ? Array.from(
+              new Set(
+                nutritionResult.allergen_visibility_keys
+                  .map((v) => pickEnumOrNull(v, allergenAllowed))
+                  .filter((v): v is string => v !== null),
+              ),
+            )
+          : [];
       } else if (resultType === 'super_health_v2') {
         const superResult = analysisResult as SuperScanResult;
         metricsData.scan_type = 'super';
@@ -1003,6 +1262,33 @@ export class ApiService {
         .upsert(metricsData, { onConflict: 'scan_id' });
 
       if (error) {
+        // PostgREST schema cache may be stale right after a migration adds a
+        // column. Retry once without the unknown column rather than dropping
+        // the entire metrics row, then log the degraded write so the schema
+        // cache can be refreshed.
+        if (isPostgrestSchemaCacheMissError(error)) {
+          const missingColumn = extractMissingColumnFromPgrstError(error);
+          if (missingColumn && missingColumn in metricsData) {
+            const { [missingColumn]: _omit, ...fallbackPayload } = metricsData;
+            const { error: retryError } = await supabase
+              .from('scan_metrics')
+              .upsert(fallbackPayload, { onConflict: 'scan_id' });
+            if (!retryError) {
+              logOperationalError(
+                '[API] saveMetricsToHistory degraded: dropped unknown column',
+                error,
+                {
+                  scan_id: scanId,
+                  requested_scan_type: scanType,
+                  analysis_scan_type: resultType,
+                  dropped_column: missingColumn,
+                },
+              );
+              return;
+            }
+          }
+        }
+
         // Ne pas faire échouer le scan si l'insertion des métriques échoue
         logOperationalError('[API] saveMetricsToHistory failed', error, {
           scan_id: scanId,
@@ -1446,5 +1732,76 @@ export class ApiService {
         analysisError: apiError,
       };
     }
+  }
+
+  /**
+   * Merge the coach's profile_updates into user_profiles.inferred_persona.
+   * Returns the new persisted persona, or null if nothing actionable was provided.
+   * Silent no-op when the user is unauthenticated.
+   */
+  static async applyCoachProfileUpdates(
+    updates: CoachProfileUpdate,
+  ): Promise<PersistedInferredPersona | null> {
+    if (!profileUpdateHasContent(updates)) return null;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      logOperationalError(
+        '[API] applyCoachProfileUpdates skipped: user not authenticated',
+        null,
+        {},
+      );
+      return null;
+    }
+
+    const { data: existingRow, error: readError } = await supabase
+      .from('user_profiles')
+      .select('inferred_persona')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (readError) {
+      logOperationalError(
+        '[API] applyCoachProfileUpdates failed to read existing persona',
+        readError,
+        { user_id: user.id },
+      );
+      return null;
+    }
+
+    const previous =
+      existingRow && typeof existingRow === 'object' && 'inferred_persona' in existingRow
+        ? ((existingRow as { inferred_persona: PersistedInferredPersona | null })
+            .inferred_persona ?? null)
+        : null;
+
+    const merged = mergeCoachProfileUpdates(previous, updates, new Date().toISOString());
+
+    const { error: updateError } = await supabase
+      .from('user_profiles')
+      .update({ inferred_persona: merged })
+      .eq('id', user.id);
+
+    if (updateError) {
+      if (isPostgrestSchemaCacheMissError(updateError)) {
+        const missingColumn = extractMissingColumnFromPgrstError(updateError);
+        if (missingColumn === 'inferred_persona') {
+          logOperationalError(
+            '[API] applyCoachProfileUpdates degraded: inferred_persona column missing — apply migration',
+            updateError,
+            { user_id: user.id },
+          );
+          return null;
+        }
+      }
+      logOperationalError(
+        '[API] applyCoachProfileUpdates failed to write persona',
+        updateError,
+        { user_id: user.id },
+      );
+      return null;
+    }
+
+    return merged;
   }
 }

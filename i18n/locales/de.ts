@@ -571,7 +571,7 @@ export const DE_TRANSLATIONS = {
     no_active_guidance_title: 'Noch keine aktive Guidance',
     no_active_guidance_body:
       'Waehle unten einen Guidance-Typ, um mit dieser Coach-Persoenlichkeit eine neue Antwort zu erzeugen.',
-    prompt_selection_hint: 'Waehle ein kurzes, klares Format.',
+    prompt_selection_hint: 'Waehle eine kurze, konkrete Coach-Frage.',
     generate_cta: 'Diese Guidance anfragen',
     expand_cta: 'Mehr lesen',
     collapse_cta: 'Weniger',
@@ -667,49 +667,50 @@ export const DE_TRANSLATIONS = {
     },
     prompts: {
       latest_scan: {
-        title: 'Letzter Scan',
-        subtitle:
-          'Verwandle dein neuestes Ergebnis in einen kurzen Aktionsplan.',
+        title: 'Prioritaet des Tages',
+        subtitle: 'Was sollte ich nach meinem letzten Scan zuerst anpassen?',
       },
       weekly_plan: {
-        title: 'Wochenplan',
+        title: '7-Tage-Plan',
         subtitle:
-          'Erstelle einen ruhigen Plan aus deinen letzten sieben Tagen.',
+          'Welche 3 realistischen Gewohnheiten sollte ich diese Woche verfolgen?',
       },
       nutrition_focus: {
-        title: 'Ernaehrungsfokus',
+        title: 'Naechste Mahlzeit',
         subtitle:
-          'Hol dir einen Essens-Impuls aus deinem letzten Ernahrungs-Scan.',
+          'Welche kleine Anpassung hilft bei meinem naechsten Teller?',
       },
       body_focus: {
-        title: 'Koerperfokus',
+        title: 'Nuetzliche Bewegung',
         subtitle:
-          'Uebersetze deinen letzten Koerper-Scan in praktische Gewohnheiten.',
+          'Welche einfache Bewegung hilft Haltung, Form oder Regelmaessigkeit?',
       },
       face_focus: {
-        title: 'Gesichtsfokus',
-        subtitle:
-          'Pruefe Haut, Glow und Erholung anhand deines letzten Gesichts-Scans.',
+        title: 'Haut & Muedigkeit',
+        subtitle: 'Was sagen meine visuellen Signale heute?',
       },
       hydration_focus: {
-        title: 'Hydration',
-        subtitle: 'Wasser und Balance fuer heute.',
+        title: 'Hydrationsritual',
+        subtitle: 'Welchen einfachen Trink-Reflex sollte ich heute testen?',
       },
       sleep_coach: {
-        title: 'Schlaf',
-        subtitle: 'Erholungs-Signale aus deinen Scans.',
+        title: 'Abend-Erholung',
+        subtitle: 'Welche leichte Routine kann mir heute Abend helfen?',
       },
       risk_watch: {
-        title: 'Achtung',
-        subtitle: 'Vorsichtige Lesart nach einem Gesundheits-Scan.',
+        title: 'Im Blick behalten',
+        subtitle:
+          'Welches Signal verdient Aufmerksamkeit, ohne Alarm auszuloesen?',
       },
       trend_review: {
-        title: 'Trend',
-        subtitle: 'Rueckblick auf 2 bis 4 Wochen.',
+        title: 'Was sich aendert',
+        subtitle:
+          'Was verbessert sich wirklich, bleibt stabil oder geht zurueck?',
       },
       recovery_plan: {
-        title: 'Erholungsplan',
-        subtitle: 'Zurueck zur Form nach einem Dip.',
+        title: 'Schneller Neustart',
+        subtitle:
+          'Wie komme ich anhand meiner aktuellen Signale wieder in die Spur?',
       },
     },
     sections: {
@@ -740,7 +741,7 @@ export const DE_TRANSLATIONS = {
     },
     context_strip: {
       persona_prefix: 'Mit',
-      mode_prefix: 'Modus',
+      mode_prefix: 'Frage',
       status_prefix: 'Status',
     },
     selection_summary: {
@@ -793,11 +794,11 @@ export const DE_TRANSLATIONS = {
     },
     settings: {
       title: 'Einstellungen',
-      subtitle: 'Wähle einen Coach und eine Art von Rat, tippe dann auf Anwenden.',
+      subtitle: 'Waehle Coach und Frage, dann fordere deinen Tipp an.',
     },
     options_sheet: {
       persona_label: 'Coach',
-      mode_label: 'Modus',
+      mode_label: 'Coach-Frage',
       apply_label: 'Uebernehmen',
       close_a11y: 'Einstellungen schliessen',
     },
@@ -1175,7 +1176,7 @@ export const DE_TRANSLATIONS = {
     signup_link: 'Registrieren',
     signup_title: 'Konto erstellen',
     signup_subtitle: 'Werden Sie Teil von Health Scan',
-    password_min_placeholder: 'Passwort (min. 6 Zeichen)',
+    password_min_placeholder: 'Passwort (8+ Zeichen, Kleinbuchstabe + Zahl)',
     password_confirm_placeholder: 'Passwort bestätigen',
     verification_note: 'Wir senden Ihnen einen Bestätigungscode.',
     signup_btn: 'Registrieren',
@@ -1184,7 +1185,8 @@ export const DE_TRANSLATIONS = {
     error_email_required: 'E-Mail ist erforderlich',
     error_password_required: 'Passwort ist erforderlich',
     error_passwords_match: 'Passwörter stimmen nicht überein',
-    error_password_length: 'Passwort muss mindestens 6 Zeichen lang sein',
+    error_password_length:
+      'Passwort muss mindestens 8 Zeichen lang sein und einen Kleinbuchstaben und eine Zahl enthalten',
     error_login_generic: 'Anmeldung fehlgeschlagen',
     error_ip_limit_reached:
       'Kontoerstellungslimit für dieses Netzwerk erreicht. Bitte versuchen Sie es später erneut.',
@@ -1221,7 +1223,8 @@ export const DE_TRANSLATIONS = {
       fill_all: 'Bitte alle Felder ausfüllen',
       invalid_email: 'Ungültige E-Mail',
       password_mismatch: 'Passwörter stimmen nicht überein',
-      password_short: 'Passwort muss mind. 6 Zeichen lang sein',
+      password_short:
+        'Passwort muss mindestens 8 Zeichen lang sein und einen Kleinbuchstaben und eine Zahl enthalten',
       disposable_email: 'Wegwerf-E-Mails sind nicht erlaubt',
       email_in_use: 'Diese E-Mail wird bereits verwendet',
       general_error: 'Ein Fehler ist aufgetreten',
@@ -1535,6 +1538,23 @@ export const DE_TRANSLATIONS = {
     super_scan_score_subtitle: 'Globales Risiko-Score',
     legend_score: 'Score (0-100)',
     legend_body_fat: 'Körperfett %',
+    metric_tabs: {
+      score: 'Score',
+      skin_quality: 'Haut',
+      symmetry: 'Symmetrie',
+      energy: 'Glow',
+      hydration: 'Hydration',
+      collagen: 'Kollagen',
+      body_fat: 'Korperfett',
+      strength: 'Kraft',
+      posture: 'Haltung',
+      metabolic_age: 'Stoffwechselalter',
+      calories: 'Kalorien',
+      protein: 'Protein',
+      carbs: 'Kohlenhydrate',
+      fats: 'Fette',
+      satiety: 'Sattigung',
+    },
   },
   super_scan_features: {
     premium_alert_title: 'Super Scan Premium',

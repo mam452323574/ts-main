@@ -9,6 +9,11 @@ export const EN_RESULT_TRANSLATIONS = {
       paywall_cta: 'Discover Premium',
       attention: 'Attention',
       ai_report: 'AI Report',
+      analysis_quality: {
+        limited: 'Image quality limited',
+        partial: 'Partial metric coverage',
+        review: 'Confidence to review',
+      },
       trajectory_preview: {
         title: '30-day projection',
         eyebrow: {

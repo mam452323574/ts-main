@@ -1328,7 +1328,14 @@ describe('CoachScreen', () => {
     });
   });
 
-  it('shows a query error state when coach data loading fails before generation', () => {
+  it('shows the refresh error title only when the ui state resolves to query_error', async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const consoleLogSpy = jest
+      .spyOn(console, 'log')
+      .mockImplementation(() => undefined);
+
+    (process.env as Record<string, string | undefined>).NODE_ENV =
+      'development';
     mockCoachEntriesState = {
       data: undefined,
       error: new Error(
@@ -1339,15 +1346,119 @@ describe('CoachScreen', () => {
       refetch: jest.fn(),
     };
 
-    const screen = render(<CoachScreen />);
+    try {
+      const screen = render(<CoachScreen />);
 
-    expect(screen.getByTestId('coach-query-error-state')).toBeTruthy();
-    expect(
-      screen.getByText(
-        "Votre dernier conseil sauvegarde reste disponible quand c'est possible. Reessayez dans un instant.",
-      ),
-    ).toBeTruthy();
-    expect(screen.queryByText(/coach_entries/i)).toBeNull();
+      expect(screen.getByTestId('coach-query-error-state')).toBeTruthy();
+      expect(
+        screen.getByText('Impossible de rafraîchir Coach maintenant'),
+      ).toBeTruthy();
+      expect(screen.queryByTestId('coach-settings-inline')).toBeNull();
+      expect(
+        screen.getByText(
+          "Votre dernier conseil sauvegardé reste disponible quand c'est possible. Réessayez dans un instant.",
+        ),
+      ).toBeTruthy();
+      expect(screen.queryByText(/coach_entries/i)).toBeNull();
+
+      await waitFor(() => {
+        expect(consoleLogSpy).toHaveBeenCalledWith(
+          '[CoachScreen] ui state',
+          expect.objectContaining({
+            ui_state: 'query_error',
+            display_mode: 'settings',
+            load_error_source: 'entries',
+            has_entries_error: true,
+            has_entries_data: false,
+            has_recent_scans_error: false,
+            has_recent_scans_data: true,
+            has_latest_ready_error: false,
+            has_latest_ready_entry_data: true,
+            has_tracked_guidance: false,
+            has_generation_guidance: false,
+          }),
+        );
+      });
+    } finally {
+      (process.env as Record<string, string | undefined>).NODE_ENV =
+        originalNodeEnv;
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('transitions from cold-start loading to query_error when latest ready bootstrap loading fails', async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const consoleLogSpy = jest
+      .spyOn(console, 'log')
+      .mockImplementation(() => undefined);
+    let latestReadyQuery = {
+      data: undefined as Record<string, unknown> | null | undefined,
+      error: null as Error | null,
+      isLoading: true,
+      isFetching: true,
+      refetch: jest.fn(),
+    };
+
+    (process.env as Record<string, string | undefined>).NODE_ENV =
+      'development';
+    mockCoachEntriesState = {
+      data: [],
+      error: null,
+      isLoading: false,
+      isFetching: false,
+      refetch: jest.fn(),
+    };
+    mockUseLatestReadyCoachEntry.mockImplementation(() => latestReadyQuery);
+
+    try {
+      const screen = render(<CoachScreen />);
+
+      expect(screen.getByTestId('coach-loading-state')).toBeTruthy();
+      expect(screen.queryByTestId('coach-query-error-state')).toBeNull();
+
+      latestReadyQuery = {
+        data: undefined,
+        error: new Error('Latest ready coach guidance is unavailable'),
+        isLoading: false,
+        isFetching: false,
+        refetch: jest.fn(),
+      };
+
+      screen.rerender(<CoachScreen />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('coach-query-error-state')).toBeTruthy();
+      });
+
+      expect(screen.queryByTestId('coach-loading-state')).toBeNull();
+      expect(
+        screen.getByText('Impossible de rafraîchir Coach maintenant'),
+      ).toBeTruthy();
+      expect(screen.queryByTestId('coach-settings-inline')).toBeNull();
+
+      await waitFor(() => {
+        expect(consoleLogSpy).toHaveBeenCalledWith(
+          '[CoachScreen] ui state',
+          expect.objectContaining({
+            ui_state: 'query_error',
+            display_mode: 'settings',
+            load_error_source: 'latest_ready',
+            has_entries_error: false,
+            has_entries_data: true,
+            has_recent_scans_error: false,
+            has_recent_scans_data: true,
+            has_latest_ready_error: true,
+            has_latest_ready_entry_data: false,
+            has_tracked_guidance: false,
+            has_generation_guidance: false,
+          }),
+        );
+      });
+    } finally {
+      (process.env as Record<string, string | undefined>).NODE_ENV =
+        originalNodeEnv;
+      consoleLogSpy.mockRestore();
+    }
   });
 
   it('shows a dedicated unavailable state for the provider-not-configured generation error', () => {
@@ -1688,7 +1799,7 @@ describe('CoachScreen', () => {
     expect(screen.queryByText('Previous advice before error')).toBeNull();
     expect(
       screen.getByText(
-        "Le service Coach n'a pas pu repondre pour le moment. Reessayez dans un instant.",
+        "Le service Coach n'a pas pu répondre pour le moment. Réessayez dans un instant.",
       ),
     ).toBeTruthy();
   });
@@ -1782,7 +1893,7 @@ describe('CoachScreen', () => {
 
       expect(
         screen.getByText(
-          'Le service Coach a renvoye une reponse inattendue. Reessayez dans un instant.',
+          'Le service Coach a renvoyé une réponse inattendue. Réessayez dans un instant.',
         ),
       ).toBeTruthy();
       expect(consoleLogSpy).toHaveBeenCalledWith(
@@ -2206,7 +2317,7 @@ describe('CoachScreen', () => {
 
       expect(
         screen.getByText(
-          "Le service Coach n'a pas pu repondre pour le moment. Reessayez dans un instant.",
+          "Le service Coach n'a pas pu répondre pour le moment. Réessayez dans un instant.",
         ),
       ).toBeTruthy();
       expect(consoleLogSpy).toHaveBeenCalledWith(
@@ -2281,7 +2392,7 @@ describe('CoachScreen', () => {
     ).toBeTruthy();
     expect(
       screen.getByText(
-        'Fais un scan d’abord pour que Coach ait des donnees a analyser.',
+        'Fais un scan d’abord pour que Coach ait des données à analyser.',
       ),
     ).toBeTruthy();
     expect(screen.getByText('Faire un scan')).toBeTruthy();
@@ -2328,8 +2439,8 @@ describe('CoachScreen', () => {
 
     await waitFor(() => {
       expect(mockShowAlert).toHaveBeenCalledWith(
-        'Impossible de rafraichir Coach maintenant',
-        "Votre dernier conseil sauvegarde reste disponible quand c'est possible. Reessayez dans un instant.",
+        'Impossible de rafraîchir Coach maintenant',
+        "Votre dernier conseil sauvegardé reste disponible quand c'est possible. Réessayez dans un instant.",
         expect.arrayContaining([
           expect.objectContaining({
             text: expect.any(String),

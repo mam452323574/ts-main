@@ -22,6 +22,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import {
+  BORDER_RADIUS,
   FONT_WEIGHTS,
   SHADOWS,
   SIZES,
@@ -320,6 +321,24 @@ export default function ScanResultScreen() {
               >
                 {viewModel.typeLabel}
               </Text>
+              {viewModel.analysisQualityLabel ? (
+                <View
+                  style={[
+                    styles.analysisQualityBadge,
+                    { backgroundColor: withAlpha(accentColor, 0.12) },
+                  ]}
+                >
+                  <Text
+                    {...RESULT_TEXT_PROPS}
+                    style={[
+                      styles.analysisQualityBadgeText,
+                      { color: accentColor },
+                    ]}
+                  >
+                    {viewModel.analysisQualityLabel}
+                  </Text>
+                </View>
+              ) : null}
             </View>
           </View>
 
@@ -744,6 +763,16 @@ const createStyles = (
       flex: 1,
       minWidth: 0,
       gap: SPACING.xs,
+    },
+    analysisQualityBadge: {
+      alignSelf: 'flex-start',
+      paddingHorizontal: SPACING.sm,
+      paddingVertical: 6,
+      borderRadius: BORDER_RADIUS.sm,
+    },
+    analysisQualityBadgeText: {
+      fontSize: SIZES.text12,
+      fontWeight: FONT_WEIGHTS.semiBold,
     },
     typeTitle: {
       fontSize: layout.heroTitleFontSize,

@@ -1,7 +1,7 @@
 import { normalizeAnalysisResult } from '@/utils/analysisNormalization';
 
 describe('analysisNormalization', () => {
-  it('upgrades an already normalized v2 payload to schema v3 without webhook fallbacks', () => {
+  it('upgrades an already normalized v2 payload to schema v4 without webhook fallbacks', () => {
     const normalized = normalizeAnalysisResult({
       schema_version: 2,
       scan_type: 'nutrition',
@@ -20,8 +20,9 @@ describe('analysisNormalization', () => {
     });
 
     expect(normalized).toEqual({
-      schema_version: 3,
+      schema_version: 4,
       scan_type: 'nutrition',
+      analysis_meta: null,
       plate_health_score: 88,
       calories_estimate: 560,
       protein_grams: 24,
@@ -51,7 +52,7 @@ describe('analysisNormalization', () => {
     });
 
     expect(normalized).toMatchObject({
-      schema_version: 3,
+      schema_version: 4,
       scan_type: 'nutrition',
       verdict_key: 'smoothie_ideal',
       glycemic_index_key: 'low',
@@ -76,7 +77,7 @@ describe('analysisNormalization', () => {
     });
 
     expect(normalized).toMatchObject({
-      schema_version: 3,
+      schema_version: 4,
       scan_type: 'nutrition',
       verdict_key: 'balanced',
       glycemic_index_key: 'low',
@@ -101,7 +102,7 @@ describe('analysisNormalization', () => {
     });
 
     expect(normalized).toMatchObject({
-      schema_version: 3,
+      schema_version: 4,
       verdict_key: 'unknown',
       glycemic_index_key: 'unknown',
       ingredient_quality_key: 'natural',
@@ -125,7 +126,7 @@ describe('analysisNormalization', () => {
     });
 
     expect(normalized).toMatchObject({
-      schema_version: 3,
+      schema_version: 4,
       scan_type: 'nutrition',
       verdict_key: 'unknown',
       glycemic_index_key: 'unknown',
@@ -152,7 +153,7 @@ describe('analysisNormalization', () => {
     });
 
     expect(normalized).toMatchObject({
-      schema_version: 3,
+      schema_version: 4,
       scan_type: 'body',
       muscle_mass_key: 'balanced',
       body_type_key: 'athletic',
@@ -484,8 +485,9 @@ describe('analysisNormalization', () => {
     });
 
     expect(normalized).toEqual({
-      schema_version: 3,
+      schema_version: 4,
       scan_type: 'nutrition',
+      analysis_meta: null,
       plate_health_score: 71,
       calories_estimate: 390,
       protein_grams: 19,
@@ -518,5 +520,37 @@ describe('analysisNormalization', () => {
         { expectedScanType: 'health' }
       )
     ).toThrow('Normalized analysis type mismatch');
+  });
+
+  it('parses analysis_meta on standard scans and clamps unsupported values', () => {
+    const normalized = normalizeAnalysisResult({
+      scan_type: 'face',
+      face_score: 81,
+      perceived_age: 28,
+      skin_quality_score: 74,
+      symmetry_percentage: 86,
+      fatigue_level: 21,
+      glow_index: 7,
+      collagen_level: 62,
+      hydration_level: 69,
+      photogenic_score: 8,
+      analysis_meta: {
+        confidence_score: '110',
+        imageQualityScore: '-4',
+        metric_coverage_score: 72,
+        limitation_flags: ['blur', 'unsupported_flag', 'blur'],
+      },
+    } as any);
+
+    expect(normalized).toMatchObject({
+      schema_version: 4,
+      scan_type: 'face',
+      analysis_meta: {
+        confidence_score: 100,
+        image_quality_score: 0,
+        metric_coverage_score: 72,
+        limitation_flags: ['blur'],
+      },
+    });
   });
 });

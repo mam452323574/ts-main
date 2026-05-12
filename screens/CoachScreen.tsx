@@ -41,6 +41,7 @@ import {
   useCoachScans,
   useLatestReadyCoachEntry,
 } from '@/hooks/queries';
+import { useApplyCoachProfileUpdates } from '@/hooks/useApplyCoachProfileUpdates';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { trackEvent } from '@/services/analytics';
 import {
@@ -114,6 +115,7 @@ type CoachGuidanceViewModel = {
 };
 
 type CoachGuidanceSource = 'mutation' | 'tracked' | 'latest_ready';
+type CoachLoadErrorSource = 'entries' | 'scans' | 'latest_ready' | 'none';
 
 type CoachRenderableCandidate = {
   status?: CoachEntry['status'] | null;
@@ -386,6 +388,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
   });
   const latestReadyEntry = latestReadyEntryData ?? null;
   const hasLatestReadyEntryData = latestReadyEntryData !== undefined;
+  useApplyCoachProfileUpdates(latestReadyEntry);
   const isPersonaSaving = pendingPersonaKey !== null;
   const generationGuidance: CoachGuidanceViewModel | null =
     !coachGeneration.isPending &&
@@ -407,6 +410,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
           renderedAt: null,
         }
       : null;
+  const hasGenerationGuidance = !!generationGuidance;
   const resumablePendingEntry = useMemo(
     () =>
       entries.find(
@@ -475,6 +479,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
           null,
       }
     : null;
+  const hasTrackedGuidance = !!trackedGuidance;
   const latestReadyGuidance: CoachGuidanceViewModel | null = latestReadyEntry
     ? {
         title: latestReadyEntry.title,
@@ -595,17 +600,28 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
   );
   const latestReadyError =
     latestReadyEntryError instanceof Error ? latestReadyEntryError : null;
+  const hasEntriesError = entriesError instanceof Error;
+  const hasRecentScansError = recentScansError instanceof Error;
+  const hasLatestReadyError = !!latestReadyError;
+  const entriesLoadError = hasEntriesError && !hasEntriesData ? entriesError : null;
+  const scansLoadError =
+    hasRecentScansError && !hasRecentScansData ? recentScansError : null;
+  const latestReadyLoadError =
+    !hasTrackedGuidance &&
+    !hasGenerationGuidance &&
+    !hasLatestReadyEntryData &&
+    hasLatestReadyError
+      ? latestReadyError
+      : null;
+  const loadErrorSource: CoachLoadErrorSource = entriesLoadError
+    ? 'entries'
+    : scansLoadError
+      ? 'scans'
+      : latestReadyLoadError
+        ? 'latest_ready'
+        : 'none';
   const loadError =
-    entriesError instanceof Error && !hasEntriesData
-      ? entriesError
-      : recentScansError instanceof Error && !hasRecentScansData
-        ? recentScansError
-        : !trackedGuidance &&
-            !generationGuidance &&
-            !hasLatestReadyEntryData &&
-            latestReadyError
-          ? latestReadyError
-          : null;
+    entriesLoadError ?? scansLoadError ?? latestReadyLoadError ?? null;
   const persistedCoachProviderUnavailable =
     isCoachProviderUnavailableEntry(latestCoachEntry);
   const generationCoachProviderUnavailable = isCoachProviderUnavailableError(
@@ -782,6 +798,11 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
       t(`coach.prompts.${promptType}.title`),
     [t],
   );
+  const promptSubtitleResolver = useCallback(
+    (promptType: (typeof COACH_PROMPT_TYPES)[number]) =>
+      t(`coach.prompts.${promptType}.subtitle`),
+    [t],
+  );
 
   const inlinePersonaOptions = useMemo(
     () =>
@@ -814,7 +835,6 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     }
   }, [isPromptLockedForUser, selectedPromptType]);
 
-  const hasGenerationGuidance = !!generationGuidance;
   useEffect(() => {
     if (hasGenerationGuidance) {
       setDisplayMode('result');
@@ -896,6 +916,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     console.log('[CoachScreen] ui state', {
       mutation_entry_id: coachGeneration.data?.entry_id ?? null,
       mutation_status: coachGeneration.data?.status ?? null,
+      display_mode: displayMode,
       tracked_entry_id: effectiveTrackedEntryId,
       tracked_status:
         trackedCoachEntry?.status ??
@@ -904,6 +925,15 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
       is_mutation_pending: coachGeneration.isPending,
       is_entries_fetching: isEntriesFetching,
       ui_state: uiState,
+      load_error_source: loadErrorSource,
+      has_entries_error: hasEntriesError,
+      has_entries_data: hasEntriesData,
+      has_recent_scans_error: hasRecentScansError,
+      has_recent_scans_data: hasRecentScansData,
+      has_latest_ready_error: hasLatestReadyError,
+      has_latest_ready_entry_data: hasLatestReadyEntryData,
+      has_tracked_guidance: hasTrackedGuidance,
+      has_generation_guidance: hasGenerationGuidance,
       generation_error_kind: showGenerationErrorState
         ? generationFailureKind
         : null,
@@ -915,13 +945,23 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     activeGuidanceSource,
     coachGeneration.data?.entry_id,
     coachGeneration.data?.status,
+    displayMode,
     displayedGuidance,
     displayedGuidanceSource,
     coachGeneration.isPending,
     effectiveTrackedEntryId,
     generationErrorDebugInfo,
     generationFailureKind,
+    hasEntriesData,
+    hasEntriesError,
+    hasGenerationGuidance,
     isEntriesFetching,
+    hasLatestReadyEntryData,
+    hasLatestReadyError,
+    hasRecentScansData,
+    hasRecentScansError,
+    hasTrackedGuidance,
+    loadErrorSource,
     showEmptyState,
     showGenerationErrorState,
     showGenerationLoadingState,
@@ -1373,6 +1413,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
                 selectedPromptType={selectedPromptType}
                 personaOptions={inlinePersonaOptions}
                 promptTitle={promptTitleResolver}
+                promptSubtitle={promptSubtitleResolver}
                 title={t('coach.settings.title')}
                 subtitle={t('coach.settings.subtitle')}
                 personaSectionLabel={t('coach.options_sheet.persona_label')}

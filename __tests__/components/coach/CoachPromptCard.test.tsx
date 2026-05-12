@@ -132,6 +132,26 @@ describe('CoachPromptCard', () => {
     expect(screen.getByText('Keep meals regular.')).toBeTruthy();
   });
 
+  it('renders selector mode subtitles when provided', () => {
+    render(
+      <CoachPromptCard
+        promptType="latest_scan"
+        title="Today's priority"
+        subtitle="What should I adjust first after my latest scan?"
+        onPress={jest.fn()}
+        variant="compact"
+        mode="selector"
+        testID="coach-prompt-selector-subtitle"
+      />,
+    );
+
+    expect(screen.getByText("Today's priority")).toBeTruthy();
+    expect(
+      screen.getByText('What should I adjust first after my latest scan?'),
+    ).toBeTruthy();
+    expect(screen.queryByTestId('coach-prompt-selector-subtitle-chevron')).toBeNull();
+  });
+
   it('renders selector mode without subtitle or chevron and highlights the selected state', () => {
     render(
       <CoachPromptCard

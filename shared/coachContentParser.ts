@@ -2,12 +2,14 @@ import {
   COACH_CONTENT_LIMITS,
   CoachConfidence,
   CoachPrimaryMetricDelta,
+  CoachProfileUpdateStructured,
   CoachResponseVersion,
   CoachStructuredContent,
   isCoachConfidence,
   isCoachMetricDirection,
   isCoachMetricInterpretation,
   isCoachMetricMagnitude,
+  isCoachProfileUpdateFocus,
   isCoachResponseVersion,
 } from './coachContent.ts';
 
@@ -55,6 +57,49 @@ function clampStringArray(
   }
 
   return items;
+}
+
+function parseProfileUpdates(
+  value: unknown,
+): CoachProfileUpdateStructured | null {
+  if (!isPlainRecord(value)) {
+    return null;
+  }
+
+  const dietSignals = clampStringArray(
+    value.detected_diet_signals,
+    COACH_CONTENT_LIMITS.dietSignalsMax,
+    COACH_CONTENT_LIMITS.dietSignal,
+  );
+  const goals = clampStringArray(
+    value.suggested_goals,
+    COACH_CONTENT_LIMITS.goalsMax,
+    COACH_CONTENT_LIMITS.goal,
+  );
+  const detectedStrongFocus = isCoachProfileUpdateFocus(value.detected_strong_focus)
+    ? value.detected_strong_focus
+    : null;
+  const suggestedPersonaKey = clampOptionalString(
+    value.suggested_persona_key,
+    COACH_CONTENT_LIMITS.personaKey,
+  );
+
+  const hasAnyContent =
+    dietSignals.length > 0 ||
+    goals.length > 0 ||
+    detectedStrongFocus !== null ||
+    suggestedPersonaKey !== null;
+
+  if (!hasAnyContent) {
+    return null;
+  }
+
+  return {
+    detected_diet_signals: dietSignals,
+    detected_strong_focus: detectedStrongFocus,
+    suggested_goals: goals,
+    suggested_persona_key: suggestedPersonaKey,
+  };
 }
 
 function parsePrimaryMetricDelta(
@@ -224,6 +269,7 @@ export function parseCoachStructuredContent(
   );
   const primaryMetricDelta = parsePrimaryMetricDelta(raw.primary_metric_delta);
   const confidence = isCoachConfidence(raw.confidence) ? raw.confidence : null;
+  const profileUpdates = parseProfileUpdates(raw.profile_updates);
 
   const hasMinimumContent =
     !!resolvedTitle &&
@@ -253,6 +299,7 @@ export function parseCoachStructuredContent(
     primary_metric_delta: primaryMetricDelta,
     data_gaps: dataGaps,
     confidence,
+    profile_updates: profileUpdates,
   };
 
   return {

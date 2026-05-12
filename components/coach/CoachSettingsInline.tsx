@@ -26,6 +26,7 @@ interface CoachSettingsInlineProps {
   selectedPromptType: CoachPromptType;
   personaOptions: readonly CoachSettingsInlinePersonaOption[];
   promptTitle: (prompt: CoachPromptType) => string;
+  promptSubtitle?: (prompt: CoachPromptType) => string;
   title: string;
   subtitle: string;
   personaSectionLabel: string;
@@ -45,6 +46,7 @@ export function CoachSettingsInline({
   selectedPromptType,
   personaOptions,
   promptTitle,
+  promptSubtitle,
   title,
   subtitle,
   personaSectionLabel,
@@ -101,6 +103,7 @@ export function CoachSettingsInline({
         selectedPromptType={selectedPromptType}
         onSelect={onSelectPromptType}
         promptTitle={promptTitle}
+        promptSubtitle={promptSubtitle}
         disabled={busy || disabled}
         isPromptLocked={isPromptLocked}
         lockedBadgeLabel={lockedBadgeLabel}

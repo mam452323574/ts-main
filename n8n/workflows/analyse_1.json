@@ -1,0 +1,514 @@
+{
+  "name": "analyse_1",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "analyse_1",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        64,
+        16
+      ],
+      "id": "58cddc74-d38e-4448-90e1-46f61234a575",
+      "name": "Webhook",
+      "webhookId": "a9b4a85b-23f6-448e-ab78-9e69e32e05fe"
+    },
+    {
+      "parameters": {
+        "jsCode": "const root = $json ?? {};\nconst body = root.body && typeof root.body === \"object\" && !Array.isArray(root.body)\n  ? root.body\n  : {};\n\nfunction readText(value) {\n  if (value === null || value === undefined) return \"\";\n  if (typeof value === \"object\") return \"\";\n  return String(value).trim();\n}\n\nfunction normalizeLanguageCode(value) {\n  const lowered = readText(value).toLowerCase();\n  if (lowered.startsWith(\"fr\")) return \"fr\";\n  if (lowered.startsWith(\"en\")) return \"en\";\n  if (lowered.startsWith(\"es\")) return \"es\";\n  if (lowered.startsWith(\"de\")) return \"de\";\n  if (lowered.startsWith(\"it\")) return \"it\";\n  if (lowered.startsWith(\"pt\")) return \"pt\";\n  return \"en\";\n}\n\nfunction normalizeScanLabel(value) {\n  const raw = readText(value)\n    .toLowerCase()\n    .normalize(\"NFD\")\n    .replace(/[\\u0300-\\u036f]/g, \"\")\n    .replace(/[_-]+/g, \" \")\n    .replace(/\\s+/g, \" \")\n    .trim();\n\n  if (!raw) return null;\n\n  const aliases = {\n    face: \"face\",\n    visage: \"face\",\n    \"face scan\": \"face\",\n    facial: \"face\",\n    skin: \"face\",\n    \"skin face\": \"face\",\n    body: \"body\",\n    corps: \"body\",\n    \"body scan\": \"body\",\n    physique: \"body\",\n    silhouette: \"body\",\n    fitness: \"body\",\n    nutrition: \"nutrition\",\n    meal: \"nutrition\",\n    food: \"nutrition\",\n    fridge: \"nutrition\",\n    chef: \"nutrition\",\n    \"nutrition scan\": \"nutrition\",\n    plate: \"nutrition\",\n    repas: \"nutrition\",\n  };\n\n  return aliases[raw] ?? null;\n}\n\nfunction normalizeLegacyAppScanType(value) {\n  const raw = readText(value)\n    .toLowerCase()\n    .normalize(\"NFD\")\n    .replace(/[\\u0300-\\u036f]/g, \"\")\n    .replace(/[_-]+/g, \" \")\n    .replace(/\\s+/g, \" \")\n    .trim();\n\n  if (raw === \"health\") return \"face\";\n  if (raw === \"body\") return \"body\";\n  if (raw === \"nutrition\") return \"nutrition\";\n  return null;\n}\n\nfunction resolveRequestedScanType() {\n  const candidates = [\n    { value: body.expected_scan_type, legacyAppType: false },\n    { value: body.scan_type, legacyAppType: false },\n    { value: body.analysis_type, legacyAppType: false },\n    { value: body.type, legacyAppType: false },\n    { value: body.scanType, legacyAppType: true },\n    { value: root.expected_scan_type, legacyAppType: false },\n    { value: root.scan_type, legacyAppType: false },\n    { value: root.analysis_type, legacyAppType: false },\n    { value: root.type, legacyAppType: false },\n    { value: root.scanType, legacyAppType: true },\n  ];\n\n  for (const candidate of candidates) {\n    const normalized = candidate.legacyAppType\n      ? normalizeLegacyAppScanType(candidate.value)\n      : normalizeScanLabel(candidate.value);\n    if (normalized) {\n      return normalized;\n    }\n  }\n\n  return null;\n}\n\nconst language_code = normalizeLanguageCode(\n  body.language || body.locale || root.language || root.locale,\n);\nconst requested_scan_type = resolveRequestedScanType();\nconst scan_route = requested_scan_type ?? \"auto_detect_fallback\";\n\nreturn [\n  {\n    json: {\n      ...root,\n      language_code,\n      requested_scan_type,\n      scan_route,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        272,
+        16
+      ],
+      "id": "8a75fa68-a3d8-4ebd-a536-20fa83a4f201",
+      "name": "Normalize Analyse Input"
+    },
+    {
+      "parameters": {
+        "jsCode": "const root = $json ?? {};\nconst body = root.body && typeof root.body === \"object\" && !Array.isArray(root.body)\n  ? { ...root.body }\n  : undefined;\n\nif (body && Object.prototype.hasOwnProperty.call(body, \"imageBase64\")) {\n  delete body.imageBase64;\n}\n\nreturn [\n  {\n    json: {\n      ...root,\n      ...(body ? { body } : {}),\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        512,
+        -160
+      ],
+      "id": "1f0cf4f4-f7a6-45a9-9f4b-7df47f34d56c",
+      "name": "Snapshot Analyse Context"
+    },
+    {
+      "parameters": {
+        "operation": "toBinary",
+        "sourceProperty": "body.imageBase64",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        512,
+        16
+      ],
+      "id": "217552fe-a1e6-4739-90e3-d2907f639a7b",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        720,
+        16
+      ],
+      "id": "b3ad2a6c-d0f0-4f79-aedb-c72c0d2576b3",
+      "name": "Merge Image + Analyse Context"
+    },
+    {
+      "parameters": {
+        "jsCode": "const allowedRoutes = new Set([\"face\", \"body\", \"nutrition\"]);\nconst currentRoute = typeof $json?.scan_route === \"string\"\n  ? $json.scan_route.trim().toLowerCase()\n  : \"\";\nconst scan_route = allowedRoutes.has(currentRoute)\n  ? currentRoute\n  : \"auto_detect_fallback\";\nconst binary = $input?.item?.binary ?? $binary ?? undefined;\n\nreturn [\n  {\n    json: {\n      ...$json,\n      scan_route,\n    },\n    ...(binary ? { binary } : {}),\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        928,
+        16
+      ],
+      "id": "2cfe6937-c442-4a1a-bf75-6c677f0afc29",
+      "name": "Determine Scan Route"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "face",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": false,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "2e2f0355-7343-4c7d-b748-e165dd066adf",
+                    "operator": {
+                      "name": "filter.operator.equals",
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.scan_route }}",
+                    "rightValue": "face"
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "body",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": false,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "a219cf4c-2217-44dc-9c07-ed0b2a584621",
+                    "operator": {
+                      "name": "filter.operator.equals",
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.scan_route }}",
+                    "rightValue": "body"
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "nutrition",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": false,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "f9c7ee89-6d7c-4154-bc15-7583a762f7e2",
+                    "operator": {
+                      "name": "filter.operator.equals",
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.scan_route }}",
+                    "rightValue": "nutrition"
+                  }
+                ]
+              },
+              "renameOutput": true
+            }
+          ]
+        },
+        "options": {
+          "ignoreCase": true,
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1168,
+        16
+      ],
+      "id": "6fe89aa4-6372-4c83-9f0f-3abdf5c7d8a5",
+      "name": "Switch scan_route"
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "text": "=You are an AI specialized in human face image analysis for wellness coaching insights.\n\nRequested language code for ALL textual values: {{$json.language_code}}\n\nLanguage rules:\n- If the code starts with \"fr\", all textual VALUES must be in French.\n- If the code starts with \"en\", all textual VALUES must be in English.\n- If the code starts with \"es\", all textual VALUES must be in Spanish.\n- If the code starts with \"de\", all textual VALUES must be in German.\n- If the code starts with \"it\", all textual VALUES must be in Italian.\n- If the code starts with \"pt\", all textual VALUES must be in Portuguese.\n- For any other value, use English.\n- JSON KEYS must always stay in English and in snake_case.\n- Only textual VALUES change with the requested language.\n\nEstimation rules:\n- For every numeric field below, produce your best visual estimate from the image.\n- Only use null as a last resort when there is genuinely no visual cue at all for that field.\n- The downstream coaching system tolerates approximation. It does NOT tolerate empty responses.\n- All scores below are visual heuristics for wellness coaching purposes, not medical assessments. Still produce your best visual estimate for each field.\n\nOutput rules:\n1. Return exactly one valid JSON object.\n2. Return no markdown, no code fences, no comments, and no text outside JSON.\n3. Never omit a field from the chosen schema.\n4. Never add extra keys outside the chosen schema.\n5. If the image does not clearly show an analyzable human face, return the ERROR schema.\n6. Keep the response short, stable, and strictly JSON.\n\nAllowed schemas for this node: face, error.\n\nTask rules:\n- Analyze only a human face image.\n- If the image is blurry, off-topic, unusable, or does not primarily show a clearly visible human face, return ERROR.\n- Never return BODY or NUTRITION from this node.\n- analysis_meta is internal scan quality metadata used by downstream coach and analytics systems.\n- analysis_meta.confidence_score, image_quality_score, and metric_coverage_score must be numbers from 0 to 100.\n- analysis_meta.limitation_flags may only contain: blur, low_light, partial_subject, occlusion, portion_uncertain.\n\nFACE schema:\n{\n  \"schema_version\": 4,\n  \"scan_type\": \"face\",\n  \"face_score\": null,\n  \"perceived_age\": null,\n  \"skin_quality_score\": null,\n  \"symmetry_percentage\": null,\n  \"fatigue_level\": null,\n  \"glow_index\": null,\n  \"face_shape\": null,\n  \"collagen_level\": null,\n  \"hydration_level\": null,\n  \"photogenic_score\": null,\n  \"skin_clarity_score\": null,\n  \"under_eye_shadow_score\": null,\n  \"under_eye_volume_score\": null,\n  \"eye_openness_score\": null,\n  \"complexion_redness_score\": null,\n  \"pore_visibility_score\": null,\n  \"skin_evenness_score\": null,\n  \"skin_radiance_score\": null,\n  \"lip_dryness_score\": null,\n  \"forehead_smoothness_score\": null,\n  \"t_zone_oiliness_score\": null,\n  \"perceived_sex_key\": null,\n  \"perceived_age_range_key\": null,\n  \"perceived_stress_level\": null,\n  \"perceived_sleep_quality\": null,\n  \"analysis_meta\": {\n    \"confidence_score\": null,\n    \"image_quality_score\": null,\n    \"metric_coverage_score\": null,\n    \"limitation_flags\": []\n  }\n}\n\nFace metric constraints:\n- schema_version must be 4.\n- face_score: number from 0 to 100.\n- perceived_age: number.\n- skin_quality_score: number from 0 to 100.\n- symmetry_percentage: number from 0 to 100.\n- fatigue_level: number from 0 to 100.\n- glow_index: number from 0 to 10.\n- face_shape: short localized text.\n- collagen_level: number from 0 to 100, visible firmness estimate.\n- hydration_level: number from 0 to 100, visible hydration estimate.\n- photogenic_score: number from 0 to 10.\n- skin_clarity_score: number from 0 to 100, visible imperfections estimate.\n- under_eye_shadow_score: number from 0 to 100, visible shadowing estimate.\n- under_eye_volume_score: number from 0 to 100, visible puffiness/volume estimate.\n- eye_openness_score: number from 0 to 100, geometric estimate.\n- complexion_redness_score: number from 0 to 100, visible redness estimate.\n- pore_visibility_score: number from 0 to 100, visible pore prominence estimate.\n- skin_evenness_score: number from 0 to 100, pigmentation uniformity estimate.\n- skin_radiance_score: number from 0 to 100, general luminosity estimate (distinct from glow_index).\n- lip_dryness_score: number from 0 to 100, visible lip dryness estimate.\n- forehead_smoothness_score: number from 0 to 100, fine line visibility estimate.\n- t_zone_oiliness_score: number from 0 to 100, visible T-zone shine estimate.\n- perceived_sex_key: one of \"male_presenting\", \"female_presenting\", \"neutral_or_unclear\". Visual presentation cue for coaching personalization.\n- perceived_age_range_key: one of \"under_18\", \"18_24\", \"25_34\", \"35_44\", \"45_54\", \"55_64\", \"65_plus\". Approximate visual age bracket.\n- perceived_stress_level: number from 0 to 100, visible facial tension estimate.\n- perceived_sleep_quality: number from 0 to 100, visible sleep quality estimate from face cues.\n\nERROR schema:\n{\n  \"scan_type\": \"error\",\n  \"message\": null\n}\n\nError rules:\n- message must be a short localized error message.\n\nFinal reminder: return only the raw JSON object.",
+        "inputType": "base64",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        1264,
+        -240
+      ],
+      "id": "4b4ee17a-bca0-47ff-ad3a-876fc258b88a",
+      "name": "Analyze Face Image",
+      "credentials": {
+        "openAiApi": {
+          "id": "1HlOAIar5EHWTgzh",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "text": "=You are an AI specialized in body, silhouette, posture, and fitness-oriented image analysis for wellness coaching insights.\n\nRequested language code for ALL textual values: {{$json.language_code}}\n\nLanguage rules:\n- If the code starts with \"fr\", all textual VALUES must be in French.\n- If the code starts with \"en\", all textual VALUES must be in English.\n- If the code starts with \"es\", all textual VALUES must be in Spanish.\n- If the code starts with \"de\", all textual VALUES must be in German.\n- If the code starts with \"it\", all textual VALUES must be in Italian.\n- If the code starts with \"pt\", all textual VALUES must be in Portuguese.\n- For any other value, use English.\n- JSON KEYS must always stay in English and in snake_case.\n- Only textual VALUES change with the requested language.\n\nEstimation rules:\n- For every numeric field below, produce your best visual estimate from the image.\n- Only use null as a last resort when there is genuinely no visual cue at all for that field.\n- The downstream coaching system tolerates approximation. It does NOT tolerate empty responses.\n- All scores below are visual heuristics for wellness coaching purposes, not medical assessments. Stay neutral, useful, and non-judgmental. Do not sexualize the person. Do not comment on attractiveness. Still produce your best visual estimate for each field.\n\nOutput rules:\n1. Return exactly one valid JSON object.\n2. Return no markdown, no code fences, no comments, and no text outside JSON.\n3. Never omit a field from the chosen schema.\n4. Never add extra keys outside the chosen schema.\n5. If the image does not clearly show an analyzable body or silhouette, return the ERROR schema.\n6. Keep the response short, stable, and strictly JSON.\n\nAllowed schemas for this node: body, error.\n\nTask rules:\n- Analyze only a human body, silhouette, posture, or overall physical form.\n- If the image is blurry, off-topic, unusable, or does not primarily show a clearly visible body or silhouette, return ERROR.\n- Never return FACE or NUTRITION from this node.\n- body_score is a neutral overall estimate of visible form, silhouette, and posture, not an attractiveness score.\n- analysis_meta is internal scan quality metadata used by downstream coach and analytics systems.\n- analysis_meta.confidence_score, image_quality_score, and metric_coverage_score must be numbers from 0 to 100.\n- analysis_meta.limitation_flags may only contain: blur, low_light, partial_subject, occlusion, portion_uncertain.\n\nBODY schema:\n{\n  \"schema_version\": 4,\n  \"scan_type\": \"body\",\n  \"body_score\": null,\n  \"body_fat_percentage\": null,\n  \"muscle_mass_label\": null,\n  \"body_type\": null,\n  \"posture_score\": null,\n  \"waist_estimation_cm\": null,\n  \"strength_index\": null,\n  \"body_symmetry\": null,\n  \"bmi_estimate\": null,\n  \"metabolic_age\": null,\n  \"muscle_definition_score\": null,\n  \"midsection_definition_score\": null,\n  \"shoulder_alignment_score\": null,\n  \"recovery_readiness_score\": null,\n  \"upper_body_definition_score\": null,\n  \"lower_body_definition_score\": null,\n  \"arm_definition_score\": null,\n  \"v_taper_score\": null,\n  \"body_tension_indicator_score\": null,\n  \"perceived_sex_key\": null,\n  \"perceived_age_range_key\": null,\n  \"estimated_height_range_key\": null,\n  \"estimated_weight_range_key\": null,\n  \"body_frame_key\": null,\n  \"perceived_fitness_level_key\": null,\n  \"analysis_meta\": {\n    \"confidence_score\": null,\n    \"image_quality_score\": null,\n    \"metric_coverage_score\": null,\n    \"limitation_flags\": []\n  }\n}\n\nBody metric constraints:\n- schema_version must be 4.\n- body_score: number from 0 to 100.\n- body_fat_percentage: number, approximate visual estimate.\n- muscle_mass_label: short localized text.\n- body_type: short localized text.\n- posture_score: number from 0 to 10.\n- waist_estimation_cm: number.\n- strength_index: number from 0 to 100.\n- body_symmetry: number from 0 to 100.\n- bmi_estimate: number, approximate visual estimate.\n- metabolic_age: number, approximate visual estimate.\n- muscle_definition_score: number from 0 to 100, visible muscle tone estimate.\n- midsection_definition_score: number from 0 to 100, visible abdominal definition estimate.\n- shoulder_alignment_score: number from 0 to 100, visual shoulder symmetry estimate.\n- recovery_readiness_score: number from 0 to 100, visual recovery heuristic.\n- upper_body_definition_score: number from 0 to 100, visible chest and shoulder definition estimate.\n- lower_body_definition_score: number from 0 to 100, visible leg and glute definition estimate.\n- arm_definition_score: number from 0 to 100, visible arm muscle definition estimate.\n- v_taper_score: number from 0 to 100, visible shoulder-to-waist ratio estimate.\n- body_tension_indicator_score: number from 0 to 100, visible postural tension estimate.\n- perceived_sex_key: one of \"male_presenting\", \"female_presenting\", \"neutral_or_unclear\". Visual presentation cue for coaching personalization.\n- perceived_age_range_key: one of \"under_18\", \"18_24\", \"25_34\", \"35_44\", \"45_54\", \"55_64\", \"65_plus\". Approximate visual age bracket.\n- estimated_height_range_key: one of \"under_150cm\", \"150_160cm\", \"160_170cm\", \"170_180cm\", \"180_190cm\", \"190_plus\". Approximate range from visible body proportions and reference cues.\n- estimated_weight_range_key: one of \"under_50kg\", \"50_60kg\", \"60_70kg\", \"70_80kg\", \"80_90kg\", \"90_100kg\", \"100_plus\". Approximate range from visible body proportions.\n- body_frame_key: one of \"small\", \"medium\", \"large\". Visual skeletal frame estimate.\n- perceived_fitness_level_key: one of \"sedentary\", \"lightly_active\", \"moderately_active\", \"very_active\", \"athletic\". Visual fitness level estimate from muscle definition and posture.\n\nERROR schema:\n{\n  \"scan_type\": \"error\",\n  \"message\": null\n}\n\nError rules:\n- message must be a short localized error message.\n\nFinal reminder: return only the raw JSON object.",
+        "inputType": "base64",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        1264,
+        -80
+      ],
+      "id": "a8975a68-4c06-48ad-b448-3d6c72af87d1",
+      "name": "Analyze Body Image",
+      "credentials": {
+        "openAiApi": {
+          "id": "1HlOAIar5EHWTgzh",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "text": "=You are an AI specialized in meal, food, and nutrition image analysis for wellness coaching insights.\n\nRequested language code for ALL textual values: {{$json.language_code}}\n\nLanguage rules:\n- If the code starts with \"fr\", all textual VALUES must be in French.\n- If the code starts with \"en\", all textual VALUES must be in English.\n- If the code starts with \"es\", all textual VALUES must be in Spanish.\n- If the code starts with \"de\", all textual VALUES must be in German.\n- If the code starts with \"it\", all textual VALUES must be in Italian.\n- If the code starts with \"pt\", all textual VALUES must be in Portuguese.\n- For any other value, use English.\n- JSON KEYS must always stay in English and in snake_case.\n- Only textual VALUES change with the requested language.\n\nEstimation rules:\n- For every numeric field below, produce your best visual estimate from the image.\n- Only use null as a last resort when there is genuinely no visual cue at all for that field.\n- The downstream coaching system tolerates approximation. It does NOT tolerate empty responses.\n- All scores below are visual heuristics for wellness coaching purposes, not medical assessments. Calories and macros are visual approximations. Still produce your best visual estimate for each field.\n\nOutput rules:\n1. Return exactly one valid JSON object.\n2. Return no markdown, no code fences, no comments, and no text outside JSON.\n3. Never omit a field from the chosen schema.\n4. Never add extra keys outside the chosen schema.\n5. If the image does not clearly show analyzable food or a meal, return the ERROR schema.\n6. Keep the response short, stable, and strictly JSON.\n\nAllowed schemas for this node: nutrition, error.\n\nTask rules:\n- Analyze only a meal, dish, plate, or visible food items.\n- If the image is blurry, off-topic, unusable, or does not primarily show clearly visible food, return ERROR.\n- Never return FACE or BODY from this node.\n- analysis_meta is internal scan quality metadata used by downstream coach and analytics systems.\n- analysis_meta.confidence_score, image_quality_score, and metric_coverage_score must be numbers from 0 to 100.\n- analysis_meta.limitation_flags may only contain: blur, low_light, partial_subject, occlusion, portion_uncertain.\n\nNUTRITION schema:\n{\n  \"schema_version\": 4,\n  \"scan_type\": \"nutrition\",\n  \"plate_health_score\": null,\n  \"calories_estimate\": null,\n  \"protein_grams\": null,\n  \"carbs_grams\": null,\n  \"fat_grams\": null,\n  \"glycemic_index_label\": null,\n  \"satiety_index\": null,\n  \"ingredient_quality\": null,\n  \"main_vitamins\": null,\n  \"short_verdict\": null,\n  \"fiber_grams_estimate\": null,\n  \"sugar_grams_estimate\": null,\n  \"processing_level_score\": null,\n  \"hydration_contribution_score\": null,\n  \"sodium_level_score\": null,\n  \"meal_balance_score\": null,\n  \"inflammation_index_score\": null,\n  \"meal_type_key\": null,\n  \"portion_size_key\": null,\n  \"color_diversity_score\": null,\n  \"vegetable_portion_ratio\": null,\n  \"protein_visibility_score\": null,\n  \"whole_grain_indicator_score\": null,\n  \"meal_freshness_score\": null,\n  \"cuisine_type_key\": null,\n  \"meat_type_key\": null,\n  \"cooking_method_key\": null,\n  \"meal_dietary_pattern_key\": null,\n  \"allergen_visibility_keys\": [],\n  \"analysis_meta\": {\n    \"confidence_score\": null,\n    \"image_quality_score\": null,\n    \"metric_coverage_score\": null,\n    \"limitation_flags\": []\n  }\n}\n\nNutrition metric constraints:\n- schema_version must be 4.\n- plate_health_score: number from 0 to 100.\n- calories_estimate: number.\n- protein_grams: number.\n- carbs_grams: number.\n- fat_grams: number.\n- glycemic_index_label: short localized text.\n- satiety_index: number from 0 to 10.\n- ingredient_quality: short localized text.\n- main_vitamins: short localized text.\n- short_verdict: maximum 5 localized words.\n- fiber_grams_estimate: number from 0 to 100.\n- sugar_grams_estimate: number from 0 to 300.\n- processing_level_score: number from 0 to 100, NOVA-style ultra-processing estimate.\n- hydration_contribution_score: number from 0 to 10.\n- sodium_level_score: number from 0 to 10, heuristic from visible food type.\n- meal_balance_score: number from 0 to 100, balance of protein, vegetables, and carbs visible on the plate.\n- inflammation_index_score: number from 0 to 100, visual pro/anti-inflammatory food heuristic.\n- meal_type_key: one of \"breakfast\", \"lunch\", \"dinner\", \"snack\", \"dessert\", \"other\".\n- portion_size_key: one of \"small\", \"medium\", \"large\", \"oversized\".\n- color_diversity_score: number from 0 to 10, count of distinct food colors visible.\n- vegetable_portion_ratio: number from 0 to 100, percentage of plate occupied by vegetables.\n- protein_visibility_score: number from 0 to 100, visible protein adequacy estimate.\n- whole_grain_indicator_score: number from 0 to 100, ratio of whole vs refined carbs visible.\n- meal_freshness_score: number from 0 to 100, visible freshness vs processed.\n- cuisine_type_key: one of \"mediterranean\", \"asian\", \"western\", \"middle_eastern\", \"latin\", \"african\", \"mixed\", \"other\".\n- meat_type_key: one of \"red_meat\", \"poultry\", \"fish\", \"seafood\", \"plant_protein\", \"dairy\", \"none\".\n- cooking_method_key: one of \"fried\", \"baked\", \"grilled\", \"raw\", \"steamed\", \"boiled\", \"sauteed\", \"other\".\n- meal_dietary_pattern_key: one of \"omnivore\", \"vegetarian_compatible\", \"vegan_compatible\", \"pescetarian_compatible\", \"keto_compatible\", \"mediterranean_compatible\", \"unclear\". The dietary pattern that this single meal is consistent with.\n- allergen_visibility_keys: array of strings (may be empty []) listing visible likely allergens. Allowed values: \"gluten_likely\", \"dairy_likely\", \"nuts_likely\", \"shellfish_likely\", \"eggs_likely\", \"soy_likely\", \"seafood_likely\". Include only with high visual confidence.\n\nERROR schema:\n{\n  \"scan_type\": \"error\",\n  \"message\": null\n}\n\nError rules:\n- message must be a short localized error message.\n\nFinal reminder: return only the raw JSON object.",
+        "inputType": "base64",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        1264,
+        80
+      ],
+      "id": "9f293bd9-0e6e-487d-96cd-c8270f69c503",
+      "name": "Analyze Nutrition Image",
+      "credentials": {
+        "openAiApi": {
+          "id": "1HlOAIar5EHWTgzh",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "text": "=You are an AI specialized in face, body, and nutrition image analysis for wellness coaching insights. Use this node only when no reliable scan type was provided. Detect the best supported category for the image, then return only the matching raw JSON object.\n\nRequested language code for ALL textual values: {{$json.language_code}}\n\nLanguage rules:\n- If the code starts with \"fr\", all textual VALUES must be in French.\n- If the code starts with \"en\", all textual VALUES must be in English.\n- If the code starts with \"es\", all textual VALUES must be in Spanish.\n- If the code starts with \"de\", all textual VALUES must be in German.\n- If the code starts with \"it\", all textual VALUES must be in Italian.\n- If the code starts with \"pt\", all textual VALUES must be in Portuguese.\n- For any other value, use English.\n- JSON KEYS must always stay in English and in snake_case.\n- Only textual VALUES change with the requested language.\n\nEstimation rules:\n- For every numeric field below, produce your best visual estimate from the image.\n- Only use null as a last resort when there is genuinely no visual cue at all for that field.\n- The downstream coaching system tolerates approximation. It does NOT tolerate empty responses.\n- All scores below are visual heuristics for wellness coaching purposes, not medical assessments. Stay neutral and non-judgmental. Still produce your best visual estimate for each field.\n\nOutput rules:\n1. Return exactly one valid JSON object.\n2. Return no markdown, no code fences, no comments, and no text outside JSON.\n3. Never omit a field from the chosen schema.\n4. Never add extra keys outside the chosen schema.\n5. Choose exactly one schema.\n6. If the image is ambiguous, return ERROR.\n7. Never return any type other than face, body, nutrition, or error.\n\nSupported schemas: face, body, nutrition, error.\n\nRouting rules:\n- Return FACE when the image primarily shows a clearly visible human face.\n- Return BODY when the image primarily shows a clearly visible human body, silhouette, posture, or physique.\n- Return NUTRITION when the image primarily shows a meal, plate, dish, ingredients, or edible items.\n- If both face and body are visible, choose the most tightly framed main subject.\n- If the subject is a meal, choose NUTRITION.\n- If the image is blurry, off-topic, unusable, or ambiguous, return ERROR.\n- Never return health, super_health, or super_scan.\n- analysis_meta is internal scan quality metadata used by downstream coach and analytics systems.\n\nFACE schema:\n{\n  \"schema_version\": 4,\n  \"scan_type\": \"face\",\n  \"face_score\": null,\n  \"perceived_age\": null,\n  \"skin_quality_score\": null,\n  \"symmetry_percentage\": null,\n  \"fatigue_level\": null,\n  \"glow_index\": null,\n  \"face_shape\": null,\n  \"collagen_level\": null,\n  \"hydration_level\": null,\n  \"photogenic_score\": null,\n  \"skin_clarity_score\": null,\n  \"under_eye_shadow_score\": null,\n  \"under_eye_volume_score\": null,\n  \"eye_openness_score\": null,\n  \"complexion_redness_score\": null,\n  \"pore_visibility_score\": null,\n  \"skin_evenness_score\": null,\n  \"skin_radiance_score\": null,\n  \"lip_dryness_score\": null,\n  \"forehead_smoothness_score\": null,\n  \"t_zone_oiliness_score\": null,\n  \"perceived_sex_key\": null,\n  \"perceived_age_range_key\": null,\n  \"perceived_stress_level\": null,\n  \"perceived_sleep_quality\": null,\n  \"analysis_meta\": {\n    \"confidence_score\": null,\n    \"image_quality_score\": null,\n    \"metric_coverage_score\": null,\n    \"limitation_flags\": []\n  }\n}\n\nBODY schema:\n{\n  \"schema_version\": 4,\n  \"scan_type\": \"body\",\n  \"body_score\": null,\n  \"body_fat_percentage\": null,\n  \"muscle_mass_label\": null,\n  \"body_type\": null,\n  \"posture_score\": null,\n  \"waist_estimation_cm\": null,\n  \"strength_index\": null,\n  \"body_symmetry\": null,\n  \"bmi_estimate\": null,\n  \"metabolic_age\": null,\n  \"muscle_definition_score\": null,\n  \"midsection_definition_score\": null,\n  \"shoulder_alignment_score\": null,\n  \"recovery_readiness_score\": null,\n  \"upper_body_definition_score\": null,\n  \"lower_body_definition_score\": null,\n  \"arm_definition_score\": null,\n  \"v_taper_score\": null,\n  \"body_tension_indicator_score\": null,\n  \"perceived_sex_key\": null,\n  \"perceived_age_range_key\": null,\n  \"estimated_height_range_key\": null,\n  \"estimated_weight_range_key\": null,\n  \"body_frame_key\": null,\n  \"perceived_fitness_level_key\": null,\n  \"analysis_meta\": {\n    \"confidence_score\": null,\n    \"image_quality_score\": null,\n    \"metric_coverage_score\": null,\n    \"limitation_flags\": []\n  }\n}\n\nNUTRITION schema:\n{\n  \"schema_version\": 4,\n  \"scan_type\": \"nutrition\",\n  \"plate_health_score\": null,\n  \"calories_estimate\": null,\n  \"protein_grams\": null,\n  \"carbs_grams\": null,\n  \"fat_grams\": null,\n  \"glycemic_index_label\": null,\n  \"satiety_index\": null,\n  \"ingredient_quality\": null,\n  \"main_vitamins\": null,\n  \"short_verdict\": null,\n  \"fiber_grams_estimate\": null,\n  \"sugar_grams_estimate\": null,\n  \"processing_level_score\": null,\n  \"hydration_contribution_score\": null,\n  \"sodium_level_score\": null,\n  \"meal_balance_score\": null,\n  \"inflammation_index_score\": null,\n  \"meal_type_key\": null,\n  \"portion_size_key\": null,\n  \"color_diversity_score\": null,\n  \"vegetable_portion_ratio\": null,\n  \"protein_visibility_score\": null,\n  \"whole_grain_indicator_score\": null,\n  \"meal_freshness_score\": null,\n  \"cuisine_type_key\": null,\n  \"meat_type_key\": null,\n  \"cooking_method_key\": null,\n  \"meal_dietary_pattern_key\": null,\n  \"allergen_visibility_keys\": [],\n  \"analysis_meta\": {\n    \"confidence_score\": null,\n    \"image_quality_score\": null,\n    \"metric_coverage_score\": null,\n    \"limitation_flags\": []\n  }\n}\n\nERROR schema:\n{\n  \"scan_type\": \"error\",\n  \"message\": null\n}\n\nGeneral metric constraints:\n- schema_version must be 4 for face, body, and nutrition.\n- 0-100 fields: face_score, skin_quality_score, symmetry_percentage, fatigue_level, collagen_level, hydration_level, skin_clarity_score, under_eye_shadow_score, under_eye_volume_score, eye_openness_score, complexion_redness_score, pore_visibility_score, skin_evenness_score, skin_radiance_score, lip_dryness_score, forehead_smoothness_score, t_zone_oiliness_score, perceived_stress_level, perceived_sleep_quality, body_score, strength_index, body_symmetry, muscle_definition_score, midsection_definition_score, shoulder_alignment_score, recovery_readiness_score, upper_body_definition_score, lower_body_definition_score, arm_definition_score, v_taper_score, body_tension_indicator_score, plate_health_score, fiber_grams_estimate, processing_level_score, meal_balance_score, inflammation_index_score, vegetable_portion_ratio, protein_visibility_score, whole_grain_indicator_score, meal_freshness_score.\n- 0-10 fields: glow_index, photogenic_score, posture_score, satiety_index, hydration_contribution_score, sodium_level_score, color_diversity_score.\n- sugar_grams_estimate: 0-300.\n- analysis_meta.confidence_score, image_quality_score, and metric_coverage_score: number from 0 to 100.\n- analysis_meta.limitation_flags may only contain: blur, low_light, partial_subject, occlusion, portion_uncertain.\n- Use concise localized labels for face_shape, muscle_mass_label, body_type, glycemic_index_label, ingredient_quality, and short_verdict.\n- meal_type_key: \"breakfast\"/\"lunch\"/\"dinner\"/\"snack\"/\"dessert\"/\"other\".\n- portion_size_key: \"small\"/\"medium\"/\"large\"/\"oversized\".\n- cuisine_type_key: \"mediterranean\"/\"asian\"/\"western\"/\"middle_eastern\"/\"latin\"/\"african\"/\"mixed\"/\"other\".\n- meat_type_key: \"red_meat\"/\"poultry\"/\"fish\"/\"seafood\"/\"plant_protein\"/\"dairy\"/\"none\".\n- cooking_method_key: \"fried\"/\"baked\"/\"grilled\"/\"raw\"/\"steamed\"/\"boiled\"/\"sauteed\"/\"other\".\n- Persona inference (face): perceived_sex_key (\"male_presenting\"/\"female_presenting\"/\"neutral_or_unclear\"), perceived_age_range_key (\"under_18\"/\"18_24\"/\"25_34\"/\"35_44\"/\"45_54\"/\"55_64\"/\"65_plus\"). Visual presentation cues for coaching personalization.\n- Persona inference (body): perceived_sex_key (same), perceived_age_range_key (same), estimated_height_range_key (\"under_150cm\"/\"150_160cm\"/\"160_170cm\"/\"170_180cm\"/\"180_190cm\"/\"190_plus\"), estimated_weight_range_key (\"under_50kg\"/\"50_60kg\"/\"60_70kg\"/\"70_80kg\"/\"80_90kg\"/\"90_100kg\"/\"100_plus\"), body_frame_key (\"small\"/\"medium\"/\"large\"), perceived_fitness_level_key (\"sedentary\"/\"lightly_active\"/\"moderately_active\"/\"very_active\"/\"athletic\"). Approximate visual ranges.\n- Persona inference (nutrition): meal_dietary_pattern_key (\"omnivore\"/\"vegetarian_compatible\"/\"vegan_compatible\"/\"pescetarian_compatible\"/\"keto_compatible\"/\"mediterranean_compatible\"/\"unclear\"), allergen_visibility_keys (array, possibly empty, of \"gluten_likely\"/\"dairy_likely\"/\"nuts_likely\"/\"shellfish_likely\"/\"eggs_likely\"/\"soy_likely\"/\"seafood_likely\").\n\nError rules:\n- message must be a short localized error message.\n\nFinal reminder: return only the raw JSON object.",
+        "inputType": "base64",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        1264,
+        240
+      ],
+      "id": "4e1a262c-c1f8-4d73-b60b-0ea61a1858be",
+      "name": "Analyze Image Auto Detect Fallback",
+      "credentials": {
+        "openAiApi": {
+          "id": "1HlOAIar5EHWTgzh",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Final shared analyse_1 normalizer.\n// Every specialized branch must converge here so the front-end always receives the same contract:\n// { success: boolean, data: object } with only face, body, nutrition, or error.\n\nfunction isPlainObject(value) {\n  return !!value && typeof value === \"object\" && !Array.isArray(value);\n}\n\nfunction readText(value) {\n  if (typeof value !== \"string\") return null;\n  const trimmed = value.trim();\n  return trimmed ? trimmed : null;\n}\n\nfunction normalizeLanguageCode(value) {\n  const lowered = String(value ?? \"\").trim().toLowerCase();\n  if (lowered.startsWith(\"fr\")) return \"fr\";\n  if (lowered.startsWith(\"en\")) return \"en\";\n  if (lowered.startsWith(\"de\")) return \"de\";\n  if (lowered.startsWith(\"it\")) return \"it\";\n  if (lowered.startsWith(\"es\")) return \"es\";\n  if (lowered.startsWith(\"pt\")) return \"pt\";\n  return \"en\";\n}\n\nfunction normalizeScanType(value) {\n  const textValue = readText(value);\n  return textValue ? textValue.toLowerCase() : null;\n}\n\nfunction normalizeExpectedRoute(value) {\n  const route = normalizeScanType(value);\n  return route === \"face\" || route === \"body\" || route === \"nutrition\"\n    ? route\n    : null;\n}\n\nconst languageCode = normalizeLanguageCode(\n  $json?.language_code ??\n    (isPlainObject($json?.body) ? $json.body.language ?? $json.body.locale : null) ??\n    $json?.language ??\n    $json?.locale,\n);\n\nconst LOCALIZED_MESSAGES = {\n  invalid_scan_response: {\n    fr: \"Reponse du scan invalide.\",\n    en: \"Invalid scan response.\",\n    de: \"Ungueltige Scan-Antwort.\",\n    it: \"Risposta della scansione non valida.\",\n    es: \"Respuesta de escaneo no valida.\",\n    pt: \"Resposta de escaneamento invalida.\",\n  },\n  generic_analysis_error: {\n    fr: \"Analyse impossible. Veuillez reessayer.\",\n    en: \"Unable to analyze the image. Please try again.\",\n    de: \"Bild konnte nicht analysiert werden. Bitte versuche es erneut.\",\n    it: \"Impossibile analizzare l'immagine. Riprova.\",\n    es: \"No se puede analizar la imagen. Intentalo de nuevo.\",\n    pt: \"Nao foi possivel analisar a imagem. Tente novamente.\",\n  },\n  scan_type_mismatch: {\n    fr: \"Le type de scan retourne ne correspond pas a la demande.\",\n    en: \"The returned scan type does not match the requested route.\",\n    de: \"Der zurueckgegebene Scan-Typ passt nicht zur angeforderten Route.\",\n    it: \"Il tipo di scansione restituito non corrisponde al percorso richiesto.\",\n    es: \"El tipo de escaneo devuelto no coincide con la ruta solicitada.\",\n    pt: \"O tipo de escaneamento retornado nao corresponde a rota solicitada.\",\n  },\n};\n\nfunction getLocalizedMessage(key) {\n  const table = LOCALIZED_MESSAGES[key] ?? LOCALIZED_MESSAGES.generic_analysis_error;\n  return table[languageCode] ?? table.en ?? \"Unknown error.\";\n}\n\nfunction stripCodeFences(value) {\n  if (typeof value !== \"string\") return \"\";\n  const trimmed = value.trim();\n  if (!trimmed) return \"\";\n  const fence = String.fromCharCode(96).repeat(3);\n  return trimmed\n    .replace(new RegExp(fence + \"(?:json)?\\\\s*([\\\\s\\\\S]*?)\\\\s*\" + fence, \"gi\"), \"$1\")\n    .trim();\n}\n\nfunction parseScalarNumber(value) {\n  if (typeof value === \"number\") {\n    return Number.isFinite(value) ? value : null;\n  }\n  if (typeof value !== \"string\") return null;\n  const trimmed = value.trim();\n  if (!trimmed) return null;\n  const parsed = Number(trimmed);\n  return Number.isFinite(parsed) ? parsed : null;\n}\n\nfunction clampNumber(value, min, max) {\n  const parsed = parseScalarNumber(value);\n  if (parsed === null) return null;\n  return Math.min(Math.max(parsed, min), max);\n}\n\nfunction normalizeEnumKey(value, allowed) {\n  if (typeof value !== \"string\") return null;\n  const trimmed = value.trim().toLowerCase();\n  if (!trimmed) return null;\n  return allowed.includes(trimmed) ? trimmed : null;\n}\n\nfunction normalizeEnumArray(value, allowed) {\n  if (!Array.isArray(value)) return [];\n  const seen = new Set();\n  const result = [];\n  for (const item of value) {\n    const normalized = normalizeEnumKey(item, allowed);\n    if (normalized && !seen.has(normalized)) {\n      seen.add(normalized);\n      result.push(normalized);\n    }\n  }\n  return result;\n}\n\nfunction pickFirstValue(values) {\n  for (const value of values) {\n    if (value !== undefined && value !== null) {\n      return value;\n    }\n  }\n  return null;\n}\n\nfunction scanTextForParsedObjects(text) {\n  const results = [];\n  for (let start = 0; start < text.length; start += 1) {\n    if (text[start] !== \"{\") continue;\n\n    let depth = 0;\n    let inString = false;\n    let escaped = false;\n\n    for (let index = start; index < text.length; index += 1) {\n      const char = text[index];\n\n      if (inString) {\n        if (escaped) {\n          escaped = false;\n        } else if (char === \"\\\\\") {\n          escaped = true;\n        } else if (char === \"\\\"\") {\n          inString = false;\n        }\n        continue;\n      }\n\n      if (char === \"\\\"\") {\n        inString = true;\n        continue;\n      }\n\n      if (char === \"{\") {\n        depth += 1;\n      } else if (char === \"}\") {\n        depth -= 1;\n        if (depth === 0) {\n          const candidate = text.slice(start, index + 1);\n          try {\n            results.push(JSON.parse(candidate));\n          } catch {}\n          break;\n        }\n      }\n    }\n  }\n  return results;\n}\n\nfunction collectObjectsFromValue(value, depth) {\n  if (depth > 6 || value === null || value === undefined) {\n    return [];\n  }\n\n  if (typeof value === \"string\") {\n    return collectObjectsFromString(value, depth + 1);\n  }\n\n  if (Array.isArray(value)) {\n    const nested = [];\n    for (const entry of value) {\n      nested.push(...collectObjectsFromValue(entry, depth + 1));\n    }\n    return nested;\n  }\n\n  if (!isPlainObject(value)) {\n    return [];\n  }\n\n  const results = [value];\n  const wrapperKeys = [\"data\", \"message\", \"content\", \"output\", \"text\", \"response\", \"result\", \"payload\"];\n\n  for (const key of wrapperKeys) {\n    if (Object.prototype.hasOwnProperty.call(value, key)) {\n      results.push(...collectObjectsFromValue(value[key], depth + 1));\n    }\n  }\n\n  if (Array.isArray(value.choices)) {\n    results.push(...collectObjectsFromValue(value.choices, depth + 1));\n  }\n\n  return results;\n}\n\nfunction collectObjectsFromString(value, depth) {\n  if (depth > 6) return [];\n\n  const stripped = stripCodeFences(value);\n  if (!stripped) return [];\n\n  try {\n    const parsed = JSON.parse(stripped);\n    const nested = collectObjectsFromValue(parsed, depth + 1);\n    if (nested.length > 0) {\n      return nested;\n    }\n  } catch {}\n\n  const extracted = [];\n  for (const parsedCandidate of scanTextForParsedObjects(stripped)) {\n    extracted.push(...collectObjectsFromValue(parsedCandidate, depth + 1));\n  }\n  return extracted;\n}\n\nconst allowedScanTypes = new Set([\"face\", \"body\", \"nutrition\", \"error\"]);\nconst allowedLimitationFlags = new Set([\n  \"blur\",\n  \"low_light\",\n  \"partial_subject\",\n  \"occlusion\",\n  \"portion_uncertain\",\n]);\nconst topLevelCandidates = [\n  $json?.message?.content,\n  $json?.choices?.[0]?.message?.content,\n  $json?.content,\n  $json?.output,\n  $json?.text,\n  $json?.response,\n  $json?.data,\n  $json,\n];\n\nlet firstObject = null;\nlet rawObject = null;\n\ncandidateLoop:\nfor (const candidate of topLevelCandidates) {\n  if (candidate === undefined || candidate === null) {\n    continue;\n  }\n\n  const objects = collectObjectsFromValue(candidate, 0);\n  for (const objectCandidate of objects) {\n    if (!isPlainObject(objectCandidate)) {\n      continue;\n    }\n\n    if (!firstObject) {\n      firstObject = objectCandidate;\n    }\n\n    const scanType = normalizeScanType(objectCandidate.scan_type);\n    if (scanType && allowedScanTypes.has(scanType)) {\n      rawObject = objectCandidate;\n      break candidateLoop;\n    }\n  }\n}\n\nif (!rawObject) {\n  rawObject = firstObject;\n}\n\nfunction wrapResult(data) {\n  return [\n    {\n      json: {\n        success: data.scan_type !== \"error\",\n        data,\n      },\n    },\n  ];\n}\n\nfunction errorResult(messageKey, explicitMessage) {\n  const message = readText(explicitMessage) || getLocalizedMessage(messageKey);\n  return wrapResult({\n    scan_type: \"error\",\n    message,\n  });\n}\n\nif (!isPlainObject(rawObject)) {\n  return errorResult(\"invalid_scan_response\");\n}\n\nconst scanType = normalizeScanType(rawObject.scan_type);\nif (!scanType || !allowedScanTypes.has(scanType)) {\n  return errorResult(\"invalid_scan_response\");\n}\n\nconst requestedRoute = normalizeExpectedRoute($json?.requested_scan_type);\nconst explicitRoute = normalizeScanType($json?.scan_route) === \"auto_detect_fallback\"\n  ? \"auto_detect_fallback\"\n  : normalizeExpectedRoute($json?.scan_route);\nconst expectedRoute = explicitRoute || requestedRoute || \"auto_detect_fallback\";\n\nif (expectedRoute !== \"auto_detect_fallback\" && scanType !== \"error\" && scanType !== expectedRoute) {\n  return errorResult(\"scan_type_mismatch\");\n}\n\nfunction buildAnalysisMeta(source) {\n  const rawMeta = isPlainObject(source.analysis_meta)\n    ? source.analysis_meta\n    : isPlainObject(source.analysisMeta)\n      ? source.analysisMeta\n      : {};\n  const rawFlags = Array.isArray(rawMeta.limitation_flags)\n    ? rawMeta.limitation_flags\n    : Array.isArray(rawMeta.limitationFlags)\n      ? rawMeta.limitationFlags\n      : [];\n\n  return {\n    confidence_score: clampNumber(\n      pickFirstValue([rawMeta.confidence_score, rawMeta.confidenceScore]),\n      0,\n      100,\n    ),\n    image_quality_score: clampNumber(\n      pickFirstValue([rawMeta.image_quality_score, rawMeta.imageQualityScore]),\n      0,\n      100,\n    ),\n    metric_coverage_score: clampNumber(\n      pickFirstValue([rawMeta.metric_coverage_score, rawMeta.metricCoverageScore]),\n      0,\n      100,\n    ),\n    limitation_flags: Array.from(\n      new Set(\n        rawFlags\n          .map((item) => readText(item))\n          .filter((item) => item && allowedLimitationFlags.has(item))\n      )\n    ),\n  };\n}\n\nfunction buildFaceSchema(source) {\n  const glowValue = pickFirstValue([\n    source.glow_index,\n    source.glowScore,\n    source.glow_score,\n    source.glow,\n    source.energy_score,\n    isPlainObject(source.metrics) ? source.metrics.glow : null,\n    isPlainObject(source.metrics) ? source.metrics.glowScore : null,\n  ]);\n\n  return {\n    schema_version: 4,\n    scan_type: \"face\",\n    face_score: clampNumber(source.face_score, 0, 100),\n    perceived_age: clampNumber(source.perceived_age, 0, 150),\n    skin_quality_score: clampNumber(source.skin_quality_score, 0, 100),\n    symmetry_percentage: clampNumber(source.symmetry_percentage, 0, 100),\n    fatigue_level: clampNumber(source.fatigue_level, 0, 100),\n    glow_index: clampNumber(glowValue, 0, 10),\n    face_shape: readText(source.face_shape),\n    collagen_level: clampNumber(source.collagen_level, 0, 100),\n    hydration_level: clampNumber(source.hydration_level, 0, 100),\n    photogenic_score: clampNumber(source.photogenic_score, 0, 10),\n    skin_clarity_score: clampNumber(source.skin_clarity_score, 0, 100),\n    under_eye_shadow_score: clampNumber(source.under_eye_shadow_score, 0, 100),\n    under_eye_volume_score: clampNumber(source.under_eye_volume_score, 0, 100),\n    eye_openness_score: clampNumber(source.eye_openness_score, 0, 100),\n    complexion_redness_score: clampNumber(source.complexion_redness_score, 0, 100),\n    pore_visibility_score: clampNumber(source.pore_visibility_score, 0, 100),\n    skin_evenness_score: clampNumber(source.skin_evenness_score, 0, 100),\n    skin_radiance_score: clampNumber(source.skin_radiance_score, 0, 100),\n    lip_dryness_score: clampNumber(source.lip_dryness_score, 0, 100),\n    forehead_smoothness_score: clampNumber(source.forehead_smoothness_score, 0, 100),\n    t_zone_oiliness_score: clampNumber(source.t_zone_oiliness_score, 0, 100),\n    perceived_sex_key: normalizeEnumKey(source.perceived_sex_key, [\"male_presenting\", \"female_presenting\", \"neutral_or_unclear\"]),\n    perceived_age_range_key: normalizeEnumKey(source.perceived_age_range_key, [\"under_18\", \"18_24\", \"25_34\", \"35_44\", \"45_54\", \"55_64\", \"65_plus\"]),\n    perceived_stress_level: clampNumber(source.perceived_stress_level, 0, 100),\n    perceived_sleep_quality: clampNumber(source.perceived_sleep_quality, 0, 100),\n    analysis_meta: buildAnalysisMeta(source),\n  };\n}\n\nfunction buildBodySchema(source) {\n  return {\n    schema_version: 4,\n    scan_type: \"body\",\n    body_score: clampNumber(source.body_score, 0, 100),\n    body_fat_percentage: clampNumber(source.body_fat_percentage, 0, 100),\n    muscle_mass_label: readText(source.muscle_mass_label),\n    body_type: readText(source.body_type),\n    posture_score: clampNumber(source.posture_score, 0, 10),\n    waist_estimation_cm: clampNumber(source.waist_estimation_cm, 0, 300),\n    strength_index: clampNumber(source.strength_index, 0, 100),\n    body_symmetry: clampNumber(source.body_symmetry, 0, 100),\n    bmi_estimate: clampNumber(source.bmi_estimate, 0, 100),\n    metabolic_age: clampNumber(source.metabolic_age, 0, 150),\n    muscle_definition_score: clampNumber(source.muscle_definition_score, 0, 100),\n    midsection_definition_score: clampNumber(source.midsection_definition_score, 0, 100),\n    shoulder_alignment_score: clampNumber(source.shoulder_alignment_score, 0, 100),\n    recovery_readiness_score: clampNumber(source.recovery_readiness_score, 0, 100),\n    upper_body_definition_score: clampNumber(source.upper_body_definition_score, 0, 100),\n    lower_body_definition_score: clampNumber(source.lower_body_definition_score, 0, 100),\n    arm_definition_score: clampNumber(source.arm_definition_score, 0, 100),\n    v_taper_score: clampNumber(source.v_taper_score, 0, 100),\n    body_tension_indicator_score: clampNumber(source.body_tension_indicator_score, 0, 100),\n    perceived_sex_key: normalizeEnumKey(source.perceived_sex_key, [\"male_presenting\", \"female_presenting\", \"neutral_or_unclear\"]),\n    perceived_age_range_key: normalizeEnumKey(source.perceived_age_range_key, [\"under_18\", \"18_24\", \"25_34\", \"35_44\", \"45_54\", \"55_64\", \"65_plus\"]),\n    estimated_height_range_key: normalizeEnumKey(source.estimated_height_range_key, [\"under_150cm\", \"150_160cm\", \"160_170cm\", \"170_180cm\", \"180_190cm\", \"190_plus\"]),\n    estimated_weight_range_key: normalizeEnumKey(source.estimated_weight_range_key, [\"under_50kg\", \"50_60kg\", \"60_70kg\", \"70_80kg\", \"80_90kg\", \"90_100kg\", \"100_plus\"]),\n    body_frame_key: normalizeEnumKey(source.body_frame_key, [\"small\", \"medium\", \"large\"]),\n    perceived_fitness_level_key: normalizeEnumKey(source.perceived_fitness_level_key, [\"sedentary\", \"lightly_active\", \"moderately_active\", \"very_active\", \"athletic\"]),\n    analysis_meta: buildAnalysisMeta(source),\n  };\n}\n\nfunction buildNutritionSchema(source) {\n  return {\n    schema_version: 4,\n    scan_type: \"nutrition\",\n    plate_health_score: clampNumber(source.plate_health_score, 0, 100),\n    calories_estimate: clampNumber(source.calories_estimate, 0, 10000),\n    protein_grams: clampNumber(source.protein_grams, 0, 1000),\n    carbs_grams: clampNumber(source.carbs_grams, 0, 1000),\n    fat_grams: clampNumber(source.fat_grams, 0, 1000),\n    glycemic_index_label: readText(source.glycemic_index_label),\n    satiety_index: clampNumber(source.satiety_index, 0, 10),\n    ingredient_quality: readText(source.ingredient_quality),\n    main_vitamins: readText(source.main_vitamins),\n    short_verdict: readText(source.short_verdict),\n    fiber_grams_estimate: clampNumber(source.fiber_grams_estimate, 0, 100),\n    sugar_grams_estimate: clampNumber(source.sugar_grams_estimate, 0, 300),\n    processing_level_score: clampNumber(source.processing_level_score, 0, 100),\n    hydration_contribution_score: clampNumber(source.hydration_contribution_score, 0, 10),\n    sodium_level_score: clampNumber(source.sodium_level_score, 0, 10),\n    meal_balance_score: clampNumber(source.meal_balance_score, 0, 100),\n    inflammation_index_score: clampNumber(source.inflammation_index_score, 0, 100),\n    meal_type_key: normalizeEnumKey(source.meal_type_key, [\"breakfast\", \"lunch\", \"dinner\", \"snack\", \"dessert\", \"other\"]),\n    portion_size_key: normalizeEnumKey(source.portion_size_key, [\"small\", \"medium\", \"large\", \"oversized\"]),\n    color_diversity_score: clampNumber(source.color_diversity_score, 0, 10),\n    vegetable_portion_ratio: clampNumber(source.vegetable_portion_ratio, 0, 100),\n    protein_visibility_score: clampNumber(source.protein_visibility_score, 0, 100),\n    whole_grain_indicator_score: clampNumber(source.whole_grain_indicator_score, 0, 100),\n    meal_freshness_score: clampNumber(source.meal_freshness_score, 0, 100),\n    cuisine_type_key: normalizeEnumKey(source.cuisine_type_key, [\"mediterranean\", \"asian\", \"western\", \"middle_eastern\", \"latin\", \"african\", \"mixed\", \"other\"]),\n    meat_type_key: normalizeEnumKey(source.meat_type_key, [\"red_meat\", \"poultry\", \"fish\", \"seafood\", \"plant_protein\", \"dairy\", \"none\"]),\n    cooking_method_key: normalizeEnumKey(source.cooking_method_key, [\"fried\", \"baked\", \"grilled\", \"raw\", \"steamed\", \"boiled\", \"sauteed\", \"other\"]),\n    meal_dietary_pattern_key: normalizeEnumKey(source.meal_dietary_pattern_key, [\"omnivore\", \"vegetarian_compatible\", \"vegan_compatible\", \"pescetarian_compatible\", \"keto_compatible\", \"mediterranean_compatible\", \"unclear\"]),\n    allergen_visibility_keys: normalizeEnumArray(source.allergen_visibility_keys, [\"gluten_likely\", \"dairy_likely\", \"nuts_likely\", \"shellfish_likely\", \"eggs_likely\", \"soy_likely\", \"seafood_likely\"]),\n    analysis_meta: buildAnalysisMeta(source),\n  };\n}\n\nif (scanType === \"error\") {\n  return wrapResult({\n    scan_type: \"error\",\n    message: readText(rawObject.message) || getLocalizedMessage(\"generic_analysis_error\"),\n  });\n}\n\nif (scanType === \"face\") {\n  return wrapResult(buildFaceSchema(rawObject));\n}\n\nif (scanType === \"body\") {\n  return wrapResult(buildBodySchema(rawObject));\n}\n\nif (scanType === \"nutrition\") {\n  return wrapResult(buildNutritionSchema(rawObject));\n}\n\nreturn errorResult(\"invalid_scan_response\");"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        16
+      ],
+      "id": "3519269d-4ea5-4ef1-aa34-febc3090df19",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1824,
+        16
+      ],
+      "id": "b165066c-3b33-401b-b7e5-e057f6128e67",
+      "name": "Respond to Webhook1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Analyse Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Analyse Input": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Snapshot Analyse Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Merge Image + Analyse Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Snapshot Analyse Context": {
+      "main": [
+        [
+          {
+            "node": "Merge Image + Analyse Context",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Image + Analyse Context": {
+      "main": [
+        [
+          {
+            "node": "Determine Scan Route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Determine Scan Route": {
+      "main": [
+        [
+          {
+            "node": "Switch scan_route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch scan_route": {
+      "main": [
+        [
+          {
+            "node": "Analyze Face Image",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Analyze Body Image",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Analyze Nutrition Image",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Analyze Image Auto Detect Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Face Image": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Body Image": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Nutrition Image": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Image Auto Detect Fallback": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "021fc42f-5e55-46b4-ab05-94e0b88303d4",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "00431bea7c112c6c03ed10860af49e6e791fd93819e027c15313a8e313bdaff9"
+  },
+  "id": "1-iAvuaAS6G39AtQyqukh",
+  "tags": []
+}

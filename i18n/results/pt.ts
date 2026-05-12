@@ -9,6 +9,11 @@ export const PT_RESULT_TRANSLATIONS = {
       paywall_cta: 'Conhecer Premium',
       attention: 'Atenção',
       ai_report: 'Relatório IA',
+      analysis_quality: {
+        limited: 'Qualidade de imagem limitada',
+        partial: 'Cobertura parcial',
+        review: 'Confianca a revisar',
+      },
       trajectory_preview: {
         title: 'Projeção de 30 dias',
         eyebrow: {

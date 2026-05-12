@@ -187,6 +187,11 @@ export function CoachPromptCard({
           >
             {title}
           </Text>
+          {subtitle ? (
+            <Text numberOfLines={3} style={styles.subtitleSelectorTile}>
+              {subtitle}
+            </Text>
+          ) : null}
         </>
       ) : (
         <>
@@ -324,11 +329,11 @@ const createStyles = (colors: any) =>
       flexDirection: 'column',
       alignItems: 'flex-start',
       justifyContent: 'flex-start',
-      gap: SPACING.sm + 2,
+      gap: SPACING.sm,
       paddingLeft: SPACING.md,
       paddingRight: SPACING.md,
       paddingVertical: SPACING.md,
-      minHeight: 132,
+      minHeight: 164,
       overflow: 'hidden',
     },
     cardFeatured: {
@@ -525,5 +530,10 @@ const createStyles = (colors: any) =>
       lineHeight: 19,
       fontWeight: FONT_WEIGHTS.bold,
       color: colors.primaryText,
+    },
+    subtitleSelectorTile: {
+      fontSize: SIZES.text12,
+      lineHeight: 16,
+      color: colors.textMuted ?? withAlpha(colors.gray, 0.95),
     },
   });

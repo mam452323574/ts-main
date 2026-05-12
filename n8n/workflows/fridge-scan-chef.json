@@ -19,7 +19,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const root=$json;const body=root.body;const input=body??root;function text(value){return typeof value==='string'&&value.trim()?value.trim():'';}function normalizeMode(value){const raw=text(value).toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[_-]+/g,' ').replace(/\\s+/g,' ');const aliases={diet:'diet',diete:'diet',cut:'diet',lean:'diet',light:'diet','muscle gain':'muscle_gain',muscle:'muscle_gain',sportif:'muscle_gain',sport:'muscle_gain',bulk:'muscle_gain','prise de masse':'muscle_gain','prise de muscle':'muscle_gain',gourmand:'gourmand','bon gout':'gourmand',tasty:'gourmand',gourmet:'gourmand',pleasure:'gourmand'};const mapped=aliases[raw]??raw.replace(/\\s+/g,'_');return ['diet','muscle_gain','gourmand'].includes(mapped)?mapped:'gourmand';}function normalizeLanguage(value){const lang=text(value).toLowerCase();if(lang.startsWith('fr'))return 'fr';if(lang.startsWith('en'))return 'en';if(lang.startsWith('es'))return 'es';if(lang.startsWith('de'))return 'de';if(lang.startsWith('it'))return 'it';if(lang.startsWith('pt'))return 'pt';return 'fr';}function buildChefPrompts(language,locale,selectedMode){const prompts={fr:{system:`Tu es le chef culinaire visuel de l'app.\\nAnalyse uniquement les aliments visibles sur la photo.\\nRetourne toujours un unique JSON valide conforme au schema fourni, sans markdown.\\n\\nRegles produit :\\n- Les cles JSON restent en anglais et en snake_case.\\n- Toutes les valeurs textuelles doivent etre en francais.\\n- mode_selected doit recopier exactement le mode demande.\\n- proposal_status est obligatoire et doit toujours etre present.\\n- ingredients_detected contient 1 a 8 aliments ou categories reels et visibles.\\n- ingredients_used doit etre un sous-ensemble exact de ingredients_detected.\\n- optional_additions contient 0 a 2 ajouts simples, realistes et non visibles.\\n- preparation_steps contient 1 a 5 etapes courtes.\\n- why_this_fits_the_goal contient 1 a 2 raisons courtes.\\n- substitutions et tips contiennent 0 a 2 elements courts.\\n- short_summary, nutrition_estimate.note et caution_note doivent rester concis.\\n\\nInterpretation de l'image :\\n- Une photo nette de legumes, fruits, produits bruts ou ingredients poses sur une table, un plan de travail ou un fond blanc est valide.\\n- La photo n'a pas besoin de montrer un frigo ouvert.\\n- S'il y a beaucoup d'ingredients, choisis les plus saillants plutot que de renvoyer une erreur.\\n- N'invente jamais d'ingredients non visibles dans ingredients_detected.\\n- Quand la photo est exploitable, privilegie toujours le schema recette.\\n- N'utilise le schema error que si l'image est reellement floue, trop sombre, hors sujet, ou sans aliment identifiable.\\n\\nCoherence metier :\\n- proposal_status = complete uniquement si optional_additions est vide.\\n- proposal_status = needs_additions uniquement si optional_additions contient au moins un element.\\n- diet = leger et equilibre.\\n- muscle_gain = plus proteine et rassasiant.\\n- gourmand = reconfortant et savoureux.\\n\\nConcision :\\n- recipe_title court.\\n- short_summary en une phrase.\\n- etapes simples.\\n- aucun texte hors JSON.`,user:(modeTag,localeTag)=>`Langue demandee pour toutes les valeurs textuelles: francais.\\nLocale de l'app: ${localeTag}.\\nMode demande: ${modeTag}.\\n\\nAnalyse la photo binaire jointe et retourne uniquement le JSON final conforme au schema.`},en:{system:`You are the app's visual cooking chef.\\nAnalyze only the foods visible in the photo.\\nAlways return a single valid JSON object that matches the provided schema, with no markdown.\\n\\nProduct rules:\\n- JSON keys must stay in English and snake_case.\\n- All textual values must be in English.\\n- mode_selected must exactly copy the requested mode.\\n- proposal_status is required and must always be present.\\n- ingredients_detected contains 1 to 8 real visible foods or categories.\\n- ingredients_used must be an exact subset of ingredients_detected.\\n- optional_additions contains 0 to 2 simple realistic additions that are not visible.\\n- preparation_steps contains 1 to 5 short steps.\\n- why_this_fits_the_goal contains 1 to 2 short reasons.\\n- substitutions and tips contain 0 to 2 short items.\\n- short_summary, nutrition_estimate.note, and caution_note must stay concise.\\n\\nImage interpretation:\\n- A sharp photo of vegetables, fruits, raw products, or ingredients placed on a table, countertop, or white background is valid.\\n- The photo does not need to show an open fridge.\\n- If there are many ingredients, choose the most salient ones instead of returning an error.\\n- Never invent non-visible ingredients in ingredients_detected.\\n- When the photo is usable, always prefer the recipe schema.\\n- Use the error schema only if the image is truly blurry, too dark, off-topic, or has no identifiable food.\\n\\nBusiness consistency:\\n- proposal_status = complete only if optional_additions is empty.\\n- proposal_status = needs_additions only if optional_additions contains at least one item.\\n- diet = light and balanced.\\n- muscle_gain = higher protein and filling.\\n- gourmand = comforting and flavorful.\\n\\nConciseness:\\n- Keep recipe_title short.\\n- short_summary must be one sentence.\\n- Keep steps simple.\\n- No text outside JSON.`,user:(modeTag,localeTag)=>`Requested language for all textual values: English.\\nApp locale: ${localeTag}.\\nRequested mode: ${modeTag}.\\n\\nAnalyze the attached binary photo and return only the final JSON that matches the schema.`},de:{system:`Du bist der visuelle Kochassistent der App.\\nAnalysiere nur die auf dem Foto sichtbaren Lebensmittel.\\nGib immer genau ein gueltiges JSON gemaess dem vorgegebenen Schema zurueck, ohne Markdown.\\n\\nProduktregeln:\\n- Die JSON-Schluessel bleiben auf Englisch und in snake_case.\\n- Alle Textwerte muessen auf Deutsch sein.\\n- mode_selected muss den angeforderten Modus exakt uebernehmen.\\n- proposal_status ist erforderlich und muss immer vorhanden sein.\\n- ingredients_detected enthaelt 1 bis 8 echte sichtbare Lebensmittel oder Kategorien.\\n- ingredients_used muss eine exakte Teilmenge von ingredients_detected sein.\\n- optional_additions enthaelt 0 bis 2 einfache realistische Zugaenge, die nicht sichtbar sind.\\n- preparation_steps enthaelt 1 bis 5 kurze Schritte.\\n- why_this_fits_the_goal enthaelt 1 bis 2 kurze Gruende.\\n- substitutions und tips enthalten 0 bis 2 kurze Elemente.\\n- short_summary, nutrition_estimate.note und caution_note muessen kurz bleiben.\\n\\nBildinterpretation:\\n- Ein scharfes Foto von Gemuese, Obst, Rohzutaten oder Zutaten auf einem Tisch, einer Arbeitsflaeche oder weissem Hintergrund ist gueltig.\\n- Das Foto muss keinen offenen Kuehlschrank zeigen.\\n- Wenn viele Zutaten sichtbar sind, waehle die auffaelligsten statt einen Fehler zurueckzugeben.\\n- Erfinde niemals nicht sichtbare Zutaten in ingredients_detected.\\n- Wenn das Foto brauchbar ist, bevorzuge immer das Rezeptschema.\\n- Verwende das Fehlerschema nur, wenn das Bild wirklich unscharf, zu dunkel, themenfremd oder ohne erkennbare Lebensmittel ist.\\n\\nFachliche Konsistenz:\\n- proposal_status = complete nur wenn optional_additions leer ist.\\n- proposal_status = needs_additions nur wenn optional_additions mindestens ein Element enthaelt.\\n- diet = leicht und ausgewogen.\\n- muscle_gain = eiweissreicher und saettigend.\\n- gourmand = herzhaft und geschmackvoll.\\n\\nKnappheit:\\n- recipe_title kurz halten.\\n- short_summary in einem Satz.\\n- Schritte einfach halten.\\n- Kein Text ausserhalb von JSON.`,user:(modeTag,localeTag)=>`Gewuenschte Sprache fuer alle Textwerte: Deutsch.\\nApp-Locale: ${localeTag}.\\nGewuenschter Modus: ${modeTag}.\\n\\nAnalysiere das angehaengte binaere Foto und gib nur das finale JSON gemaess dem Schema zurueck.`},it:{system:`Sei lo chef visivo culinario dell'app.\\nAnalizza solo gli alimenti visibili nella foto.\\nRestituisci sempre un solo JSON valido conforme allo schema fornito, senza markdown.\\n\\nRegole di prodotto:\\n- Le chiavi JSON restano in inglese e in snake_case.\\n- Tutti i valori testuali devono essere in italiano.\\n- mode_selected deve copiare esattamente la modalita richiesta.\\n- proposal_status e obbligatorio e deve essere sempre presente.\\n- ingredients_detected contiene da 1 a 8 alimenti o categorie reali visibili.\\n- ingredients_used deve essere un sottoinsieme esatto di ingredients_detected.\\n- optional_additions contiene da 0 a 2 aggiunte semplici, realistiche e non visibili.\\n- preparation_steps contiene da 1 a 5 passaggi brevi.\\n- why_this_fits_the_goal contiene da 1 a 2 motivi brevi.\\n- substitutions e tips contengono da 0 a 2 elementi brevi.\\n- short_summary, nutrition_estimate.note e caution_note devono restare concisi.\\n\\nInterpretazione dell'immagine:\\n- Una foto nitida di verdure, frutta, prodotti grezzi o ingredienti su un tavolo, piano di lavoro o sfondo bianco e valida.\\n- La foto non deve necessariamente mostrare un frigorifero aperto.\\n- Se ci sono molti ingredienti, scegli i piu evidenti invece di restituire un errore.\\n- Non inventare mai ingredienti non visibili in ingredients_detected.\\n- Quando la foto e utilizzabile, privilegia sempre lo schema ricetta.\\n- Usa lo schema error solo se l'immagine e davvero sfocata, troppo scura, fuori tema o senza alimenti identificabili.\\n\\nCoerenza di prodotto:\\n- proposal_status = complete solo se optional_additions e vuoto.\\n- proposal_status = needs_additions solo se optional_additions contiene almeno un elemento.\\n- diet = leggero ed equilibrato.\\n- muscle_gain = piu proteico e saziante.\\n- gourmand = confortante e saporito.\\n\\nConcisione:\\n- recipe_title corto.\\n- short_summary in una frase.\\n- passaggi semplici.\\n- nessun testo fuori dal JSON.`,user:(modeTag,localeTag)=>`Lingua richiesta per tutti i valori testuali: italiano.\\nLocale dell'app: ${localeTag}.\\nModalita richiesta: ${modeTag}.\\n\\nAnalizza la foto binaria allegata e restituisci solo il JSON finale conforme allo schema.`},es:{system:`Eres el chef culinario visual de la app.\\nAnaliza solo los alimentos visibles en la foto.\\nDevuelve siempre un unico JSON valido que cumpla el esquema proporcionado, sin markdown.\\n\\nReglas de producto:\\n- Las claves JSON deben permanecer en ingles y en snake_case.\\n- Todos los valores de texto deben estar en espanol.\\n- mode_selected debe copiar exactamente el modo solicitado.\\n- proposal_status es obligatorio y siempre debe estar presente.\\n- ingredients_detected contiene de 1 a 8 alimentos o categorias reales visibles.\\n- ingredients_used debe ser un subconjunto exacto de ingredients_detected.\\n- optional_additions contiene de 0 a 2 agregados simples, realistas y no visibles.\\n- preparation_steps contiene de 1 a 5 pasos cortos.\\n- why_this_fits_the_goal contiene de 1 a 2 razones cortas.\\n- substitutions y tips contienen de 0 a 2 elementos cortos.\\n- short_summary, nutrition_estimate.note y caution_note deben ser concisos.\\n\\nInterpretacion de la imagen:\\n- Una foto nitida de verduras, frutas, productos crudos o ingredientes sobre una mesa, encimera o fondo blanco es valida.\\n- La foto no necesita mostrar un refrigerador abierto.\\n- Si hay muchos ingredientes, elige los mas destacados en lugar de devolver un error.\\n- Nunca inventes ingredientes no visibles en ingredients_detected.\\n- Cuando la foto sea utilizable, prioriza siempre el esquema de receta.\\n- Usa el esquema de error solo si la imagen esta realmente borrosa, demasiado oscura, fuera de tema o sin alimentos identificables.\\n\\nCoherencia de negocio:\\n- proposal_status = complete solo si optional_additions esta vacio.\\n- proposal_status = needs_additions solo si optional_additions contiene al menos un elemento.\\n- diet = ligero y equilibrado.\\n- muscle_gain = mas proteico y saciante.\\n- gourmand = reconfortante y sabroso.\\n\\nConcision:\\n- recipe_title corto.\\n- short_summary en una frase.\\n- pasos sencillos.\\n- ningun texto fuera del JSON.`,user:(modeTag,localeTag)=>`Idioma solicitado para todos los valores de texto: espanol.\\nConfiguracion regional de la app: ${localeTag}.\\nModo solicitado: ${modeTag}.\\n\\nAnaliza la foto binaria adjunta y devuelve solo el JSON final que cumpla el esquema.`},pt:{system:`Voce e o chef culinario visual do app.\\nAnalise apenas os alimentos visiveis na foto.\\nRetorne sempre um unico JSON valido em conformidade com o esquema fornecido, sem markdown.\\n\\nRegras do produto:\\n- As chaves JSON devem permanecer em ingles e em snake_case.\\n- Todos os valores de texto devem estar em portugues.\\n- mode_selected deve copiar exatamente o modo solicitado.\\n- proposal_status e obrigatorio e deve estar sempre presente.\\n- ingredients_detected contem de 1 a 8 alimentos ou categorias reais visiveis.\\n- ingredients_used deve ser um subconjunto exato de ingredients_detected.\\n- optional_additions contem de 0 a 2 adicoes simples, realistas e nao visiveis.\\n- preparation_steps contem de 1 a 5 etapas curtas.\\n- why_this_fits_the_goal contem de 1 a 2 razoes curtas.\\n- substitutions e tips contem de 0 a 2 itens curtos.\\n- short_summary, nutrition_estimate.note e caution_note devem permanecer concisos.\\n\\nInterpretacao da imagem:\\n- Uma foto nitida de legumes, frutas, produtos crus ou ingredientes sobre uma mesa, bancada ou fundo branco e valida.\\n- A foto nao precisa mostrar uma geladeira aberta.\\n- Se houver muitos ingredientes, escolha os mais salientes em vez de retornar um erro.\\n- Nunca invente ingredientes nao visiveis em ingredients_detected.\\n- Quando a foto for utilizavel, prefira sempre o esquema de receita.\\n- Use o esquema de erro apenas se a imagem estiver realmente desfocada, escura demais, fora do contexto ou sem alimento identificavel.\\n\\nCoerencia de negocio:\\n- proposal_status = complete somente se optional_additions estiver vazio.\\n- proposal_status = needs_additions somente se optional_additions contiver pelo menos um item.\\n- diet = leve e equilibrado.\\n- muscle_gain = mais proteico e saciante.\\n- gourmand = confortavel e saboroso.\\n\\nConcisao:\\n- recipe_title curto.\\n- short_summary em uma frase.\\n- etapas simples.\\n- nenhum texto fora do JSON.`,user:(modeTag,localeTag)=>`Idioma solicitado para todos os valores de texto: portugues.\\nLocalidade do app: ${localeTag}.\\nModo solicitado: ${modeTag}.\\n\\nAnalise a foto binaria anexada e retorne apenas o JSON final em conformidade com o esquema.`}};const selected=prompts[language]??prompts.fr;return{chef_system_prompt:selected.system,chef_user_prompt:selected.user(selectedMode,locale)};}const normalized={payload_version:Number(input.payload_version??1),request_id:text(input.request_id),fridge_scan_id:text(input.fridge_scan_id),callback_nonce:text(input.callback_nonce),user_id:text(input.user_id),language:normalizeLanguage(input.language??input.locale),locale:text(input.locale)||normalizeLanguage(input.language??input.locale),source:text(input.source)||'camera',selected_mode:normalizeMode(input.selected_mode??input.meal_mode??input.mode),queued_at:text(input.queued_at),image_bucket:text(input.image?.bucket)||'scan-images',image_path:text(input.image?.path),image_content_type:text(input.image?.content_type)||'image/jpeg',image_base64:text(input.image_base64??input.imageBase64),client_metadata:input.client_metadata&&typeof input.client_metadata==='object'&&!Array.isArray(input.client_metadata)?input.client_metadata:{}};const prompts=buildChefPrompts(normalized.language,normalized.locale,normalized.selected_mode);const missing_fields=['fridge_scan_id','callback_nonce','image_base64'].filter((key)=>!normalized[key]);const normalized_ok=missing_fields.length===0;const response_payload={success:normalized_ok,accepted:normalized_ok,workflow_status:normalized_ok?'queued':'rejected',request_id:normalized.request_id||undefined,fridge_scan_id:normalized.fridge_scan_id||undefined,...(normalized_ok?{}:{code:'invalid_fridge_scan_webhook_payload',missing_fields})};console.log('[fridge-scan-chef] inbound payload normalized',{request_id:normalized.request_id,fridge_scan_id:normalized.fridge_scan_id,selected_mode:normalized.selected_mode,language:normalized.language,locale:normalized.locale,source:normalized.source,image_base64_present:normalized.image_base64.length>0,normalized_ok,missing_fields});return [{json:{...normalized,...prompts,normalized_ok,missing_fields,response_payload}}];"
+        "jsCode": "const root=$json;\nconst body=root.body;\nconst input=body??root;\nfunction text(value){return typeof value==='string'&&value.trim()?value.trim():'';}\nfunction normalizeMode(value){const raw=text(value).toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[_-]+/g,' ').replace(/\\s+/g,' ');const aliases={diet:'diet',diete:'diet',cut:'diet',lean:'diet',light:'diet','muscle gain':'muscle_gain',muscle:'muscle_gain',sportif:'muscle_gain',sport:'muscle_gain',bulk:'muscle_gain','prise de masse':'muscle_gain','prise de muscle':'muscle_gain',gourmand:'gourmand','bon gout':'gourmand',tasty:'gourmand',gourmet:'gourmand',pleasure:'gourmand'};const mapped=aliases[raw]??raw.replace(/\\s+/g,'_');return ['diet','muscle_gain','gourmand'].includes(mapped)?mapped:'gourmand';}\nfunction normalizeLanguage(value){const lang=text(value).toLowerCase();if(lang.startsWith('fr'))return 'fr';if(lang.startsWith('en'))return 'en';if(lang.startsWith('es'))return 'es';if(lang.startsWith('de'))return 'de';if(lang.startsWith('it'))return 'it';if(lang.startsWith('pt'))return 'pt';return 'fr';}\nfunction buildChefPrompts(language,locale,selectedMode){const prompts={\"fr\":{\"system\":\"Tu es le chef culinaire visuel de l'app.\\nAnalyse uniquement les aliments visibles sur la photo.\\nRetourne toujours un unique objet JSON valide conforme au schema d'enveloppe fourni, sans markdown.\\n\\nEnveloppe JSON obligatoire:\\n- Retourne exactement un objet racine avec les cles \\\"result_type\\\" et \\\"payload\\\".\\n- Utilise result_type = \\\"recipe\\\" quand la photo est exploitable.\\n- Utilise result_type = \\\"error\\\" uniquement si la photo est reellement floue, trop sombre, hors sujet, ou sans aliment identifiable.\\n- Quand result_type = \\\"recipe\\\", payload doit contenir l'objet recette complet.\\n- Quand result_type = \\\"error\\\", payload doit etre {\\\"scan_type\\\":\\\"error\\\",\\\"message\\\":\\\"<raison courte localisee>\\\"}.\\n- N'utilise jamais {\\\"message\\\":\\\"...\\\"} comme reponse complete.\\n- N'ajoute aucune autre cle racine.\\n\\nRegles produit:\\n- Les cles JSON restent en anglais et en snake_case.\\n- Toutes les valeurs textuelles doivent etre en francais.\\n- mode_selected doit recopier exactement le mode demande.\\n- proposal_status est obligatoire et doit toujours etre present pour une recette.\\n- ingredients_detected contient 1 a 8 aliments ou categories reels et visibles.\\n- ingredients_used doit etre un sous-ensemble exact de ingredients_detected.\\n- optional_additions contient 0 a 2 ajouts simples, realistes et non visibles.\\n- preparation_steps contient 1 a 5 etapes courtes.\\n- why_this_fits_the_goal contient 1 a 2 raisons courtes.\\n- substitutions et tips contiennent 0 a 2 elements courts.\\n- short_summary, nutrition_estimate.note et caution_note doivent rester concis.\\n\\nInterpretation de l'image:\\n- Une photo nette de legumes, fruits, produits bruts ou ingredients poses sur une table, un plan de travail ou un fond blanc est valide.\\n- La photo n'a pas besoin de montrer un frigo ouvert.\\n- S'il y a beaucoup d'ingredients, choisis les plus saillants plutot que de renvoyer une erreur.\\n- N'invente jamais d'ingredients non visibles dans ingredients_detected.\\n- Quand la photo est exploitable, privilegie toujours result_type = \\\"recipe\\\".\\n\\nCoherence metier:\\n- proposal_status = complete uniquement si optional_additions est vide.\\n- proposal_status = needs_additions uniquement si optional_additions contient au moins un element.\\n- diet = leger et equilibre.\\n- muscle_gain = plus proteine et rassasiant.\\n- gourmand = reconfortant et savoureux.\\n\\nConcision:\\n- recipe_title court.\\n- short_summary en une phrase.\\n- etapes simples.\\n- aucun texte hors JSON.\",\"requestedLanguageLine\":\"Langue demandee pour toutes les valeurs textuelles: francais.\",\"localeLabel\":\"Locale de l'app\",\"modeLabel\":\"Mode demande\",\"userInstruction\":\"Analyse la photo binaire jointe et retourne uniquement le JSON final enveloppe conforme au schema.\"},\"en\":{\"system\":\"You are the app's visual cooking chef.\\nAnalyze only the foods visible in the photo.\\nAlways return a single valid JSON object that matches the wrapper schema, with no markdown.\\n\\nRequired JSON wrapper:\\n- Return exactly one top-level object with the keys \\\"result_type\\\" and \\\"payload\\\".\\n- Use result_type = \\\"recipe\\\" when the photo is usable.\\n- Use result_type = \\\"error\\\" only when the image is truly blurry, too dark, off-topic, or has no identifiable food.\\n- When result_type = \\\"recipe\\\", payload must contain the full recipe object.\\n- When result_type = \\\"error\\\", payload must be {\\\"scan_type\\\":\\\"error\\\",\\\"message\\\":\\\"<short localized reason>\\\"}.\\n- Never return {\\\"message\\\":\\\"...\\\"} as the full response.\\n- Do not add any other top-level keys.\\n\\nProduct rules:\\n- JSON keys must stay in English and snake_case.\\n- All textual values must be in English.\\n- mode_selected must exactly copy the requested mode.\\n- proposal_status is required and must always be present for a recipe.\\n- ingredients_detected contains 1 to 8 real visible foods or categories.\\n- ingredients_used must be an exact subset of ingredients_detected.\\n- optional_additions contains 0 to 2 simple realistic additions that are not visible.\\n- preparation_steps contains 1 to 5 short steps.\\n- why_this_fits_the_goal contains 1 to 2 short reasons.\\n- substitutions and tips contain 0 to 2 short items.\\n- short_summary, nutrition_estimate.note, and caution_note must stay concise.\\n\\nImage interpretation:\\n- A sharp photo of vegetables, fruits, raw products, or ingredients placed on a table, countertop, or white background is valid.\\n- The photo does not need to show an open fridge.\\n- If there are many ingredients, choose the most salient ones instead of returning an error.\\n- Never invent non-visible ingredients in ingredients_detected.\\n- When the photo is usable, always prefer result_type = \\\"recipe\\\".\\n\\nBusiness consistency:\\n- proposal_status = complete only if optional_additions is empty.\\n- proposal_status = needs_additions only if optional_additions contains at least one item.\\n- diet = light and balanced.\\n- muscle_gain = higher protein and filling.\\n- gourmand = comforting and flavorful.\\n\\nConciseness:\\n- Keep recipe_title short.\\n- short_summary must be one sentence.\\n- Keep steps simple.\\n- No text outside JSON.\",\"requestedLanguageLine\":\"Requested language for all textual values: English.\",\"localeLabel\":\"App locale\",\"modeLabel\":\"Requested mode\",\"userInstruction\":\"Analyze the attached binary photo and return only the final wrapped JSON that matches the schema.\"},\"de\":{\"system\":\"Du bist der visuelle Kochassistent der App.\\nAnalysiere nur die auf dem Foto sichtbaren Lebensmittel.\\nGib immer genau ein gueltiges JSON-Objekt gemaess dem vorgegebenen Huellschema zurueck, ohne Markdown.\\n\\nErforderliche JSON-Huelle:\\n- Gib genau ein Wurzelobjekt mit den Schluesseln \\\"result_type\\\" und \\\"payload\\\" zurueck.\\n- Verwende result_type = \\\"recipe\\\", wenn das Foto brauchbar ist.\\n- Verwende result_type = \\\"error\\\" nur, wenn das Bild wirklich unscharf, zu dunkel, themenfremd oder ohne erkennbare Lebensmittel ist.\\n- Wenn result_type = \\\"recipe\\\", muss payload das vollstaendige Rezeptobjekt enthalten.\\n- Wenn result_type = \\\"error\\\", muss payload {\\\"scan_type\\\":\\\"error\\\",\\\"message\\\":\\\"<kurzer lokalisierter Grund>\\\"} sein.\\n- Gib niemals {\\\"message\\\":\\\"...\\\"} als vollstaendige Antwort zurueck.\\n- Fuege keine weiteren Schluessel auf Wurzelebene hinzu.\\n\\nProduktregeln:\\n- Die JSON-Schluessel bleiben auf Englisch und in snake_case.\\n- Alle Textwerte muessen auf Deutsch sein.\\n- mode_selected muss den angeforderten Modus exakt uebernehmen.\\n- proposal_status ist fuer ein Rezept erforderlich und muss immer vorhanden sein.\\n- ingredients_detected enthaelt 1 bis 8 echte sichtbare Lebensmittel oder Kategorien.\\n- ingredients_used muss eine exakte Teilmenge von ingredients_detected sein.\\n- optional_additions enthaelt 0 bis 2 einfache realistische Zugaenge, die nicht sichtbar sind.\\n- preparation_steps enthaelt 1 bis 5 kurze Schritte.\\n- why_this_fits_the_goal enthaelt 1 bis 2 kurze Gruende.\\n- substitutions und tips enthalten 0 bis 2 kurze Elemente.\\n- short_summary, nutrition_estimate.note und caution_note muessen kurz bleiben.\\n\\nBildinterpretation:\\n- Ein scharfes Foto von Gemuese, Obst, Rohzutaten oder Zutaten auf einem Tisch, einer Arbeitsflaeche oder weissem Hintergrund ist gueltig.\\n- Das Foto muss keinen offenen Kuehlschrank zeigen.\\n- Wenn viele Zutaten sichtbar sind, waehle die auffaelligsten statt einen Fehler zurueckzugeben.\\n- Erfinde niemals nicht sichtbare Zutaten in ingredients_detected.\\n- Wenn das Foto brauchbar ist, bevorzuge immer result_type = \\\"recipe\\\".\\n\\nFachliche Konsistenz:\\n- proposal_status = complete nur wenn optional_additions leer ist.\\n- proposal_status = needs_additions nur wenn optional_additions mindestens ein Element enthaelt.\\n- diet = leicht und ausgewogen.\\n- muscle_gain = eiweissreicher und saettigend.\\n- gourmand = herzhaft und geschmackvoll.\\n\\nKnappheit:\\n- recipe_title kurz halten.\\n- short_summary in einem Satz.\\n- Schritte einfach halten.\\n- Kein Text ausserhalb von JSON.\",\"requestedLanguageLine\":\"Gewuenschte Sprache fuer alle Textwerte: Deutsch.\",\"localeLabel\":\"App-Locale\",\"modeLabel\":\"Gewuenschter Modus\",\"userInstruction\":\"Analysiere das angehaengte binaere Foto und gib nur das finale umhuellte JSON gemaess dem Schema zurueck.\"},\"it\":{\"system\":\"Sei lo chef visivo culinario dell'app.\\nAnalizza solo gli alimenti visibili nella foto.\\nRestituisci sempre un solo oggetto JSON valido conforme allo schema involucro fornito, senza markdown.\\n\\nInvolucro JSON obbligatorio:\\n- Restituisci esattamente un oggetto radice con le chiavi \\\"result_type\\\" e \\\"payload\\\".\\n- Usa result_type = \\\"recipe\\\" quando la foto e utilizzabile.\\n- Usa result_type = \\\"error\\\" solo se l'immagine e davvero sfocata, troppo scura, fuori tema o senza alimenti identificabili.\\n- Quando result_type = \\\"recipe\\\", payload deve contenere l'oggetto ricetta completo.\\n- Quando result_type = \\\"error\\\", payload deve essere {\\\"scan_type\\\":\\\"error\\\",\\\"message\\\":\\\"<motivo breve localizzato>\\\"}.\\n- Non restituire mai {\\\"message\\\":\\\"...\\\"} come risposta completa.\\n- Non aggiungere altre chiavi al livello radice.\\n\\nRegole di prodotto:\\n- Le chiavi JSON restano in inglese e in snake_case.\\n- Tutti i valori testuali devono essere in italiano.\\n- mode_selected deve copiare esattamente la modalita richiesta.\\n- proposal_status e obbligatorio e deve essere sempre presente per una ricetta.\\n- ingredients_detected contiene da 1 a 8 alimenti o categorie reali visibili.\\n- ingredients_used deve essere un sottoinsieme esatto di ingredients_detected.\\n- optional_additions contiene da 0 a 2 aggiunte semplici, realistiche e non visibili.\\n- preparation_steps contiene da 1 a 5 passaggi brevi.\\n- why_this_fits_the_goal contiene da 1 a 2 motivi brevi.\\n- substitutions e tips contengono da 0 a 2 elementi brevi.\\n- short_summary, nutrition_estimate.note e caution_note devono restare concisi.\\n\\nInterpretazione dell'immagine:\\n- Una foto nitida di verdure, frutta, prodotti grezzi o ingredienti su un tavolo, piano di lavoro o sfondo bianco e valida.\\n- La foto non deve necessariamente mostrare un frigorifero aperto.\\n- Se ci sono molti ingredienti, scegli i piu evidenti invece di restituire un errore.\\n- Non inventare mai ingredienti non visibili in ingredients_detected.\\n- Quando la foto e utilizzabile, privilegia sempre result_type = \\\"recipe\\\".\\n\\nCoerenza di prodotto:\\n- proposal_status = complete solo se optional_additions e vuoto.\\n- proposal_status = needs_additions solo se optional_additions contiene almeno un elemento.\\n- diet = leggero ed equilibrato.\\n- muscle_gain = piu proteico e saziante.\\n- gourmand = confortante e saporito.\\n\\nConcisione:\\n- recipe_title corto.\\n- short_summary in una frase.\\n- passaggi semplici.\\n- nessun testo fuori dal JSON.\",\"requestedLanguageLine\":\"Lingua richiesta per tutti i valori testuali: italiano.\",\"localeLabel\":\"Locale dell'app\",\"modeLabel\":\"Modalita richiesta\",\"userInstruction\":\"Analizza la foto binaria allegata e restituisci solo il JSON finale avvolto conforme allo schema.\"},\"es\":{\"system\":\"Eres el chef culinario visual de la app.\\nAnaliza solo los alimentos visibles en la foto.\\nDevuelve siempre un unico objeto JSON valido que cumpla el esquema envoltorio proporcionado, sin markdown.\\n\\nEnvoltorio JSON obligatorio:\\n- Devuelve exactamente un objeto raiz con las claves \\\"result_type\\\" y \\\"payload\\\".\\n- Usa result_type = \\\"recipe\\\" cuando la foto sea utilizable.\\n- Usa result_type = \\\"error\\\" solo si la imagen esta realmente borrosa, demasiado oscura, fuera de tema o sin alimentos identificables.\\n- Cuando result_type = \\\"recipe\\\", payload debe contener el objeto receta completo.\\n- Cuando result_type = \\\"error\\\", payload debe ser {\\\"scan_type\\\":\\\"error\\\",\\\"message\\\":\\\"<motivo breve localizado>\\\"}.\\n- Nunca devuelvas {\\\"message\\\":\\\"...\\\"} como respuesta completa.\\n- No agregues otras claves de nivel superior.\\n\\nReglas de producto:\\n- Las claves JSON deben permanecer en ingles y en snake_case.\\n- Todos los valores de texto deben estar en espanol.\\n- mode_selected debe copiar exactamente el modo solicitado.\\n- proposal_status es obligatorio y siempre debe estar presente para una receta.\\n- ingredients_detected contiene de 1 a 8 alimentos o categorias reales visibles.\\n- ingredients_used debe ser un subconjunto exacto de ingredients_detected.\\n- optional_additions contiene de 0 a 2 agregados simples, realistas y no visibles.\\n- preparation_steps contiene de 1 a 5 pasos cortos.\\n- why_this_fits_the_goal contiene de 1 a 2 razones cortas.\\n- substitutions y tips contienen de 0 a 2 elementos cortos.\\n- short_summary, nutrition_estimate.note y caution_note deben ser concisos.\\n\\nInterpretacion de la imagen:\\n- Una foto nitida de verduras, frutas, productos crudos o ingredientes sobre una mesa, encimera o fondo blanco es valida.\\n- La foto no necesita mostrar un refrigerador abierto.\\n- Si hay muchos ingredientes, elige los mas destacados en lugar de devolver un error.\\n- Nunca inventes ingredientes no visibles en ingredients_detected.\\n- Cuando la foto sea utilizable, prioriza siempre result_type = \\\"recipe\\\".\\n\\nCoherencia de negocio:\\n- proposal_status = complete solo si optional_additions esta vacio.\\n- proposal_status = needs_additions solo si optional_additions contiene al menos un elemento.\\n- diet = ligero y equilibrado.\\n- muscle_gain = mas proteico y saciante.\\n- gourmand = reconfortante y sabroso.\\n\\nConcision:\\n- recipe_title corto.\\n- short_summary en una frase.\\n- pasos sencillos.\\n- ningun texto fuera del JSON.\",\"requestedLanguageLine\":\"Idioma solicitado para todos los valores de texto: espanol.\",\"localeLabel\":\"Configuracion regional de la app\",\"modeLabel\":\"Modo solicitado\",\"userInstruction\":\"Analiza la foto binaria adjunta y devuelve solo el JSON final envuelto que cumpla el esquema.\"},\"pt\":{\"system\":\"Voce e o chef culinario visual do app.\\nAnalise apenas os alimentos visiveis na foto.\\nRetorne sempre um unico objeto JSON valido em conformidade com o esquema de envelope fornecido, sem markdown.\\n\\nEnvelope JSON obrigatorio:\\n- Retorne exatamente um objeto raiz com as chaves \\\"result_type\\\" e \\\"payload\\\".\\n- Use result_type = \\\"recipe\\\" quando a foto for utilizavel.\\n- Use result_type = \\\"error\\\" apenas se a imagem estiver realmente desfocada, escura demais, fora do contexto ou sem alimento identificavel.\\n- Quando result_type = \\\"recipe\\\", payload deve conter o objeto de receita completo.\\n- Quando result_type = \\\"error\\\", payload deve ser {\\\"scan_type\\\":\\\"error\\\",\\\"message\\\":\\\"<motivo curto localizado>\\\"}.\\n- Nunca retorne {\\\"message\\\":\\\"...\\\"} como resposta completa.\\n- Nao adicione outras chaves no nivel raiz.\\n\\nRegras do produto:\\n- As chaves JSON devem permanecer em ingles e em snake_case.\\n- Todos os valores de texto devem estar em portugues.\\n- mode_selected deve copiar exatamente o modo solicitado.\\n- proposal_status e obrigatorio e deve estar sempre presente para uma receita.\\n- ingredients_detected contem de 1 a 8 alimentos ou categorias reais visiveis.\\n- ingredients_used deve ser um subconjunto exato de ingredients_detected.\\n- optional_additions contem de 0 a 2 adicoes simples, realistas e nao visiveis.\\n- preparation_steps contem de 1 a 5 etapas curtas.\\n- why_this_fits_the_goal contem de 1 a 2 razoes curtas.\\n- substitutions e tips contem de 0 a 2 itens curtos.\\n- short_summary, nutrition_estimate.note e caution_note devem permanecer concisos.\\n\\nInterpretacao da imagem:\\n- Uma foto nitida de legumes, frutas, produtos crus ou ingredientes sobre uma mesa, bancada ou fundo branco e valida.\\n- A foto nao precisa mostrar uma geladeira aberta.\\n- Se houver muitos ingredientes, escolha os mais salientes em vez de retornar um erro.\\n- Nunca invente ingredientes nao visiveis em ingredients_detected.\\n- Quando a foto for utilizavel, prefira sempre result_type = \\\"recipe\\\".\\n\\nCoerencia de negocio:\\n- proposal_status = complete somente se optional_additions estiver vazio.\\n- proposal_status = needs_additions somente se optional_additions contiver pelo menos um item.\\n- diet = leve e equilibrado.\\n- muscle_gain = mais proteico e saciante.\\n- gourmand = confortavel e saboroso.\\n\\nConcisao:\\n- recipe_title curto.\\n- short_summary em uma frase.\\n- etapas simples.\\n- nenhum texto fora do JSON.\",\"requestedLanguageLine\":\"Idioma solicitado para todos os valores de texto: portugues.\",\"localeLabel\":\"Localidade do app\",\"modeLabel\":\"Modo solicitado\",\"userInstruction\":\"Analise a foto binaria anexada e retorne apenas o JSON final envelopado em conformidade com o esquema.\"}};const selected=prompts[language]??prompts.fr;return{chef_system_prompt:selected.system,chef_user_prompt:[selected.requestedLanguageLine,selected.localeLabel+': '+locale+'.',selected.modeLabel+': '+selectedMode+'.','',selected.userInstruction].join('\\n')};}\nconst normalized={payload_version:Number(input.payload_version??1),request_id:text(input.request_id),fridge_scan_id:text(input.fridge_scan_id),callback_nonce:text(input.callback_nonce),user_id:text(input.user_id),language:normalizeLanguage(input.language??input.locale),locale:text(input.locale)||normalizeLanguage(input.language??input.locale),source:text(input.source)||'camera',selected_mode:normalizeMode(input.selected_mode??input.meal_mode??input.mode),queued_at:text(input.queued_at),image_bucket:text(input.image?.bucket)||'scan-images',image_path:text(input.image?.path),image_content_type:text(input.image?.content_type)||'image/jpeg',image_base64:text(input.image_base64??input.imageBase64),client_metadata:input.client_metadata&&typeof input.client_metadata==='object'&&!Array.isArray(input.client_metadata)?input.client_metadata:{}};\nconst prompts=buildChefPrompts(normalized.language,normalized.locale,normalized.selected_mode);\nconst missing_fields=['fridge_scan_id','callback_nonce','image_base64'].filter((key)=>!normalized[key]);\nconst normalized_ok=missing_fields.length===0;\nconst response_payload={success:normalized_ok,accepted:normalized_ok,workflow_status:normalized_ok?'queued':'rejected',request_id:normalized.request_id||undefined,fridge_scan_id:normalized.fridge_scan_id||undefined,...(normalized_ok?{}:{code:'invalid_fridge_scan_webhook_payload',missing_fields})};\nconsole.log('[fridge-scan-chef] inbound payload normalized',{request_id:normalized.request_id,fridge_scan_id:normalized.fridge_scan_id,selected_mode:normalized.selected_mode,language:normalized.language,locale:normalized.locale,source:normalized.source,image_base64_present:normalized.image_base64.length>0,normalized_ok,missing_fields});\nreturn [{json:{...normalized,...prompts,normalized_ok,missing_fields,response_payload}}];"
       },
       "id": "f2e5d94a-f616-48fe-828b-b6809ff9a4dc",
       "name": "Normalize inbound fridge scan",
@@ -106,7 +106,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const selectedMode=typeof $json.selected_mode==='string'&&$json.selected_mode.trim()?$json.selected_mode.trim():'gourmand';\nconst language=typeof $json.language==='string'&&$json.language.trim()?$json.language.trim():(typeof $json.locale==='string'&&$json.locale.trim()?$json.locale.trim():'fr');\nconst locale=typeof $json.locale==='string'&&$json.locale.trim()?$json.locale.trim():(typeof $json.language==='string'&&$json.language.trim()?$json.language.trim():'fr');\nconst callbackContext={fridge_scan_id:$json.fridge_scan_id,request_id:$json.request_id||undefined,callback_nonce:$json.callback_nonce,selected_mode:selectedMode,language,locale};\nreturn [{json:{...callbackContext,callback_context:callbackContext,callback_context_snapshot:callbackContext}}];"
+        "jsCode": "const selectedMode=typeof $json.selected_mode==='string'&&$json.selected_mode.trim()?$json.selected_mode.trim():'gourmand';\nconst language=typeof $json.language==='string'&&$json.language.trim()?$json.language.trim():(typeof $json.locale==='string'&&$json.locale.trim()?$json.locale.trim():'fr');\nconst locale=typeof $json.locale==='string'&&$json.locale.trim()?$json.locale.trim():(typeof $json.language==='string'&&$json.language.trim()?$json.language.trim():'fr');\nconst chefSystemPrompt=typeof $json.chef_system_prompt==='string'?$json.chef_system_prompt:'';\nconst chefUserPrompt=typeof $json.chef_user_prompt==='string'?$json.chef_user_prompt:'';\nconst callbackContext={fridge_scan_id:$json.fridge_scan_id,request_id:$json.request_id||undefined,callback_nonce:$json.callback_nonce,selected_mode:selectedMode,language,locale};\nreturn [{json:{...callbackContext,chef_system_prompt:chefSystemPrompt,chef_user_prompt:chefUserPrompt,callback_context:callbackContext,callback_context_snapshot:callbackContext}}];"
       },
       "id": "5d6f4c70-760d-4381-8213-31e88d0e9f2f",
       "name": "Snapshot callback context",
@@ -125,7 +125,7 @@
           "messageValues": [
             {
               "type": "SystemMessagePromptTemplate",
-            "message": "={{ $json.chef_system_prompt || 'Return only a single valid JSON object that matches the provided schema, with no markdown.' }}"
+              "message": "={{ $json.chef_system_prompt || 'Return only a single valid JSON object that matches the provided schema, with no markdown.' }}"
             },
             {
               "type": "HumanMessagePromptTemplate",
@@ -167,126 +167,163 @@
                 "verbosity": "low",
                 "name": "fridge_meal_result",
                 "schema": {
-                  "oneOf": [
-                    {
-                      "type": "object",
-                      "additionalProperties": false,
-                      "required": [
-                        "schema_version",
-                        "mode_selected",
-                        "proposal_status",
-                        "recipe_title",
-                        "short_summary",
-                        "ingredients_detected",
-                        "ingredients_used",
-                        "optional_additions",
-                        "preparation_steps",
-                        "why_this_fits_the_goal",
-                        "nutrition_estimate",
-                        "substitutions",
-                        "tips",
-                        "caution_note"
-                      ],
-                      "properties": {
-                        "schema_version": {
-                          "type": "integer",
-                          "const": 1
-                        },
-                        "mode_selected": {
-                          "type": "string",
-                          "enum": [
-                            "diet",
-                            "muscle_gain",
-                            "gourmand"
-                          ]
-                        },
-                        "proposal_status": {
-                          "type": "string",
-                          "enum": [
-                            "complete",
-                            "needs_additions",
-                            "limited"
-                          ]
-                        },
-                        "recipe_title": {
-                          "type": "string"
-                        },
-                        "short_summary": {
-                          "type": "string"
-                        },
-                        "ingredients_detected": {
-                          "type": "array",
-                          "minItems": 1,
-                          "maxItems": 8,
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "ingredients_used": {
-                          "type": "array",
-                          "minItems": 1,
-                          "maxItems": 6,
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "optional_additions": {
-                          "type": "array",
-                          "maxItems": 2,
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "preparation_steps": {
-                          "type": "array",
-                          "minItems": 1,
-                          "maxItems": 5,
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "why_this_fits_the_goal": {
-                          "type": "array",
-                          "minItems": 1,
-                          "maxItems": 2,
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "nutrition_estimate": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "result_type",
+                    "payload"
+                  ],
+                  "properties": {
+                    "result_type": {
+                      "type": "string",
+                      "enum": [
+                        "recipe",
+                        "error"
+                      ]
+                    },
+                    "payload": {
+                      "anyOf": [
+                        {
                           "type": "object",
                           "additionalProperties": false,
                           "required": [
-                            "calories_band",
-                            "protein_band",
-                            "note"
+                            "schema_version",
+                            "mode_selected",
+                            "proposal_status",
+                            "recipe_title",
+                            "short_summary",
+                            "ingredients_detected",
+                            "ingredients_used",
+                            "optional_additions",
+                            "preparation_steps",
+                            "why_this_fits_the_goal",
+                            "nutrition_estimate",
+                            "substitutions",
+                            "tips",
+                            "caution_note"
                           ],
                           "properties": {
-                            "calories_band": {
-                              "type": [
-                                "string",
-                                "null"
-                              ],
+                            "schema_version": {
+                              "type": "integer",
+                              "const": 1
+                            },
+                            "mode_selected": {
+                              "type": "string",
                               "enum": [
-                                "light",
-                                "moderate",
-                                "hearty",
-                                null
+                                "diet",
+                                "muscle_gain",
+                                "gourmand"
                               ]
                             },
-                            "protein_band": {
-                              "type": [
-                                "string",
-                                "null"
-                              ],
+                            "proposal_status": {
+                              "type": "string",
                               "enum": [
-                                "low",
-                                "medium",
-                                "high",
-                                null
+                                "complete",
+                                "needs_additions",
+                                "limited"
                               ]
                             },
-                            "note": {
+                            "recipe_title": {
+                              "type": "string"
+                            },
+                            "short_summary": {
+                              "type": "string"
+                            },
+                            "ingredients_detected": {
+                              "type": "array",
+                              "minItems": 1,
+                              "maxItems": 8,
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "ingredients_used": {
+                              "type": "array",
+                              "minItems": 1,
+                              "maxItems": 6,
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "optional_additions": {
+                              "type": "array",
+                              "maxItems": 2,
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "preparation_steps": {
+                              "type": "array",
+                              "minItems": 1,
+                              "maxItems": 5,
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "why_this_fits_the_goal": {
+                              "type": "array",
+                              "minItems": 1,
+                              "maxItems": 2,
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "nutrition_estimate": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "calories_band",
+                                "protein_band",
+                                "note"
+                              ],
+                              "properties": {
+                                "calories_band": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ],
+                                  "enum": [
+                                    "light",
+                                    "moderate",
+                                    "hearty",
+                                    null
+                                  ]
+                                },
+                                "protein_band": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ],
+                                  "enum": [
+                                    "low",
+                                    "medium",
+                                    "high",
+                                    null
+                                  ]
+                                },
+                                "note": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                }
+                              }
+                            },
+                            "substitutions": {
+                              "type": "array",
+                              "maxItems": 2,
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "tips": {
+                              "type": "array",
+                              "maxItems": 2,
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "caution_note": {
                               "type": [
                                 "string",
                                 "null"
@@ -294,46 +331,26 @@
                             }
                           }
                         },
-                        "substitutions": {
-                          "type": "array",
-                          "maxItems": 2,
-                          "items": {
-                            "type": "string"
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "scan_type",
+                            "message"
+                          ],
+                          "properties": {
+                            "scan_type": {
+                              "type": "string",
+                              "const": "error"
+                            },
+                            "message": {
+                              "type": "string"
+                            }
                           }
-                        },
-                        "tips": {
-                          "type": "array",
-                          "maxItems": 2,
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "caution_note": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
                         }
-                      }
-                    },
-                    {
-                      "type": "object",
-                      "additionalProperties": false,
-                      "required": [
-                        "scan_type",
-                        "message"
-                      ],
-                      "properties": {
-                        "scan_type": {
-                          "type": "string",
-                          "const": "error"
-                        },
-                        "message": {
-                          "type": "string"
-                        }
-                      }
+                      ]
                     }
-                  ]
+                  }
                 },
                 "strict": true
               }
@@ -373,7 +390,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const ALLOWED_MODES=new Set(['diet','muscle_gain','gourmand']);\nconst ALLOWED_STATUSES=new Set(['complete','needs_additions','limited']);\nconst CALORIES_BANDS=new Set(['light','moderate','hearty']);\nconst PROTEIN_BANDS=new Set(['low','medium','high']);\nfunction normalizeLanguage(value){const lang=String(value||'').trim().toLowerCase();if(lang.startsWith('fr'))return 'fr';if(lang.startsWith('en'))return 'en';if(lang.startsWith('es'))return 'es';if(lang.startsWith('de'))return 'de';if(lang.startsWith('it'))return 'it';if(lang.startsWith('pt'))return 'pt';return 'fr';}\nfunction message(lang,key){const messages={invalid:{fr:'Reponse du chef invalide',en:'Invalid chef response',es:'Respuesta del chef no valida',de:'Ungueltige Chef-Antwort',it:'Risposta chef non valida',pt:'Resposta do chef invalida'},no_food:{fr:'Analyse impossible. Reprenez une photo plus claire des aliments.',en:'Unable to identify foods. Please retake a clearer photo.',es:'No se pueden identificar los alimentos. Toma una foto mas clara.',de:'Lebensmittel konnten nicht erkannt werden. Bitte mache ein klareres Foto.',it:'Impossibile identificare gli alimenti. Scatta una foto piu chiara.',pt:'Nao foi possivel identificar os alimentos. Tire uma foto mais nitida.'},generic:{fr:'Analyse impossible. Veuillez reessayer.',en:'Unable to analyze the image. Please try again.',es:'No se puede analizar la imagen. Intentalo de nuevo.',de:'Bild konnte nicht analysiert werden. Bitte versuche es erneut.',it:'Impossibile analizzare l\\'immagine. Riprova.',pt:'Nao foi possivel analisar a imagem. Tente novamente.'}};return messages[key]?.[lang]||messages[key]?.fr||'Analyse impossible.';}\nfunction str(value){return typeof value==='string'&&value.trim()?value.trim():null;}\nfunction normalizeNullableEnum(value,allowedSet){if(value===null||value===undefined)return null;const parsed=str(value);return parsed&&allowedSet.has(parsed)?parsed:null;}\nfunction normalizeStringArray(value,maxItems,minimumItems=0,allowMissing=false){if(value==null&&allowMissing)return [];if(!Array.isArray(value))return null;const normalized=[];const seen=new Set();for(const item of value){const text=str(item);if(!text||seen.has(text))continue;normalized.push(text);seen.add(text);if(normalized.length>=maxItems)break;}return normalized.length>=minimumItems?normalized:null;}\nfunction extractJsonFromText(text){if(typeof text!=='string')return null;const unfenced=text.replace(/^\\uFEFF/,'').replace(/^\\s*```(?:json)?\\s*/i,'').replace(/\\s*```\\s*$/i,'').trim();try{return JSON.parse(unfenced);}catch{}const first=unfenced.indexOf('{');const last=unfenced.lastIndexOf('}');if(first>=0&&last>first){try{return JSON.parse(unfenced.slice(first,last+1));}catch{}}return null;}\nfunction summarizeRawOutput(rawOutput){if(rawOutput===undefined||rawOutput===null)return undefined;const text=typeof rawOutput==='string'?rawOutput:JSON.stringify(rawOutput);return text.length>1200?text.slice(0,1200)+'...':text;}\nfunction normalizeCallbackContext(source){const nested=source&&typeof source.callback_context==='object'&&!Array.isArray(source.callback_context)?source.callback_context:{};const snapshot=source&&typeof source.callback_context_snapshot==='object'&&!Array.isArray(source.callback_context_snapshot)?source.callback_context_snapshot:{};const selectedMode=str(source.selected_mode)||str(snapshot.selected_mode)||str(nested.selected_mode)||'gourmand';const language=str(source.language)||str(snapshot.language)||str(nested.language)||str(source.locale)||str(snapshot.locale)||str(nested.locale)||'fr';const locale=str(source.locale)||str(snapshot.locale)||str(nested.locale)||str(source.language)||str(snapshot.language)||str(nested.language)||language||'fr';return {fridge_scan_id:str(source.fridge_scan_id)||str(snapshot.fridge_scan_id)||str(nested.fridge_scan_id),request_id:str(source.request_id)||str(snapshot.request_id)||str(nested.request_id)||undefined,callback_nonce:str(source.callback_nonce)||str(snapshot.callback_nonce)||str(nested.callback_nonce),selected_mode:selectedMode,language,locale};}\nfunction withCallbackContext(base,context){return [{json:{...base,fridge_scan_id:context.fridge_scan_id,...(context.request_id?{request_id:context.request_id}:{}),callback_nonce:context.callback_nonce,selected_mode:context.selected_mode,language:context.language,locale:context.locale,callback_context:context,callback_context_snapshot:context}}];}\nfunction errorPayload(messageText,reason,rawOutput){return withCallbackContext({success:false,data:{scan_type:'error',message:messageText},raw_output:summarizeRawOutput(rawOutput),debug_reason:reason},context);}\nfunction looksLikeRecipeObject(value){return Boolean(value&&typeof value==='object'&&!Array.isArray(value)&&(value.scan_type==='error'||Number(value.schema_version)===1||Array.isArray(value.ingredients_detected)||str(value.recipe_title)||str(value.proposal_status)));}\nfunction parseCandidate(candidate,depth=0){if(depth>6||candidate===undefined||candidate===null)return null;if(typeof candidate==='object'){if(looksLikeRecipeObject(candidate))return candidate;const wrappers=[candidate.data,candidate.result,candidate.output,candidate.response,candidate.content,candidate.message,candidate.text,candidate.json];for(const wrapper of wrappers){const parsed=parseCandidate(wrapper,depth+1);if(parsed)return parsed;}return null;}if(typeof candidate==='string'){const parsed=extractJsonFromText(candidate);if(!parsed||typeof parsed!=='object')return null;return parseCandidate(parsed,depth+1);}return null;}\nconst context=normalizeCallbackContext($json);\nconst languageCode=normalizeLanguage(context.language||context.locale);\nconst expectedMode=ALLOWED_MODES.has(context.selected_mode)?context.selected_mode:'gourmand';\ncontext.selected_mode=expectedMode;\ncontext.language=normalizeLanguage(context.language);\ncontext.locale=normalizeLanguage(context.locale||context.language);\nconst candidates=[$json,$json.output,$json.output_text,$json.response,$json.data,$json.content,$json.text,$json.message,$json.message?.content,$json.choices?.[0]?.message?.content].filter((value)=>value!==undefined&&value!==null);\nlet rawObj=null;\nlet rawOutput=$json.error??candidates[0]??null;\nfor(const candidate of candidates){const parsed=parseCandidate(candidate);if(parsed){rawObj=parsed;rawOutput=candidate;break;}}\nif(!rawObj&&$json.error){return errorPayload(message(languageCode,'generic'),'model_execution_error',$json.error);}\nif(!rawObj||typeof rawObj!=='object'){return errorPayload(message(languageCode,'invalid'),'recipe_output_not_parseable',rawOutput);}\nif(rawObj.scan_type==='error'){return errorPayload(str(rawObj.message)||message(languageCode,'generic'),'model_returned_error',rawOutput);}\nconst schemaVersionValue=rawObj.schema_version;\nconst schemaVersion=schemaVersionValue===undefined||schemaVersionValue===null||schemaVersionValue===''?1:Number(schemaVersionValue);\nif(schemaVersion!==1){return errorPayload(message(languageCode,'invalid'),'invalid_recipe_contract',rawOutput);}\nconst recipeTitle=str(rawObj.recipe_title);\nconst shortSummary=str(rawObj.short_summary);\nconst rawModeSelected=str(rawObj.mode_selected);\nconst modeSelected=rawModeSelected||expectedMode;\nconst ingredientsDetected=normalizeStringArray(rawObj.ingredients_detected,8,1,false);\nconst ingredientsUsed=normalizeStringArray(rawObj.ingredients_used,6,1,false);\nconst optionalAdditionsNormalized=normalizeStringArray(rawObj.optional_additions,2,0,true);\nconst preparationSteps=normalizeStringArray(rawObj.preparation_steps,5,1,false);\nconst whyThisFitsTheGoal=normalizeStringArray(rawObj.why_this_fits_the_goal,2,1,false);\nconst substitutionsNormalized=normalizeStringArray(rawObj.substitutions,2,0,true);\nconst tipsNormalized=normalizeStringArray(rawObj.tips,2,0,true);\nconst nutritionEstimateRaw=rawObj.nutrition_estimate&&typeof rawObj.nutrition_estimate==='object'&&!Array.isArray(rawObj.nutrition_estimate)?rawObj.nutrition_estimate:{};\nif(!ingredientsDetected||!ingredientsUsed){return errorPayload(message(languageCode,'no_food'),'no_ingredients_detected',rawOutput);}\nconst optionalAdditions=optionalAdditionsNormalized??[];\nlet proposalStatus=str(rawObj.proposal_status);\nif(!proposalStatus){proposalStatus=optionalAdditions.length>0?'needs_additions':'complete';}\nelse if(!ALLOWED_STATUSES.has(proposalStatus)){return errorPayload(message(languageCode,'invalid'),'invalid_proposal_status',rawOutput);}\nif(!recipeTitle||!shortSummary||!preparationSteps||!whyThisFitsTheGoal||optionalAdditionsNormalized===null||substitutionsNormalized===null||tipsNormalized===null){return errorPayload(message(languageCode,'invalid'),'invalid_recipe_contract',rawOutput);}\nif(!ALLOWED_MODES.has(modeSelected)||modeSelected!==expectedMode){return errorPayload(message(languageCode,'invalid'),'mode_selected_mismatch',rawOutput);}\nif(!ingredientsUsed.every((item)=>ingredientsDetected.includes(item))){return errorPayload(message(languageCode,'invalid'),'ingredients_used_not_subset_of_detected',rawOutput);}\nif(proposalStatus==='complete'&&optionalAdditions.length>0){return errorPayload(message(languageCode,'invalid'),'complete_has_additions',rawOutput);}\nif(proposalStatus==='needs_additions'&&optionalAdditions.length===0){return errorPayload(message(languageCode,'invalid'),'needs_additions_without_additions',rawOutput);}\nconst substitutions=substitutionsNormalized??[];\nconst tips=tipsNormalized??[];\nconst nutritionEstimate={calories_band:normalizeNullableEnum(nutritionEstimateRaw.calories_band,CALORIES_BANDS),protein_band:normalizeNullableEnum(nutritionEstimateRaw.protein_band,PROTEIN_BANDS),note:nutritionEstimateRaw.note===null?null:str(nutritionEstimateRaw.note)};\nconst finalData={schema_version:1,mode_selected:expectedMode,proposal_status:proposalStatus,recipe_title:recipeTitle,short_summary:shortSummary,ingredients_detected:ingredientsDetected,ingredients_used:ingredientsUsed,optional_additions:optionalAdditions,preparation_steps:preparationSteps,why_this_fits_the_goal:whyThisFitsTheGoal,nutrition_estimate:nutritionEstimate,substitutions,tips,caution_note:rawObj.caution_note===null?null:str(rawObj.caution_note)};\nreturn withCallbackContext({success:true,data:finalData,raw_output:summarizeRawOutput(rawOutput)},context);"
+        "jsCode": "const ALLOWED_MODES=new Set(['diet','muscle_gain','gourmand']);\nconst ALLOWED_STATUSES=new Set(['complete','needs_additions','limited']);\nconst CALORIES_BANDS=new Set(['light','moderate','hearty']);\nconst PROTEIN_BANDS=new Set(['low','medium','high']);\nfunction isRecord(value){return Boolean(value)&&typeof value==='object'&&!Array.isArray(value);}\nfunction normalizeLanguage(value){const lang=String(value||'').trim().toLowerCase();if(lang.startsWith('fr'))return 'fr';if(lang.startsWith('en'))return 'en';if(lang.startsWith('es'))return 'es';if(lang.startsWith('de'))return 'de';if(lang.startsWith('it'))return 'it';if(lang.startsWith('pt'))return 'pt';return 'fr';}\nfunction message(lang,key){const messages={invalid:{fr:'Reponse du chef invalide',en:'Invalid chef response',es:'Respuesta del chef no valida',de:'Ungueltige Chef-Antwort',it:'Risposta chef non valida',pt:'Resposta do chef invalida'},no_food:{fr:'Analyse impossible. Reprenez une photo plus claire des aliments.',en:'Unable to identify foods. Please retake a clearer photo.',es:'No se pueden identificar los alimentos. Toma una foto mas clara.',de:'Lebensmittel konnten nicht erkannt werden. Bitte mache ein klareres Foto.',it:'Impossibile identificare gli alimenti. Scatta una foto piu chiara.',pt:'Nao foi possivel identificar os alimentos. Tire uma foto mais nitida.'},generic:{fr:'Analyse impossible. Veuillez reessayer.',en:'Unable to analyze the image. Please try again.',es:'No se puede analizar la imagen. Intentalo de nuevo.',de:'Bild konnte nicht analysiert werden. Bitte versuche es erneut.',it:'Impossibile analizzare l\\'immagine. Riprova.',pt:'Nao foi possivel analisar a imagem. Tente novamente.'}};return messages[key]?.[lang]||messages[key]?.fr||'Analyse impossible.';}\nfunction str(value){return typeof value==='string'&&value.trim()?value.trim():null;}\nfunction normalizeNullableEnum(value,allowedSet){if(value===null||value===undefined)return null;const parsed=str(value);return parsed&&allowedSet.has(parsed)?parsed:null;}\nfunction normalizeStringArray(value,maxItems,minimumItems=0,allowMissing=false){if(value==null&&allowMissing)return [];if(!Array.isArray(value))return null;const normalized=[];const seen=new Set();for(const item of value){const text=str(item);if(!text||seen.has(text))continue;normalized.push(text);seen.add(text);if(normalized.length>=maxItems)break;}return normalized.length>=minimumItems?normalized:null;}\nfunction extractJsonFromText(text){if(typeof text!=='string')return null;const unfenced=text.replace(/^\\uFEFF/,'').replace(/^\\s*```(?:json)?\\s*/i,'').replace(/\\s*```\\s*$/i,'').trim();try{return JSON.parse(unfenced);}catch{}const first=unfenced.indexOf('{');const last=unfenced.lastIndexOf('}');if(first>=0&&last>first){try{return JSON.parse(unfenced.slice(first,last+1));}catch{}}return null;}\nfunction summarizeRawOutput(rawOutput){if(rawOutput===undefined||rawOutput===null)return undefined;const text=typeof rawOutput==='string'?rawOutput:JSON.stringify(rawOutput);return text.length>1200?text.slice(0,1200)+'...':text;}\nfunction normalizeCallbackContext(source){const nested=source&&typeof source.callback_context==='object'&&!Array.isArray(source.callback_context)?source.callback_context:{};const snapshot=source&&typeof source.callback_context_snapshot==='object'&&!Array.isArray(source.callback_context_snapshot)?source.callback_context_snapshot:{};const selectedMode=str(source.selected_mode)||str(snapshot.selected_mode)||str(nested.selected_mode)||'gourmand';const language=str(source.language)||str(snapshot.language)||str(nested.language)||str(source.locale)||str(snapshot.locale)||str(nested.locale)||'fr';const locale=str(source.locale)||str(snapshot.locale)||str(nested.locale)||str(source.language)||str(snapshot.language)||str(nested.language)||language||'fr';return{fridge_scan_id:str(source.fridge_scan_id)||str(snapshot.fridge_scan_id)||str(nested.fridge_scan_id),request_id:str(source.request_id)||str(snapshot.request_id)||str(nested.request_id)||undefined,callback_nonce:str(source.callback_nonce)||str(snapshot.callback_nonce)||str(nested.callback_nonce),selected_mode:selectedMode,language,locale};}\nfunction withCallbackContext(base,context){return[{json:{...base,fridge_scan_id:context.fridge_scan_id,...(context.request_id?{request_id:context.request_id}:{}),callback_nonce:context.callback_nonce,selected_mode:context.selected_mode,language:context.language,locale:context.locale,callback_context:context,callback_context_snapshot:context}}];}\nfunction errorPayload(messageText,reason,rawOutput){return withCallbackContext({success:false,data:{scan_type:'error',message:messageText},raw_output:summarizeRawOutput(rawOutput),debug_reason:reason},context);}\nfunction looksLikeRecipeObject(value){return Boolean(isRecord(value)&&(value.scan_type==='error'||Number(value.schema_version)===1||Array.isArray(value.ingredients_detected)||str(value.recipe_title)||str(value.proposal_status)));}\nfunction looksLikeMessageOnlyObject(value){return Boolean(isRecord(value)&&Object.keys(value).length===1&&str(value.message));}\nfunction looksLikeWrappedObject(value){return Boolean(isRecord(value)&&str(value.result_type)&&value.payload!==undefined);}\nfunction detectPayloadKind(value){if(!isRecord(value))return null;if(value.scan_type==='error'&&str(value.message))return'error';if(looksLikeRecipeObject(value))return'recipe';if(looksLikeMessageOnlyObject(value))return'message_only';return null;}\nfunction parseCandidate(candidate,depth=0,source){const origin=source===undefined?candidate:source;if(depth>8||candidate===undefined||candidate===null)return null;if(typeof candidate==='string'){const parsed=extractJsonFromText(candidate);if(!parsed||typeof parsed!=='object')return null;return parseCandidate(parsed,depth+1,origin);}if(!isRecord(candidate))return null;if(looksLikeWrappedObject(candidate))return{shape:'wrapped',raw_output:origin,result_type:str(candidate.result_type),payload:candidate.payload};if(looksLikeRecipeObject(candidate))return{shape:'legacy',raw_output:origin,result_type:detectPayloadKind(candidate),payload:candidate};const wrappers=[candidate.data,candidate.result,candidate.output,candidate.response,candidate.content,candidate.message,candidate.text,candidate.json,candidate.parsed];for(const wrapper of wrappers){const parsed=parseCandidate(wrapper,depth+1,origin);if(parsed)return parsed;}if(looksLikeMessageOnlyObject(candidate))return{shape:'message_only',raw_output:origin,payload:candidate};return null;}\nconst context=normalizeCallbackContext($json);\nconst languageCode=normalizeLanguage(context.language||context.locale);\nconst expectedMode=ALLOWED_MODES.has(context.selected_mode)?context.selected_mode:'gourmand';\ncontext.selected_mode=expectedMode;\ncontext.language=normalizeLanguage(context.language);\ncontext.locale=normalizeLanguage(context.locale||context.language);\nconst candidates=[$json,$json.output,$json.output_text,$json.output_parsed,$json.response,$json.data,$json.content,$json.text,$json.message,$json.parsed,$json.message?.content,$json.choices?.[0]?.message?.content].filter((value)=>value!==undefined&&value!==null);\nlet parsedResult=null;\nlet rawOutput=$json.error??candidates[0]??null;\nfor(const candidate of candidates){const parsed=parseCandidate(candidate,0,candidate);if(parsed){parsedResult=parsed;rawOutput=parsed.raw_output;break;}}\nif(!parsedResult&&$json.error){return errorPayload(message(languageCode,'generic'),'model_execution_error',$json.error);}\nif(!parsedResult){return errorPayload(message(languageCode,'invalid'),'recipe_output_not_parseable',rawOutput);}\nif(parsedResult.shape==='message_only'){return errorPayload(message(languageCode,'invalid'),'message_only_output_not_allowed',rawOutput);}\nconst rawObj=parsedResult.payload;\nconst payloadKind=detectPayloadKind(rawObj);\nif(payloadKind==='message_only'){return errorPayload(message(languageCode,'invalid'),'message_only_output_not_allowed',rawOutput);}\nif(parsedResult.shape==='wrapped'){if(parsedResult.result_type!=='recipe'&&parsedResult.result_type!=='error'){return errorPayload(message(languageCode,'invalid'),'invalid_result_type',rawOutput);}if(!payloadKind){return errorPayload(message(languageCode,'invalid'),'invalid_wrapped_payload',rawOutput);}if(parsedResult.result_type!==payloadKind){return errorPayload(message(languageCode,'invalid'),'wrapped_result_type_payload_mismatch',rawOutput);}}\nif(!payloadKind||!isRecord(rawObj)){return errorPayload(message(languageCode,'invalid'),'recipe_output_not_parseable',rawOutput);}\nif(payloadKind==='error'){return errorPayload(str(rawObj.message)||message(languageCode,'generic'),'model_returned_error',rawOutput);}\nconst schemaVersionValue=rawObj.schema_version;\nconst schemaVersion=schemaVersionValue===undefined||schemaVersionValue===null||schemaVersionValue===''?1:Number(schemaVersionValue);\nif(schemaVersion!==1){return errorPayload(message(languageCode,'invalid'),'invalid_recipe_contract',rawOutput);}\nconst recipeTitle=str(rawObj.recipe_title);\nconst shortSummary=str(rawObj.short_summary);\nconst rawModeSelected=str(rawObj.mode_selected);\nconst modeSelected=rawModeSelected||expectedMode;\nconst ingredientsDetected=normalizeStringArray(rawObj.ingredients_detected,8,1,false);\nconst ingredientsUsed=normalizeStringArray(rawObj.ingredients_used,6,1,false);\nconst optionalAdditionsNormalized=normalizeStringArray(rawObj.optional_additions,2,0,true);\nconst preparationSteps=normalizeStringArray(rawObj.preparation_steps,5,1,false);\nconst whyThisFitsTheGoal=normalizeStringArray(rawObj.why_this_fits_the_goal,2,1,false);\nconst substitutionsNormalized=normalizeStringArray(rawObj.substitutions,2,0,true);\nconst tipsNormalized=normalizeStringArray(rawObj.tips,2,0,true);\nconst nutritionEstimateRaw=isRecord(rawObj.nutrition_estimate)?rawObj.nutrition_estimate:{};\nif(!ingredientsDetected||!ingredientsUsed){return errorPayload(message(languageCode,'no_food'),'no_ingredients_detected',rawOutput);}\nconst optionalAdditions=optionalAdditionsNormalized??[];\nlet proposalStatus=str(rawObj.proposal_status);\nif(!proposalStatus){proposalStatus=optionalAdditions.length>0?'needs_additions':'complete';}else if(!ALLOWED_STATUSES.has(proposalStatus)){return errorPayload(message(languageCode,'invalid'),'invalid_proposal_status',rawOutput);}\nif(!recipeTitle||!shortSummary||!preparationSteps||!whyThisFitsTheGoal||optionalAdditionsNormalized===null||substitutionsNormalized===null||tipsNormalized===null){return errorPayload(message(languageCode,'invalid'),'invalid_recipe_contract',rawOutput);}\nif(!ALLOWED_MODES.has(modeSelected)||modeSelected!==expectedMode){return errorPayload(message(languageCode,'invalid'),'mode_selected_mismatch',rawOutput);}\nif(!ingredientsUsed.every((item)=>ingredientsDetected.includes(item))){return errorPayload(message(languageCode,'invalid'),'ingredients_used_not_subset_of_detected',rawOutput);}\nif(proposalStatus==='complete'&&optionalAdditions.length>0){return errorPayload(message(languageCode,'invalid'),'complete_has_additions',rawOutput);}\nif(proposalStatus==='needs_additions'&&optionalAdditions.length===0){return errorPayload(message(languageCode,'invalid'),'needs_additions_without_additions',rawOutput);}\nconst substitutions=substitutionsNormalized??[];\nconst tips=tipsNormalized??[];\nconst nutritionEstimate={calories_band:normalizeNullableEnum(nutritionEstimateRaw.calories_band,CALORIES_BANDS),protein_band:normalizeNullableEnum(nutritionEstimateRaw.protein_band,PROTEIN_BANDS),note:nutritionEstimateRaw.note===null?null:str(nutritionEstimateRaw.note)};\nconst finalData={schema_version:1,mode_selected:expectedMode,proposal_status:proposalStatus,recipe_title:recipeTitle,short_summary:shortSummary,ingredients_detected:ingredientsDetected,ingredients_used:ingredientsUsed,optional_additions:optionalAdditions,preparation_steps:preparationSteps,why_this_fits_the_goal:whyThisFitsTheGoal,nutrition_estimate:nutritionEstimate,substitutions,tips,caution_note:rawObj.caution_note===null?null:str(rawObj.caution_note)};\nreturn withCallbackContext({success:true,data:finalData,raw_output:summarizeRawOutput(rawOutput)},context);"
       },
       "id": "59fd9de5-0e43-4d70-80c2-4bb1849c2d9f",
       "name": "Validate completion",
@@ -447,6 +464,21 @@
         2620,
         40
       ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "8f7f4c8b-5291-4462-9bf3-4e68c4f84f51",
+      "name": "Merge LLM Input + Context",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1180,
+        40
+      ]
     }
   ],
   "connections": {
@@ -504,7 +536,7 @@
       "main": [
         [
           {
-            "node": "Basic LLM Chain",
+            "node": "Merge LLM Input + Context",
             "type": "main",
             "index": 0
           }
@@ -514,6 +546,11 @@
     "Snapshot callback context": {
       "main": [
         [
+          {
+            "node": "Merge LLM Input + Context",
+            "type": "main",
+            "index": 1
+          },
           {
             "node": "Merge Chef + Context",
             "type": "main",
@@ -587,6 +624,17 @@
         [
           {
             "node": "Build signed callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge LLM Input + Context": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
             "type": "main",
             "index": 0
           }

@@ -99,7 +99,7 @@ verify_jwt = true
 
 # === New Edge Functions added in security/post-pentest-fixes-2026-05 ===
 
-# Server-side signup wrapper: HIBP + disposable email + IP rate limit + nonce.
+# Server-side signup wrapper: disposable email + IP rate limit + password policy + nonce.
 # Public (no JWT) — caller is unauthenticated by definition (signing up).
 [functions.secure-signup]
 verify_jwt = false

@@ -16,7 +16,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useAnalytics } from '@/hooks/queries';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { AnalyticsPeriod } from '@/types';
+import {
+  AnalyticsPeriod,
+  BodyScoreHistoryItem,
+  FaceScoreHistoryItem,
+  NutritionHistoryItem,
+} from '@/types';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ErrorMessage } from '@/components/ErrorMessage';
 import { SIZES, SPACING, BORDER_RADIUS, FONT_WEIGHTS, SHADOWS, withAlpha } from '@/constants/theme';
@@ -47,6 +52,15 @@ type DenseMonthEntry = {
   monthLabel: string;
 };
 
+type ChartScaleKind = 'score100' | 'score10' | 'percentage' | 'age' | 'dynamic';
+
+type MetricSelectorOption<T> = {
+  id: string;
+  labelKey: string;
+  scale: ChartScaleKind;
+  valueExtractor: (item: T) => number;
+};
+
 const CHART_X_LABEL_FONT_SIZE = 12;
 const CHART_X_LABEL_ESTIMATED_CHAR_WIDTH = 7;
 const CHART_X_LABEL_GAP = 12;
@@ -56,6 +70,123 @@ const DENSE_LABEL_MAX_PADDING = 72;
 const DENSE_LABEL_STANDARD_ROTATION = 45;
 const DENSE_LABEL_COMPACT_ROTATION = 60;
 const EMPTY_ANALYTICS_HISTORY: never[] = [];
+
+const HEALTH_CHART_METRICS: ReadonlyArray<MetricSelectorOption<FaceScoreHistoryItem>> = [
+  {
+    id: 'score',
+    labelKey: 'analytics.metric_tabs.score',
+    scale: 'score100',
+    valueExtractor: (item) => item.faceScore,
+  },
+  {
+    id: 'skin_quality',
+    labelKey: 'analytics.metric_tabs.skin_quality',
+    scale: 'score100',
+    valueExtractor: (item) => item.skinQualityScore,
+  },
+  {
+    id: 'symmetry',
+    labelKey: 'analytics.metric_tabs.symmetry',
+    scale: 'percentage',
+    valueExtractor: (item) => item.symmetryPercentage,
+  },
+  {
+    id: 'energy',
+    labelKey: 'analytics.metric_tabs.energy',
+    scale: 'score10',
+    valueExtractor: (item) => item.energyScore,
+  },
+  {
+    id: 'hydration',
+    labelKey: 'analytics.metric_tabs.hydration',
+    scale: 'score100',
+    valueExtractor: (item) => item.hydrationLevel,
+  },
+  {
+    id: 'collagen',
+    labelKey: 'analytics.metric_tabs.collagen',
+    scale: 'score100',
+    valueExtractor: (item) => item.collagenLevel,
+  },
+];
+
+const BODY_CHART_METRICS: ReadonlyArray<MetricSelectorOption<BodyScoreHistoryItem>> = [
+  {
+    id: 'score',
+    labelKey: 'analytics.metric_tabs.score',
+    scale: 'score100',
+    valueExtractor: (item) => item.bodyScore,
+  },
+  {
+    id: 'body_fat',
+    labelKey: 'analytics.metric_tabs.body_fat',
+    scale: 'percentage',
+    valueExtractor: (item) => item.bodyFatPercentage,
+  },
+  {
+    id: 'strength',
+    labelKey: 'analytics.metric_tabs.strength',
+    scale: 'score100',
+    valueExtractor: (item) => item.strengthIndex,
+  },
+  {
+    id: 'posture',
+    labelKey: 'analytics.metric_tabs.posture',
+    scale: 'score10',
+    valueExtractor: (item) => item.postureScore,
+  },
+  {
+    id: 'symmetry',
+    labelKey: 'analytics.metric_tabs.symmetry',
+    scale: 'percentage',
+    valueExtractor: (item) => item.bodySymmetry,
+  },
+  {
+    id: 'metabolic_age',
+    labelKey: 'analytics.metric_tabs.metabolic_age',
+    scale: 'age',
+    valueExtractor: (item) => item.metabolicAge,
+  },
+];
+
+const NUTRITION_CHART_METRICS: ReadonlyArray<MetricSelectorOption<NutritionHistoryItem>> = [
+  {
+    id: 'score',
+    labelKey: 'analytics.metric_tabs.score',
+    scale: 'score100',
+    valueExtractor: (item) => item.nutritionScore,
+  },
+  {
+    id: 'calories',
+    labelKey: 'analytics.metric_tabs.calories',
+    scale: 'dynamic',
+    valueExtractor: (item) => item.caloriesEstimate,
+  },
+  {
+    id: 'protein',
+    labelKey: 'analytics.metric_tabs.protein',
+    scale: 'dynamic',
+    valueExtractor: (item) => item.proteinGrams,
+  },
+  {
+    id: 'carbs',
+    labelKey: 'analytics.metric_tabs.carbs',
+    scale: 'dynamic',
+    valueExtractor: (item) => item.carbsGrams,
+  },
+  {
+    id: 'fats',
+    labelKey: 'analytics.metric_tabs.fats',
+    scale: 'dynamic',
+    valueExtractor: (item) => item.fatGrams,
+  },
+  {
+    id: 'satiety',
+    labelKey: 'analytics.metric_tabs.satiety',
+    scale: 'score10',
+    valueExtractor: (item) => item.satietyIndex,
+  },
+];
 
 const clamp = (value: number, min: number, max: number): number => {
   return Math.min(max, Math.max(min, value));
@@ -122,9 +253,52 @@ const getMaxLabels = (selectedPeriod: AnalyticsPeriod): number => {
   }
 };
 
-const sanitizeScore = (value: number | null | undefined): number => {
+const sanitizeChartValue = (
+  value: number | null | undefined,
+  ceiling: number,
+): number => {
   if (value === null || value === undefined || Number.isNaN(value)) return 0;
-  return Math.max(0, Math.min(100, Math.round(value)));
+  return Math.max(0, Math.min(ceiling, Math.round(value)));
+};
+
+const roundUpToStep = (value: number, step: number): number => {
+  if (!Number.isFinite(value) || value <= 0) {
+    return step;
+  }
+
+  return Math.ceil(value / step) * step;
+};
+
+const resolveChartCeiling = (
+  values: number[],
+  scale: ChartScaleKind,
+): number => {
+  const maxValue = values.length > 0 ? Math.max(...values, 0) : 0;
+
+  switch (scale) {
+    case 'score10':
+      return 10;
+    case 'score100':
+    case 'percentage':
+      return 100;
+    case 'age':
+      return Math.max(40, roundUpToStep(maxValue + 5, 5));
+    case 'dynamic':
+    default:
+      if (maxValue <= 10) {
+        return 10;
+      }
+
+      if (maxValue <= 50) {
+        return roundUpToStep(maxValue * 1.15, 5);
+      }
+
+      if (maxValue <= 150) {
+        return roundUpToStep(maxValue * 1.15, 10);
+      }
+
+      return roundUpToStep(maxValue * 1.15, 25);
+  }
 };
 
 const parseLocalDate = (dateStr: string): Date => {
@@ -282,6 +456,11 @@ export default function AnalyticsScreen() {
   const [period, setPeriod] = useState<AnalyticsPeriod>('7days');
   const [paywallVisible, setPaywallVisible] = useState(false);
   const [measuredDenseLabelWidth, setMeasuredDenseLabelWidth] = useState(0);
+  const [healthMetricId, setHealthMetricId] = useState(HEALTH_CHART_METRICS[0].id);
+  const [bodyMetricId, setBodyMetricId] = useState(BODY_CHART_METRICS[0].id);
+  const [nutritionMetricId, setNutritionMetricId] = useState(
+    NUTRITION_CHART_METRICS[0].id,
+  );
   const { showAlert, alertElement } = useCustomAlert();
   const isPremium = hasPremiumAccessFromProfile(userProfile);
 
@@ -323,7 +502,18 @@ export default function AnalyticsScreen() {
 
   const healthScoreHistory = data?.healthScoreHistory ?? EMPTY_ANALYTICS_HISTORY;
   const bodyScoreHistory = data?.bodyScoreHistory ?? EMPTY_ANALYTICS_HISTORY;
+  const faceScoreHistory = data?.faceScoreHistory ?? EMPTY_ANALYTICS_HISTORY;
   const nutritionHistory = data?.nutritionHistory ?? EMPTY_ANALYTICS_HISTORY;
+
+  const selectedHealthMetric =
+    HEALTH_CHART_METRICS.find((metric) => metric.id === healthMetricId) ??
+    HEALTH_CHART_METRICS[0];
+  const selectedBodyMetric =
+    BODY_CHART_METRICS.find((metric) => metric.id === bodyMetricId) ??
+    BODY_CHART_METRICS[0];
+  const selectedNutritionMetric =
+    NUTRITION_CHART_METRICS.find((metric) => metric.id === nutritionMetricId) ??
+    NUTRITION_CHART_METRICS[0];
 
   const hasData =
     healthScoreHistory.length > 0 ||
@@ -349,11 +539,25 @@ export default function AnalyticsScreen() {
 
   const aggregatedHistory = useMemo(() => {
     return {
-      healthAgg: aggregateData(healthScoreHistory, bucketSize, (item) => item.value),
-      bodyAgg: aggregateData(bodyScoreHistory, bucketSize, (item) => item.bodyScore),
-      nutritionAgg: aggregateData(nutritionHistory, bucketSize, (item) => item.nutritionScore),
+      healthAgg: aggregateData(faceScoreHistory, bucketSize, (item) =>
+        selectedHealthMetric.valueExtractor(item),
+      ),
+      bodyAgg: aggregateData(bodyScoreHistory, bucketSize, (item) =>
+        selectedBodyMetric.valueExtractor(item),
+      ),
+      nutritionAgg: aggregateData(nutritionHistory, bucketSize, (item) =>
+        selectedNutritionMetric.valueExtractor(item),
+      ),
     };
-  }, [healthScoreHistory, bodyScoreHistory, nutritionHistory, bucketSize]);
+  }, [
+    faceScoreHistory,
+    bodyScoreHistory,
+    nutritionHistory,
+    bucketSize,
+    selectedHealthMetric,
+    selectedBodyMetric,
+    selectedNutritionMetric,
+  ]);
 
   const denseMonthEntrySets = useMemo(() => {
     if (!isDensePeriod) return [] as DenseMonthEntry[][];
@@ -420,8 +624,17 @@ export default function AnalyticsScreen() {
     : styles.chart;
 
   const buildChartData = useCallback(
-    (aggregated: AggregatedChartPoint[], colorRgba: string) => {
+    (
+      aggregated: AggregatedChartPoint[],
+      colorRgba: string,
+      scale: ChartScaleKind,
+    ) => {
       if (aggregated.length === 0) return null;
+
+      const ceiling = resolveChartCeiling(
+        aggregated.map((item) => item.value),
+        scale,
+      );
 
       const rawLabels = isDensePeriod
         ? buildDenseMonthLabels(buildDenseMonthEntries(aggregated, locale), showEveryOtherDenseMonth)
@@ -431,12 +644,17 @@ export default function AnalyticsScreen() {
         labels: isDensePeriod ? rawLabels : sparseLabels(rawLabels, maxLabels),
         datasets: [
           {
-            data: aggregated.map((item) => sanitizeScore(item.value)),
+            data: aggregated.map((item) => sanitizeChartValue(item.value, ceiling)),
             color: (opacity = 1) => colorRgba.replace('OPACITY', String(opacity)),
             strokeWidth: 3,
           },
           { data: [0], withDots: false, strokeWidth: 0, color: () => 'transparent' },
-          { data: [100], withDots: false, strokeWidth: 0, color: () => 'transparent' },
+          {
+            data: [ceiling],
+            withDots: false,
+            strokeWidth: 0,
+            color: () => 'transparent',
+          },
         ],
       };
     },
@@ -445,11 +663,29 @@ export default function AnalyticsScreen() {
 
   const { healthScoreData, physicalEvolutionData, nutritionScoreData } = useMemo(() => {
     return {
-      healthScoreData: buildChartData(aggregatedHistory.healthAgg, 'rgba(50, 173, 230, OPACITY)'),
-      physicalEvolutionData: buildChartData(aggregatedHistory.bodyAgg, 'rgba(0, 122, 255, OPACITY)'),
-      nutritionScoreData: buildChartData(aggregatedHistory.nutritionAgg, 'rgba(52, 199, 89, OPACITY)'),
+      healthScoreData: buildChartData(
+        aggregatedHistory.healthAgg,
+        'rgba(50, 173, 230, OPACITY)',
+        selectedHealthMetric.scale,
+      ),
+      physicalEvolutionData: buildChartData(
+        aggregatedHistory.bodyAgg,
+        'rgba(0, 122, 255, OPACITY)',
+        selectedBodyMetric.scale,
+      ),
+      nutritionScoreData: buildChartData(
+        aggregatedHistory.nutritionAgg,
+        'rgba(52, 199, 89, OPACITY)',
+        selectedNutritionMetric.scale,
+      ),
     };
-  }, [aggregatedHistory, buildChartData]);
+  }, [
+    aggregatedHistory,
+    buildChartData,
+    selectedHealthMetric.scale,
+    selectedBodyMetric.scale,
+    selectedNutritionMetric.scale,
+  ]);
 
   if (isLoading) {
     return <LoadingSpinner />;
@@ -559,7 +795,7 @@ export default function AnalyticsScreen() {
           accessible={true}
           accessibilityLabel={
             healthScoreData
-              ? `${t('analytics.health_score')}: ${healthScoreData.datasets[0].data.slice(-1)[0]}/100`
+              ? `${t('analytics.health_score')} - ${t(selectedHealthMetric.labelKey)}: ${healthScoreData.datasets[0].data.slice(-1)[0]}`
               : `${t('analytics.health_score')}: ${t('analytics.empty_state')}`
           }
         >
@@ -568,6 +804,40 @@ export default function AnalyticsScreen() {
             <Text style={styles.chartTitle}>{t('analytics.health_score')}</Text>
           </View>
           <Text style={styles.chartSubtitle}>{t('analytics.health_score_subtitle')}</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.metricSelector}
+            style={styles.metricSelectorScroll}
+          >
+            {HEALTH_CHART_METRICS.map((metric) => {
+              const isSelected = selectedHealthMetric.id === metric.id;
+
+              return (
+                <TouchableOpacity
+                  key={metric.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={t(metric.labelKey)}
+                  accessibilityState={{ selected: isSelected }}
+                  style={[
+                    styles.metricButton,
+                    isSelected && styles.metricButtonActive,
+                  ]}
+                  testID={`analytics-health-metric-${metric.id}`}
+                  onPress={() => setHealthMetricId(metric.id)}
+                >
+                  <Text
+                    style={[
+                      styles.metricButtonText,
+                      isSelected && styles.metricButtonTextActive,
+                    ]}
+                  >
+                    {t(metric.labelKey)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
           {healthScoreData ? (
             <LineChart
               data={healthScoreData}
@@ -580,7 +850,7 @@ export default function AnalyticsScreen() {
               }}
               {...ANALYTICS_LIKE_LINE_CHART_PROPS}
               style={chartStyle}
-              yAxisInterval={10}
+              yAxisInterval={selectedHealthMetric.scale === 'score10' ? 1 : 10}
               verticalLabelRotation={denseXAxisLayout.labelRotation}
               xLabelsOffset={denseXAxisLayout.xLabelsOffset}
             />
@@ -596,7 +866,7 @@ export default function AnalyticsScreen() {
           accessible={true}
           accessibilityLabel={
             physicalEvolutionData
-              ? `${t('analytics.physical_evolution')}: ${physicalEvolutionData.datasets[0].data.slice(-1)[0]}/100`
+              ? `${t('analytics.physical_evolution')} - ${t(selectedBodyMetric.labelKey)}: ${physicalEvolutionData.datasets[0].data.slice(-1)[0]}`
               : `${t('analytics.physical_evolution')}: ${t('analytics.empty_state')}`
           }
         >
@@ -605,6 +875,40 @@ export default function AnalyticsScreen() {
             <Text style={styles.chartTitle}>{t('analytics.physical_evolution')}</Text>
           </View>
           <Text style={styles.chartSubtitle}>{t('analytics.physical_evolution_subtitle')}</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.metricSelector}
+            style={styles.metricSelectorScroll}
+          >
+            {BODY_CHART_METRICS.map((metric) => {
+              const isSelected = selectedBodyMetric.id === metric.id;
+
+              return (
+                <TouchableOpacity
+                  key={metric.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={t(metric.labelKey)}
+                  accessibilityState={{ selected: isSelected }}
+                  style={[
+                    styles.metricButton,
+                    isSelected && styles.metricButtonActive,
+                  ]}
+                  testID={`analytics-body-metric-${metric.id}`}
+                  onPress={() => setBodyMetricId(metric.id)}
+                >
+                  <Text
+                    style={[
+                      styles.metricButtonText,
+                      isSelected && styles.metricButtonTextActive,
+                    ]}
+                  >
+                    {t(metric.labelKey)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
           {physicalEvolutionData ? (
             <LineChart
               data={physicalEvolutionData}
@@ -632,7 +936,7 @@ export default function AnalyticsScreen() {
           accessible={true}
           accessibilityLabel={
             nutritionScoreData
-              ? `${t('analytics.nutrition_score')}: ${nutritionScoreData.datasets[0].data.slice(-1)[0]}/100`
+              ? `${t('analytics.nutrition_score')} - ${t(selectedNutritionMetric.labelKey)}: ${nutritionScoreData.datasets[0].data.slice(-1)[0]}`
               : `${t('analytics.nutrition_score')}: ${t('analytics.empty_state')}`
           }
         >
@@ -641,6 +945,40 @@ export default function AnalyticsScreen() {
             <Text style={styles.chartTitle}>{t('analytics.nutrition_score')}</Text>
           </View>
           <Text style={styles.chartSubtitle}>{t('analytics.nutrition_score_subtitle')}</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.metricSelector}
+            style={styles.metricSelectorScroll}
+          >
+            {NUTRITION_CHART_METRICS.map((metric) => {
+              const isSelected = selectedNutritionMetric.id === metric.id;
+
+              return (
+                <TouchableOpacity
+                  key={metric.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={t(metric.labelKey)}
+                  accessibilityState={{ selected: isSelected }}
+                  style={[
+                    styles.metricButton,
+                    isSelected && styles.metricButtonActive,
+                  ]}
+                  testID={`analytics-nutrition-metric-${metric.id}`}
+                  onPress={() => setNutritionMetricId(metric.id)}
+                >
+                  <Text
+                    style={[
+                      styles.metricButtonText,
+                      isSelected && styles.metricButtonTextActive,
+                    ]}
+                  >
+                    {t(metric.labelKey)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
           {nutritionScoreData ? (
             <LineChart
               data={nutritionScoreData}
@@ -781,6 +1119,31 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: SIZES.text12,
     color: colors.gray,
     marginBottom: SPACING.md,
+  },
+  metricSelectorScroll: {
+    marginBottom: SPACING.md,
+  },
+  metricSelector: {
+    gap: SPACING.sm,
+    paddingRight: SPACING.xs,
+  },
+  metricButton: {
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    backgroundColor: colors.lightGray,
+  },
+  metricButtonActive: {
+    backgroundColor: withAlpha(colors.primary, 0.14),
+  },
+  metricButtonText: {
+    fontSize: SIZES.text12,
+    color: colors.gray,
+    fontWeight: FONT_WEIGHTS.medium,
+  },
+  metricButtonTextActive: {
+    color: colors.primaryText,
+    fontWeight: FONT_WEIGHTS.semiBold,
   },
   chart: {
     marginLeft: -SPACING.md,

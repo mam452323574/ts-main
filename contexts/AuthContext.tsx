@@ -39,6 +39,7 @@ import { queryClient } from '@/services/queryClient';
 import { createOAuthState } from '@/utils/oauthState';
 import { invalidateScanEligibilityQueries } from '@/utils/scanEligibilityQuery';
 import { syncDeviceLocaleToProfile } from '@/services/userProfile';
+import { isPostgresUniqueViolation } from '@/utils/postgrestErrors';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -694,6 +695,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return profile;
     } catch (error) {
+      if (isPostgresUniqueViolation(error)) {
+        // Race with on_auth_user_created trigger or concurrent repair: row
+        // exists now, re-read instead of invalidating the profile state.
+        const refreshed = await readUserProfileResult(currentUser.id);
+        if (!isAuthHydrationCurrent(version)) {
+          return null;
+        }
+        applyUserProfile(refreshed.profile, version, {
+          userId: currentUser.id,
+          source: refreshed.profile ? 'supabase' : 'profile-error',
+        });
+        return refreshed.profile;
+      }
+
       logOperationalError('[Auth] Failed to repair missing user profile', error, {
         user_id: currentUser.id,
       });
@@ -1212,10 +1227,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     locale,
   ]);
 
-  const signIn = async (
+  const logCleanupSkippedWithoutSession = (userId: string) => {
+    logOperationalError('[Cleanup] Skipped orphan cleanup because no session', null, {
+      user_id: userId,
+    });
+  };
+
+  const installSecureLoginSession = async (
     email: string,
-    password: string
-  ): Promise<{ nextStep: AuthNextStep; userId: string }> => {
+    password: string,
+  ): Promise<{ user: User; session: Session }> => {
     // Phase 0 (post-pentest, Free-plan path): route login through the
     // server-side `secure-login` Edge Function so the per-account lockout
     // (AUTH-VULN-03) actually fires for app traffic. On Pro+ this would be
@@ -1238,8 +1259,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // `signInWithPassword`'s error: a generic Error. Account-locked is
       // distinguishable via the code so callers can show a custom UI.
       const errorCode = secureBody?.code ?? 'invalid_credentials';
-      const error = new Error(secureBody?.error ?? 'Invalid email or password.');
-      (error as Error & { code?: string }).code = errorCode;
+      const error = new Error(secureBody?.error ?? 'Invalid email or password.') as Error & {
+        code?: string;
+        status?: number;
+      };
+      error.code = errorCode;
+      error.status = secureResponse.status;
       throw error;
     }
 
@@ -1251,12 +1276,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refresh_token: secureBody.session.refresh_token,
     });
 
-    if (setErr || !data?.user) {
-      logOperationalError('[SignIn] failed to install session locally', setErr, {});
+    if (setErr || !data?.user || !data?.session) {
       throw new Error('Login session could not be installed. Please try again.');
     }
 
-    const userId = data.user.id;
+    return {
+      user: data.user,
+      session: data.session,
+    };
+  };
+
+  const signIn = async (
+    email: string,
+    password: string
+  ): Promise<{ nextStep: AuthNextStep; userId: string }> => {
+    let signedInUser: User;
+    try {
+      ({ user: signedInUser } = await installSecureLoginSession(email, password));
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message === 'Login session could not be installed. Please try again.'
+      ) {
+        logOperationalError('[SignIn] failed to install session locally', error, {});
+      }
+      throw error;
+    }
+
+    const userId = signedInUser.id;
     const profile = await loadUserProfile(userId, authVersionRef.current);
     const nextStep = await resolveNextAuthStep(profile);
 
@@ -1334,7 +1381,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   ): Promise<{ userId: string; email: string }> => {
     // Wave 2.5 (post-pentest 2026-05) — instead of calling
     // `supabase.auth.signUp()` directly, route the signup through the
-    // server-side `secure-signup` Edge Function. It enforces HIBP, the
+    // server-side `secure-signup` Edge Function. It enforces the
     // disposable-email blocklist (with subdomain matching), the IP rate
     // limit, and the password policy in one bypass-proof place. The
     // companion DB trigger (migration 20260502020100) refuses any direct
@@ -1352,58 +1399,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
 
     const secureBody = await secureResponse.json().catch(() => ({}));
+    const securePayload =
+      secureBody && typeof secureBody === 'object' && !Array.isArray(secureBody)
+        ? (secureBody as { code?: unknown; request_id?: unknown })
+        : {};
+    const secureCode =
+      typeof securePayload.code === 'string' ? securePayload.code : undefined;
+    const secureRequestId =
+      typeof securePayload.request_id === 'string'
+        ? securePayload.request_id
+        : undefined;
+
+    if (secureResponse.status === 429 && secureCode === 'signup_rate_limited') {
+      const limitError = new Error(
+        t('auth.error_ip_limit_reached') ||
+          'Signup limit reached for this network.'
+      ) as Error & {
+        code?: string;
+        status?: number;
+        requestId?: string;
+      };
+      limitError.name = 'IpLimitError';
+      limitError.code = secureCode;
+      limitError.status = secureResponse.status;
+      limitError.requestId = secureRequestId;
+      logOperationalError('[SignUp] secure-signup rate limited', null, {
+        status: secureResponse.status,
+        code: secureCode,
+        request_id: secureRequestId,
+      });
+      throw limitError;
+    }
 
     if (!secureResponse.ok || !secureBody?.ok || !secureBody?.user_id) {
       // secure-signup returns a generic, enumeration-safe error for ALL
-      // rejection paths (HIBP, disposable, rate limit, policy, email taken,
-      // etc.). We surface a generic UI error to match.
+      // rejection paths except the safe network-level rate limit. We surface
+      // a generic UI error to match.
       logOperationalError('[SignUp] secure-signup rejected', null, {
         status: secureResponse.status,
-        code: secureBody?.code,
+        code: secureCode,
+        request_id: secureRequestId,
       });
       throw new Error(t('auth.error_account_creation'));
     }
 
     const newUserId = secureBody.user_id as string;
-
-    const { error: profileError } = await supabase
-      .from('user_profiles')
-      .insert(
-        buildInitialProfileInsert({
-          id: newUserId,
-          email,
-        })
-      );
-
-    if (profileError) {
-      // U2-α Phase 3 — l'insert profile a échoué : on a un compte
-      // `auth.users` orphelin. On déclenche le cleanup via Edge Function
-      // (`cleanup-orphan-user`) qui supprime auth.users + nettoie sessions.
-      logOperationalError('[SignUp] Failed to create initial profile', profileError, {
+    let signedInUser: User;
+    try {
+      ({ user: signedInUser } = await installSecureLoginSession(email, password));
+    } catch (error) {
+      logOperationalError('[SignUp] Failed to install session after secure-signup', error, {
         user_id: newUserId,
       });
-      try {
-        await cleanupOrphanUser(newUserId);
-      } catch (cleanupError) {
-        logOperationalError('[SignUp] Orphan cleanup failed after profile insert error', cleanupError, {
-          user_id: newUserId,
-        });
-      }
+      logCleanupSkippedWithoutSession(newUserId);
       throw new Error(t('auth.error_account_creation'));
     }
 
-    // secure-signup uses admin.createUser which does NOT return a session.
-    // We need an active session to drive the email-verification flow
-    // (sendVerificationEmail), so sign in immediately. The new auth-pre-login
-    // hook will not block this because there are zero prior failed attempts.
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (signInError || !signInData.session) {
-      logOperationalError('[SignUp] Auto signIn after signUp failed', signInError, {
+    const repairedProfile = await repairMissingUserProfile(signedInUser);
+
+    if (!repairedProfile) {
+      logOperationalError('[SignUp] Failed to repair initial profile after session install', null, {
         user_id: newUserId,
       });
+      await cleanupOrphanUser(newUserId);
+      throw new Error(t('auth.error_account_creation'));
     }
 
     return { userId: newUserId, email };
@@ -1553,27 +1612,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(t('auth.error_disposable_email'));
       }
 
-      const { error: profileError } = await supabase
-        .from('user_profiles')
-        .insert(
-          buildInitialProfileInsert(
-            {
-              id: oauthUser.id,
-              email,
-            },
-            {
-              avatar_url: oauthUser.user_metadata?.avatar_url || null,
-            }
-          )
-        );
+      const repairedProfile = await repairMissingUserProfile(oauthUser);
 
-      if (profileError) {
-        logOperationalError('[OAuth] Failed to create OAuth profile', profileError, {
+      if (!repairedProfile) {
+        logOperationalError('[OAuth] Failed to repair OAuth profile after session install', null, {
           provider,
           user_id: oauthUser.id,
         });
         await cleanupOrphanUser(oauthUser.id);
-        throw profileError;
+        throw new Error(t('auth.error_account_creation'));
       }
 
       void recordIpSignup(oauthUser.id);
@@ -1824,17 +1871,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const cleanupOrphanUser = async (userId: string): Promise<void> => {
+    const accessToken = await resolveFunctionAccessToken();
+
+    if (!accessToken) {
+      logCleanupSkippedWithoutSession(userId);
+      return;
+    }
+
     try {
-      const {
-        data: { session: currentSession },
-      } = await supabase.auth.getSession();
-
-      const accessToken = currentSession?.access_token;
-
-      if (!accessToken) {
-        throw new Error('Authentication required for cleanup');
-      }
-
       const response = await fetch(
         getSupabaseFunctionUrl('cleanup-orphan-user'),
         {
@@ -1855,11 +1899,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         );
       }
 
-      await supabase.auth.signOut();
     } catch (error) {
       logOperationalError('[Cleanup] Failed to clean up orphan user', error, {
         user_id: userId,
       });
+    } finally {
+      try {
+        await supabase.auth.signOut();
+      } catch (signOutError) {
+        logOperationalError('[Cleanup] Failed to sign out after orphan cleanup', signOutError, {
+          user_id: userId,
+        });
+      }
     }
   };
 

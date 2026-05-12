@@ -1,11 +1,12 @@
 // AUTH-VULN-01/02/03 fix (Wave 2.3): bypass-proof signup wrapper.
 //
 // This Edge Function is the single, server-side gate for new account creation.
-// All signup-quality controls (HIBP, disposable email, IP rate limit, password
-// policy) run here BEFORE any state is mutated. The defense-in-depth trigger
-// from migration 20260502020100 (`enforce_signup_nonce_trigger`) refuses any
-// `auth.users` INSERT that wasn't preceded by a valid attestation row, making
-// this wrapper unbypassable once the trigger is enabled in production.
+// Signup-quality controls (disposable email, IP rate limit, password policy,
+// and nonce attestation) run here BEFORE any state is mutated. The
+// defense-in-depth trigger from migration 20260502020100
+// (`enforce_signup_nonce_trigger`) refuses any `auth.users` INSERT that
+// wasn't preceded by a valid attestation row, making this wrapper unbypassable
+// once the trigger is enabled in production.
 //
 // Flow:
 //   1. CORS / method check.
@@ -13,18 +14,17 @@
 //   3. Validate email format (regex + length).
 //   4. Disposable-email subdomain-aware lookup.
 //   5. IP rate limit (existing `check_ip_signup_allowed` RPC).
-//   6. HIBP leaked-password check (shared module).
-//   7. Password policy check (≥12 chars, mixed character classes).
+//   6. Optional HIBP leaked-password check (currently disabled by product decision).
+//   7. Password policy check (8+ chars, lowercase + digit).
 //   8. Generate UUID nonce, INSERT `signup_attestations`.
-//   9. `auth.admin.createUser({ email, password, email_confirm: false,
+//   9. `auth.admin.createUser({ email, password, email_confirm: true,
 //      user_metadata: { signup_nonce } })`.
 //  10. Record IP signup tracking.
 //  11. Return success.
 //
 // Email enumeration safety: every rejection path (any failed step) returns
 // the SAME generic error response and pads timing with a small random sleep
-// so an attacker can't infer which check tripped. The signup endpoint
-// response time is dominated by the HIBP round-trip in any case.
+// so an attacker can't infer which check tripped.
 //
 // Failure semantics: ANY internal error (DB down, env missing, etc.) returns
 // the same generic `signup_failed` to the client. Real diagnostics go to
@@ -68,6 +68,16 @@ interface SignupResult {
   user_id: string;
 }
 
+type SignupRejectionReason =
+  | 'invalid_body'
+  | 'invalid_email'
+  | 'disposable_email'
+  | 'ip_rate_limited'
+  | 'password_policy'
+  | 'auth_create_failed';
+
+type SafeLogMetadata = Record<string, string | number | boolean | null | undefined>;
+
 // --------------------- Helpers --------------------------------------------
 
 function extractEmailDomain(email: string): string | null {
@@ -99,27 +109,65 @@ function generateNonce(): string {
   return crypto.randomUUID();
 }
 
+function generateRequestId(): string {
+  return crypto.randomUUID();
+}
+
 async function constantishDelay(): Promise<void> {
-  // 100–250ms random pad on rejection paths to mask timing differences
-  // between "rejected by HIBP" (slow) vs "rejected by regex" (fast).
+  // 100-250ms random pad on rejection paths to mask timing differences.
   const padMs = 100 + Math.floor(Math.random() * 150);
   await new Promise((resolve) => setTimeout(resolve, padMs));
 }
 
-function rejectGeneric(req: Request): Response {
+function logSignupRejection(
+  requestId: string,
+  reason: SignupRejectionReason,
+  metadata?: SafeLogMetadata,
+) {
+  console.warn('[secure-signup] rejected', {
+    request_id: requestId,
+    reason,
+    ...(metadata ?? {}),
+  });
+}
+
+function rejectGeneric(
+  req: Request,
+  requestId: string,
+  reason: SignupRejectionReason,
+  metadata?: SafeLogMetadata,
+): Response {
+  logSignupRejection(requestId, reason, metadata);
   // 422 chosen so it's distinguishable from 400 (malformed body) but never
   // tells the client which specific validation failed.
   return jsonResponse(
     req,
-    { error: GENERIC_REJECT_MESSAGE, code: 'signup_failed' },
+    { error: GENERIC_REJECT_MESSAGE, code: 'signup_failed', request_id: requestId },
     { status: 422 },
   );
 }
 
-function internalError(req: Request, status = 503): Response {
+function rateLimitError(req: Request, requestId: string): Response {
+  logSignupRejection(requestId, 'ip_rate_limited');
   return jsonResponse(
     req,
-    { error: GENERIC_INTERNAL_MESSAGE, code: 'signup_unavailable' },
+    {
+      error: 'Account creation limit reached for this network. Please try again later.',
+      code: 'signup_rate_limited',
+      request_id: requestId,
+    },
+    { status: 429 },
+  );
+}
+
+function internalError(req: Request, requestId: string, status = 503): Response {
+  return jsonResponse(
+    req,
+    {
+      error: GENERIC_INTERNAL_MESSAGE,
+      code: 'signup_unavailable',
+      request_id: requestId,
+    },
     { status },
   );
 }
@@ -148,13 +196,15 @@ Deno.serve(async (req: Request) => {
     return handleCorsPreflightRequest(req);
   }
 
+  const requestId = generateRequestId();
+
   const corsError = validateCorsOrigin(req);
   if (corsError) return corsError;
 
   if (req.method !== 'POST') {
     return jsonResponse(
       req,
-      { error: 'Method not allowed', code: 'method_not_allowed' },
+      { error: 'Method not allowed', code: 'method_not_allowed', request_id: requestId },
       { status: 405 },
     );
   }
@@ -164,7 +214,7 @@ Deno.serve(async (req: Request) => {
   const parsed = await parseBody(req);
   if (!parsed) {
     await constantishDelay();
-    return rejectGeneric(req);
+    return rejectGeneric(req, requestId, 'invalid_body');
   }
   const { email, password } = parsed;
   const emailLower = email.toLowerCase();
@@ -173,7 +223,7 @@ Deno.serve(async (req: Request) => {
   const domain = extractEmailDomain(email);
   if (!domain) {
     await constantishDelay();
-    return rejectGeneric(req);
+    return rejectGeneric(req, requestId, 'invalid_email');
   }
 
   // 3. Build service-role client. Internal errors here are NOT user-facing
@@ -182,8 +232,11 @@ Deno.serve(async (req: Request) => {
   try {
     admin = createServiceRoleClient();
   } catch (e) {
-    console.error('[secure-signup] failed to build service-role client', e);
-    return internalError(req);
+    console.error('[secure-signup] failed to build service-role client', {
+      request_id: requestId,
+      error: e,
+    });
+    return internalError(req, requestId);
   }
 
   const clientIp = resolveTrustedClientIp(req);
@@ -202,12 +255,15 @@ Deno.serve(async (req: Request) => {
         .limit(1);
 
       if (disposableErr) {
-        console.error('[secure-signup] disposable lookup failed', disposableErr);
-        return internalError(req);
+        console.error('[secure-signup] disposable lookup failed', {
+          request_id: requestId,
+          error: disposableErr,
+        });
+        return internalError(req, requestId);
       }
       if (disposableHits && disposableHits.length > 0) {
         await constantishDelay();
-        return rejectGeneric(req);
+        return rejectGeneric(req, requestId, 'disposable_email');
       }
     }
 
@@ -217,13 +273,16 @@ Deno.serve(async (req: Request) => {
       { client_ip: clientIp },
     );
     if (ipCheckErr) {
-      console.error('[secure-signup] check_ip_signup_allowed failed', ipCheckErr);
-      return internalError(req);
+      console.error('[secure-signup] check_ip_signup_allowed failed', {
+        request_id: requestId,
+        error: ipCheckErr,
+      });
+      return internalError(req, requestId);
     }
     const ipResult = Array.isArray(ipCheckData) ? ipCheckData[0] : ipCheckData;
     if (ipResult && ipResult.allowed === false) {
       await constantishDelay();
-      return rejectGeneric(req);
+      return rateLimitError(req, requestId);
     }
 
     // 6. HIBP — DISABLED 2026-05 by product decision. AUTH-VULN-01 is now
@@ -241,7 +300,7 @@ Deno.serve(async (req: Request) => {
     // 7. Password policy.
     if (!isPasswordPolicyOk(password)) {
       await constantishDelay();
-      return rejectGeneric(req);
+      return rejectGeneric(req, requestId, 'password_policy');
     }
 
     // 8. Generate nonce + insert attestation. This MUST succeed before we
@@ -255,16 +314,22 @@ Deno.serve(async (req: Request) => {
         ip: clientIp,
       });
     if (attestErr) {
-      console.error('[secure-signup] attestation insert failed', attestErr);
-      return internalError(req);
+      console.error('[secure-signup] attestation insert failed', {
+        request_id: requestId,
+        error: attestErr,
+      });
+      return internalError(req, requestId);
     }
 
-    // 9. Create the user via admin API. `email_confirm: false` keeps the
-    //    email-verification gate in play (Wave 1.1 disabled mailer_autoconfirm).
+    // 9. Create the user via admin API. We confirm at the Supabase Auth
+    //    layer so `secure-login` can issue the short-lived app session used
+    //    to send/verify the custom email code. The product verification gate
+    //    remains `user_profiles.email_verified`, which starts false and is
+    //    only flipped by `verify-email-code`.
     const { data: createdData, error: createErr } = await admin.auth.admin.createUser({
       email,
       password,
-      email_confirm: false,
+      email_confirm: true,
       user_metadata: { signup_nonce: nonce },
     });
 
@@ -273,18 +338,28 @@ Deno.serve(async (req: Request) => {
       // Don't reveal whether the email is taken (enumeration leak); return
       // generic reject. The attestation row will be GC'd by the cron in
       // ~24h or by `purge_old_signup_attestations`.
-      console.warn('[secure-signup] admin.createUser failed', {
+      logSignupRejection(requestId, 'auth_create_failed', {
         error_code: createErr.code,
         error_status: createErr.status,
       });
       await constantishDelay();
-      return rejectGeneric(req);
+      return jsonResponse(
+        req,
+        {
+          error: GENERIC_REJECT_MESSAGE,
+          code: 'signup_failed',
+          request_id: requestId,
+        },
+        { status: 422 },
+      );
     }
 
     const newUser = createdData?.user;
     if (!newUser?.id) {
-      console.error('[secure-signup] admin.createUser returned no user');
-      return internalError(req);
+      console.error('[secure-signup] admin.createUser returned no user', {
+        request_id: requestId,
+      });
+      return internalError(req, requestId);
     }
 
     // 10. Record successful IP signup for the running rate-limit window.
@@ -295,6 +370,7 @@ Deno.serve(async (req: Request) => {
     if (ipRecordErr) {
       // Non-fatal: the user is created. Log + continue.
       console.warn('[secure-signup] record_ip_signup failed (non-fatal)', {
+        request_id: requestId,
         error_code: ipRecordErr.code,
       });
     }
@@ -305,14 +381,21 @@ Deno.serve(async (req: Request) => {
     return jsonResponse(req, result, { status: 201 });
   } catch (error) {
     // Catch-all to ensure we never leak stack traces or internal state.
-    console.error('[secure-signup] unhandled error', error);
+    console.error('[secure-signup] unhandled error', {
+      request_id: requestId,
+      error,
+    });
     if (error instanceof Phase2HttpError) {
       return jsonResponse(
         req,
-        { error: GENERIC_INTERNAL_MESSAGE, code: 'signup_unavailable' },
+        {
+          error: GENERIC_INTERNAL_MESSAGE,
+          code: 'signup_unavailable',
+          request_id: requestId,
+        },
         { status: error.status >= 500 ? error.status : 503 },
       );
     }
-    return internalError(req);
+    return internalError(req, requestId);
   }
 });

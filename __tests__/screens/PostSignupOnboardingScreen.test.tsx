@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 import * as mockReactNative from 'react-native';
 
 import PostSignupOnboardingScreen from '@/screens/PostSignupOnboardingScreen';
-import { SPACING } from '@/constants/theme';
+import { DARK_COLORS, LIGHT_COLORS, SPACING } from '@/constants/theme';
 
 const mockReplace = jest.fn();
 const mockMarkTutorialSeen = jest.fn();
@@ -17,9 +17,27 @@ const mockFetchRevenueCatCustomerInfo = jest.fn();
 const mockHasPremiumEntitlement = jest.fn();
 const mockMarkAutoPresentationStarted = jest.fn();
 const mockUseAuth = jest.fn();
+const mockUseLanguage = jest.fn();
 const mockUseFeatureFlags = jest.fn();
 const mockUseGrowthExperience = jest.fn();
 const mockUsePostSignupOnboardingPending = jest.fn();
+const mockUseTheme = jest.fn();
+const mockActualOnboardingPromoAssets =
+  jest.requireActual<typeof import('@/constants/onboardingPromoAssets')>(
+    '@/constants/onboardingPromoAssets',
+  );
+const mockGetOnboardingPromoAsset = jest.fn(
+  mockActualOnboardingPromoAssets.getOnboardingPromoAsset,
+);
+const mockFridgeScanIllustration = jest.fn(
+  ({ isDark }: { isDark: boolean }) => {
+    const { Text } = mockReactNative;
+
+    return (
+      <Text testID="fridge-preview-theme">{isDark ? 'dark' : 'light'}</Text>
+    );
+  },
+);
 const originalPlatform = mockReactNative.Platform.OS;
 const reactNativeModule =
   jest.requireActual<typeof import('react-native')>('react-native');
@@ -33,6 +51,16 @@ jest.mock('expo-router', () => ({
     replace: mockReplace,
   }),
 }));
+
+jest.mock('@/constants/onboardingPromoAssets', () => {
+  const actual = jest.requireActual('@/constants/onboardingPromoAssets');
+
+  return {
+    ...actual,
+    getOnboardingPromoAsset: (theme: any, locale: any, slide: any) =>
+      mockGetOnboardingPromoAsset(theme, locale, slide),
+  };
+});
 
 jest.mock('@/components/Button', () => ({
   Button: ({
@@ -124,8 +152,21 @@ jest.mock('@/components/AvatarPicker', () => ({
   },
 }));
 
+jest.mock('@/components/home/FridgeScanIllustration', () => ({
+  FridgeScanIllustration: (props: { isDark: boolean }) =>
+    mockFridgeScanIllustration(props),
+}));
+
 jest.mock('@/contexts/AuthContext', () => ({
   useAuth: () => mockUseAuth(),
+}));
+
+jest.mock('@/contexts/LanguageContext', () => ({
+  useLanguage: () => mockUseLanguage(),
+}));
+
+jest.mock('@/contexts/ThemeContext', () => ({
+  useTheme: () => mockUseTheme(),
 }));
 
 jest.mock('@/hooks/queries', () => ({
@@ -178,6 +219,11 @@ describe('PostSignupOnboardingScreen', () => {
       scale: 3,
       fontScale: 1,
     });
+    mockGetOnboardingPromoAsset.mockReset();
+    mockGetOnboardingPromoAsset.mockImplementation(
+      mockActualOnboardingPromoAssets.getOnboardingPromoAsset,
+    );
+    mockFridgeScanIllustration.mockClear();
 
     mockMarkTutorialSeen.mockResolvedValue(undefined);
     mockUpdateAvatarUrl.mockResolvedValue(undefined);
@@ -191,11 +237,36 @@ describe('PostSignupOnboardingScreen', () => {
     mockUseFeatureFlags.mockReturnValue({
       data: { entry_offer_offering_id: 'entry-offer-default' },
     });
+    mockUseLanguage.mockReturnValue({
+      t: (key: string) =>
+        ({
+          'common.next': 'Suivant',
+          'onboarding.avatar_title': 'Ajoutez une photo de profil',
+          'onboarding.avatar_subtitle': "C'est optionnel pour l'instant.",
+          'onboarding.avatar_change_title': 'Photo de profil',
+          'onboarding.avatar_change_subtitle':
+            'Gardez-la ou changez-la plus tard.',
+          'onboarding.avatar_skip': 'Passer pour le moment',
+          'onboarding.enter_app': "Ouvrir l'app",
+          'onboarding.slide_1_eyebrow': 'Scanner',
+          'onboarding.slide_1_title': 'Scanne ce qui compte',
+          'onboarding.slide_1_subtitle':
+            'Capture visage, corps et repas en quelques secondes.',
+        })[key] ?? key,
+      locale: 'fr',
+      language: 'fr',
+      changeLanguage: jest.fn(),
+    });
     mockUseGrowthExperience.mockReturnValue({ data: null });
     mockUsePostSignupOnboardingPending.mockReturnValue({
       isPending: true,
       isLoading: false,
       refresh: jest.fn(),
+    });
+    mockUseTheme.mockReturnValue({
+      colors: LIGHT_COLORS,
+      isDark: false,
+      toggleTheme: jest.fn(),
     });
     mockUseAuth.mockReturnValue({
       user: { id: 'user-123', email: 'test@example.com' },
@@ -267,7 +338,332 @@ describe('PostSignupOnboardingScreen', () => {
       expect(screen.getByTestId('post-signup-slides-step')).toBeTruthy();
     });
 
+    expect(screen.getByTestId('post-signup-promo-slide-scanner')).toBeTruthy();
     expect(screen.queryByTestId('post-signup-avatar-step')).toBeNull();
+  });
+
+  it('renders the localized light promo hero with native slide copy when the active locale has an asset', async () => {
+    mockUseLanguage.mockReturnValue({
+      t: (key: string) =>
+        ({
+          'common.next': 'Next',
+          'onboarding.avatar_change_title': 'Profile photo',
+          'onboarding.avatar_change_subtitle': 'Keep it or change it later.',
+          'onboarding.enter_app': 'Open app',
+          'onboarding.slide_1_eyebrow': 'Scanner',
+          'onboarding.slide_1_title': 'Scan what matters',
+          'onboarding.slide_1_subtitle':
+            'Capture face, body, and meals in seconds.',
+        })[key] ?? key,
+      locale: 'en',
+      language: 'en',
+      changeLanguage: jest.fn(),
+    });
+    mockUseAuth.mockReturnValue({
+      user: { id: 'user-123', email: 'test@example.com' },
+      userProfile: {
+        id: 'user-123',
+        username: 'testuser',
+        avatar_url: 'avatars/existing-user.jpg',
+        has_seen_tutorial: false,
+        account_tier: 'free',
+      },
+      isEmailVerified: true,
+      markTutorialSeen: mockMarkTutorialSeen,
+      updateAvatarUrl: mockUpdateAvatarUrl,
+    });
+
+    render(<PostSignupOnboardingScreen />);
+
+    await screen.findByTestId('post-signup-avatar-step');
+
+    fireEvent.press(screen.getByText('Next'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('post-signup-promo-slide-scanner')).toBeTruthy();
+    });
+
+    expect(screen.getByText('Scan what matters')).toBeTruthy();
+    expect(
+      screen.getByText('Capture face, body, and meals in seconds.'),
+    ).toBeTruthy();
+    expect(screen.queryByTestId('post-signup-fallback-slide-scanner')).toBeNull();
+  });
+
+  it('renders final promo heroes for every onboarding slide', async () => {
+    mockUseAuth.mockReturnValue({
+      user: { id: 'user-123', email: 'test@example.com' },
+      userProfile: {
+        id: 'user-123',
+        username: 'testuser',
+        avatar_url: 'avatars/existing-user.jpg',
+        has_seen_tutorial: false,
+        account_tier: 'free',
+      },
+      isEmailVerified: true,
+      markTutorialSeen: mockMarkTutorialSeen,
+      updateAvatarUrl: mockUpdateAvatarUrl,
+    });
+
+    render(<PostSignupOnboardingScreen />);
+
+    await screen.findByTestId('post-signup-avatar-step');
+
+    fireEvent.press(screen.getByText('Suivant'));
+
+    const slideKeys = ['scanner', 'coach', 'social', 'analytics', 'fridge'];
+
+    for (const [index, slideKey] of slideKeys.entries()) {
+      await waitFor(() => {
+        expect(
+          screen.getByTestId(`post-signup-promo-slide-${slideKey}`),
+        ).toBeTruthy();
+      });
+
+      expect(
+        screen.queryByTestId(`post-signup-fallback-slide-${slideKey}`),
+      ).toBeNull();
+
+      if (index < slideKeys.length - 1) {
+        fireEvent.press(screen.getByText('Suivant'));
+      }
+    }
+  });
+
+  it('uses a restrained hero crop for standard vertical promo assets', async () => {
+    const resolveAssetSourceSpy = jest
+      .spyOn(mockReactNative.Image, 'resolveAssetSource')
+      .mockReturnValue({ width: 941, height: 1672, scale: 1 } as any);
+
+    try {
+      render(<PostSignupOnboardingScreen />);
+
+      fireEvent.press(await screen.findByTestId('post-signup-skip-avatar'));
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId('post-signup-promo-hero-image-scanner'),
+        ).toBeTruthy();
+      });
+
+      const image = screen.getByTestId('post-signup-promo-hero-image-scanner');
+      const imageStyle = mockReactNative.StyleSheet.flatten(image.props.style);
+
+      expect(imageStyle.transform).toEqual([{ scale: 1.045 }]);
+    } finally {
+      resolveAssetSourceSpy.mockRestore();
+    }
+  });
+
+  it('uses a more conservative hero crop for wider promo assets', async () => {
+    const resolveAssetSourceSpy = jest
+      .spyOn(mockReactNative.Image, 'resolveAssetSource')
+      .mockReturnValue({ width: 1024, height: 1536, scale: 1 } as any);
+
+    try {
+      render(<PostSignupOnboardingScreen />);
+
+      fireEvent.press(await screen.findByTestId('post-signup-skip-avatar'));
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId('post-signup-promo-hero-image-scanner'),
+        ).toBeTruthy();
+      });
+
+      const image = screen.getByTestId('post-signup-promo-hero-image-scanner');
+      const imageStyle = mockReactNative.StyleSheet.flatten(image.props.style);
+
+      expect(imageStyle.transform).toEqual([{ scale: 1.025 }]);
+    } finally {
+      resolveAssetSourceSpy.mockRestore();
+    }
+  });
+
+  it('renders the localized dark promo hero when the active locale has a dark scanner asset', async () => {
+    mockUseLanguage.mockReturnValue({
+      t: (key: string) =>
+        ({
+          'common.next': 'Next',
+          'onboarding.avatar_change_title': 'Profile photo',
+          'onboarding.avatar_change_subtitle': 'Keep it or change it later.',
+          'onboarding.enter_app': 'Open app',
+        })[key] ?? key,
+      locale: 'en',
+      language: 'en',
+      changeLanguage: jest.fn(),
+    });
+    mockUseTheme.mockReturnValue({
+      colors: DARK_COLORS,
+      isDark: true,
+      toggleTheme: jest.fn(),
+    });
+    mockUseAuth.mockReturnValue({
+      user: { id: 'user-123', email: 'test@example.com' },
+      userProfile: {
+        id: 'user-123',
+        username: 'testuser',
+        avatar_url: 'avatars/existing-user.jpg',
+        has_seen_tutorial: false,
+        account_tier: 'free',
+      },
+      isEmailVerified: true,
+      markTutorialSeen: mockMarkTutorialSeen,
+      updateAvatarUrl: mockUpdateAvatarUrl,
+    });
+
+    render(<PostSignupOnboardingScreen />);
+
+    await screen.findByTestId('post-signup-avatar-step');
+
+    fireEvent.press(screen.getByText('Next'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('post-signup-promo-slide-scanner')).toBeTruthy();
+    });
+
+    expect(screen.queryByTestId('post-signup-fallback-slide-scanner')).toBeNull();
+  });
+
+  it('renders the localized dark promo hero for the french scanner asset', async () => {
+    mockUseLanguage.mockReturnValue({
+      t: (key: string) =>
+        ({
+          'common.next': 'Suivant',
+          'onboarding.avatar_change_title': 'Photo de profil',
+          'onboarding.avatar_change_subtitle':
+            'Gardez-la ou changez-la plus tard.',
+          'onboarding.enter_app': "Ouvrir l'app",
+        })[key] ?? key,
+      locale: 'fr',
+      language: 'fr',
+      changeLanguage: jest.fn(),
+    });
+    mockUseTheme.mockReturnValue({
+      colors: DARK_COLORS,
+      isDark: true,
+      toggleTheme: jest.fn(),
+    });
+    mockUseAuth.mockReturnValue({
+      user: { id: 'user-123', email: 'test@example.com' },
+      userProfile: {
+        id: 'user-123',
+        username: 'testuser',
+        avatar_url: 'avatars/existing-user.jpg',
+        has_seen_tutorial: false,
+        account_tier: 'free',
+      },
+      isEmailVerified: true,
+      markTutorialSeen: mockMarkTutorialSeen,
+      updateAvatarUrl: mockUpdateAvatarUrl,
+    });
+
+    render(<PostSignupOnboardingScreen />);
+
+    await screen.findByTestId('post-signup-avatar-step');
+
+    fireEvent.press(screen.getByText('Suivant'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('post-signup-promo-slide-scanner')).toBeTruthy();
+    });
+
+    expect(screen.queryByTestId('post-signup-fallback-slide-scanner')).toBeNull();
+  });
+
+  it('passes the light theme through to the fridge fallback preview', async () => {
+    mockGetOnboardingPromoAsset.mockImplementation((theme, locale, slide) =>
+      slide === 'fridge'
+        ? null
+        : mockActualOnboardingPromoAssets.getOnboardingPromoAsset(
+            theme,
+            locale,
+            slide,
+          ),
+    );
+    mockUseAuth.mockReturnValue({
+      user: { id: 'user-123', email: 'test@example.com' },
+      userProfile: {
+        id: 'user-123',
+        username: 'testuser',
+        avatar_url: 'avatars/existing-user.jpg',
+        has_seen_tutorial: false,
+        account_tier: 'free',
+      },
+      isEmailVerified: true,
+      markTutorialSeen: mockMarkTutorialSeen,
+      updateAvatarUrl: mockUpdateAvatarUrl,
+    });
+
+    render(<PostSignupOnboardingScreen />);
+
+    await screen.findByTestId('post-signup-avatar-step');
+
+    fireEvent.press(screen.getByText('Suivant'));
+    fireEvent.press(screen.getByText('Suivant'));
+    fireEvent.press(screen.getByText('Suivant'));
+    fireEvent.press(screen.getByText('Suivant'));
+    fireEvent.press(screen.getByText('Suivant'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('post-signup-fallback-slide-fridge')).toBeTruthy();
+    });
+
+    expect(screen.queryByTestId('post-signup-promo-slide-fridge')).toBeNull();
+    expect(screen.getByTestId('fridge-preview-theme').props.children).toBe('light');
+    expect(mockFridgeScanIllustration).toHaveBeenLastCalledWith(
+      expect.objectContaining({ isDark: false }),
+    );
+  });
+
+  it('passes the dark theme through to the fridge fallback preview', async () => {
+    mockGetOnboardingPromoAsset.mockImplementation((theme, locale, slide) =>
+      slide === 'fridge'
+        ? null
+        : mockActualOnboardingPromoAssets.getOnboardingPromoAsset(
+            theme,
+            locale,
+            slide,
+          ),
+    );
+    mockUseTheme.mockReturnValue({
+      colors: DARK_COLORS,
+      isDark: true,
+      toggleTheme: jest.fn(),
+    });
+    mockUseAuth.mockReturnValue({
+      user: { id: 'user-123', email: 'test@example.com' },
+      userProfile: {
+        id: 'user-123',
+        username: 'testuser',
+        avatar_url: 'avatars/existing-user.jpg',
+        has_seen_tutorial: false,
+        account_tier: 'free',
+      },
+      isEmailVerified: true,
+      markTutorialSeen: mockMarkTutorialSeen,
+      updateAvatarUrl: mockUpdateAvatarUrl,
+    });
+
+    render(<PostSignupOnboardingScreen />);
+
+    await screen.findByTestId('post-signup-avatar-step');
+
+    fireEvent.press(screen.getByText('Suivant'));
+    fireEvent.press(screen.getByText('Suivant'));
+    fireEvent.press(screen.getByText('Suivant'));
+    fireEvent.press(screen.getByText('Suivant'));
+    fireEvent.press(screen.getByText('Suivant'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('post-signup-fallback-slide-fridge')).toBeTruthy();
+    });
+
+    expect(screen.queryByTestId('post-signup-promo-slide-fridge')).toBeNull();
+    expect(screen.getByTestId('fridge-preview-theme').props.children).toBe('dark');
+    expect(mockFridgeScanIllustration).toHaveBeenLastCalledWith(
+      expect.objectContaining({ isDark: true }),
+    );
   });
 
   it('keeps existing-avatar users on the full avatar step before the slides', async () => {

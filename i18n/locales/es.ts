@@ -561,7 +561,7 @@ export const ES_TRANSLATIONS = {
     no_active_guidance_title: 'Aun no hay un consejo activo',
     no_active_guidance_body:
       'Elige abajo un tipo de guidance para generar una respuesta nueva con esta personalidad.',
-    prompt_selection_hint: 'Elige un formato corto y claro.',
+    prompt_selection_hint: 'Elige una pregunta corta y accionable.',
     generate_cta: 'Pedir este consejo',
     expand_cta: 'Leer mas',
     collapse_cta: 'Reducir',
@@ -652,48 +652,45 @@ export const ES_TRANSLATIONS = {
     },
     prompts: {
       latest_scan: {
-        title: 'Ultimo scan',
-        subtitle:
-          'Convierte tu resultado mas reciente en un mini plan de accion.',
+        title: 'Prioridad del dia',
+        subtitle: 'Que debo ajustar primero despues de mi ultimo scan?',
       },
       weekly_plan: {
-        title: 'Plan semanal',
-        subtitle:
-          'Construye un plan tranquilo a partir de tus ultimos siete dias.',
+        title: 'Plan 7 dias',
+        subtitle: 'Que 3 habitos realistas seguir esta semana?',
       },
       nutrition_focus: {
-        title: 'Foco nutricion',
-        subtitle:
-          'Recibe una sugerencia centrada en comida desde tu ultimo scan nutricional.',
+        title: 'Proxima comida',
+        subtitle: 'Que pequeno ajuste hacer en mi proximo plato?',
       },
       body_focus: {
-        title: 'Foco cuerpo',
-        subtitle: 'Traduce tu ultimo scan corporal en habitos practicos.',
+        title: 'Movimiento util',
+        subtitle:
+          'Que gesto simple ayudaria postura, forma o regularidad?',
       },
       face_focus: {
-        title: 'Foco rostro',
-        subtitle:
-          'Revisa piel, glow y recuperacion desde tu ultimo scan facial.',
+        title: 'Piel y fatiga',
+        subtitle: 'Que dicen mis senales visuales hoy?',
       },
       hydration_focus: {
-        title: 'Hidratacion',
-        subtitle: 'Agua y equilibrio del dia.',
+        title: 'Ritual hidratacion',
+        subtitle: 'Que reflejo simple probar hoy?',
       },
       sleep_coach: {
-        title: 'Sueno',
-        subtitle: 'Senales de descanso y recuperacion.',
+        title: 'Recuperacion noche',
+        subtitle: 'Que rutina ligera podria ayudarme esta noche?',
       },
       risk_watch: {
-        title: 'Atencion',
-        subtitle: 'Lectura prudente tras un scan global.',
+        title: 'Punto a vigilar',
+        subtitle: 'Que senal merece atencion sin alarmarme?',
       },
       trend_review: {
-        title: 'Tendencia',
-        subtitle: 'Sobre las 2 a 4 ultimas semanas.',
+        title: 'Lo que cambia',
+        subtitle: 'Que progresa, se mantiene o retrocede de verdad?',
       },
       recovery_plan: {
-        title: 'Plan de recuperacion',
-        subtitle: 'Volver a la forma tras una bajada.',
+        title: 'Reinicio rapido',
+        subtitle: 'Como volver al ritmo desde mis senales recientes?',
       },
     },
     sections: {
@@ -724,7 +721,7 @@ export const ES_TRANSLATIONS = {
     },
     context_strip: {
       persona_prefix: 'Con',
-      mode_prefix: 'Modo',
+      mode_prefix: 'Pregunta',
       status_prefix: 'Estado',
     },
     selection_summary: {
@@ -777,11 +774,11 @@ export const ES_TRANSLATIONS = {
     },
     settings: {
       title: 'Ajustes',
-      subtitle: 'Elige un coach y un tipo de consejo, luego pulsa aplicar.',
+      subtitle: 'Elige un coach y una pregunta, luego pide tu consejo.',
     },
     options_sheet: {
       persona_label: 'Coach',
-      mode_label: 'Modo',
+      mode_label: 'Pregunta al coach',
       apply_label: 'Aplicar',
       close_a11y: 'Cerrar ajustes',
     },
@@ -1195,7 +1192,7 @@ export const ES_TRANSLATIONS = {
     signup_link: 'Regístrate',
     signup_title: 'Crear Cuenta',
     signup_subtitle: 'Únete para escanear y mejorar tu salud',
-    password_min_placeholder: 'Contraseña (min. 6 caracteres)',
+    password_min_placeholder: 'Contraseña (8+ caracteres, minúscula + número)',
     password_confirm_placeholder: 'Confirmar contraseña',
     verification_note: 'Te enviaremos un código de verificación.',
     signup_btn: 'Registrarse',
@@ -1209,7 +1206,8 @@ export const ES_TRANSLATIONS = {
       fill_all: 'Por favor, complete todos los campos',
       invalid_email: 'Correo electrónico no válido',
       password_mismatch: 'Las contraseñas no coinciden',
-      password_short: 'La contraseña debe tener al menos 6 caracteres',
+      password_short:
+        'La contraseña debe tener al menos 8 caracteres e incluir una minúscula y un número',
       disposable_email: 'No se permiten correos electrónicos temporales',
       email_in_use: 'Este correo electrónico ya está en uso',
       general_error: 'Ocurrió un error',
@@ -1223,7 +1221,8 @@ export const ES_TRANSLATIONS = {
     error_email_required: 'Se requiere correo electrónico',
     error_password_required: 'Se requiere contraseña',
     error_passwords_match: 'Las contraseñas no coinciden',
-    error_password_length: 'La contraseña debe tener al menos 6 caracteres.',
+    error_password_length:
+      'La contraseña debe tener al menos 8 caracteres e incluir una minúscula y un número.',
     error_login_generic: 'error de inicio de sesion',
     error_signup_generic: 'Registro fallido',
     error_account_creation: 'Error al crear cuenta',
@@ -1407,6 +1406,23 @@ export const ES_TRANSLATIONS = {
     super_scan_score_subtitle: 'Puntuación de Riesgo Global',
     legend_score: 'Puntuación (0-100)',
     legend_body_fat: 'Grasa Corporal %',
+    metric_tabs: {
+      score: 'Puntuacion',
+      skin_quality: 'Piel',
+      symmetry: 'Simetria',
+      energy: 'Brillo',
+      hydration: 'Hidratacion',
+      collagen: 'Colageno',
+      body_fat: 'Grasa',
+      strength: 'Fuerza',
+      posture: 'Postura',
+      metabolic_age: 'Edad metabolica',
+      calories: 'Calorias',
+      protein: 'Proteina',
+      carbs: 'Carbos',
+      fats: 'Grasas',
+      satiety: 'Saciedad',
+    },
   },
   super_scan_features: {
     premium_alert_title: 'Super Scan Premium',

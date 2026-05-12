@@ -5,8 +5,8 @@
 - The app runs at **AAL1 only** — MFA enrollment was removed (commits `1efd1b7`, `214323a`) and `auth.mfa_factors` purged (migration `20260425230000`). All RLS policies that previously gated rows on `aal = aal2` have been unwrapped (migrations `20260425220000`, `20260425240000`).
 - **Risk accepted**: a single compromised password = full account takeover, including for admin accounts. There is no second factor.
 - **Compensating controls in place**:
-  1. **HIBP password check at signup** via [`supabase/functions/before-user-created`](supabase/functions/before-user-created/index.ts) — blocks signups with passwords from known data breaches (k-anonymity, fail-open). See [`SETUP_AUTH_HOOK_HIBP.md`](SETUP_AUTH_HOOK_HIBP.md).
-  2. **Static common-password blacklist** via [`utils/passwordBlacklist.ts`](utils/passwordBlacklist.ts) (`SignUpCredentialsSchema.refine`).
+  1. **Server-side signup gate** via [`supabase/functions/secure-signup`](supabase/functions/secure-signup/index.ts) — enforces disposable-email filtering, IP signup rate limits, password policy, and nonce attestation before account creation.
+  2. **Static common-password blacklist** via [`utils/passwordBlacklist.ts`](utils/passwordBlacklist.ts) (`SignUpCredentialsSchema.refine`). This is client-side UX only; the server-side HIBP check is disabled by product decision.
   3. **Email verification** required before access (Edge Functions `send-verification-email` / `verify-email-code`).
   4. **Inactivity timeout 15 min** in [`app/_layout.tsx`](app/_layout.tsx) (`useInactivityTimeout`).
   5. **Global signOut scope** so password reset / suspicious activity invalidates all device sessions.
@@ -70,8 +70,8 @@ MFA / second-factor auth was removed from the product. The check `assertAal2Bear
 To make the password-only flow as hard to compromise as possible, these controls are mandatory and tested as part of the security regression suite (`__tests__/security/`):
 
 1. **Per-account login lockout** — `auth-pre-login` Edge Function + `record_login_attempt()` RPC. 5 fails / 15min from same (email,ip) → 30-min lock with exponential backoff. **NOTE (Free plan):** until upgraded to Supabase Pro+, the lockout is enforced via the client-side wrapper `secure-login` (called from `AuthContext.signIn()`). An attacker calling `/auth/v1/token` directly with the public anon key bypasses the wrapper. This is an accepted residual risk pending Pro+ upgrade.
-2. **Server-side HIBP enforcement** — `secure-signup` Edge Function + `auth.enforce_signup_nonce` trigger. Direct `/auth/v1/signup` calls bypassing the wrapper are rejected at the Postgres layer.
-3. **Email verification gate** — `mailer_autoconfirm = false`. New accounts are not usable until `verify-email-code` succeeds.
+2. **Server-side signup wrapper** — `secure-signup` Edge Function + `auth.enforce_signup_nonce` trigger. Direct `/auth/v1/signup` calls bypassing the wrapper are rejected at the Postgres layer.
+3. **Email verification gate** — `secure-signup` creates an auth-confirmed user only after signup controls pass so the app can install a session for `send-verification-email` / `verify-email-code`; the product gate is `user_profiles.email_verified`, which remains false until `verify-email-code` succeeds.
 4. **Password policy (RELAXED 2026-05)** — minimum 8 characters, requires lowercase + digit only. HIBP check disabled per product decision. This re-opens AUTH-VULN-01 by design — accepted residual risk because the lockout, email-verify, disposable-email, and IP rate-limit controls remain in place. To re-enable HIBP: uncomment the block in `supabase/functions/secure-signup/index.ts` and toggle "Leaked password protection" ON in the Supabase dashboard.
 5. **Server-side disposable-email filter** — folded into `secure-signup`, blocks subdomain bypasses.
 

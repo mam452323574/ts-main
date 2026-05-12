@@ -31,23 +31,48 @@ import { logOperationalError } from '@/utils/observability';
 import type {
   AnalysisResult,
   CoachComparisonToPrevious,
+  CoachDataReliability,
+  CoachDataReliabilityComponents,
+  CoachDormancyRiskLevel,
+  CoachEngagementLevel,
   CoachEntry,
   CoachGenerateResponse,
+  CoachGoalInference,
   CoachGuidancePayload,
   CoachGuidanceResult,
+  CoachInferredMetricSignal,
+  CoachInferredPersona,
+  CoachInferredPersonaField,
   CoachKeyMetrics,
+  CoachLifestyleArchetypeKey,
+  CoachLifestyleSignature,
   CoachMetricDelta,
   CoachMetricInterpretationHint,
+  CoachNutritionProfile,
   CoachPersonaKey,
+  CoachPreferredTimeOfDay,
+  CoachPrimaryGoalKey,
   CoachPromptType,
   CoachQuotaStatus,
+  CoachRecommendations,
+  CoachRecommendationTone,
   CoachRelevantFlag,
   CoachResponseVersion,
+  CoachRiskLevel,
+  CoachRiskSignals,
   CoachScanDigest,
+  CoachScanFrequencyLabel,
   CoachScanRichContext,
   CoachStructuredContent,
+  CoachTemporalPatterns,
+  CoachTrajectoryDirection,
+  CoachTrajectoryEntry,
+  CoachTrajectoryMap,
   CoachTrendMetric,
   CoachTrendSummary,
+  CoachWeekdayWeekendBalance,
+  InferredPersonaConfidence,
+  ScanAnalysisMeta,
   ScanType,
   SuperScanResult,
 } from '@/types';
@@ -66,6 +91,9 @@ export const COACH_QUOTA_STATUS_UNAVAILABLE_ERROR_CODE =
 // enough source material after type filtering.
 const RECENT_COACH_SCAN_LIMIT = 32;
 const COACH_TREND_SAMPLE_COUNT = 3;
+const COACH_LOW_CONFIDENCE_THRESHOLD = 60;
+const COACH_LOW_IMAGE_QUALITY_THRESHOLD = 55;
+const COACH_PARTIAL_METRIC_COVERAGE_THRESHOLD = 70;
 
 interface SupabaseErrorLike {
   code?: string;
@@ -796,6 +824,71 @@ const COACH_METRIC_SPECS: Record<ScanType, CoachMetricSpec[]> = {
       interpretationHint: 'higher_is_better',
       tolerance: 2,
     },
+    {
+      metric: 'skin_clarity_score',
+      interpretationHint: 'higher_is_better',
+      tolerance: 3,
+    },
+    {
+      metric: 'under_eye_shadow_score',
+      interpretationHint: 'lower_is_better',
+      tolerance: 3,
+    },
+    {
+      metric: 'under_eye_volume_score',
+      interpretationHint: 'lower_is_better',
+      tolerance: 3,
+    },
+    {
+      metric: 'eye_openness_score',
+      interpretationHint: 'higher_is_better',
+      tolerance: 3,
+    },
+    {
+      metric: 'complexion_redness_score',
+      interpretationHint: 'lower_is_better',
+      tolerance: 3,
+    },
+    {
+      metric: 'pore_visibility_score',
+      interpretationHint: 'lower_is_better',
+      tolerance: 3,
+    },
+    {
+      metric: 'skin_evenness_score',
+      interpretationHint: 'higher_is_better',
+      tolerance: 3,
+    },
+    {
+      metric: 'skin_radiance_score',
+      interpretationHint: 'higher_is_better',
+      tolerance: 3,
+    },
+    {
+      metric: 'lip_dryness_score',
+      interpretationHint: 'lower_is_better',
+      tolerance: 3,
+    },
+    {
+      metric: 'forehead_smoothness_score',
+      interpretationHint: 'higher_is_better',
+      tolerance: 3,
+    },
+    {
+      metric: 't_zone_oiliness_score',
+      interpretationHint: 'lower_is_better',
+      tolerance: 3,
+    },
+    {
+      metric: 'perceived_stress_level',
+      interpretationHint: 'lower_is_better',
+      tolerance: 3,
+    },
+    {
+      metric: 'perceived_sleep_quality',
+      interpretationHint: 'higher_is_better',
+      tolerance: 3,
+    },
   ],
   body: [
     { metric: 'body_score', interpretationHint: 'higher_is_better', tolerance: 2 },
@@ -814,6 +907,51 @@ const COACH_METRIC_SPECS: Record<ScanType, CoachMetricSpec[]> = {
     { metric: 'body_symmetry', interpretationHint: 'higher_is_better', tolerance: 2 },
     { metric: 'bmi_estimate', interpretationHint: 'neutral_context', tolerance: 1 },
     { metric: 'metabolic_age', interpretationHint: 'lower_is_better', tolerance: 1 },
+    {
+      metric: 'muscle_definition_score',
+      interpretationHint: 'higher_is_better',
+      tolerance: 3,
+    },
+    {
+      metric: 'midsection_definition_score',
+      interpretationHint: 'higher_is_better',
+      tolerance: 3,
+    },
+    {
+      metric: 'shoulder_alignment_score',
+      interpretationHint: 'higher_is_better',
+      tolerance: 3,
+    },
+    {
+      metric: 'recovery_readiness_score',
+      interpretationHint: 'higher_is_better',
+      tolerance: 3,
+    },
+    {
+      metric: 'upper_body_definition_score',
+      interpretationHint: 'higher_is_better',
+      tolerance: 3,
+    },
+    {
+      metric: 'lower_body_definition_score',
+      interpretationHint: 'higher_is_better',
+      tolerance: 3,
+    },
+    {
+      metric: 'arm_definition_score',
+      interpretationHint: 'higher_is_better',
+      tolerance: 3,
+    },
+    {
+      metric: 'v_taper_score',
+      interpretationHint: 'higher_is_better',
+      tolerance: 3,
+    },
+    {
+      metric: 'body_tension_indicator_score',
+      interpretationHint: 'lower_is_better',
+      tolerance: 3,
+    },
   ],
   nutrition: [
     {
@@ -830,6 +968,66 @@ const COACH_METRIC_SPECS: Record<ScanType, CoachMetricSpec[]> = {
     { metric: 'carbs_grams', interpretationHint: 'neutral_context', tolerance: 3 },
     { metric: 'fat_grams', interpretationHint: 'neutral_context', tolerance: 3 },
     { metric: 'satiety_index', interpretationHint: 'higher_is_better', tolerance: 2 },
+    {
+      metric: 'fiber_grams_estimate',
+      interpretationHint: 'higher_is_better',
+      tolerance: 2,
+    },
+    {
+      metric: 'sugar_grams_estimate',
+      interpretationHint: 'lower_is_better',
+      tolerance: 3,
+    },
+    {
+      metric: 'processing_level_score',
+      interpretationHint: 'lower_is_better',
+      tolerance: 3,
+    },
+    {
+      metric: 'hydration_contribution_score',
+      interpretationHint: 'higher_is_better',
+      tolerance: 1,
+    },
+    {
+      metric: 'sodium_level_score',
+      interpretationHint: 'lower_is_better',
+      tolerance: 1,
+    },
+    {
+      metric: 'meal_balance_score',
+      interpretationHint: 'higher_is_better',
+      tolerance: 3,
+    },
+    {
+      metric: 'inflammation_index_score',
+      interpretationHint: 'lower_is_better',
+      tolerance: 3,
+    },
+    {
+      metric: 'color_diversity_score',
+      interpretationHint: 'higher_is_better',
+      tolerance: 1,
+    },
+    {
+      metric: 'vegetable_portion_ratio',
+      interpretationHint: 'higher_is_better',
+      tolerance: 3,
+    },
+    {
+      metric: 'protein_visibility_score',
+      interpretationHint: 'higher_is_better',
+      tolerance: 3,
+    },
+    {
+      metric: 'whole_grain_indicator_score',
+      interpretationHint: 'higher_is_better',
+      tolerance: 3,
+    },
+    {
+      metric: 'meal_freshness_score',
+      interpretationHint: 'higher_is_better',
+      tolerance: 3,
+    },
   ],
   super: [
     {
@@ -848,9 +1046,61 @@ const PRIMARY_COACH_METRIC_BY_SCAN_TYPE: Record<ScanType, string> = {
 };
 
 const SECONDARY_TREND_METRICS_BY_SCAN_TYPE: Record<ScanType, string[]> = {
-  health: ['fatigue_level', 'hydration_level'],
-  body: ['body_fat_percentage'],
-  nutrition: ['calories_estimate', 'protein_grams'],
+  health: [
+    'fatigue_level',
+    'skin_quality_score',
+    'glow_index',
+    'collagen_level',
+    'hydration_level',
+    'photogenic_score',
+    'skin_clarity_score',
+    'under_eye_shadow_score',
+    'under_eye_volume_score',
+    'eye_openness_score',
+    'complexion_redness_score',
+    'pore_visibility_score',
+    'skin_evenness_score',
+    'skin_radiance_score',
+    'lip_dryness_score',
+    'forehead_smoothness_score',
+    't_zone_oiliness_score',
+    'perceived_stress_level',
+    'perceived_sleep_quality',
+  ],
+  body: [
+    'body_fat_percentage',
+    'posture_score',
+    'strength_index',
+    'body_symmetry',
+    'metabolic_age',
+    'muscle_definition_score',
+    'midsection_definition_score',
+    'shoulder_alignment_score',
+    'recovery_readiness_score',
+    'upper_body_definition_score',
+    'lower_body_definition_score',
+    'arm_definition_score',
+    'v_taper_score',
+    'body_tension_indicator_score',
+  ],
+  nutrition: [
+    'calories_estimate',
+    'protein_grams',
+    'carbs_grams',
+    'fat_grams',
+    'satiety_index',
+    'fiber_grams_estimate',
+    'sugar_grams_estimate',
+    'processing_level_score',
+    'hydration_contribution_score',
+    'meal_balance_score',
+    'inflammation_index_score',
+    'color_diversity_score',
+    'vegetable_portion_ratio',
+    'protein_visibility_score',
+    'whole_grain_indicator_score',
+    'meal_freshness_score',
+  ],
   super: ['global_risk_score'],
 };
 
@@ -994,6 +1244,17 @@ function finalizeFallbackFields(fields: Record<string, unknown>) {
   return isRecord(compactedFields) ? compactedFields : null;
 }
 
+function readAnalysisMetaFromNormalizedResult(
+  normalized: CoachNormalizedAnalysisResult,
+): ScanAnalysisMeta | null {
+  if (!('analysis_meta' in normalized)) {
+    return null;
+  }
+
+  const analysisMeta = normalized.analysis_meta;
+  return analysisMeta ?? null;
+}
+
 function createCoachRichKeyMetrics(
   normalized: CoachNormalizedAnalysisResult,
 ): CoachKeyMetrics {
@@ -1011,6 +1272,21 @@ function createCoachRichKeyMetrics(
         collagen_level: normalized.collagen_level,
         hydration_level: normalized.hydration_level,
         photogenic_score: normalized.photogenic_score,
+        skin_clarity_score: normalized.skin_clarity_score ?? null,
+        under_eye_shadow_score: normalized.under_eye_shadow_score ?? null,
+        under_eye_volume_score: normalized.under_eye_volume_score ?? null,
+        eye_openness_score: normalized.eye_openness_score ?? null,
+        complexion_redness_score: normalized.complexion_redness_score ?? null,
+        pore_visibility_score: normalized.pore_visibility_score ?? null,
+        skin_evenness_score: normalized.skin_evenness_score ?? null,
+        skin_radiance_score: normalized.skin_radiance_score ?? null,
+        lip_dryness_score: normalized.lip_dryness_score ?? null,
+        forehead_smoothness_score: normalized.forehead_smoothness_score ?? null,
+        t_zone_oiliness_score: normalized.t_zone_oiliness_score ?? null,
+        perceived_sex_key: normalized.perceived_sex_key ?? null,
+        perceived_age_range_key: normalized.perceived_age_range_key ?? null,
+        perceived_stress_level: normalized.perceived_stress_level ?? null,
+        perceived_sleep_quality: normalized.perceived_sleep_quality ?? null,
       };
     case 'body':
       return {
@@ -1024,6 +1300,21 @@ function createCoachRichKeyMetrics(
         body_symmetry: normalized.body_symmetry,
         bmi_estimate: normalized.bmi_estimate,
         metabolic_age: normalized.metabolic_age,
+        muscle_definition_score: normalized.muscle_definition_score ?? null,
+        midsection_definition_score: normalized.midsection_definition_score ?? null,
+        shoulder_alignment_score: normalized.shoulder_alignment_score ?? null,
+        recovery_readiness_score: normalized.recovery_readiness_score ?? null,
+        upper_body_definition_score: normalized.upper_body_definition_score ?? null,
+        lower_body_definition_score: normalized.lower_body_definition_score ?? null,
+        arm_definition_score: normalized.arm_definition_score ?? null,
+        v_taper_score: normalized.v_taper_score ?? null,
+        body_tension_indicator_score: normalized.body_tension_indicator_score ?? null,
+        perceived_sex_key: normalized.perceived_sex_key ?? null,
+        perceived_age_range_key: normalized.perceived_age_range_key ?? null,
+        estimated_height_range_key: normalized.estimated_height_range_key ?? null,
+        estimated_weight_range_key: normalized.estimated_weight_range_key ?? null,
+        body_frame_key: normalized.body_frame_key ?? null,
+        perceived_fitness_level_key: normalized.perceived_fitness_level_key ?? null,
       };
     case 'nutrition':
       return {
@@ -1037,6 +1328,27 @@ function createCoachRichKeyMetrics(
         satiety_index: normalized.satiety_index,
         ingredient_quality_key: normalized.ingredient_quality_key,
         main_vitamin_keys: normalized.main_vitamin_keys,
+        fiber_grams_estimate: normalized.fiber_grams_estimate ?? null,
+        sugar_grams_estimate: normalized.sugar_grams_estimate ?? null,
+        processing_level_score: normalized.processing_level_score ?? null,
+        hydration_contribution_score: normalized.hydration_contribution_score ?? null,
+        sodium_level_score: normalized.sodium_level_score ?? null,
+        meal_balance_score: normalized.meal_balance_score ?? null,
+        inflammation_index_score: normalized.inflammation_index_score ?? null,
+        meal_type_key: normalized.meal_type_key ?? null,
+        portion_size_key: normalized.portion_size_key ?? null,
+        color_diversity_score: normalized.color_diversity_score ?? null,
+        vegetable_portion_ratio: normalized.vegetable_portion_ratio ?? null,
+        protein_visibility_score: normalized.protein_visibility_score ?? null,
+        whole_grain_indicator_score: normalized.whole_grain_indicator_score ?? null,
+        meal_freshness_score: normalized.meal_freshness_score ?? null,
+        cuisine_type_key: normalized.cuisine_type_key ?? null,
+        meat_type_key: normalized.meat_type_key ?? null,
+        cooking_method_key: normalized.cooking_method_key ?? null,
+        meal_dietary_pattern_key: normalized.meal_dietary_pattern_key ?? null,
+        allergen_visibility_keys: Array.isArray(normalized.allergen_visibility_keys)
+          ? normalized.allergen_visibility_keys
+          : [],
       };
     case 'super_health_v2':
       return {
@@ -1063,6 +1375,14 @@ function createCoachDigestMetrics(
         fatigue_level: normalized.fatigue_level,
         glow_index: normalized.glow_index,
         hydration_level: normalized.hydration_level,
+        skin_clarity_score: normalized.skin_clarity_score ?? null,
+        under_eye_shadow_score: normalized.under_eye_shadow_score ?? null,
+        skin_radiance_score: normalized.skin_radiance_score ?? null,
+        lip_dryness_score: normalized.lip_dryness_score ?? null,
+        perceived_sex_key: normalized.perceived_sex_key ?? null,
+        perceived_age_range_key: normalized.perceived_age_range_key ?? null,
+        perceived_stress_level: normalized.perceived_stress_level ?? null,
+        perceived_sleep_quality: normalized.perceived_sleep_quality ?? null,
       };
     case 'body':
       return {
@@ -1072,6 +1392,14 @@ function createCoachDigestMetrics(
         body_type_key: normalized.body_type_key,
         posture_score: normalized.posture_score,
         strength_index: normalized.strength_index,
+        muscle_definition_score: normalized.muscle_definition_score ?? null,
+        v_taper_score: normalized.v_taper_score ?? null,
+        perceived_sex_key: normalized.perceived_sex_key ?? null,
+        perceived_age_range_key: normalized.perceived_age_range_key ?? null,
+        estimated_height_range_key: normalized.estimated_height_range_key ?? null,
+        estimated_weight_range_key: normalized.estimated_weight_range_key ?? null,
+        body_frame_key: normalized.body_frame_key ?? null,
+        perceived_fitness_level_key: normalized.perceived_fitness_level_key ?? null,
       };
     case 'nutrition':
       return {
@@ -1082,6 +1410,18 @@ function createCoachDigestMetrics(
         fat_grams: normalized.fat_grams,
         verdict_key: normalized.verdict_key,
         glycemic_index_key: normalized.glycemic_index_key,
+        fiber_grams_estimate: normalized.fiber_grams_estimate ?? null,
+        sugar_grams_estimate: normalized.sugar_grams_estimate ?? null,
+        processing_level_score: normalized.processing_level_score ?? null,
+        meal_type_key: normalized.meal_type_key ?? null,
+        color_diversity_score: normalized.color_diversity_score ?? null,
+        vegetable_portion_ratio: normalized.vegetable_portion_ratio ?? null,
+        cuisine_type_key: normalized.cuisine_type_key ?? null,
+        cooking_method_key: normalized.cooking_method_key ?? null,
+        meal_dietary_pattern_key: normalized.meal_dietary_pattern_key ?? null,
+        allergen_visibility_keys: Array.isArray(normalized.allergen_visibility_keys)
+          ? normalized.allergen_visibility_keys
+          : [],
       };
     case 'super_health_v2':
       return {
@@ -1408,6 +1748,7 @@ function buildCoachRelevantFlags(
   comparison: CoachComparisonToPrevious,
 ): CoachRelevantFlag[] {
   const flags = new Set<CoachRelevantFlag>();
+  const analysisMeta = readAnalysisMetaFromNormalizedResult(currentScan.normalized);
   const primaryMetric = PRIMARY_COACH_METRIC_BY_SCAN_TYPE[currentScan.scan_type];
   const primaryMetricDelta =
     comparison.metric_deltas.find((item) => item.metric === primaryMetric) ?? null;
@@ -1421,6 +1762,35 @@ function buildCoachRelevantFlags(
     flags.add('has_recent_decline');
   }
 
+  if (
+    analysisMeta?.confidence_score !== null &&
+    analysisMeta?.confidence_score !== undefined &&
+    analysisMeta.confidence_score < COACH_LOW_CONFIDENCE_THRESHOLD
+  ) {
+    flags.add('low_confidence_scan');
+  }
+
+  if (
+    (analysisMeta?.image_quality_score !== null &&
+      analysisMeta?.image_quality_score !== undefined &&
+      analysisMeta.image_quality_score < COACH_LOW_IMAGE_QUALITY_THRESHOLD) ||
+    analysisMeta?.limitation_flags.includes('blur') ||
+    analysisMeta?.limitation_flags.includes('low_light') ||
+    analysisMeta?.limitation_flags.includes('occlusion')
+  ) {
+    flags.add('image_quality_limited');
+  }
+
+  if (
+    (analysisMeta?.metric_coverage_score !== null &&
+      analysisMeta?.metric_coverage_score !== undefined &&
+      analysisMeta.metric_coverage_score < COACH_PARTIAL_METRIC_COVERAGE_THRESHOLD) ||
+    analysisMeta?.limitation_flags.includes('partial_subject') ||
+    analysisMeta?.limitation_flags.includes('portion_uncertain')
+  ) {
+    flags.add('partial_metric_coverage');
+  }
+
   switch (currentScan.scan_type) {
     case 'health': {
       const hydrationLevel = readNumericMetricValue(
@@ -1431,6 +1801,26 @@ function buildCoachRelevantFlags(
         currentScan.key_metrics,
         'fatigue_level',
       );
+      const skinClarityScore = readNumericMetricValue(
+        currentScan.key_metrics,
+        'skin_clarity_score',
+      );
+      const underEyeShadowScore = readNumericMetricValue(
+        currentScan.key_metrics,
+        'under_eye_shadow_score',
+      );
+      const underEyeVolumeScore = readNumericMetricValue(
+        currentScan.key_metrics,
+        'under_eye_volume_score',
+      );
+      const eyeOpennessScore = readNumericMetricValue(
+        currentScan.key_metrics,
+        'eye_openness_score',
+      );
+      const complexionRednessScore = readNumericMetricValue(
+        currentScan.key_metrics,
+        'complexion_redness_score',
+      );
 
       if (hydrationLevel !== null && hydrationLevel < 40) {
         flags.add('low_hydration');
@@ -1439,6 +1829,76 @@ function buildCoachRelevantFlags(
       if (fatigueLevel !== null && fatigueLevel > 60) {
         flags.add('high_fatigue');
       }
+
+      if (skinClarityScore !== null && skinClarityScore < 40) {
+        flags.add('low_skin_clarity');
+      }
+
+      if (underEyeShadowScore !== null && underEyeShadowScore > 60) {
+        flags.add('high_under_eye_shadow');
+      }
+
+      if (underEyeVolumeScore !== null && underEyeVolumeScore > 55) {
+        flags.add('high_under_eye_volume');
+      }
+
+      if (eyeOpennessScore !== null && eyeOpennessScore < 40) {
+        flags.add('low_eye_openness');
+      }
+
+      if (complexionRednessScore !== null && complexionRednessScore > 60) {
+        flags.add('high_complexion_redness');
+      }
+
+      const poreVisibilityScore = readNumericMetricValue(
+        currentScan.key_metrics,
+        'pore_visibility_score',
+      );
+      const skinEvennessScore = readNumericMetricValue(
+        currentScan.key_metrics,
+        'skin_evenness_score',
+      );
+      const skinRadianceScore = readNumericMetricValue(
+        currentScan.key_metrics,
+        'skin_radiance_score',
+      );
+      const lipDrynessScore = readNumericMetricValue(
+        currentScan.key_metrics,
+        'lip_dryness_score',
+      );
+
+      if (poreVisibilityScore !== null && poreVisibilityScore > 60) {
+        flags.add('high_pore_visibility');
+      }
+
+      if (skinEvennessScore !== null && skinEvennessScore < 40) {
+        flags.add('low_skin_evenness');
+      }
+
+      if (skinRadianceScore !== null && skinRadianceScore < 40) {
+        flags.add('low_skin_radiance');
+      }
+
+      if (lipDrynessScore !== null && lipDrynessScore > 60) {
+        flags.add('high_lip_dryness');
+      }
+
+      const perceivedStressLevel = readNumericMetricValue(
+        currentScan.key_metrics,
+        'perceived_stress_level',
+      );
+      const perceivedSleepQuality = readNumericMetricValue(
+        currentScan.key_metrics,
+        'perceived_sleep_quality',
+      );
+
+      if (perceivedStressLevel !== null && perceivedStressLevel > 60) {
+        flags.add('high_perceived_stress');
+      }
+
+      if (perceivedSleepQuality !== null && perceivedSleepQuality < 40) {
+        flags.add('low_perceived_sleep_quality');
+      }
       break;
     }
     case 'body': {
@@ -1446,9 +1906,82 @@ function buildCoachRelevantFlags(
         currentScan.key_metrics,
         'body_fat_percentage',
       );
+      const muscleDefinitionScore = readNumericMetricValue(
+        currentScan.key_metrics,
+        'muscle_definition_score',
+      );
+      const midsectionDefinitionScore = readNumericMetricValue(
+        currentScan.key_metrics,
+        'midsection_definition_score',
+      );
+      const shoulderAlignmentScore = readNumericMetricValue(
+        currentScan.key_metrics,
+        'shoulder_alignment_score',
+      );
+      const recoveryReadinessScore = readNumericMetricValue(
+        currentScan.key_metrics,
+        'recovery_readiness_score',
+      );
 
       if (bodyFatPercentage !== null && bodyFatPercentage >= 30) {
         flags.add('high_body_fat');
+      }
+
+      if (muscleDefinitionScore !== null && muscleDefinitionScore < 35) {
+        flags.add('low_muscle_definition');
+      }
+
+      if (midsectionDefinitionScore !== null && midsectionDefinitionScore < 35) {
+        flags.add('low_midsection_definition');
+      }
+
+      if (shoulderAlignmentScore !== null && shoulderAlignmentScore < 50) {
+        flags.add('low_shoulder_alignment');
+      }
+
+      if (recoveryReadinessScore !== null && recoveryReadinessScore < 40) {
+        flags.add('low_recovery_readiness');
+      }
+
+      const upperBodyDefinitionScore = readNumericMetricValue(
+        currentScan.key_metrics,
+        'upper_body_definition_score',
+      );
+      const lowerBodyDefinitionScore = readNumericMetricValue(
+        currentScan.key_metrics,
+        'lower_body_definition_score',
+      );
+      const armDefinitionScore = readNumericMetricValue(
+        currentScan.key_metrics,
+        'arm_definition_score',
+      );
+      const vTaperScore = readNumericMetricValue(
+        currentScan.key_metrics,
+        'v_taper_score',
+      );
+      const bodyTensionIndicatorScore = readNumericMetricValue(
+        currentScan.key_metrics,
+        'body_tension_indicator_score',
+      );
+
+      if (upperBodyDefinitionScore !== null && upperBodyDefinitionScore < 35) {
+        flags.add('low_upper_body_definition');
+      }
+
+      if (lowerBodyDefinitionScore !== null && lowerBodyDefinitionScore < 35) {
+        flags.add('low_lower_body_definition');
+      }
+
+      if (armDefinitionScore !== null && armDefinitionScore < 35) {
+        flags.add('low_arm_definition');
+      }
+
+      if (vTaperScore !== null && vTaperScore < 40) {
+        flags.add('low_v_taper');
+      }
+
+      if (bodyTensionIndicatorScore !== null && bodyTensionIndicatorScore > 60) {
+        flags.add('high_body_tension');
       }
       break;
     }
@@ -1457,9 +1990,91 @@ function buildCoachRelevantFlags(
         currentScan.key_metrics,
         'protein_grams',
       );
+      const fiberGramsEstimate = readNumericMetricValue(
+        currentScan.key_metrics,
+        'fiber_grams_estimate',
+      );
+      const sugarGramsEstimate = readNumericMetricValue(
+        currentScan.key_metrics,
+        'sugar_grams_estimate',
+      );
+      const sodiumLevelScore = readNumericMetricValue(
+        currentScan.key_metrics,
+        'sodium_level_score',
+      );
+      const processingLevelScore = readNumericMetricValue(
+        currentScan.key_metrics,
+        'processing_level_score',
+      );
+      const mealBalanceScore = readNumericMetricValue(
+        currentScan.key_metrics,
+        'meal_balance_score',
+      );
+      const inflammationIndexScore = readNumericMetricValue(
+        currentScan.key_metrics,
+        'inflammation_index_score',
+      );
 
       if (proteinGrams !== null && proteinGrams < 20) {
         flags.add('low_protein');
+      }
+
+      if (fiberGramsEstimate !== null && fiberGramsEstimate < 8) {
+        flags.add('low_fiber');
+      }
+
+      if (sugarGramsEstimate !== null && sugarGramsEstimate > 35) {
+        flags.add('high_sugar_intake');
+      }
+
+      if (sodiumLevelScore !== null && sodiumLevelScore >= 7) {
+        flags.add('high_sodium_intake');
+      }
+
+      if (processingLevelScore !== null && processingLevelScore > 65) {
+        flags.add('high_processing_level');
+      }
+
+      if (mealBalanceScore !== null && mealBalanceScore < 40) {
+        flags.add('low_meal_balance');
+      }
+
+      if (inflammationIndexScore !== null && inflammationIndexScore > 60) {
+        flags.add('high_inflammation_index');
+      }
+
+      const colorDiversityScore = readNumericMetricValue(
+        currentScan.key_metrics,
+        'color_diversity_score',
+      );
+      const vegetablePortionRatio = readNumericMetricValue(
+        currentScan.key_metrics,
+        'vegetable_portion_ratio',
+      );
+      const proteinVisibilityScore = readNumericMetricValue(
+        currentScan.key_metrics,
+        'protein_visibility_score',
+      );
+
+      if (colorDiversityScore !== null && colorDiversityScore < 4) {
+        flags.add('low_color_diversity');
+      }
+
+      if (vegetablePortionRatio !== null && vegetablePortionRatio < 30) {
+        flags.add('low_vegetable_portion');
+      }
+
+      if (proteinVisibilityScore !== null && proteinVisibilityScore < 40) {
+        flags.add('low_protein_visibility');
+      }
+
+      const allergenVisibilityKeys = (currentScan.key_metrics as unknown as Record<string, unknown>)
+        ?.allergen_visibility_keys;
+      if (
+        Array.isArray(allergenVisibilityKeys) &&
+        allergenVisibilityKeys.length > 0
+      ) {
+        flags.add('allergen_visible');
       }
       break;
     }
@@ -1504,6 +2119,7 @@ function createCoachScanRichContext(
     normalized_scan_type: currentScan.normalized.scan_type,
     captured_at: currentScan.captured_at,
     analysis_result_normalized: currentScan.normalized,
+    analysis_meta: readAnalysisMetaFromNormalizedResult(currentScan.normalized),
     key_metrics: currentScan.key_metrics,
     raw_fallback_fields: currentScan.raw_fallback_fields,
     coach_relevant_flags: buildCoachRelevantFlags(
@@ -2158,6 +2774,1309 @@ function getScansWithinLastDays(scans: CoachSourceScan[], days: number) {
   });
 }
 
+const PERSONA_AGE_FALLBACK_THRESHOLDS: ReadonlyArray<[number, string]> = [
+  [18, 'under_18'],
+  [25, '18_24'],
+  [35, '25_34'],
+  [45, '35_44'],
+  [55, '45_54'],
+  [65, '55_64'],
+];
+
+function ageNumericToRangeKey(age: number): string | null {
+  if (!Number.isFinite(age) || age < 0 || age > 130) return null;
+  for (const [threshold, key] of PERSONA_AGE_FALLBACK_THRESHOLDS) {
+    if (age < threshold) return key;
+  }
+  return '65_plus';
+}
+
+function readPersonaKeyMetric(
+  metrics: CoachKeyMetrics,
+  field: string,
+): string | null {
+  const value = (metrics as unknown as Record<string, unknown>)[field];
+  if (typeof value !== 'string' || !value) return null;
+  return value;
+}
+
+function readPersonaArrayMetric(
+  metrics: CoachKeyMetrics,
+  field: string,
+): string[] {
+  const value = (metrics as unknown as Record<string, unknown>)[field];
+  return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
+}
+
+function aggregateModeKey(values: ReadonlyArray<string | null>): {
+  value: string | null;
+  sample_count: number;
+} {
+  const counts = new Map<string, number>();
+  let sample_count = 0;
+  for (const value of values) {
+    if (!value) continue;
+    sample_count += 1;
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+  if (sample_count === 0) return { value: null, sample_count: 0 };
+
+  let bestKey: string | null = null;
+  let bestCount = -1;
+  for (const [key, count] of counts) {
+    if (count > bestCount) {
+      bestKey = key;
+      bestCount = count;
+    }
+  }
+  return { value: bestKey, sample_count };
+}
+
+function confidenceFromSampleCount(count: number): InferredPersonaConfidence | null {
+  if (count <= 0) return null;
+  if (count <= 1) return 'low';
+  if (count <= 4) return 'medium';
+  return 'high';
+}
+
+function buildPersonaField<T extends string>(
+  values: ReadonlyArray<T | null>,
+): CoachInferredPersonaField<T> {
+  const { value, sample_count } = aggregateModeKey(values);
+  return {
+    value: (value as T | null) ?? null,
+    source: 'infere',
+    confidence: confidenceFromSampleCount(sample_count),
+    sample_count,
+  };
+}
+
+function pickFaceAgeRangeKey(scan: CoachSourceScan): string | null {
+  if (scan.normalized.scan_type !== 'face') return null;
+  const rangeKey = readPersonaKeyMetric(
+    scan.key_metrics,
+    'perceived_age_range_key',
+  );
+  if (rangeKey) return rangeKey;
+
+  const perceivedAge = readNumericMetricValue(scan.key_metrics, 'perceived_age');
+  if (perceivedAge !== null) {
+    return ageNumericToRangeKey(perceivedAge);
+  }
+  return null;
+}
+
+function pickBodyAgeRangeKey(scan: CoachSourceScan): string | null {
+  if (scan.normalized.scan_type !== 'body') return null;
+  return readPersonaKeyMetric(scan.key_metrics, 'perceived_age_range_key');
+}
+
+function deriveEngagementLevel(scanCount7d: number): CoachEngagementLevel {
+  if (scanCount7d < 2) return 'low';
+  if (scanCount7d < 5) return 'medium';
+  return 'high';
+}
+
+function deriveOverallConfidence(scanCount: number): InferredPersonaConfidence {
+  if (scanCount < 3) return 'low';
+  if (scanCount < 8) return 'medium';
+  return 'high';
+}
+
+function aggregateDietarySignals(scans: CoachSourceScan[]): string[] {
+  const nutritionScans = scans.filter((scan) => scan.scan_type === 'nutrition');
+  if (nutritionScans.length === 0) return [];
+
+  const patternCounts = new Map<string, number>();
+  for (const scan of nutritionScans) {
+    const pattern = readPersonaKeyMetric(scan.key_metrics, 'meal_dietary_pattern_key');
+    if (!pattern || pattern === 'unclear') continue;
+    patternCounts.set(pattern, (patternCounts.get(pattern) ?? 0) + 1);
+  }
+
+  const minOccurrences = Math.max(2, Math.ceil(nutritionScans.length * 0.3));
+  return Array.from(patternCounts.entries())
+    .filter(([, count]) => count >= minOccurrences)
+    .sort(([, a], [, b]) => b - a)
+    .map(([key]) => key);
+}
+
+function aggregateRecurringAllergenSignals(scans: CoachSourceScan[]): string[] {
+  const nutritionScans = scans.filter((scan) => scan.scan_type === 'nutrition');
+  if (nutritionScans.length === 0) return [];
+
+  const counts = new Map<string, number>();
+  for (const scan of nutritionScans) {
+    const keys = readPersonaArrayMetric(scan.key_metrics, 'allergen_visibility_keys');
+    for (const key of keys) {
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+  }
+
+  const minOccurrences = Math.max(2, Math.ceil(nutritionScans.length * 0.3));
+  return Array.from(counts.entries())
+    .filter(([, count]) => count >= minOccurrences)
+    .sort(([, a], [, b]) => b - a)
+    .map(([key]) => key);
+}
+
+function deriveDominantScanFocus(
+  scans: CoachSourceScan[],
+): CoachInferredPersonaField<ScanType> {
+  if (scans.length === 0) {
+    return { value: null, source: 'infere', confidence: null, sample_count: 0 };
+  }
+
+  const counts = new Map<ScanType, number>();
+  for (const scan of scans) {
+    counts.set(scan.scan_type, (counts.get(scan.scan_type) ?? 0) + 1);
+  }
+
+  let bestType: ScanType | null = null;
+  let bestCount = -1;
+  for (const [type, count] of counts) {
+    if (count > bestCount) {
+      bestType = type;
+      bestCount = count;
+    }
+  }
+
+  return {
+    value: bestType,
+    source: 'infere',
+    confidence: confidenceFromSampleCount(bestCount),
+    sample_count: bestCount > 0 ? bestCount : 0,
+  };
+}
+
+function computeMetricSignals(
+  scans: CoachSourceScan[],
+): {
+  weak_metrics: CoachInferredMetricSignal[];
+  strong_metrics: CoachInferredMetricSignal[];
+} {
+  const weak: CoachInferredMetricSignal[] = [];
+  const strong: CoachInferredMetricSignal[] = [];
+
+  for (const scanType of Object.keys(COACH_METRIC_SPECS) as ScanType[]) {
+    const specs = COACH_METRIC_SPECS[scanType];
+    const typeScans = scans.filter((scan) => scan.scan_type === scanType);
+    if (typeScans.length < 2) continue;
+
+    for (const spec of specs) {
+      const values: number[] = [];
+      for (const scan of typeScans) {
+        const value = readNumericMetricValue(scan.key_metrics, spec.metric);
+        if (value !== null) values.push(value);
+      }
+      if (values.length < 2) continue;
+
+      const average = values.reduce((acc, v) => acc + v, 0) / values.length;
+      const rounded = roundMetricNumber(average);
+      const signal: CoachInferredMetricSignal = {
+        metric: spec.metric,
+        scan_type: scanType,
+        average_value: rounded,
+        sample_count: values.length,
+        interpretation_hint: spec.interpretationHint,
+      };
+
+      if (spec.interpretationHint === 'higher_is_better') {
+        if (average < 40) weak.push(signal);
+        else if (average > 70) strong.push(signal);
+      } else if (spec.interpretationHint === 'lower_is_better') {
+        if (average > 60) weak.push(signal);
+        else if (average < 30) strong.push(signal);
+      }
+    }
+  }
+
+  const sortByGap = (signal: CoachInferredMetricSignal): number => {
+    return signal.interpretation_hint === 'higher_is_better'
+      ? signal.average_value
+      : 100 - signal.average_value;
+  };
+
+  weak.sort((a, b) => sortByGap(a) - sortByGap(b));
+  strong.sort((a, b) => sortByGap(b) - sortByGap(a));
+
+  return {
+    weak_metrics: weak.slice(0, 6),
+    strong_metrics: strong.slice(0, 6),
+  };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+//   Data reliability — quantitative scoring of how much the coach should
+//   weight the inferred persona. The overall percent is a weighted composite
+//   of sample size, recency, consistency, image quality, and coverage.
+// ────────────────────────────────────────────────────────────────────────────
+
+function computeSampleSizePercent(count: number): number {
+  if (count <= 0) return 0;
+  if (count >= 20) return 100;
+  if (count >= 10) return 75 + ((count - 10) / 10) * 25;
+  if (count >= 5) return 50 + ((count - 5) / 5) * 25;
+  if (count >= 3) return 30 + ((count - 3) / 2) * 20;
+  if (count >= 1) return 10 + ((count - 1) / 2) * 20;
+  return 0;
+}
+
+function computeRecencyPercent(daysAgo: number | null): number {
+  if (daysAgo === null || !Number.isFinite(daysAgo)) return 0;
+  if (daysAgo <= 0) return 100;
+  if (daysAgo >= 90) return 10;
+  if (daysAgo >= 30) return 10 + ((90 - daysAgo) / 60) * 30;
+  if (daysAgo >= 7) return 40 + ((30 - daysAgo) / 23) * 40;
+  return 80 + ((7 - daysAgo) / 7) * 20;
+}
+
+function computeConsistencyPercent(scans: CoachSourceScan[]): number {
+  const fields = ['perceived_sex_key', 'perceived_age_range_key', 'body_frame_key'];
+  let totalPercent = 0;
+  let fieldsWithData = 0;
+
+  for (const field of fields) {
+    const distinct = new Set<string>();
+    for (const scan of scans) {
+      const value = readPersonaKeyMetric(scan.key_metrics, field);
+      if (value) distinct.add(value);
+    }
+    if (distinct.size === 0) continue;
+    fieldsWithData += 1;
+    totalPercent += Math.max(20, 100 / distinct.size);
+  }
+
+  if (fieldsWithData === 0) return 50;
+  return Math.round(totalPercent / fieldsWithData);
+}
+
+function computeImageQualityPercent(scans: CoachSourceScan[]): number {
+  const scores: number[] = [];
+  for (const scan of scans) {
+    const meta = scan.normalized && 'analysis_meta' in scan.normalized
+      ? scan.normalized.analysis_meta
+      : null;
+    const score = meta?.image_quality_score;
+    if (typeof score === 'number' && Number.isFinite(score)) {
+      scores.push(Math.max(0, Math.min(100, score)));
+    }
+  }
+  if (scores.length === 0) return 50;
+  return Math.round(scores.reduce((acc, v) => acc + v, 0) / scores.length);
+}
+
+function computeCoveragePercentFromFields(
+  fields: ReadonlyArray<CoachInferredPersonaField<string>>,
+): number {
+  if (fields.length === 0) return 0;
+  const filled = fields.filter((field) => field.value !== null).length;
+  return Math.round((filled / fields.length) * 100);
+}
+
+function computeOverallReliabilityPercent(
+  components: CoachDataReliabilityComponents,
+): number {
+  const weighted =
+    0.30 * components.sample_size_percent +
+    0.25 * components.recency_percent +
+    0.20 * components.consistency_percent +
+    0.15 * components.image_quality_percent +
+    0.10 * components.coverage_percent;
+  return Math.round(Math.max(0, Math.min(100, weighted)));
+}
+
+function detectReliabilityCaveats(
+  scans: CoachSourceScan[],
+  components: CoachDataReliabilityComponents,
+  lastScanDaysAgo: number | null,
+): string[] {
+  const caveats: string[] = [];
+  if (scans.length < 5) caveats.push('low_sample_size');
+  if (lastScanDaysAgo !== null && lastScanDaysAgo > 30) caveats.push('stale_data_30d_plus');
+  if (components.image_quality_percent < 50) caveats.push('image_quality_limited');
+
+  const sexValues = new Set(
+    scans
+      .map((scan) => readPersonaKeyMetric(scan.key_metrics, 'perceived_sex_key'))
+      .filter((v): v is string => !!v),
+  );
+  if (sexValues.size >= 2) caveats.push('inconsistent_sex_inference');
+
+  const scanTypes = new Set(scans.map((scan) => scan.scan_type));
+  if (scanTypes.size === 1) caveats.push('single_scan_type_only');
+
+  if (components.coverage_percent < 40) caveats.push('low_persona_coverage');
+
+  return caveats;
+}
+
+function buildDataReliability(
+  scans: CoachSourceScan[],
+  apparentFields: ReadonlyArray<CoachInferredPersonaField<string>>,
+  lastScanDaysAgo: number | null,
+): CoachDataReliability {
+  const components: CoachDataReliabilityComponents = {
+    sample_size_percent: Math.round(computeSampleSizePercent(scans.length)),
+    recency_percent: Math.round(computeRecencyPercent(lastScanDaysAgo)),
+    consistency_percent: computeConsistencyPercent(scans),
+    image_quality_percent: computeImageQualityPercent(scans),
+    coverage_percent: computeCoveragePercentFromFields(apparentFields),
+  };
+  return {
+    overall_percent: computeOverallReliabilityPercent(components),
+    components,
+    caveats: detectReliabilityCaveats(scans, components, lastScanDaysAgo),
+  };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+//   Temporal patterns — cadence, dormancy, time-of-day, streaks.
+// ────────────────────────────────────────────────────────────────────────────
+
+function bucketHourToTimeOfDay(
+  hour: number,
+): 'morning' | 'afternoon' | 'evening' | 'night' {
+  if (hour < 6) return 'night';
+  if (hour < 12) return 'morning';
+  if (hour < 18) return 'afternoon';
+  if (hour < 22) return 'evening';
+  return 'night';
+}
+
+function classifyScanFrequency(
+  scansLast14d: number,
+): CoachScanFrequencyLabel {
+  if (scansLast14d === 0) return 'unknown';
+  if (scansLast14d >= 7) return 'daily';
+  if (scansLast14d >= 3) return 'regular';
+  return 'sporadic';
+}
+
+function classifyDormancyRisk(
+  lastScanDaysAgo: number | null,
+): CoachDormancyRiskLevel {
+  if (lastScanDaysAgo === null) return 'high';
+  if (lastScanDaysAgo > 14) return 'high';
+  if (lastScanDaysAgo > 7) return 'medium';
+  return 'low';
+}
+
+function classifyWeekdayWeekendBalance(
+  scans: CoachSourceScan[],
+): CoachWeekdayWeekendBalance {
+  if (scans.length < 3) return 'unknown';
+  let weekday = 0;
+  let weekend = 0;
+  for (const scan of scans) {
+    const date = new Date(scan.captured_at);
+    if (!Number.isFinite(date.getTime())) continue;
+    const day = date.getDay();
+    if (day === 0 || day === 6) weekend += 1;
+    else weekday += 1;
+  }
+  const total = weekday + weekend;
+  if (total === 0) return 'unknown';
+  const weekendShare = weekend / total;
+  if (weekendShare >= 0.55) return 'weekend_heavy';
+  if (weekendShare <= 0.20) return 'weekday_heavy';
+  return 'balanced';
+}
+
+function pickPreferredTimeOfDay(
+  scans: CoachSourceScan[],
+): CoachPreferredTimeOfDay {
+  if (scans.length < 3) return 'unknown';
+  const counts = new Map<string, number>();
+  let total = 0;
+  for (const scan of scans) {
+    const date = new Date(scan.captured_at);
+    if (!Number.isFinite(date.getTime())) continue;
+    const bucket = bucketHourToTimeOfDay(date.getHours());
+    counts.set(bucket, (counts.get(bucket) ?? 0) + 1);
+    total += 1;
+  }
+  if (total === 0) return 'unknown';
+  let topBucket: string | null = null;
+  let topCount = 0;
+  for (const [bucket, count] of counts) {
+    if (count > topCount) {
+      topBucket = bucket;
+      topCount = count;
+    }
+  }
+  if (!topBucket) return 'unknown';
+  return topCount / total >= 0.4 ? (topBucket as CoachPreferredTimeOfDay) : 'mixed';
+}
+
+function computeStreaks(scans: CoachSourceScan[]): {
+  current_streak_days: number;
+  longest_streak_days: number;
+} {
+  if (scans.length === 0) return { current_streak_days: 0, longest_streak_days: 0 };
+  const dayKeys = Array.from(
+    new Set(
+      scans
+        .map((scan) => new Date(scan.captured_at))
+        .filter((d) => Number.isFinite(d.getTime()))
+        .map((d) => d.toISOString().slice(0, 10)),
+    ),
+  ).sort();
+
+  if (dayKeys.length === 0) return { current_streak_days: 0, longest_streak_days: 0 };
+
+  let longest = 1;
+  let running = 1;
+  for (let i = 1; i < dayKeys.length; i += 1) {
+    const prev = new Date(`${dayKeys[i - 1]}T00:00:00.000Z`).getTime();
+    const cur = new Date(`${dayKeys[i]}T00:00:00.000Z`).getTime();
+    const diffDays = Math.round((cur - prev) / 86400000);
+    if (diffDays === 1) {
+      running += 1;
+      if (running > longest) longest = running;
+    } else {
+      running = 1;
+    }
+  }
+
+  const lastDayKey = dayKeys[dayKeys.length - 1];
+  const lastDayMs = new Date(`${lastDayKey}T00:00:00.000Z`).getTime();
+  const todayMs = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z').getTime();
+  const lastDiff = Math.round((todayMs - lastDayMs) / 86400000);
+  const currentStreak = lastDiff <= 1 ? running : 0;
+
+  return { current_streak_days: currentStreak, longest_streak_days: longest };
+}
+
+function computeLastScanDaysAgo(scans: CoachSourceScan[]): number | null {
+  if (scans.length === 0) return null;
+  const now = Date.now();
+  let mostRecent = -Infinity;
+  for (const scan of scans) {
+    const ts = Date.parse(scan.captured_at);
+    if (Number.isFinite(ts) && ts > mostRecent) mostRecent = ts;
+  }
+  if (!Number.isFinite(mostRecent)) return null;
+  return Math.max(0, Math.floor((now - mostRecent) / 86400000));
+}
+
+function buildTemporalPatterns(
+  scans: CoachSourceScan[],
+  scanCount7d: number,
+  lastScanDaysAgo: number | null,
+): CoachTemporalPatterns {
+  const scansLast30d = getScansWithinLastDays(scans, 30).length;
+  const scansLast14d = getScansWithinLastDays(scans, 14).length;
+  const { current_streak_days, longest_streak_days } = computeStreaks(scans);
+
+  return {
+    last_scan_days_ago: lastScanDaysAgo,
+    scans_last_7d: scanCount7d,
+    scans_last_30d: scansLast30d,
+    scan_frequency_label: classifyScanFrequency(scansLast14d),
+    preferred_time_of_day_key: pickPreferredTimeOfDay(scans),
+    weekday_weekend_balance: classifyWeekdayWeekendBalance(scans),
+    longest_streak_days,
+    current_streak_days,
+    dormancy_risk_level: classifyDormancyRisk(lastScanDaysAgo),
+  };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+//   Goal inference + motivation indicators.
+// ────────────────────────────────────────────────────────────────────────────
+
+function scanTypeDistribution(
+  scans: CoachSourceScan[],
+): Map<ScanType, number> {
+  const counts = new Map<ScanType, number>();
+  for (const scan of scans) {
+    counts.set(scan.scan_type, (counts.get(scan.scan_type) ?? 0) + 1);
+  }
+  return counts;
+}
+
+function dominantScanShare(
+  scans: CoachSourceScan[],
+  scanType: ScanType,
+): number {
+  if (scans.length === 0) return 0;
+  const distribution = scanTypeDistribution(scans);
+  return (distribution.get(scanType) ?? 0) / scans.length;
+}
+
+function averageMetricForType(
+  scans: CoachSourceScan[],
+  scanType: ScanType,
+  metric: string,
+): number | null {
+  const values: number[] = [];
+  for (const scan of scans) {
+    if (scan.scan_type !== scanType) continue;
+    const v = readNumericMetricValue(scan.key_metrics, metric);
+    if (v !== null) values.push(v);
+  }
+  if (values.length === 0) return null;
+  return values.reduce((acc, v) => acc + v, 0) / values.length;
+}
+
+function inferPrimaryGoal(
+  scans: CoachSourceScan[],
+  trajectories: CoachTrajectoryMap,
+  engagement: CoachEngagementLevel,
+): CoachGoalInference {
+  if (scans.length < 2) {
+    return {
+      primary_goal_key: 'unclear',
+      confidence: null,
+      motivation_indicators: [],
+    };
+  }
+
+  const bodyShare = dominantScanShare(scans, 'body');
+  const faceShare = dominantScanShare(scans, 'health');
+  const nutritionShare = dominantScanShare(scans, 'nutrition');
+  const superShare = dominantScanShare(scans, 'super');
+
+  const motivationIndicators: string[] = [];
+  if (faceShare >= 0.4) motivationIndicators.push('aesthetic_focus');
+  if (bodyShare >= 0.4) motivationIndicators.push('body_composition_focus');
+  if (nutritionShare >= 0.4) motivationIndicators.push('nutrition_tracking_focus');
+  if (Math.max(bodyShare, faceShare, nutritionShare) < 0.5 && scans.length >= 4) {
+    motivationIndicators.push('holistic_wellness');
+  }
+  const stressAvg = averageMetricForType(scans, 'health', 'perceived_stress_level');
+  const sleepAvg = averageMetricForType(scans, 'health', 'perceived_sleep_quality');
+  if ((stressAvg !== null && stressAvg > 60) || (sleepAvg !== null && sleepAvg < 40)) {
+    motivationIndicators.push('recovery_focus');
+  }
+  if (engagement === 'high') motivationIndicators.push('consistency');
+
+  let primaryGoal: CoachPrimaryGoalKey = 'unclear';
+  if (bodyShare >= 0.4 && trajectories.body_fat_percentage.direction === 'improving') {
+    primaryGoal = 'weight_loss';
+  } else if (
+    bodyShare >= 0.4 &&
+    trajectories.muscle_definition_score.direction === 'improving'
+  ) {
+    primaryGoal = 'muscle_gain';
+  } else if (faceShare >= 0.5) {
+    primaryGoal = 'skin_health';
+  } else if (
+    (stressAvg !== null && stressAvg > 60) ||
+    (sleepAvg !== null && sleepAvg < 40)
+  ) {
+    primaryGoal = 'sleep_recovery';
+  } else if (
+    superShare > 0 ||
+    (bodyShare > 0.25 && nutritionShare > 0.25 && faceShare > 0.25)
+  ) {
+    primaryGoal = 'general_wellness';
+  } else if (
+    bodyShare >= 0.4 &&
+    trajectories.muscle_definition_score.direction === 'improving' &&
+    trajectories.body_score.direction === 'improving'
+  ) {
+    primaryGoal = 'sport_performance';
+  }
+
+  if (primaryGoal !== 'unclear' && motivationIndicators.length === 0) {
+    motivationIndicators.push('goal_oriented');
+  }
+
+  return {
+    primary_goal_key: primaryGoal,
+    confidence: confidenceFromSampleCount(scans.length),
+    motivation_indicators: Array.from(new Set(motivationIndicators)),
+  };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+//   Lifestyle signature — archetype + aggregate stress/sleep/hydration/recovery.
+// ────────────────────────────────────────────────────────────────────────────
+
+function averageFromMetrics(
+  scans: CoachSourceScan[],
+  picks: ReadonlyArray<{ scan_type: ScanType; metric: string; scale?: number }>,
+): number | null {
+  const values: number[] = [];
+  for (const { scan_type, metric, scale } of picks) {
+    for (const scan of scans) {
+      if (scan.scan_type !== scan_type) continue;
+      const v = readNumericMetricValue(scan.key_metrics, metric);
+      if (v !== null) values.push(scale ? v * scale : v);
+    }
+  }
+  if (values.length === 0) return null;
+  return Math.round(values.reduce((acc, v) => acc + v, 0) / values.length);
+}
+
+function classifyArchetype(
+  scans: CoachSourceScan[],
+  trajectories: CoachTrajectoryMap,
+  riskSignals: CoachRiskSignals,
+  recoveryAggregate: number | null,
+  stressAggregate: number | null,
+  engagement: CoachEngagementLevel,
+): CoachLifestyleArchetypeKey {
+  if (scans.length < 3) return 'unclear';
+
+  const fitnessLevels = scans
+    .map((scan) => readPersonaKeyMetric(scan.key_metrics, 'perceived_fitness_level_key'))
+    .filter((v): v is string => !!v);
+  const isFit = fitnessLevels.some(
+    (lvl) => lvl === 'very_active' || lvl === 'athletic',
+  );
+
+  const faceShare = dominantScanShare(scans, 'health');
+  const bodyShare = dominantScanShare(scans, 'body');
+  const balancedMix = Math.max(faceShare, bodyShare) < 0.6 && scans.length >= 5;
+
+  const elevatedRisk =
+    riskSignals.cardiovascular_risk_level_key === 'elevated' ||
+    riskSignals.metabolic_risk_level_key === 'elevated' ||
+    riskSignals.inflammation_risk_level_key === 'elevated';
+  const chronicStress = stressAggregate !== null && stressAggregate > 60;
+  const lowRecovery = recoveryAggregate !== null && recoveryAggregate < 40;
+
+  if (elevatedRisk || chronicStress || lowRecovery) return 'health_recovery';
+  if (isFit && bodyShare >= 0.3 && trajectories.body_score.direction !== 'declining') {
+    return 'active_athlete';
+  }
+  if (balancedMix && engagement === 'high') return 'wellness_seeker';
+  if (faceShare >= 0.5) return 'aesthetic_focused';
+  if (engagement === 'low' || scans.length < 5) return 'casual_explorer';
+  return 'unclear';
+}
+
+function buildLifestyleSignature(
+  scans: CoachSourceScan[],
+  trajectories: CoachTrajectoryMap,
+  riskSignals: CoachRiskSignals,
+  engagement: CoachEngagementLevel,
+): CoachLifestyleSignature {
+  const stress = averageFromMetrics(scans, [
+    { scan_type: 'health', metric: 'perceived_stress_level' },
+  ]);
+  const sleep = averageFromMetrics(scans, [
+    { scan_type: 'health', metric: 'perceived_sleep_quality' },
+  ]);
+  const hydration = averageFromMetrics(scans, [
+    { scan_type: 'health', metric: 'hydration_level' },
+    { scan_type: 'nutrition', metric: 'hydration_contribution_score', scale: 10 },
+  ]);
+
+  const recoveryValues: number[] = [];
+  for (const scan of scans) {
+    if (scan.scan_type !== 'body') continue;
+    const readiness = readNumericMetricValue(scan.key_metrics, 'recovery_readiness_score');
+    if (readiness !== null) recoveryValues.push(readiness);
+    const tension = readNumericMetricValue(scan.key_metrics, 'body_tension_indicator_score');
+    if (tension !== null) recoveryValues.push(100 - tension);
+  }
+  const recovery =
+    recoveryValues.length === 0
+      ? null
+      : Math.round(recoveryValues.reduce((acc, v) => acc + v, 0) / recoveryValues.length);
+
+  return {
+    archetype_key: classifyArchetype(
+      scans,
+      trajectories,
+      riskSignals,
+      recovery,
+      stress,
+      engagement,
+    ),
+    stress_indicator_aggregate: stress,
+    sleep_indicator_aggregate: sleep,
+    hydration_indicator_aggregate: hydration,
+    recovery_indicator_aggregate: recovery,
+  };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+//   Nutrition profile — preferences and intake averages.
+// ────────────────────────────────────────────────────────────────────────────
+
+function topKeysByFrequency(
+  scans: CoachSourceScan[],
+  field: string,
+  limit: number,
+): string[] {
+  const nutritionScans = scans.filter((s) => s.scan_type === 'nutrition');
+  if (nutritionScans.length === 0) return [];
+  const counts = new Map<string, number>();
+  for (const scan of nutritionScans) {
+    const key = readPersonaKeyMetric(scan.key_metrics, field);
+    if (!key) continue;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return Array.from(counts.entries())
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, limit)
+    .map(([key]) => key);
+}
+
+function buildMealTimingDistribution(
+  scans: CoachSourceScan[],
+): Record<string, number> {
+  const distribution: Record<string, number> = {};
+  for (const scan of scans) {
+    if (scan.scan_type !== 'nutrition') continue;
+    const key = readPersonaKeyMetric(scan.key_metrics, 'meal_type_key');
+    if (!key) continue;
+    distribution[key] = (distribution[key] ?? 0) + 1;
+  }
+  return distribution;
+}
+
+function buildNutritionProfile(
+  scans: CoachSourceScan[],
+): CoachNutritionProfile {
+  const nutritionScans = scans.filter((s) => s.scan_type === 'nutrition');
+  const cuisinePrefs = topKeysByFrequency(scans, 'cuisine_type_key', 3);
+  const cookingPrefs = topKeysByFrequency(scans, 'cooking_method_key', 2);
+  const meatPrefs = topKeysByFrequency(scans, 'meat_type_key', 1);
+
+  const colorAvg = averageMetricForType(scans, 'nutrition', 'color_diversity_score');
+  const diversityScore =
+    colorAvg !== null
+      ? Math.min(100, Math.round(colorAvg * 10 + (cuisinePrefs.length >= 3 ? 20 : 0)))
+      : null;
+
+  const processingAvg = averageMetricForType(scans, 'nutrition', 'processing_level_score');
+  const sugarAvg = averageMetricForType(scans, 'nutrition', 'sugar_grams_estimate');
+  const fiberAvg = averageMetricForType(scans, 'nutrition', 'fiber_grams_estimate');
+  const proteinAvg = averageMetricForType(scans, 'nutrition', 'protein_grams');
+
+  const roundOptional = (value: number | null): number | null =>
+    value === null ? null : Math.round(value);
+
+  return {
+    dietary_diversity_score: diversityScore,
+    cuisine_preference_keys: cuisinePrefs,
+    cooking_method_preference_keys: cookingPrefs,
+    dominant_meat_type_key: meatPrefs[0] ?? null,
+    meal_timing_distribution:
+      nutritionScans.length === 0 ? {} : buildMealTimingDistribution(scans),
+    processing_level_average: roundOptional(processingAvg),
+    sugar_intake_average_grams: roundOptional(sugarAvg),
+    fiber_intake_average_grams: roundOptional(fiberAvg),
+    protein_intake_average_grams: roundOptional(proteinAvg),
+  };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+//   Trajectories — improving/stable/declining for 7 key metrics.
+// ────────────────────────────────────────────────────────────────────────────
+
+const TRAJECTORY_METRIC_DEFS: ReadonlyArray<{
+  field: keyof CoachTrajectoryMap;
+  metric: string;
+  scan_type: ScanType;
+  interpretationHint: CoachMetricInterpretationHint;
+  significantDelta: number;
+}> = [
+  { field: 'body_score', metric: 'body_score', scan_type: 'body', interpretationHint: 'higher_is_better', significantDelta: 5 },
+  { field: 'face_score', metric: 'face_score', scan_type: 'health', interpretationHint: 'higher_is_better', significantDelta: 5 },
+  { field: 'plate_health_score', metric: 'plate_health_score', scan_type: 'nutrition', interpretationHint: 'higher_is_better', significantDelta: 5 },
+  { field: 'body_fat_percentage', metric: 'body_fat_percentage', scan_type: 'body', interpretationHint: 'lower_is_better', significantDelta: 2 },
+  { field: 'hydration_level', metric: 'hydration_level', scan_type: 'health', interpretationHint: 'higher_is_better', significantDelta: 8 },
+  { field: 'fatigue_level', metric: 'fatigue_level', scan_type: 'health', interpretationHint: 'lower_is_better', significantDelta: 8 },
+  { field: 'muscle_definition_score', metric: 'muscle_definition_score', scan_type: 'body', interpretationHint: 'higher_is_better', significantDelta: 5 },
+];
+
+function classifyMetricTrajectory(
+  delta: number | null,
+  hint: CoachMetricInterpretationHint,
+  significantDelta: number,
+): CoachTrajectoryDirection {
+  if (delta === null || !Number.isFinite(delta)) return 'unknown';
+  const tolerance = significantDelta / 2;
+  if (Math.abs(delta) < tolerance) return 'stable';
+
+  if (hint === 'higher_is_better') {
+    return delta >= significantDelta ? 'improving' : 'declining';
+  }
+  if (hint === 'lower_is_better') {
+    return delta <= -significantDelta ? 'improving' : 'declining';
+  }
+  return 'stable';
+}
+
+function buildTrajectoryEntry(
+  scans: CoachSourceScan[],
+  def: typeof TRAJECTORY_METRIC_DEFS[number],
+): CoachTrajectoryEntry {
+  const typeScans = scans.filter((s) => s.scan_type === def.scan_type);
+  const sortedAsc = [...typeScans].sort(
+    (a, b) => Date.parse(a.captured_at) - Date.parse(b.captured_at),
+  );
+  const values: number[] = [];
+  for (const scan of sortedAsc) {
+    const v = readNumericMetricValue(scan.key_metrics, def.metric);
+    if (v !== null) values.push(v);
+  }
+  if (values.length < 3) {
+    return {
+      metric: def.metric,
+      scan_type: def.scan_type,
+      direction: 'unknown',
+      delta: null,
+      sample_count: values.length,
+    };
+  }
+  const delta = roundMetricNumber(values[values.length - 1] - values[0]);
+  return {
+    metric: def.metric,
+    scan_type: def.scan_type,
+    direction: classifyMetricTrajectory(delta, def.interpretationHint, def.significantDelta),
+    delta,
+    sample_count: values.length,
+  };
+}
+
+function buildTrajectoryMap(scans: CoachSourceScan[]): CoachTrajectoryMap {
+  const result = {} as Record<keyof CoachTrajectoryMap, CoachTrajectoryEntry>;
+  for (const def of TRAJECTORY_METRIC_DEFS) {
+    result[def.field] = buildTrajectoryEntry(scans, def);
+  }
+  return result as CoachTrajectoryMap;
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+//   Risk signals — cardiovascular / metabolic / inflammation.
+// ────────────────────────────────────────────────────────────────────────────
+
+function levelFromDriverCount(count: number, hasData: boolean): CoachRiskLevel {
+  if (!hasData) return 'unknown';
+  if (count === 0) return 'low';
+  if (count <= 2) return 'moderate';
+  return 'elevated';
+}
+
+function recurringMetricBreach(
+  scans: CoachSourceScan[],
+  scanType: ScanType,
+  metric: string,
+  threshold: number,
+  comparator: 'gt' | 'lt',
+  minOccurrences = 2,
+  minRatio = 0.4,
+): boolean {
+  const typeScans = scans.filter((s) => s.scan_type === scanType);
+  if (typeScans.length === 0) return false;
+  let breaches = 0;
+  let observed = 0;
+  for (const scan of typeScans) {
+    const v = readNumericMetricValue(scan.key_metrics, metric);
+    if (v === null) continue;
+    observed += 1;
+    if (comparator === 'gt' ? v > threshold : v < threshold) breaches += 1;
+  }
+  if (observed === 0) return false;
+  return breaches >= minOccurrences && breaches / observed >= minRatio;
+}
+
+function buildRiskSignals(
+  scans: CoachSourceScan[],
+  trajectories: CoachTrajectoryMap,
+): CoachRiskSignals {
+  const hasNutrition = scans.some((s) => s.scan_type === 'nutrition');
+  const hasBody = scans.some((s) => s.scan_type === 'body');
+  const hasFace = scans.some((s) => s.scan_type === 'health');
+
+  const cardiovascular: string[] = [];
+  if (recurringMetricBreach(scans, 'nutrition', 'sugar_grams_estimate', 35, 'gt'))
+    cardiovascular.push('recurring_high_sugar');
+  if (recurringMetricBreach(scans, 'nutrition', 'processing_level_score', 65, 'gt'))
+    cardiovascular.push('recurring_high_processing');
+  if (recurringMetricBreach(scans, 'nutrition', 'sodium_level_score', 7, 'gt'))
+    cardiovascular.push('recurring_high_sodium');
+  const fitnessSedentary = scans.some((s) => {
+    const lvl = readPersonaKeyMetric(s.key_metrics, 'perceived_fitness_level_key');
+    return lvl === 'sedentary';
+  });
+  if (fitnessSedentary) cardiovascular.push('sedentary_inference');
+
+  const metabolic: string[] = [];
+  if (trajectories.body_fat_percentage.direction === 'declining')
+    metabolic.push('high_body_fat_trajectory');
+  if (recurringMetricBreach(scans, 'nutrition', 'protein_grams', 20, 'lt'))
+    metabolic.push('low_protein_pattern');
+  if (recurringMetricBreach(scans, 'nutrition', 'fiber_grams_estimate', 8, 'lt'))
+    metabolic.push('low_fiber_pattern');
+
+  const inflammation: string[] = [];
+  if (recurringMetricBreach(scans, 'nutrition', 'inflammation_index_score', 60, 'gt'))
+    inflammation.push('recurring_high_inflammation_index');
+  if (recurringMetricBreach(scans, 'health', 'complexion_redness_score', 60, 'gt'))
+    inflammation.push('recurring_high_complexion_redness');
+
+  return {
+    cardiovascular_risk_level_key: levelFromDriverCount(cardiovascular.length, hasNutrition || hasBody),
+    cardiovascular_risk_drivers: cardiovascular,
+    metabolic_risk_level_key: levelFromDriverCount(metabolic.length, hasBody || hasNutrition),
+    metabolic_risk_drivers: metabolic,
+    inflammation_risk_level_key: levelFromDriverCount(inflammation.length, hasNutrition || hasFace),
+    inflammation_risk_drivers: inflammation,
+  };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+//   Anomalies — outlier tags.
+// ────────────────────────────────────────────────────────────────────────────
+
+function detectAnomalies(scans: CoachSourceScan[]): string[] {
+  const anomalies: string[] = [];
+
+  const faceScans = scans
+    .filter((s) => s.scan_type === 'health')
+    .sort((a, b) => Date.parse(b.captured_at) - Date.parse(a.captured_at));
+  if (faceScans.length >= 3) {
+    const latestFatigue = readNumericMetricValue(faceScans[0].key_metrics, 'fatigue_level');
+    const prevFatigueValues: number[] = [];
+    for (const scan of faceScans.slice(1)) {
+      const v = readNumericMetricValue(scan.key_metrics, 'fatigue_level');
+      if (v !== null) prevFatigueValues.push(v);
+    }
+    if (
+      latestFatigue !== null &&
+      latestFatigue > 80 &&
+      prevFatigueValues.length >= 2 &&
+      prevFatigueValues.reduce((a, b) => a + b, 0) / prevFatigueValues.length < 50
+    ) {
+      anomalies.push('severe_fatigue_spike_recent');
+    }
+  }
+
+  for (const scan of scans) {
+    if (scan.scan_type !== 'health') continue;
+    const stress = readNumericMetricValue(scan.key_metrics, 'perceived_stress_level');
+    if (stress !== null && stress > 80) {
+      anomalies.push('extreme_stress_observation');
+      break;
+    }
+  }
+
+  const nutritionScans = scans
+    .filter((s) => s.scan_type === 'nutrition')
+    .sort((a, b) => Date.parse(b.captured_at) - Date.parse(a.captured_at));
+  if (nutritionScans.length >= 4) {
+    const latestCal = readNumericMetricValue(nutritionScans[0].key_metrics, 'calories_estimate');
+    const prevCal: number[] = [];
+    for (const scan of nutritionScans.slice(1)) {
+      const v = readNumericMetricValue(scan.key_metrics, 'calories_estimate');
+      if (v !== null) prevCal.push(v);
+    }
+    if (latestCal !== null && prevCal.length >= 3) {
+      const avg = prevCal.reduce((a, b) => a + b, 0) / prevCal.length;
+      if (avg > 0 && latestCal < avg * 0.6) anomalies.push('sudden_calorie_drop');
+    }
+  }
+
+  const weightBands = new Set(
+    scans
+      .filter((s) => s.scan_type === 'body')
+      .map((s) => readPersonaKeyMetric(s.key_metrics, 'estimated_weight_range_key'))
+      .filter((v): v is string => !!v),
+  );
+  if (weightBands.size >= 2) anomalies.push('weight_band_shift_detected');
+
+  if (nutritionScans.length >= 3) {
+    const allergenCounts = new Map<string, number>();
+    for (const scan of nutritionScans) {
+      const allergens = readPersonaArrayMetric(scan.key_metrics, 'allergen_visibility_keys');
+      for (const a of allergens) {
+        allergenCounts.set(a, (allergenCounts.get(a) ?? 0) + 1);
+      }
+    }
+    for (const [, count] of allergenCounts) {
+      if (count / nutritionScans.length > 0.7) {
+        anomalies.push('allergen_concentration_unusual');
+        break;
+      }
+    }
+  }
+
+  const sexValues = new Set(
+    scans
+      .map((s) => readPersonaKeyMetric(s.key_metrics, 'perceived_sex_key'))
+      .filter((v): v is string => !!v),
+  );
+  if (sexValues.size >= 2) anomalies.push('inconsistent_sex_inference');
+
+  const sortedByTime = [...scans].sort(
+    (a, b) => Date.parse(a.captured_at) - Date.parse(b.captured_at),
+  );
+  for (let i = 1; i < sortedByTime.length; i += 1) {
+    const prev = Date.parse(sortedByTime[i - 1].captured_at);
+    const cur = Date.parse(sortedByTime[i].captured_at);
+    if (!Number.isFinite(prev) || !Number.isFinite(cur)) continue;
+    if ((cur - prev) / 86400000 > 21) {
+      anomalies.push('dormancy_period_detected');
+      break;
+    }
+  }
+
+  return anomalies.slice(0, 8);
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+//   Coach recommendations — emphasis / avoid / tone / next scan focus.
+// ────────────────────────────────────────────────────────────────────────────
+
+function pickRecommendedEmphasis(
+  trajectories: CoachTrajectoryMap,
+  riskSignals: CoachRiskSignals,
+  lifestyle: CoachLifestyleSignature,
+): string[] {
+  const emphasis: string[] = [];
+
+  if (lifestyle.hydration_indicator_aggregate !== null && lifestyle.hydration_indicator_aggregate < 50) {
+    emphasis.push('hydration');
+  }
+  if (lifestyle.sleep_indicator_aggregate !== null && lifestyle.sleep_indicator_aggregate < 50) {
+    emphasis.push('sleep');
+  }
+  if (riskSignals.metabolic_risk_drivers.includes('low_fiber_pattern')) {
+    emphasis.push('nutrition_variety');
+  }
+  if (lifestyle.stress_indicator_aggregate !== null && lifestyle.stress_indicator_aggregate > 60) {
+    emphasis.push('stress_recovery');
+  }
+  if (trajectories.body_score.direction === 'declining' && !emphasis.includes('nutrition_variety')) {
+    emphasis.push('body_composition_focus');
+  }
+  if (trajectories.face_score.direction === 'declining' && !emphasis.includes('sleep')) {
+    emphasis.push('skin_recovery');
+  }
+
+  return Array.from(new Set(emphasis)).slice(0, 3);
+}
+
+function pickTopicsToAvoid(
+  engagement: CoachEngagementLevel,
+  dietarySignals: string[],
+  anomalies: string[],
+): string[] {
+  const topics: string[] = [];
+  const restrictiveDiet = dietarySignals.some((s) =>
+    ['vegan_compatible', 'keto_compatible'].includes(s),
+  );
+  if (engagement === 'low' && restrictiveDiet) topics.push('weight_loss_pressure');
+  if (anomalies.includes('weight_band_shift_detected')) {
+    if (!topics.includes('weight_loss_pressure')) topics.push('weight_loss_pressure');
+  }
+  if (anomalies.includes('severe_fatigue_spike_recent') && !topics.includes('intensity_increase')) {
+    topics.push('intensity_increase');
+  }
+  return topics.slice(0, 2);
+}
+
+function pickRecommendedTone(
+  trajectories: CoachTrajectoryMap,
+  riskSignals: CoachRiskSignals,
+  lifestyle: CoachLifestyleSignature,
+  engagement: CoachEngagementLevel,
+): CoachRecommendationTone {
+  const trajectoryEntries = Object.values(trajectories);
+  const improving = trajectoryEntries.filter((t) => t.direction === 'improving').length;
+  const declining = trajectoryEntries.filter((t) => t.direction === 'declining').length;
+
+  if (
+    riskSignals.cardiovascular_risk_level_key === 'elevated' ||
+    riskSignals.metabolic_risk_level_key === 'elevated'
+  ) {
+    return 'cautious';
+  }
+
+  if (improving >= 2 && declining === 0) return 'celebratory';
+
+  if (
+    declining >= 2 ||
+    (lifestyle.stress_indicator_aggregate !== null && lifestyle.stress_indicator_aggregate > 60)
+  ) {
+    return 'supportive_gentle';
+  }
+
+  if (engagement === 'high' && declining === 0) return 'direct_motivating';
+
+  return 'neutral_informative';
+}
+
+function pickNextScanFocus(
+  scans: CoachSourceScan[],
+  trajectories: CoachTrajectoryMap,
+): ScanType | null {
+  if (scans.length === 0) return null;
+  const recent = getScansWithinLastDays(scans, 7);
+  const recentTypes = new Set(recent.map((s) => s.scan_type));
+  const allTypes: ScanType[] = ['health', 'body', 'nutrition'];
+  const missing = allTypes.filter((t) => !recentTypes.has(t));
+  if (missing.length > 0) return missing[0];
+  for (const t of allTypes) {
+    const entry = (Object.values(trajectories) as CoachTrajectoryEntry[]).find(
+      (e) => e.scan_type === t && e.direction === 'unknown',
+    );
+    if (entry) return t;
+  }
+  return null;
+}
+
+function buildCoachRecommendations(
+  scans: CoachSourceScan[],
+  trajectories: CoachTrajectoryMap,
+  riskSignals: CoachRiskSignals,
+  lifestyle: CoachLifestyleSignature,
+  engagement: CoachEngagementLevel,
+  dietarySignals: string[],
+  anomalies: string[],
+): CoachRecommendations {
+  return {
+    recommended_emphasis: pickRecommendedEmphasis(trajectories, riskSignals, lifestyle),
+    topics_to_avoid: pickTopicsToAvoid(engagement, dietarySignals, anomalies),
+    suggested_tone_key: pickRecommendedTone(trajectories, riskSignals, lifestyle, engagement),
+    next_scan_focus_suggestion_key: pickNextScanFocus(scans, trajectories),
+  };
+}
+
+// Hard cutoff: scans older than this many days are excluded from persona
+// aggregations. They still contribute to temporal_patterns (streaks,
+// dormancy detection) and scan_count_total, but not to apparent attributes,
+// trajectories, risk signals, anomalies, or coach recommendations. Avoids
+// letting a 4-month-old scan distort current persona inference.
+const RECENT_SCANS_CUTOFF_DAYS = 90;
+
+function filterScansWithinCutoff(
+  scans: CoachSourceScan[],
+  cutoffDays: number,
+): CoachSourceScan[] {
+  const cutoffMs = Date.now() - cutoffDays * 86400000;
+  return scans.filter((scan) => {
+    const ts = Date.parse(scan.captured_at);
+    // Keep scans with invalid timestamps so they aren't silently dropped.
+    return !Number.isFinite(ts) || ts >= cutoffMs;
+  });
+}
+
+export function inferProfileFromScans(
+  allScans: CoachSourceScan[],
+  scanCount7d: number,
+): CoachInferredPersona | null {
+  if (allScans.length === 0) return null;
+
+  const scans = filterScansWithinCutoff(allScans, RECENT_SCANS_CUTOFF_DAYS);
+  const droppedAgedCount = allScans.length - scans.length;
+  if (scans.length === 0) return null;
+
+  const faceSexValues = scans
+    .filter((scan) => scan.scan_type === 'health')
+    .map((scan) => readPersonaKeyMetric(scan.key_metrics, 'perceived_sex_key'));
+  const bodySexValues = scans
+    .filter((scan) => scan.scan_type === 'body')
+    .map((scan) => readPersonaKeyMetric(scan.key_metrics, 'perceived_sex_key'));
+  const allSexValues = [...faceSexValues, ...bodySexValues];
+
+  const faceAgeValues = scans
+    .filter((scan) => scan.scan_type === 'health')
+    .map(pickFaceAgeRangeKey);
+  const bodyAgeValues = scans.map(pickBodyAgeRangeKey);
+  const allAgeValues = [...faceAgeValues, ...bodyAgeValues];
+
+  const bodyScans = scans.filter((scan) => scan.scan_type === 'body');
+  const heightValues = bodyScans.map((scan) =>
+    readPersonaKeyMetric(scan.key_metrics, 'estimated_height_range_key'),
+  );
+  const weightValues = bodyScans.map((scan) =>
+    readPersonaKeyMetric(scan.key_metrics, 'estimated_weight_range_key'),
+  );
+  const frameValues = bodyScans.map((scan) =>
+    readPersonaKeyMetric(scan.key_metrics, 'body_frame_key'),
+  );
+  const fitnessValues = bodyScans.map((scan) =>
+    readPersonaKeyMetric(scan.key_metrics, 'perceived_fitness_level_key'),
+  );
+
+  const { weak_metrics, strong_metrics } = computeMetricSignals(scans);
+
+  const apparentSex = buildPersonaField(allSexValues);
+  const apparentAgeRange = buildPersonaField(allAgeValues);
+  const apparentHeightRange = buildPersonaField(heightValues);
+  const apparentWeightRange = buildPersonaField(weightValues);
+  const apparentBodyFrame = buildPersonaField(frameValues);
+  const apparentFitnessLevel = buildPersonaField(fitnessValues);
+
+  const dietarySignals = aggregateDietarySignals(scans);
+  const engagement = deriveEngagementLevel(scanCount7d);
+  const lastScanDaysAgo = computeLastScanDaysAgo(allScans);
+
+  const trajectories = buildTrajectoryMap(scans);
+  const riskSignals = buildRiskSignals(scans, trajectories);
+  const lifestyleSignature = buildLifestyleSignature(
+    scans,
+    trajectories,
+    riskSignals,
+    engagement,
+  );
+  const anomalies = detectAnomalies(scans);
+
+  const apparentFields = [
+    apparentSex,
+    apparentAgeRange,
+    apparentHeightRange,
+    apparentWeightRange,
+    apparentBodyFrame,
+    apparentFitnessLevel,
+  ];
+
+  const dataReliability = buildDataReliability(
+    scans,
+    apparentFields,
+    lastScanDaysAgo,
+  );
+  if (droppedAgedCount > 0) {
+    dataReliability.caveats = Array.from(
+      new Set([...dataReliability.caveats, 'aged_scans_excluded']),
+    );
+  }
+
+  return {
+    apparent_sex: apparentSex,
+    apparent_age_range: apparentAgeRange,
+    apparent_height_range: apparentHeightRange,
+    apparent_weight_range: apparentWeightRange,
+    apparent_body_frame: apparentBodyFrame,
+    apparent_fitness_level: apparentFitnessLevel,
+    dominant_scan_focus: deriveDominantScanFocus(scans),
+    dietary_signals: dietarySignals,
+    recurring_allergen_signals: aggregateRecurringAllergenSignals(scans),
+    engagement_level: engagement,
+    weak_metrics,
+    strong_metrics,
+    scan_count_total: allScans.length,
+    inferred_confidence: deriveOverallConfidence(scans.length),
+    data_reliability: dataReliability,
+    temporal_patterns: buildTemporalPatterns(allScans, scanCount7d, lastScanDaysAgo),
+    goal_inference: inferPrimaryGoal(scans, trajectories, engagement),
+    lifestyle_signature: lifestyleSignature,
+    nutrition_profile: buildNutritionProfile(scans),
+    trajectories,
+    risk_signals: riskSignals,
+    anomalies,
+    coach_recommendations: buildCoachRecommendations(
+      scans,
+      trajectories,
+      riskSignals,
+      lifestyleSignature,
+      engagement,
+      dietarySignals,
+      anomalies,
+    ),
+  };
+}
+
 export function buildCoachPayload(
   promptType: CoachPromptType,
   scans: CoachSourceScan[],
@@ -2203,6 +4122,7 @@ export function buildCoachPayload(
       selectedScanPrevious,
     ),
     trend_summary: buildTrendSummary(selectedScan, scans),
+    inferred_persona: inferProfileFromScans(scans, scansWithinWeek.length),
     ...(byType ? { by_type: byType } : {}),
   };
 }

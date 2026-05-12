@@ -58,8 +58,8 @@ describe('SignUpCredentialsSchema', () => {
     expect(
       SignUpCredentialsSchema.safeParse({
         email: 'new@example.com',
-        password: 'longenough',
-        confirmPassword: 'longenough',
+        password: 'longenough1',
+        confirmPassword: 'longenough1',
       }).success,
     ).toBe(true);
   });
@@ -68,16 +68,46 @@ describe('SignUpCredentialsSchema', () => {
     expect(
       SignUpCredentialsSchema.safeParse({
         email: 'new@example.com',
-        password: 'short',
-        confirmPassword: 'short',
+        password: 'short1',
+        confirmPassword: 'short1',
       }).success,
     ).toBe(false);
+  });
+
+  it('rejette un password sans chiffre', () => {
+    const result = SignUpCredentialsSchema.safeParse({
+      email: 'new@example.com',
+      password: 'longenough',
+      confirmPassword: 'longenough',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues.find(
+        (i) => i.message === 'password_policy',
+      );
+      expect(issue).toBeDefined();
+    }
+  });
+
+  it('rejette un password sans minuscule', () => {
+    const result = SignUpCredentialsSchema.safeParse({
+      email: 'new@example.com',
+      password: 'STRONGER1',
+      confirmPassword: 'STRONGER1',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues.find(
+        (i) => i.message === 'password_policy',
+      );
+      expect(issue).toBeDefined();
+    }
   });
 
   it('rejette une confirmation différente', () => {
     const result = SignUpCredentialsSchema.safeParse({
       email: 'new@example.com',
-      password: 'longenough',
+      password: 'longenough1',
       confirmPassword: 'mismatch1',
     });
     expect(result.success).toBe(false);
@@ -101,4 +131,3 @@ describe('SignUpCredentialsSchema', () => {
     }
   });
 });
-

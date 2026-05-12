@@ -287,6 +287,24 @@ describe('ScanResultScreen', () => {
     expect(getAllByText(/:locked:/).length).toBeGreaterThan(0);
   });
 
+  it('renders a discreet analysis quality badge when scan confidence is limited', () => {
+    mockParams.mockReturnValue({
+      analysisData: JSON.stringify({
+        ...makeFaceResult(),
+        analysis_meta: {
+          confidence_score: 78,
+          image_quality_score: 42,
+          metric_coverage_score: 88,
+          limitation_flags: ['blur'],
+        },
+      }),
+    });
+
+    const { getByText } = render(<ScanResultScreen />);
+
+    expect(getByText('Image quality limited')).toBeTruthy();
+  });
+
   it('keeps result chrome sourced from common.results instead of legacy scan_result', () => {
     const translations = i18n.translations as Record<string, any>;
     const previousCommonTitle = translations.en.common.results.title;
@@ -431,7 +449,7 @@ describe('ScanResultScreen', () => {
       },
     });
     expect(JSON.parse(pushedRoute.params.analysisData)).toMatchObject({
-      schema_version: 3,
+      schema_version: 4,
       scan_type: 'face',
       face_shape_key: 'oval',
     });
@@ -484,7 +502,7 @@ describe('ScanResultScreen', () => {
       },
     });
     expect(JSON.parse(pushedRoute.params.analysisData)).toMatchObject({
-      schema_version: 3,
+      schema_version: 4,
       scan_type: 'face',
       face_shape_key: 'oval',
     });
