@@ -919,6 +919,77 @@ describe('ApiService', () => {
     });
   });
 
+  describe('checkScanEligibilityBatch', () => {
+    it('loads multiple scan eligibilities in one edge function call', async () => {
+      mockGetSession.mockResolvedValue({
+        data: { session: { access_token: 'test-token' } },
+      });
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            success: true,
+            eligibility: {
+              body: {
+                success: true,
+                allowed: true,
+                current_count: 0,
+                limit: 3,
+              },
+              health: {
+                success: true,
+                allowed: false,
+                message_key: 'scan_limits.msg_weekly_reached_with_time',
+                next_recharge_at: new Date('2026-05-14T08:00:00.000Z').toISOString(),
+              },
+            },
+            errors: {
+              nutrition: {
+                error: 'Quota RPC unavailable',
+                code: 'quota_rpc_unavailable',
+                status: 503,
+                request_id: 'req-batch-1',
+              },
+            },
+            request_id: 'req-batch-1',
+          }),
+      });
+
+      const result = await ApiService.checkScanEligibilityBatch(['body', 'health', 'nutrition']);
+
+      expect(result.data.body?.allowed).toBe(true);
+      expect(result.data.body?.scanType).toBe('body');
+      expect(result.data.health?.allowed).toBe(false);
+      expect(result.data.health?.message_key).toBe('scan_limits.msg_weekly_reached_with_time');
+      expect(result.errors.nutrition?.code).toBe('quota_rpc_unavailable');
+      expect(result.errors.nutrition?.status).toBe(503);
+      expect(result.requestId).toBe('req-batch-1');
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/functions/v1/check-scan-eligibility-batch'),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ scan_types: ['body', 'health', 'nutrition'] }),
+        }),
+      );
+    });
+
+    it('throws on an invalid batch envelope', async () => {
+      mockGetSession.mockResolvedValue({
+        data: { session: { access_token: 'test-token' } },
+      });
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ success: false }),
+      });
+
+      await expect(ApiService.checkScanEligibilityBatch(['body'])).rejects.toThrow(
+        'Scan eligibility batch returned an invalid payload',
+      );
+    });
+  });
+
   describe('getNextAvailableScanDate', () => {
     it('returns next available date', async () => {
       mockGetSession.mockResolvedValue({

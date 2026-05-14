@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
-  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -10,11 +9,11 @@ import {
   View,
 } from 'react-native';
 import { Minus, Plus } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   BORDER_RADIUS,
   FONT_WEIGHTS,
-  SHADOWS,
   SIZES,
   SPACING,
   withAlpha,
@@ -22,11 +21,12 @@ import {
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { SocialAdminModerationItem } from '@/types';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   getKeyboardAvoidingViewBehavior,
   getMinimumBottomInsetPadding,
 } from '@/utils/mobileLayout';
+
+import { buildAdminChromePalette } from './adminModerationTheme';
 
 interface AdminReactionAdjustmentModalProps {
   item: SocialAdminModerationItem | null;
@@ -60,7 +60,11 @@ function StatColumn({
   invalid: boolean;
 }) {
   const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const chrome = useMemo(
+    () => buildAdminChromePalette(colors, 'needs_review'),
+    [colors],
+  );
+  const styles = useMemo(() => createStyles(chrome), [chrome]);
 
   return (
     <View
@@ -71,9 +75,9 @@ function StatColumn({
     >
       <View style={styles.statHeader}>
         {icon === 'plus' ? (
-          <Plus color={colors.primary} size={14} />
+          <Plus color={chrome.trustAccent} size={14} />
         ) : (
-          <Minus color={colors.error} size={14} />
+          <Minus color={chrome.dangerAccent} size={14} />
         )}
         <Text style={styles.statTitle}>{title}</Text>
       </View>
@@ -100,7 +104,11 @@ export function AdminReactionAdjustmentModal({
   const { colors } = useTheme();
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
-  const styles = useMemo(() => createStyles(colors, insets), [colors, insets]);
+  const chrome = useMemo(
+    () => buildAdminChromePalette(colors, 'needs_review'),
+    [colors],
+  );
+  const styles = useMemo(() => createStyles(chrome, insets), [chrome, insets]);
 
   return (
     <Modal
@@ -114,7 +122,8 @@ export function AdminReactionAdjustmentModal({
         style={styles.modalBackdrop}
       >
         <View style={styles.modalCard} testID="admin-social-adjust-reactions-modal">
-          <Text style={styles.modalTitle}>
+          <View style={styles.handle} />
+          <Text style={styles.modalEyebrow}>
             {t('social.admin.reaction_adjustment.title')}
           </Text>
           <Text style={styles.modalBody}>
@@ -141,7 +150,9 @@ export function AdminReactionAdjustmentModal({
                   count: item.effective_dislike_count,
                 })}
                 previewLabel={t('social.admin.reaction_adjustment.preview_value', {
-                  count: preview?.nextEffectiveDislikeCount ?? item.effective_dislike_count,
+                  count:
+                    preview?.nextEffectiveDislikeCount ??
+                    item.effective_dislike_count,
                 })}
                 invalid={!isInputValid}
               />
@@ -161,7 +172,8 @@ export function AdminReactionAdjustmentModal({
                 !isInputValid ? styles.modalInputInvalid : null,
               ]}
               placeholder={t('social.admin.reaction_adjustment.input_placeholder')}
-              placeholderTextColor={colors.gray}
+              placeholderTextColor={chrome.textMuted}
+              selectionColor={chrome.filterAccent}
               testID="admin-social-adjust-likes-input"
             />
           </View>
@@ -179,7 +191,8 @@ export function AdminReactionAdjustmentModal({
                 !isInputValid ? styles.modalInputInvalid : null,
               ]}
               placeholder={t('social.admin.reaction_adjustment.input_placeholder')}
-              placeholderTextColor={colors.gray}
+              placeholderTextColor={chrome.textMuted}
+              selectionColor={chrome.filterAccent}
               testID="admin-social-adjust-dislikes-input"
             />
           </View>
@@ -195,7 +208,8 @@ export function AdminReactionAdjustmentModal({
               multiline
               textAlignVertical="top"
               placeholder={t('social.admin.reaction_adjustment.note_placeholder')}
-              placeholderTextColor={colors.gray}
+              placeholderTextColor={chrome.textMuted}
+              selectionColor={chrome.filterAccent}
               testID="admin-social-adjust-note-input"
             />
           </View>
@@ -218,7 +232,12 @@ export function AdminReactionAdjustmentModal({
               style={[styles.actionButton, styles.actionButtonNeutral]}
               testID="admin-social-adjust-cancel"
             >
-              <Text style={[styles.actionButtonLabel, styles.actionButtonLabelNeutral]}>
+              <Text
+                style={[
+                  styles.actionButtonLabel,
+                  styles.actionButtonLabelNeutral,
+                ]}
+              >
                 {t('common.cancel')}
               </Text>
             </TouchableOpacity>
@@ -233,7 +252,12 @@ export function AdminReactionAdjustmentModal({
               ]}
               testID="admin-social-adjust-submit"
             >
-              <Text style={[styles.actionButtonLabel, styles.actionButtonLabelPrimary]}>
+              <Text
+                style={[
+                  styles.actionButtonLabel,
+                  styles.actionButtonLabelPrimary,
+                ]}
+              >
                 {t('common.save')}
               </Text>
             </TouchableOpacity>
@@ -244,36 +268,50 @@ export function AdminReactionAdjustmentModal({
   );
 }
 
-const createStyles = (colors: any, insets: { bottom: number } = { bottom: 0 }) =>
+const createStyles = (
+  chrome: ReturnType<typeof buildAdminChromePalette>,
+  insets: { bottom: number } = { bottom: 0 },
+) =>
   StyleSheet.create({
     modalBackdrop: {
       flex: 1,
       justifyContent: 'flex-end',
-      backgroundColor: withAlpha(colors.primaryText, 0.4),
+      backgroundColor: withAlpha(chrome.screenBackground, 0.76),
       paddingBottom: getMinimumBottomInsetPadding(insets.bottom, SPACING.sm),
     },
     modalCard: {
-      borderTopLeftRadius: BORDER_RADIUS.xl,
-      borderTopRightRadius: BORDER_RADIUS.xl,
-      backgroundColor: colors.cardBackground,
+      borderTopLeftRadius: BORDER_RADIUS.hero,
+      borderTopRightRadius: BORDER_RADIUS.hero,
+      backgroundColor: chrome.surfaceRaised,
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderColor: chrome.borderSubtle,
       paddingHorizontal: SPACING.lg,
-      paddingTop: SPACING.xl,
+      paddingTop: SPACING.sm,
       paddingBottom:
         getMinimumBottomInsetPadding(insets.bottom, SPACING.sm) + SPACING.lg,
       gap: SPACING.md,
-      ...SHADOWS.card,
+      shadowColor: chrome.shadowColor,
+      shadowOffset: { width: 0, height: -12 },
+      shadowOpacity: 0.34,
+      shadowRadius: 26,
+      elevation: 12,
     },
-    modalTitle: {
+    handle: {
+      alignSelf: 'center',
+      width: 44,
+      height: 5,
+      borderRadius: BORDER_RADIUS.full,
+      backgroundColor: chrome.handle,
+    },
+    modalEyebrow: {
       fontSize: SIZES.text18,
       fontWeight: FONT_WEIGHTS.bold,
-      color: colors.primaryText,
+      color: chrome.textPrimary,
     },
     modalBody: {
       fontSize: SIZES.text14,
       lineHeight: 22,
-      color: colors.textMuted ?? colors.gray,
+      color: chrome.textSecondary,
     },
     statsRow: {
       flexDirection: 'row',
@@ -281,15 +319,15 @@ const createStyles = (colors: any, insets: { bottom: number } = { bottom: 0 }) =
     },
     statColumn: {
       flex: 1,
-      borderRadius: BORDER_RADIUS.lg,
+      borderRadius: BORDER_RADIUS.xl,
       padding: SPACING.md,
       gap: SPACING.xs,
-      backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.03),
+      backgroundColor: chrome.surfaceMuted,
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderColor: chrome.borderSubtle,
     },
     statColumnInvalid: {
-      borderColor: withAlpha(colors.error, 0.22),
+      borderColor: chrome.dangerAccentBorder,
     },
     statHeader: {
       flexDirection: 'row',
@@ -299,16 +337,16 @@ const createStyles = (colors: any, insets: { bottom: number } = { bottom: 0 }) =
     statTitle: {
       fontSize: SIZES.text12,
       fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.primaryText,
+      color: chrome.textPrimary,
     },
     statLine: {
       fontSize: SIZES.text12,
-      color: colors.textMuted ?? colors.gray,
+      color: chrome.textMuted,
     },
     statPreview: {
       fontSize: SIZES.text14,
       fontWeight: FONT_WEIGHTS.bold,
-      color: colors.primaryText,
+      color: chrome.textPrimary,
     },
     fieldBlock: {
       gap: SPACING.xs,
@@ -316,42 +354,42 @@ const createStyles = (colors: any, insets: { bottom: number } = { bottom: 0 }) =
     modalFieldLabel: {
       fontSize: SIZES.text12,
       fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.primaryText,
+      color: chrome.textPrimary,
     },
     modalInput: {
       minHeight: 48,
-      borderRadius: BORDER_RADIUS.lg,
+      borderRadius: BORDER_RADIUS.xl,
       paddingHorizontal: SPACING.md,
       borderWidth: 1,
-      borderColor: colors.borderStrong ?? withAlpha(colors.primaryText, 0.12),
-      backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.03),
-      color: colors.primaryText,
+      borderColor: chrome.borderStrong,
+      backgroundColor: withAlpha(chrome.screenBackground, 0.42),
+      color: chrome.textPrimary,
       fontSize: SIZES.text14,
     },
     modalInputInvalid: {
-      borderColor: withAlpha(colors.error, 0.22),
+      borderColor: chrome.dangerAccentBorder,
     },
     modalTextarea: {
-      minHeight: 96,
+      minHeight: 100,
       paddingTop: SPACING.md,
     },
     validationCard: {
-      borderRadius: BORDER_RADIUS.lg,
+      borderRadius: BORDER_RADIUS.xl,
       padding: SPACING.md,
       gap: SPACING.xs,
-      backgroundColor: withAlpha(colors.error, 0.08),
+      backgroundColor: chrome.dangerAccentSoft,
       borderWidth: 1,
-      borderColor: withAlpha(colors.error, 0.18),
+      borderColor: chrome.dangerAccentBorder,
     },
     validationTitle: {
       fontSize: SIZES.text12,
       fontWeight: FONT_WEIGHTS.bold,
-      color: colors.error,
+      color: chrome.dangerAccent,
     },
     validationBody: {
       fontSize: SIZES.text12,
       lineHeight: 18,
-      color: colors.error,
+      color: chrome.dangerAccent,
     },
     modalActionsRow: {
       flexDirection: 'row',
@@ -360,19 +398,19 @@ const createStyles = (colors: any, insets: { bottom: number } = { bottom: 0 }) =
     },
     actionButton: {
       flex: 1,
-      minHeight: 46,
+      minHeight: 48,
       borderRadius: BORDER_RADIUS.full,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1,
     },
-    actionButtonPrimary: {
-      backgroundColor: withAlpha(colors.primary, 0.12),
-      borderColor: withAlpha(colors.primary, 0.22),
-    },
     actionButtonNeutral: {
-      backgroundColor: withAlpha(colors.primaryText, 0.04),
-      borderColor: withAlpha(colors.primaryText, 0.08),
+      backgroundColor: chrome.surfaceMuted,
+      borderColor: chrome.borderSubtle,
+    },
+    actionButtonPrimary: {
+      backgroundColor: chrome.trustAccent,
+      borderColor: chrome.trustAccentBorder,
     },
     actionButtonDisabled: {
       opacity: 0.5,
@@ -381,11 +419,11 @@ const createStyles = (colors: any, insets: { bottom: number } = { bottom: 0 }) =
       fontSize: SIZES.text14,
       fontWeight: FONT_WEIGHTS.semiBold,
     },
-    actionButtonLabelPrimary: {
-      color: colors.primary,
-    },
     actionButtonLabelNeutral: {
-      color: colors.primaryText,
+      color: chrome.textSecondary,
+    },
+    actionButtonLabelPrimary: {
+      color: chrome.textOnAccent,
     },
   });
 

@@ -11,39 +11,39 @@ export interface CoachPersonaVisual {
 
 const COACH_PERSONA_VISUALS: Record<CoachPersonaKey, CoachPersonaVisual> = {
   gentle_supportive: {
-    imageSource: require('../assets/images/coach/gentle_supportive.png'),
+    imageSource: require('../assets/images/coach/gentle_supportive.webp'),
     fallbackLabel: 'GS',
-    haloTint: '#6CA7FF',
+    haloTint: '#7FA9D4',
     teaserPriority: 1,
   },
   strict_tough: {
-    imageSource: require('../assets/images/coach/strict_tough.png'),
+    imageSource: require('../assets/images/coach/strict_tough.webp'),
     fallbackLabel: 'ST',
-    haloTint: '#7E90B7',
+    haloTint: '#8792A7',
     teaserPriority: 5,
   },
   motivational_energetic: {
-    imageSource: require('../assets/images/coach/motivational_energetic.png'),
+    imageSource: require('../assets/images/coach/motivational_energetic.webp'),
     fallbackLabel: 'ME',
-    haloTint: '#42BFFF',
+    haloTint: '#76A9C8',
     teaserPriority: 2,
   },
   patient_calm: {
-    imageSource: require('../assets/images/coach/patient_calm.png'),
+    imageSource: require('../assets/images/coach/patient_calm.webp'),
     fallbackLabel: 'PC',
-    haloTint: '#53C6BB',
+    haloTint: '#72AFA8',
     teaserPriority: 4,
   },
   analytical_precise: {
-    imageSource: require('../assets/images/coach/analytical_precise.png'),
+    imageSource: require('../assets/images/coach/analytical_precise.webp'),
     fallbackLabel: 'AP',
-    haloTint: '#88A7FF',
+    haloTint: '#8D9EC8',
     teaserPriority: 3,
   },
   playful_light: {
-    imageSource: require('../assets/images/coach/playful_light.png'),
+    imageSource: require('../assets/images/coach/playful_light.webp'),
     fallbackLabel: 'PL',
-    haloTint: '#FF8F8B',
+    haloTint: '#D98B86',
     teaserPriority: 6,
   },
 };
@@ -66,4 +66,3 @@ export function getCoachPersonaTeaserKeys(
 
   return [activePersonaKey, ...otherKeys].slice(0, count);
 }
-

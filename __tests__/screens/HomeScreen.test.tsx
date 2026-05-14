@@ -6,10 +6,13 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react-native';
-import { Platform } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import HomeScreen from '@/screens/HomeScreen';
 import { getGamificationAssetSource } from '@/constants/gamificationAssets';
-import { BORDER_RADIUS, mixColors, withAlpha } from '@/constants/theme';
+import {
+  buildPremiumHealthModulePalette,
+  getPremiumHealthResponsiveCardMetrics,
+} from '@/constants/premiumHealth';
 
 const mockPush = jest.fn();
 const mockUseAuth = jest.fn();
@@ -102,6 +105,14 @@ jest.mock('@/contexts/LanguageContext', () => ({
           return 'Data unavailable';
         case 'scan_limit.unavailable':
           return 'Unavailable';
+        case 'scan_limit.upgrade':
+          return 'Go Premium';
+        case 'home.items_available':
+          return 'Available Scans';
+        case 'home.global_score':
+          return 'Global Score';
+        case 'home.companion_title':
+          return 'Companion';
         case 'home.fox_evolution.eyebrow':
           return 'Fox evolution';
         case 'home.fox_evolution.scan_total':
@@ -132,6 +143,20 @@ jest.mock('@/contexts/LanguageContext', () => ({
           return 'scans analyzed';
         case 'home.analytics_card_scan_count':
           return `${options.count} scans analyzed`;
+        case 'components.feature_list.premium':
+          return 'Premium';
+        case 'components.super_scan.title':
+          return 'Super Scan';
+        case 'components.super_scan.subtitle_locked':
+          return 'Full Body & Face Analysis';
+        case 'navigation.scanner':
+          return 'Scan';
+        case 'navigation.analytics':
+          return 'Analytics';
+        case 'navigation.coach':
+          return 'Coach';
+        case 'scan_types.super':
+          return 'Super Scan';
         case 'home.fridge_scan.eyebrow':
           return 'Premium';
         case 'home.fridge_scan.title':
@@ -177,6 +202,37 @@ const mockRefetchAll = jest.fn();
 const mockRefetchScanType = jest.fn();
 const mockScanLimitIndicatorProps: any[] = [];
 const getStyles = (style: any) => (Array.isArray(style) ? style : [style]);
+const collectTestIdsInOrder = (node: any, result: string[] = []) => {
+  if (!node) {
+    return result;
+  }
+
+  if (Array.isArray(node)) {
+    node.forEach((child) => collectTestIdsInOrder(child, result));
+    return result;
+  }
+
+  if (node.props?.testID) {
+    result.push(node.props.testID);
+  }
+
+  if (node.children) {
+    collectTestIdsInOrder(node.children, result);
+  }
+
+  return result;
+};
+const standardCardMetrics = getPremiumHealthResponsiveCardMetrics(390);
+const analyticsModulePalette = buildPremiumHealthModulePalette(
+  mockThemeColors as any,
+  false,
+  'trust',
+);
+const premiumModulePalette = buildPremiumHealthModulePalette(
+  mockThemeColors as any,
+  false,
+  'premium',
+);
 const originalPlatform = Platform.OS;
 const reactNativeModule =
   jest.requireActual<typeof import('react-native')>('react-native');
@@ -210,6 +266,9 @@ const buildEligibilityHookResult = (
   isLoading: false,
   isAuthReady: true,
   canQuery: true,
+  isFetched: true,
+  isFetching: false,
+  isStale: false,
   refetchAll: mockRefetchAll,
   refetchScanType: mockRefetchScanType,
   ...overrides,
@@ -219,6 +278,18 @@ jest.mock('@/hooks/queries', () => ({
   useDashboard: () => mockUseDashboard(),
   useAllScanEligibility: () => mockUseAllScanEligibility(),
   useFeatureFlags: () => mockUseFeatureFlags(),
+  useGrowthExperience: () => mockUseGrowthExperience(),
+}));
+jest.mock('@/hooks/queries/useDashboard', () => ({
+  useDashboard: () => mockUseDashboard(),
+}));
+jest.mock('@/hooks/queries/useScanEligibility', () => ({
+  useAllScanEligibility: () => mockUseAllScanEligibility(),
+}));
+jest.mock('@/hooks/queries/useFeatureFlags', () => ({
+  useFeatureFlags: () => mockUseFeatureFlags(),
+}));
+jest.mock('@/hooks/queries/useGrowthExperience', () => ({
   useGrowthExperience: () => mockUseGrowthExperience(),
 }));
 
@@ -278,12 +349,12 @@ jest.mock('@/components/ScanLimitIndicator', () => ({
       (eligibility?.nextRechargeAt
         ? Date.parse(eligibility.nextRechargeAt)
         : undefined);
-    const showTimer = limit > 0 && remaining < limit && !!nextRechargeAt;
-    const timerLabel = limit > 1 ? '+1 dans 05h 42m' : 'Recharge 21h 14m';
+    const showTimer = limit > 0 && remaining <= 0 && !!nextRechargeAt;
+    const timerLabel = 'Nouveau scan dans 21h 14m';
 
     return (
       <View>
-        <Text>{`quota:${remaining}/${limit}`}</Text>
+        {remaining > 0 ? <Text>{`quota:${remaining}/${limit}`}</Text> : null}
         {showTimer ? (
           <Text testID="home-quota-timer">{timerLabel}</Text>
         ) : (
@@ -442,12 +513,38 @@ describe('HomeScreen', () => {
       }),
     );
 
-    render(<HomeScreen />);
+    const { toJSON } = render(<HomeScreen />);
+    const orderedTestIds = collectTestIdsInOrder(toJSON());
 
-    expect(screen.getByText('home.items_available')).toBeTruthy();
+    expect(screen.queryByTestId('home-editorial-hero-section')).toBeNull();
+    expect(screen.getByTestId('home-scan-rail-section')).toBeTruthy();
+    expect(screen.getByTestId('home-journey-section')).toBeTruthy();
+    expect(screen.getByTestId('home-secondary-modules-section')).toBeTruthy();
+    expect(
+      orderedTestIds.indexOf('home-journey-section'),
+    ).toBeLessThan(orderedTestIds.indexOf('home-secondary-modules-section'));
+    expect(
+      orderedTestIds.indexOf('home-fridge-scan-card'),
+    ).toBeLessThan(orderedTestIds.indexOf('home-analytics-card'));
+    expect(
+      orderedTestIds.indexOf('home-analytics-card'),
+    ).toBeLessThan(orderedTestIds.indexOf('home-scan-rail-section'));
+
+    expect(screen.queryByTestId('home-editorial-hero')).toBeNull();
+    expect(screen.queryByTestId('home-editorial-score-card')).toBeNull();
+    expect(screen.queryByTestId('home-primary-scan-action')).toBeNull();
+    expect(screen.queryByTestId('home-secondary-analytics-action')).toBeNull();
+    expect(screen.getByTestId('home-scan-rail')).toBeTruthy();
+    expect(screen.getByTestId('home-scan-cards-grid')).toBeTruthy();
+    expect(screen.getAllByTestId('scan-limit-card-shell')).toHaveLength(3);
+    expect(screen.getByText('Available Scans')).toBeTruthy();
     expect(screen.getByText('TestUser')).toBeTruthy();
     expect(screen.getByTestId('fox-evolution-hero')).toBeTruthy();
+    expect(screen.getByTestId('home-super-scan-upsell-card')).toBeTruthy();
+    expect(screen.getByTestId('home-super-scan-upsell-cta')).toBeTruthy();
+    expect(screen.queryByTestId('home-premium-banner-shell')).toBeNull();
     expect(screen.getByTestId('home-fridge-scan-card')).toBeTruthy();
+    expect(screen.getByTestId('home-analytics-card')).toBeTruthy();
     expect(screen.getByTestId('home-chef-group')).toBeTruthy();
     expect(screen.getByTestId('home-chef-group-image')).toBeTruthy();
     expect(screen.queryByTestId('home-chef-row')).toBeNull();
@@ -463,7 +560,7 @@ describe('HomeScreen', () => {
     expect(screen.queryByText('5 Chef requests / day')).toBeNull();
     expect(screen.getByTestId('home-fridge-scan-cta')).toBeTruthy();
     expect(screen.getAllByText('quota:3/3')).toHaveLength(3);
-    expect(screen.getByText('super:locked')).toBeTruthy();
+    expect(screen.queryByText('super:locked')).toBeNull();
     expect(screen.queryByText('...')).toBeNull();
     expect(screen.queryByText('home.hero_title')).toBeNull();
     expect(screen.queryByText('CircularProgress')).toBeNull();
@@ -529,10 +626,10 @@ describe('HomeScreen', () => {
 
     render(<HomeScreen />);
 
-    expect(screen.getByText('quota:0/1')).toBeTruthy();
-    expect(screen.getByText('Recharge 21h 14m')).toBeTruthy();
+    expect(screen.queryByText('quota:0/1')).toBeNull();
+    expect(screen.getByText('Nouveau scan dans 21h 14m')).toBeTruthy();
     expect(screen.getByText('quota:2/3')).toBeTruthy();
-    expect(screen.getByText('+1 dans 05h 42m')).toBeTruthy();
+    expect(screen.queryByText('+1 dans 05h 42m')).toBeNull();
     expect(screen.getByText('quota:3/3')).toBeTruthy();
     expect(screen.queryByText('...')).toBeNull();
   });
@@ -763,6 +860,7 @@ describe('HomeScreen', () => {
     expect(screen.getByText('AdminUser')).toBeTruthy();
     expect(screen.getAllByText('quota:20/20')).toHaveLength(3);
     expect(screen.getByText('super:20/20')).toBeTruthy();
+    expect(screen.queryByTestId('home-super-scan-upsell-card')).toBeNull();
     expect(screen.queryByText('...')).toBeNull();
   });
 
@@ -823,27 +921,27 @@ describe('HomeScreen', () => {
     expect(cardShellStyles).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          width: 140,
+          flex: 1,
           elevation: 2,
         }),
       ]),
     );
 
-    const bannerShellStyles = getStyles(
-      getByTestId('home-premium-banner-shell').props.style,
+    const upsellShellStyles = getStyles(
+      getByTestId('home-super-scan-upsell-card').props.style,
     );
-    const bannerSurfaceStyles = getStyles(
-      getByTestId('home-premium-banner-surface').props.style,
+    const upsellSurfaceStyles = getStyles(
+      getByTestId('home-super-scan-upsell-surface').props.style,
     );
 
-    expect(bannerShellStyles).toEqual(
+    expect(upsellShellStyles).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           elevation: 4,
         }),
       ]),
     );
-    expect(bannerSurfaceStyles).toEqual(
+    expect(upsellSurfaceStyles).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           overflow: 'hidden',
@@ -851,6 +949,58 @@ describe('HomeScreen', () => {
         }),
       ]),
     );
+  });
+
+  it('centers the available scan cards and keeps quotas readable', () => {
+    mockUseDashboard.mockReturnValue({
+      data: buildDashboardData(),
+      isLoading: false,
+      error: null,
+      refetch: jest.fn(),
+      isRefetching: false,
+    });
+    mockUseAllScanEligibility.mockReturnValue(
+      buildEligibilityHookResult({
+        data: {
+          body: { allowed: true, remaining: 20, limit: 20, current_count: 0 },
+          health: { allowed: true, remaining: 15, limit: 20, current_count: 5 },
+          nutrition: { allowed: true, remaining: 18, limit: 20, current_count: 2 },
+          super: { allowed: false, remaining: 0, message: 'locked' },
+        },
+      }),
+    );
+
+    const { getAllByTestId, getByTestId } = render(<HomeScreen />);
+
+    expect(StyleSheet.flatten(getByTestId('home-scan-cards-grid').props.style)).toEqual(
+      expect.objectContaining({
+        width: '100%',
+        maxWidth: 420,
+        alignSelf: 'center',
+        justifyContent: 'center',
+      }),
+    );
+    expect(StyleSheet.flatten(getByTestId('home-super-scan-container').props.style)).toEqual(
+      expect.objectContaining({
+        width: '100%',
+        maxWidth: 420,
+        alignSelf: 'center',
+      }),
+    );
+    expect(StyleSheet.flatten(getAllByTestId('scan-limit-card-surface')[0].props.style)).toEqual(
+      expect.objectContaining({
+        alignItems: 'center',
+      }),
+    );
+    expect(StyleSheet.flatten(getAllByTestId('scan-limit-label')[0].props.style)).toEqual(
+      expect.objectContaining({
+        textAlign: 'center',
+        alignSelf: 'stretch',
+      }),
+    );
+    expect(screen.getByText('quota:15/20')).toBeTruthy();
+    expect(screen.getByText('quota:20/20')).toBeTruthy();
+    expect(screen.getByText('quota:18/20')).toBeTruthy();
   });
 
   it('renders the stage 0 fox evolution hero with empty stage progress', () => {
@@ -1028,16 +1178,16 @@ describe('HomeScreen', () => {
     expect(mascotShellStyles).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          width: 232,
-          height: 232,
+          width: 182,
+          height: 182,
         }),
       ]),
     );
     expect(mascotImageStyles).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          width: 210,
-          height: 210,
+          width: 164,
+          height: 164,
         }),
       ]),
     );
@@ -1079,16 +1229,16 @@ describe('HomeScreen', () => {
     expect(mascotShellStyles).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          width: 264,
-          height: 264,
+          width: 208,
+          height: 208,
         }),
       ]),
     );
     expect(mascotImageStyles).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          width: 240,
-          height: 240,
+          width: 190,
+          height: 190,
         }),
       ]),
     );
@@ -1132,16 +1282,16 @@ describe('HomeScreen', () => {
     expect(mascotShellStyles).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          width: 304,
-          height: 304,
+          width: 236,
+          height: 236,
         }),
       ]),
     );
     expect(mascotImageStyles).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          width: 280,
-          height: 280,
+          width: 220,
+          height: 220,
         }),
       ]),
     );
@@ -1176,31 +1326,16 @@ describe('HomeScreen', () => {
     expect(analyticsCardSurfaceStyles).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          minHeight: 462,
-          borderRadius: BORDER_RADIUS.hero,
-          backgroundColor: mixColors(
-            mockThemeColors.cardBackground,
-            mockThemeColors.primary,
-            0.05,
-          ),
-          borderColor: withAlpha(
-            mixColors(
-              mockThemeColors.primaryDark,
-              mockThemeColors.white,
-              0.2,
-            ),
-            0.18,
-          ),
+          minHeight: standardCardMetrics.cardMinHeight,
+          borderRadius: standardCardMetrics.cardRadius,
+          backgroundColor: analyticsModulePalette.surfaceBackground,
+          borderColor: analyticsModulePalette.surfaceBorder,
         }),
       ]),
     );
     expect(analyticsTitle).toBeTruthy();
     expect(analyticsTitle).toHaveStyle({
-      color: mixColors(
-        mockThemeColors.primaryText,
-        mockThemeColors.primaryDark,
-        0.12,
-      ),
+      color: analyticsModulePalette.title,
     });
     expect(screen.getByText('Review your latest results and progress.')).toBeTruthy();
     expect(screen.getByText('View my analytics')).toBeTruthy();
@@ -1224,19 +1359,8 @@ describe('HomeScreen', () => {
     expect(analyticsCtaStyles).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          backgroundColor: mixColors(
-            mockThemeColors.white,
-            mockThemeColors.primary,
-            0.22,
-          ),
-          borderColor: withAlpha(
-            mixColors(
-              mockThemeColors.primaryDark,
-              mockThemeColors.white,
-              0.2,
-            ),
-            0.18,
-          ),
+          backgroundColor: analyticsModulePalette.ctaBackground,
+          borderColor: analyticsModulePalette.ctaBorder,
         }),
       ]),
     );
@@ -1304,46 +1428,20 @@ describe('HomeScreen', () => {
     expect(chefSurfaceStyles).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          minHeight: 462,
-          backgroundColor: mixColors(
-            mockThemeColors.cardBackground,
-            mockThemeColors.gold,
-            0.08,
-          ),
-          borderColor: withAlpha(
-            mixColors(
-              mockThemeColors.gold,
-              mockThemeColors.white,
-              0.58,
-            ),
-            0.22,
-          ),
+          minHeight: standardCardMetrics.cardMinHeight,
+          backgroundColor: premiumModulePalette.surfaceBackground,
+          borderColor: premiumModulePalette.surfaceBorder,
         }),
       ]),
     );
     expect(chefTitle).toHaveStyle({
-      color: mixColors(
-        mockThemeColors.primaryText,
-        mockThemeColors.warning,
-        0.12,
-      ),
+      color: premiumModulePalette.title,
     });
     expect(chefCtaStyles).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          backgroundColor: mixColors(
-            mockThemeColors.warning,
-            mockThemeColors.white,
-            0.78,
-          ),
-          borderColor: withAlpha(
-            mixColors(
-              mockThemeColors.gold,
-              mockThemeColors.white,
-              0.58,
-            ),
-            0.26,
-          ),
+          backgroundColor: premiumModulePalette.ctaBackground,
+          borderColor: premiumModulePalette.ctaBorder,
         }),
       ]),
     );

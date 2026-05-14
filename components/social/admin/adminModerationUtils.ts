@@ -235,6 +235,12 @@ export function buildModerationRequest(
   return baseRequest;
 }
 
+export function isModerationItemApprovable(item: SocialAdminModerationItem) {
+  return getPrimaryActionDefinitions(item).some(
+    (actionDefinition) => actionDefinition.action === 'approve',
+  );
+}
+
 export function getAvailableCategoryOptions(item: SocialAdminModerationItem) {
   if (item.content_type !== 'post' || !item.category) {
     return [];

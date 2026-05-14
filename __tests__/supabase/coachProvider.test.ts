@@ -83,6 +83,7 @@ describe('coach provider configuration', () => {
 
   it('returns the configured coach webhook URL without touching coach_entries when present', async () => {
     env[COACH_GENERATE_WEBHOOK_ENV_NAME] = ' https://hooks.example.com/coach ';
+    env.WEBHOOK_ALLOWED_HOSTS = 'hooks.example.com';
 
     const update = jest.fn();
     const from = jest.fn(() => ({

@@ -8,6 +8,7 @@ import { Phase2HttpError, toPhase2ErrorPayload } from '../_shared/phase2Errors.t
 import {
   createRequestId,
   logPhase2Error,
+  logPhase2Info,
   summarizeWebhookResult,
 } from '../_shared/phase2Observability.ts';
 import { postWebhookJson } from '../_shared/phase2Webhook.ts';
@@ -42,9 +43,13 @@ import {
   ANALYZE_SCAN_REQUEST_KEYS,
   SCAN_IMAGE_BUCKET,
   SCAN_IMAGE_MAX_BYTES,
+  getProviderScanType,
   hasJpegMagicBytes,
   isAppScanType,
 } from '../../../shared/scanContract.ts';
+
+const OBSERVABILITY_CONTROL_CHARS_PATTERN =
+  /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g;
 
 function requirePostMethod(req: Request) {
   if (req.method !== 'POST') {
@@ -58,6 +63,78 @@ function readScanType(value: unknown): SupportedScanType {
   }
 
   throw new Phase2HttpError(400, 'invalid_scan_type', 'scan_type is invalid');
+}
+
+function readNonEmptyString(value: unknown) {
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : null;
+}
+
+function sanitizeObservabilityExcerpt(value: unknown, maxLength = 180) {
+  const text = readNonEmptyString(value);
+  if (!text) {
+    return null;
+  }
+
+  const normalized = text
+    .replace(OBSERVABILITY_CONTROL_CHARS_PATTERN, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!normalized) {
+    return null;
+  }
+
+  return normalized.slice(0, maxLength);
+}
+
+function resolveProviderContentDiagnostic(
+  payload: Record<string, unknown> | null,
+  rawText?: string | null,
+) {
+  const messageRecord =
+    payload && typeof payload.message === 'object' && payload.message !== null
+      ? (payload.message as Record<string, unknown>)
+      : null;
+  const contentCandidate =
+    readNonEmptyString(messageRecord?.content) ??
+    readNonEmptyString(payload?.content) ??
+    readNonEmptyString(payload?.output) ??
+    readNonEmptyString(payload?.text) ??
+    readNonEmptyString(payload?.response) ??
+    readNonEmptyString(rawText);
+
+  return {
+    provider_content_length: contentCandidate?.length,
+    provider_content_excerpt:
+      sanitizeObservabilityExcerpt(contentCandidate) ?? undefined,
+  };
+}
+
+function buildAnalysisNormalizationDiagnostics(
+  payload: Record<string, unknown> | null,
+  rawText: string | null | undefined,
+  requestedScanType: SupportedScanType,
+) {
+  const payloadKeys = payload ? Object.keys(payload).slice(0, 12) : [];
+  const nestedData =
+    payload && typeof payload.data === 'object' && payload.data !== null
+      ? (payload.data as Record<string, unknown>)
+      : null;
+  const reportedScanType =
+    readNonEmptyString(nestedData?.scan_type) ??
+    readNonEmptyString(payload?.scan_type) ??
+    undefined;
+
+  return {
+    requested_scan_type: requestedScanType,
+    expected_provider_scan_type: getProviderScanType(requestedScanType),
+    provider_reported_scan_type: reportedScanType,
+    provider_top_level_keys:
+      payloadKeys.length > 0 ? payloadKeys.join(',') : undefined,
+    ...resolveProviderContentDiagnostic(payload, rawText),
+  };
 }
 
 async function lookupStoredScanObjectByPath(
@@ -551,11 +628,38 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const analysisResult = resolveNormalizedScanAnalysisPayload(
-      webhookResult.payload,
-      requestedScanType,
-      webhookResult.rawText,
-    );
+    let analysisResult: ReturnType<typeof resolveNormalizedScanAnalysisPayload>;
+    try {
+      analysisResult = resolveNormalizedScanAnalysisPayload(
+        webhookResult.payload,
+        requestedScanType,
+        webhookResult.rawText,
+      );
+    } catch (error) {
+      if (
+        error instanceof Phase2HttpError &&
+        (
+          error.code === 'analysis_failed' ||
+          error.code === 'invalid_analysis_response' ||
+          error.code === 'analysis_type_mismatch'
+        )
+      ) {
+        logPhase2Info(
+          '[analyze-scan] Analysis normalization diagnostics',
+          {
+            request_id: requestId,
+            scan_id: scanRow.id,
+            ...buildAnalysisNormalizationDiagnostics(
+              webhookResult.payload,
+              webhookResult.rawText,
+              requestedScanType,
+            ),
+          },
+        );
+      }
+
+      throw error;
+    }
 
     console.info('[analyze-scan] Scan analysis response parsed', {
       request_id: requestId,

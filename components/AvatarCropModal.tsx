@@ -265,9 +265,9 @@ export function AvatarCropModal({
               testID="avatar-crop-confirm"
             >
               {confirming ? (
-                <ActivityIndicator color={colors.white} size="small" />
+                <ActivityIndicator color={colors.background} size="small" />
               ) : (
-                <Check color={colors.white} size={20} />
+                <Check color={colors.background} size={20} />
               )}
               <Text style={styles.confirmButtonText}>
                 {t('components.avatar.crop_confirm')}
@@ -344,13 +344,15 @@ const createStyles = (colors: any, isDark: boolean, cropSize: number) =>
       gap: SPACING.xs,
       paddingHorizontal: SPACING.md,
       borderRadius: 22,
-      backgroundColor: colors.primary,
+      backgroundColor: colors.primaryText,
+      borderWidth: 1,
+      borderColor: withAlpha(colors.white, 0.2),
     },
     confirmButtonDisabled: {
       opacity: 0.65,
     },
     confirmButtonText: {
-      color: colors.white,
+      color: colors.background,
       fontSize: SIZES.text14,
       fontWeight: FONT_WEIGHTS.bold,
     },

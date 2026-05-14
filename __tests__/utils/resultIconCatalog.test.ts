@@ -89,6 +89,7 @@ describe('result icon catalog', () => {
       ...(nutritionViewModel.macros?.items.map((item) => item.icon) ?? []),
       ...nutritionViewModel.metrics.map((item) => item.icon),
       ...nutritionViewModel.premiumMetrics.map((item) => item.icon),
+      ...(nutritionViewModel.nutritionLongSections?.map((item) => item.icon) ?? []),
     ];
 
     emittedTokens.forEach((token) => {

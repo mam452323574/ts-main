@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { decode } from 'base64-arraybuffer';
 import { Platform } from 'react-native';
-import { DashboardData, AnalyticsData, AnalyticsPeriod, ScanType, ScanEligibilityResponse, AnalysisResult, ScanBodyResult, ScanFaceResult, ScanNutritionResult, SuperScanResult, BodyScoreHistoryItem, FaceScoreHistoryItem, NutritionHistoryItem, SuperScanHistoryItem, PremiumPotentialHistoryPoint, PremiumPotentialInputs, Scan, GamificationData, CoachProfileUpdate, PersistedInferredPersona } from '@/types';
+import { DashboardData, AnalyticsData, AnalyticsPeriod, ScanType, ScanEligibilityResponse, AnalysisResult, ScanBodyResult, ScanFaceResult, ScanNutritionResult, SuperScanResult, BodyScoreHistoryItem, FaceScoreHistoryItem, NutritionHistoryItem, SuperScanHistoryItem, PremiumPotentialHistoryPoint, PremiumPotentialInputs, Scan, GamificationData } from '@/types';
 import type { CoachPersonaKey } from '@/shared/coachPersonas';
 import { resolveGamification } from '@/constants/gamification';
 import { STORAGE_BUCKET_NAME } from '@/constants/scan';
@@ -148,8 +148,28 @@ interface InvokeAuthedFunctionOptions {
   context?: Record<string, unknown>;
 }
 
+export type ScanEligibilityBatchData = Partial<
+  Record<ScanType, ScanEligibilityResponse>
+>;
+
+export type ScanEligibilityBatchErrors = Partial<Record<ScanType, ApiError>>;
+
+export interface ScanEligibilityBatchResult {
+  data: ScanEligibilityBatchData;
+  errors: ScanEligibilityBatchErrors;
+  requestId?: string;
+}
+
+interface ScanEligibilityBatchFunctionResponse {
+  success?: boolean;
+  eligibility?: Record<string, ScanEligibilityResponse>;
+  errors?: Record<string, unknown>;
+  request_id?: string;
+}
+
 const missingGamificationRpcWarnings = new Set<string>();
 const ANALYZE_SCAN_IMAGE_RETRY_DELAY_MS = 1_000;
+const APP_SCAN_TYPES = new Set<ScanType>(['body', 'health', 'nutrition', 'super']);
 
 function toSupabaseErrorLike(error: unknown): SupabaseErrorLike {
   if (!error || typeof error !== 'object') {
@@ -557,6 +577,49 @@ function normalizeScanEligibilityResponse(data: ScanEligibilityResponse) {
   return data;
 }
 
+function isScanTypeKey(value: string): value is ScanType {
+  return APP_SCAN_TYPES.has(value as ScanType);
+}
+
+function buildBatchEligibilityError(scanType: ScanType, payload: unknown) {
+  const errorPayload =
+    payload && typeof payload === 'object' && !Array.isArray(payload)
+      ? (payload as {
+          error?: unknown;
+          message?: unknown;
+          code?: unknown;
+          status?: unknown;
+          request_id?: unknown;
+        })
+      : {};
+  const apiError = new ApiError(
+    typeof errorPayload.error === 'string'
+      ? errorPayload.error
+      : typeof errorPayload.message === 'string'
+        ? errorPayload.message
+        : 'Scan eligibility unavailable',
+    'EDGE_FUNCTION',
+    payload,
+    {
+      scanType,
+      stage: 'eligibility',
+    },
+  );
+
+  apiError.code =
+    typeof errorPayload.code === 'string'
+      ? errorPayload.code
+      : 'scan_eligibility_failed';
+  apiError.status =
+    typeof errorPayload.status === 'number' ? errorPayload.status : 500;
+  apiError.requestId =
+    typeof errorPayload.request_id === 'string'
+      ? errorPayload.request_id
+      : undefined;
+
+  return apiError;
+}
+
 async function invokeAuthedFunction<TResponse>(
   functionName: string,
   payload: Record<string, unknown>,
@@ -695,45 +758,6 @@ async function rollbackReservedScanAfterUploadFailure(scanId: string, scanType: 
       scan_type: scanType,
     });
   }
-}
-
-function mergeCoachProfileUpdates(
-  previous: PersistedInferredPersona | null,
-  updates: CoachProfileUpdate,
-  nowIso: string,
-): PersistedInferredPersona {
-  const dietSignals = new Set<string>(previous?.detected_diet_signals ?? []);
-  for (const signal of updates.detected_diet_signals) {
-    if (typeof signal === 'string' && signal.trim().length > 0) {
-      dietSignals.add(signal.trim());
-    }
-  }
-
-  const goals = new Set<string>(previous?.suggested_goals ?? []);
-  for (const goal of updates.suggested_goals) {
-    if (typeof goal === 'string' && goal.trim().length > 0) {
-      goals.add(goal.trim());
-    }
-  }
-
-  return {
-    detected_diet_signals: Array.from(dietSignals).slice(0, 8),
-    detected_strong_focus: updates.detected_strong_focus ?? previous?.detected_strong_focus ?? null,
-    suggested_goals: Array.from(goals).slice(0, 6),
-    suggested_persona_key:
-      updates.suggested_persona_key ?? previous?.suggested_persona_key ?? null,
-    last_updated_at: nowIso,
-    update_count: (previous?.update_count ?? 0) + 1,
-  };
-}
-
-function profileUpdateHasContent(updates: CoachProfileUpdate): boolean {
-  return (
-    updates.detected_diet_signals.length > 0 ||
-    updates.suggested_goals.length > 0 ||
-    updates.detected_strong_focus !== null ||
-    updates.suggested_persona_key !== null
-  );
 }
 
 export class ApiService {
@@ -1392,6 +1416,58 @@ export class ApiService {
     return normalizeScanEligibilityResponse(data);
   }
 
+  static async checkScanEligibilityBatch(
+    scanTypes?: ScanType[],
+  ): Promise<ScanEligibilityBatchResult> {
+    const response =
+      await invokeAuthedFunction<ScanEligibilityBatchFunctionResponse>(
+        'check-scan-eligibility-batch',
+        Array.isArray(scanTypes) && scanTypes.length > 0
+          ? { scan_types: scanTypes }
+          : {},
+      );
+
+    if (!response || response.success !== true) {
+      throw new ApiError(
+        'Scan eligibility batch returned an invalid payload',
+        'EDGE_FUNCTION',
+        response,
+        {
+          functionName: 'check-scan-eligibility-batch',
+          stage: 'eligibility',
+        },
+      );
+    }
+
+    const data: ScanEligibilityBatchData = {};
+    const errors: ScanEligibilityBatchErrors = {};
+
+    Object.entries(response.eligibility ?? {}).forEach(([scanType, eligibility]) => {
+      if (!isScanTypeKey(scanType) || !eligibility) {
+        return;
+      }
+
+      data[scanType] = normalizeScanEligibilityResponse({
+        ...eligibility,
+        scanType: eligibility.scanType ?? scanType,
+      });
+    });
+
+    Object.entries(response.errors ?? {}).forEach(([scanType, errorPayload]) => {
+      if (!isScanTypeKey(scanType)) {
+        return;
+      }
+
+      errors[scanType] = buildBatchEligibilityError(scanType, errorPayload);
+    });
+
+    return {
+      data,
+      errors,
+      requestId: response.request_id,
+    };
+  }
+
   static async getNextAvailableScanDate(scanType: ScanType): Promise<number | null> {
     try {
       const result = await this.checkScanEligibilityOnly(scanType);
@@ -1419,7 +1495,7 @@ export class ApiService {
     const canScan = eligibility.allowed || hasWelcomeCredits;
     if (!canScan) {
       throw new ApiError(
-        eligibility.message || 'Scan non autorise',
+        eligibility.message || 'Scan non autorisé',
         'VALIDATION',
         undefined,
         {
@@ -1732,76 +1808,5 @@ export class ApiService {
         analysisError: apiError,
       };
     }
-  }
-
-  /**
-   * Merge the coach's profile_updates into user_profiles.inferred_persona.
-   * Returns the new persisted persona, or null if nothing actionable was provided.
-   * Silent no-op when the user is unauthenticated.
-   */
-  static async applyCoachProfileUpdates(
-    updates: CoachProfileUpdate,
-  ): Promise<PersistedInferredPersona | null> {
-    if (!profileUpdateHasContent(updates)) return null;
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      logOperationalError(
-        '[API] applyCoachProfileUpdates skipped: user not authenticated',
-        null,
-        {},
-      );
-      return null;
-    }
-
-    const { data: existingRow, error: readError } = await supabase
-      .from('user_profiles')
-      .select('inferred_persona')
-      .eq('id', user.id)
-      .maybeSingle();
-
-    if (readError) {
-      logOperationalError(
-        '[API] applyCoachProfileUpdates failed to read existing persona',
-        readError,
-        { user_id: user.id },
-      );
-      return null;
-    }
-
-    const previous =
-      existingRow && typeof existingRow === 'object' && 'inferred_persona' in existingRow
-        ? ((existingRow as { inferred_persona: PersistedInferredPersona | null })
-            .inferred_persona ?? null)
-        : null;
-
-    const merged = mergeCoachProfileUpdates(previous, updates, new Date().toISOString());
-
-    const { error: updateError } = await supabase
-      .from('user_profiles')
-      .update({ inferred_persona: merged })
-      .eq('id', user.id);
-
-    if (updateError) {
-      if (isPostgrestSchemaCacheMissError(updateError)) {
-        const missingColumn = extractMissingColumnFromPgrstError(updateError);
-        if (missingColumn === 'inferred_persona') {
-          logOperationalError(
-            '[API] applyCoachProfileUpdates degraded: inferred_persona column missing — apply migration',
-            updateError,
-            { user_id: user.id },
-          );
-          return null;
-        }
-      }
-      logOperationalError(
-        '[API] applyCoachProfileUpdates failed to write persona',
-        updateError,
-        { user_id: user.id },
-      );
-      return null;
-    }
-
-    return merged;
   }
 }

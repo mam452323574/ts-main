@@ -46,7 +46,8 @@ import {
 } from '@/constants/theme';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useFridgeScanRecord } from '@/hooks/queries';
+import { useAuth } from '@/contexts/AuthContext';
+import { useFridgeScanRecord } from '@/hooks/queries/useFridgeScanRecord';
 import {
   FRIDGE_MEAL_MODES,
   isFridgeMealMode,
@@ -58,6 +59,7 @@ import {
   type ResultLayoutState,
 } from '@/utils/resultLayout';
 import { logOperationalInfo } from '@/utils/observability';
+import { resolvePremiumRenderStateFromProfile } from '@/utils/subscription';
 
 type RouteParamValue = string | string[] | undefined;
 
@@ -100,6 +102,7 @@ export default function FridgeScanResultScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { colors: themeColors, isDark } = useTheme();
+  const { userProfile, loading: authLoading } = useAuth();
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -131,6 +134,10 @@ export default function FridgeScanResultScreen() {
     () => createStyles(colors, insets, isDark, modeTheme, layout),
     [colors, insets, isDark, modeTheme, layout],
   );
+  const premiumRenderState = resolvePremiumRenderStateFromProfile(
+    userProfile,
+    authLoading,
+  );
 
   const handleClose = () => {
     router.replace('/(tabs)' as any);
@@ -138,6 +145,10 @@ export default function FridgeScanResultScreen() {
 
   const handleNewScan = () => {
     router.replace('/scan-frigo' as any);
+  };
+
+  const handlePremiumPress = () => {
+    router.push('/premium-upgrade' as any);
   };
 
   const status = record?.status ?? 'queued';
@@ -347,6 +358,8 @@ export default function FridgeScanResultScreen() {
           <ChefResultCard
             imageUri={imageUri}
             mealResult={mealResult}
+            onPremiumPress={handlePremiumPress}
+            premiumRenderState={premiumRenderState}
             selectedMode={selectedMode}
             t={t}
           />

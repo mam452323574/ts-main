@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { SIZES, SPACING, BORDER_RADIUS } from '@/constants/theme';
+import { FONT_WEIGHTS, SIZES, SPACING, BORDER_RADIUS, SHADOWS, withAlpha } from '@/constants/theme';
 import { hasPremiumAccessFromProfile } from '@/utils/subscription';
 
 interface FeatureGateProps {
@@ -49,13 +49,13 @@ export function FeatureGate({
           <Lock color={colors.primary} size={48} />
         </View>
         <View style={styles.crownBadge}>
-          <Crown color={colors.white} size={20} fill={colors.white} />
+          <Crown color={colors.background} size={20} fill={colors.background} />
         </View>
       </View>
 
       <View style={styles.content}>
         <View style={styles.iconContainer}>
-          <Crown color="#FFD700" size={32} fill="#FFD700" />
+          <Crown color={colors.gold} size={32} fill={withAlpha(colors.gold, 0.24)} />
         </View>
         <Text style={styles.title}>{t('components.feature_gate.title')}</Text>
       </View>
@@ -69,7 +69,7 @@ export function FeatureGate({
         style={({ pressed }) => [styles.upgradeButton, pressed && styles.upgradeButtonPressed]}
         onPress={handleUpgrade}
       >
-        <Crown color={colors.white} size={20} fill={colors.white} />
+        <Crown color={colors.background} size={20} fill={colors.background} />
         <Text style={styles.upgradeButtonText}>{t('components.feature_gate.upgrade_btn')}</Text>
       </Pressable>
 
@@ -109,8 +109,9 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.cardBackground,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: colors.primary,
+    borderWidth: 1,
+    borderColor: withAlpha(colors.primary, 0.28),
+    ...SHADOWS.card,
   },
   crownBadge: {
     position: 'absolute',
@@ -119,22 +120,22 @@ const createStyles = (colors: any) => StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.gold,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
-    borderColor: colors.cardBackground,
+    borderColor: colors.background,
   },
   title: {
     fontSize: SIZES.lg,
-    fontWeight: '600',
+    fontWeight: FONT_WEIGHTS.semiBold,
     color: colors.gray,
     marginBottom: SPACING.sm,
   },
   featureName: {
     fontSize: SIZES.xxl,
-    fontWeight: 'bold',
-    color: colors.primary,
+    fontWeight: FONT_WEIGHTS.bold,
+    color: colors.primaryText,
     textAlign: 'center',
     marginBottom: SPACING.md,
   },
@@ -148,16 +149,19 @@ const createStyles = (colors: any) => StyleSheet.create({
   upgradeButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryText,
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.xl,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: BORDER_RADIUS.full,
     gap: SPACING.sm,
+    borderWidth: 1,
+    borderColor: withAlpha(colors.white, 0.2),
+    ...SHADOWS.button,
   },
   upgradeButtonText: {
     fontSize: SIZES.lg,
-    fontWeight: '600',
-    color: colors.white,
+    fontWeight: FONT_WEIGHTS.semiBold,
+    color: colors.background,
   },
   hint: {
     fontSize: SIZES.sm,

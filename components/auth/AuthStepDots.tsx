@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 
-import { BORDER_RADIUS, SPACING, withAlpha } from '@/constants/theme';
-import { useTheme } from '@/contexts/ThemeContext';
+import { BORDER_RADIUS, SPACING } from '@/constants/theme';
+import { useAuthPalette } from './tokens';
 
 interface AuthStepDotsProps {
   total: number;
@@ -11,8 +11,8 @@ interface AuthStepDotsProps {
 }
 
 export function AuthStepDots({ total, current, style }: AuthStepDotsProps) {
-  const { colors, isDark } = useTheme();
-  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const palette = useAuthPalette();
+  const styles = useMemo(() => createStyles(palette), [palette]);
 
   return (
     <View style={[styles.row, style]}>
@@ -26,19 +26,19 @@ export function AuthStepDots({ total, current, style }: AuthStepDotsProps) {
   );
 }
 
-const createStyles = (colors: any, isDark: boolean) =>
+const createStyles = (palette: ReturnType<typeof useAuthPalette>) =>
   StyleSheet.create({
     row: {
       flexDirection: 'row',
-      gap: SPACING.sm,
+      gap: SPACING.xs + 2,
     },
     dot: {
       flex: 1,
-      height: 4,
+      height: 5,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.12 : 0.10),
+      backgroundColor: palette.progressInactive,
     },
     dotActive: {
-      backgroundColor: colors.primaryText,
+      backgroundColor: palette.progressActive,
     },
   });

@@ -215,6 +215,79 @@ function localizeCatalogKey(
   );
 }
 
+function localizeCatalogDisplayValue(
+  namespace: string,
+  rawValue: string | null | undefined,
+  fallbackText: string | null | undefined,
+  t: Translator,
+  emptyFallback = ''
+) {
+  const trimmedValue = typeof rawValue === 'string' ? rawValue.trim() : '';
+  if (trimmedValue) {
+    const normalizedKey = normalizeResultCatalogKey(trimmedValue);
+    if (normalizedKey && normalizedKey !== 'unknown') {
+      const translationKey = `${namespace}.${normalizedKey}`;
+      const translated = t(translationKey);
+
+      if (!isMissingTranslationResult(translated, translationKey)) {
+        return translated;
+      }
+
+      const fallbackConfig = NAMESPACE_FALLBACKS[namespace];
+      if (fallbackConfig && fallbackConfig.translationKey !== translationKey) {
+        warnMissingResultTranslation(translationKey, fallbackConfig.translationKey);
+      }
+    }
+  }
+
+  const trimmedFallbackText =
+    typeof fallbackText === 'string' ? fallbackText.trim() : '';
+  return trimmedFallbackText || emptyFallback;
+}
+
+function localizeCatalogDisplayList(
+  namespace: string,
+  rawValues: string[] | null | undefined,
+  fallbackText: string | null | undefined,
+  t: Translator,
+  options: {
+    locale?: string | null;
+    emptyFallback?: string;
+  } = {}
+) {
+  const translatedValues = Array.from(
+    new Set(
+      (Array.isArray(rawValues) ? rawValues : [])
+        .map((value) => normalizeResultCatalogKey(value))
+        .filter((value) => value.length > 0 && value !== 'unknown')
+        .map((key) => {
+          const translationKey = `${namespace}.${key}`;
+          const translated = t(translationKey);
+
+          if (!isMissingTranslationResult(translated, translationKey)) {
+            return translated;
+          }
+
+          const fallbackConfig = NAMESPACE_FALLBACKS[namespace];
+          if (fallbackConfig && fallbackConfig.translationKey !== translationKey) {
+            warnMissingResultTranslation(translationKey, fallbackConfig.translationKey);
+          }
+
+          return '';
+        })
+        .filter((value) => value.length > 0)
+    )
+  );
+
+  if (translatedValues.length > 0) {
+    return joinLocalizedList(translatedValues, options.locale);
+  }
+
+  const trimmedFallbackText =
+    typeof fallbackText === 'string' ? fallbackText.trim() : '';
+  return trimmedFallbackText || (options.emptyFallback ?? '');
+}
+
 function joinLocalizedList(values: string[], locale?: string | null) {
   if (values.length === 0) {
     return '';
@@ -251,6 +324,37 @@ export function localizeVerdict(
   return localizeCatalogKey('verdicts', rawValue, t, emptyFallback);
 }
 
+export function localizeDisplayQualitativeLevel(
+  category: QualitativeLevelCategory,
+  rawValue: string | null | undefined,
+  fallbackText: string | null | undefined,
+  t: Translator,
+  emptyFallback = ''
+) {
+  return localizeCatalogDisplayValue(
+    `qualitative_levels.${category}`,
+    rawValue,
+    fallbackText,
+    t,
+    emptyFallback
+  );
+}
+
+export function localizeDisplayVerdict(
+  rawValue: string | null | undefined,
+  fallbackText: string | null | undefined,
+  t: Translator,
+  emptyFallback = ''
+) {
+  return localizeCatalogDisplayValue(
+    'verdicts',
+    rawValue,
+    fallbackText,
+    t,
+    emptyFallback
+  );
+}
+
 export function localizeNutritionVitaminKeys(
   rawValues: string[] | null | undefined,
   t: Translator,
@@ -285,6 +389,24 @@ export function localizeNutritionVitaminKeys(
   }
 
   return joinLocalizedList(translatedValues, options.locale);
+}
+
+export function localizeDisplayNutritionVitaminKeys(
+  rawValues: string[] | null | undefined,
+  fallbackText: string | null | undefined,
+  t: Translator,
+  options: {
+    locale?: string | null;
+    emptyFallback?: string;
+  } = {}
+) {
+  return localizeCatalogDisplayList(
+    'scan.nutrition.vitamins',
+    rawValues,
+    fallbackText,
+    t,
+    options
+  );
 }
 
 export function localizeSuperScanSummaryKey(

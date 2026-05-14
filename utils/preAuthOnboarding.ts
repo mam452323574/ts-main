@@ -3,9 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ThemeType } from '@/constants/theme';
 
 export type PreAuthOnboardingStep =
-  | 'theme'
-  | 'username'
-  | 'avatar'
+  | 'intro'
+  | 'profile'
   | 'account'
   | 'verification';
 
@@ -28,13 +27,12 @@ const DEFAULT_PRE_AUTH_ONBOARDING_DRAFT: PreAuthOnboardingDraft = {
   avatarSkipped: false,
   email: '',
   createdUserId: null,
-  lastStep: 'theme',
+  lastStep: 'intro',
 };
 
 const VALID_STEPS: ReadonlySet<string> = new Set([
-  'theme',
-  'username',
-  'avatar',
+  'intro',
+  'profile',
   'account',
   'verification',
 ]);
@@ -53,9 +51,23 @@ function readTheme(value: unknown): ThemeType | null {
 }
 
 function readStep(value: unknown): PreAuthOnboardingStep {
-  return typeof value === 'string' && VALID_STEPS.has(value)
-    ? (value as PreAuthOnboardingStep)
-    : 'theme';
+  if (typeof value !== 'string') {
+    return 'intro';
+  }
+
+  if (VALID_STEPS.has(value)) {
+    return value as PreAuthOnboardingStep;
+  }
+
+  switch (value) {
+    case 'theme':
+      return 'intro';
+    case 'username':
+    case 'avatar':
+      return 'profile';
+    default:
+      return 'intro';
+  }
 }
 
 export function sanitizePreAuthOnboardingDraft(

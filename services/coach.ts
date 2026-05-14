@@ -11,16 +11,27 @@ import {
   isCoachPersonaKey,
 } from '@/shared/coachPersonas';
 import {
+  normalizeCoachQuestionKey,
+  normalizeCoachQuestionText,
+  resolveCoachQuestionHints,
+  resolveCoachQuestionSelection,
+} from '@/shared/coachQuestions';
+import {
   getCoachPromptScanQuota,
-  isCoachPromptType,
-  normalizeCoachPromptType,
+  LATEST_SCAN_ISSUE_RESOLUTION_PROMPT_TYPE,
+  normalizeCoachGenerationPromptType,
+  resolveVisibleCoachPromptType,
 } from '@/shared/coachPromptTypes';
+import { normalizeCoachScanIntentPayload } from '@/shared/scanCoachIntent';
 import { isCoachResponseVersion } from '@/shared/coachContent';
-import { parseCoachStructuredContent } from '@/shared/coachContentParser';
+import {
+  mergeCoachStructuredContentWithBodyFallback,
+  parseCoachStructuredContent,
+} from '@/shared/coachContentParser';
 import { getDefaultCoachDisclaimer } from '@/shared/coachCopy';
+import { normalizePersistedInferredPersona } from '@/shared/coachProfileMemory';
 import { resolveLocalizedText } from '@/utils/analysisTextLocalization';
 import {
-  getAnalysisResultScanType,
   tryNormalizeAnalysisResult,
 } from '@/utils/analysisNormalization';
 import {
@@ -37,9 +48,11 @@ import type {
   CoachEngagementLevel,
   CoachEntry,
   CoachGenerateResponse,
+  CoachGenerationPromptType,
   CoachGoalInference,
   CoachGuidancePayload,
   CoachGuidanceResult,
+  CoachScanIntentPayload,
   CoachInferredMetricSignal,
   CoachInferredPersona,
   CoachInferredPersonaField,
@@ -52,7 +65,7 @@ import type {
   CoachPersonaKey,
   CoachPreferredTimeOfDay,
   CoachPrimaryGoalKey,
-  CoachPromptType,
+  CoachQuestionKey,
   CoachQuotaStatus,
   CoachRecommendations,
   CoachRecommendationTone,
@@ -71,14 +84,19 @@ import type {
   CoachTrendMetric,
   CoachTrendSummary,
   CoachWeekdayWeekendBalance,
+  FatDistributionScanResult,
   InferredPersonaConfidence,
+  PersistedInferredPersona,
   ScanAnalysisMeta,
+  ScanCoachIntent,
   ScanType,
   SuperScanResult,
 } from '@/types';
 
 const COACH_FUNCTION_NAME = 'coach-generate-response';
 const COACH_QUOTA_STATUS_FUNCTION_NAME = 'coach-quota-status';
+const COACH_SCREEN_SNAPSHOT_FUNCTION_NAME = 'coach-screen-snapshot';
+const COACH_SYNC_PROFILE_MEMORY_FUNCTION_NAME = 'coach-sync-profile-memory';
 export const COACH_PROVIDER_NOT_CONFIGURED_ERROR_CODE =
   'coach_webhook_not_configured';
 export const INVALID_COACH_RESPONSE_ERROR_CODE = 'invalid_coach_response';
@@ -120,7 +138,10 @@ export interface CoachSourceScan {
   digest: CoachScanDigest;
 }
 
-export type CoachNormalizedAnalysisResult = AnalysisResult | SuperScanResult;
+export type CoachNormalizedAnalysisResult =
+  | AnalysisResult
+  | SuperScanResult
+  | FatDistributionScanResult;
 
 type CoachMetricDirection = CoachMetricDelta['direction'];
 
@@ -175,6 +196,10 @@ export interface CoachServiceErrorDebugInfo {
   requestId: string | null;
   functionName: string | null;
   details: unknown;
+  providerFailureKind: string | null;
+  providerFailureStage: string | null;
+  providerNodeType: string | null;
+  providerNodeName: string | null;
 }
 
 export interface CoachEntryFailureDebugInfo extends CoachServiceErrorDebugInfo {
@@ -208,12 +233,38 @@ export interface CoachHistorySummary {
   latest_entry_at: string | null;
 }
 
+interface CoachSyncProfileMemoryResponse {
+  success?: unknown;
+  applied_count?: unknown;
+  profile_memory?: unknown;
+}
+
+interface CoachScreenSnapshotResponse {
+  success?: unknown;
+  entries?: unknown;
+  quota?: unknown;
+  recent_scans?: unknown;
+  latest_ready_entry?: unknown;
+  history_summary?: unknown;
+  request_id?: unknown;
+}
+
+export interface CoachScreenSnapshot {
+  entries: CoachEntry[];
+  quota: CoachQuotaStatus;
+  recentScans: CoachSourceScan[];
+  latestReadyEntry: RenderableCoachEntry | null;
+  historySummary: CoachHistorySummary;
+  requestId?: string;
+}
+
 function shouldDebugCoachService() {
   return typeof __DEV__ !== 'undefined' && __DEV__ && process.env.NODE_ENV !== 'test';
 }
 
 export function getCoachServiceErrorDebugInfo(error: unknown): CoachServiceErrorDebugInfo {
   if (error instanceof CoachServiceError) {
+    const detailsRecord = isRecord(error.details) ? error.details : null;
     return {
       message: error.message,
       code: error.code ?? null,
@@ -221,6 +272,14 @@ export function getCoachServiceErrorDebugInfo(error: unknown): CoachServiceError
       requestId: error.requestId ?? null,
       functionName: error.functionName ?? null,
       details: error.details ?? null,
+      providerFailureKind:
+        readOptionalString(detailsRecord?.provider_failure_kind) ?? null,
+      providerFailureStage:
+        readOptionalString(detailsRecord?.provider_failure_stage) ?? null,
+      providerNodeType:
+        readOptionalString(detailsRecord?.provider_node_type) ?? null,
+      providerNodeName:
+        readOptionalString(detailsRecord?.provider_node_name) ?? null,
     };
   }
 
@@ -232,6 +291,10 @@ export function getCoachServiceErrorDebugInfo(error: unknown): CoachServiceError
       requestId: null,
       functionName: null,
       details: null,
+      providerFailureKind: null,
+      providerFailureStage: null,
+      providerNodeType: null,
+      providerNodeName: null,
     };
   }
 
@@ -242,6 +305,10 @@ export function getCoachServiceErrorDebugInfo(error: unknown): CoachServiceError
     requestId: null,
     functionName: null,
     details: error ?? null,
+    providerFailureKind: null,
+    providerFailureStage: null,
+    providerNodeType: null,
+    providerNodeName: null,
   };
 }
 
@@ -269,10 +336,23 @@ function isCoachProviderRequestFailureCode(code?: string | null) {
         code !== COACH_PROVIDER_NOT_CONFIGURED_ERROR_CODE));
 }
 
+function isInvalidCoachProviderFailureKind(kind?: string | null) {
+  return (
+    kind === 'json_parse_failed' ||
+    kind === 'agent_output_parse_failed' ||
+    kind === 'invalid_provider_response'
+  );
+}
+
 function resolveCoachFailureKindFromCode(
   code?: string | null,
   status?: number | null,
+  providerFailureKind?: string | null,
 ): CoachFailureKind {
+  if (isInvalidCoachProviderFailureKind(providerFailureKind)) {
+    return 'invalid_provider_response';
+  }
+
   if (code === COACH_PROVIDER_NOT_CONFIGURED_ERROR_CODE) {
     return 'provider_unavailable';
   }
@@ -290,7 +370,11 @@ function resolveCoachFailureKindFromCode(
 
 export function resolveCoachFailureKindFromError(error: unknown): CoachFailureKind {
   const debugInfo = getCoachServiceErrorDebugInfo(error);
-  return resolveCoachFailureKindFromCode(debugInfo.code, debugInfo.status);
+  return resolveCoachFailureKindFromCode(
+    debugInfo.code,
+    debugInfo.status,
+    debugInfo.providerFailureKind,
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -457,6 +541,14 @@ export function getCoachEntryFailureDebugInfo(
     source: readOptionalString(responsePayload?.source),
     fallbackUsed: readOptionalBoolean(responsePayload?.fallback),
     responseBodyPresent: readOptionalBoolean(responsePayload?.response_body_present),
+    providerFailureKind:
+      readOptionalString(responsePayload?.provider_failure_kind) ?? null,
+    providerFailureStage:
+      readOptionalString(responsePayload?.provider_failure_stage) ?? null,
+    providerNodeType:
+      readOptionalString(responsePayload?.provider_node_type) ?? null,
+    providerNodeName:
+      readOptionalString(responsePayload?.provider_node_name) ?? null,
   };
 }
 
@@ -467,7 +559,11 @@ export function resolveCoachFailureKindFromEntry(
     | undefined,
 ): CoachFailureKind {
   const debugInfo = getCoachEntryFailureDebugInfo(entry);
-  return resolveCoachFailureKindFromCode(debugInfo?.code, debugInfo?.status);
+  return resolveCoachFailureKindFromCode(
+    debugInfo?.code,
+    debugInfo?.status,
+    debugInfo?.providerFailureKind,
+  );
 }
 
 function normalizeCoachLocale(locale?: string | null) {
@@ -792,6 +888,17 @@ async function invokeAuthedCoachFunction<TResponse>(
   });
 }
 
+async function syncCoachProfileMemory(): Promise<PersistedInferredPersona | null> {
+  const response = await invokeAuthedCoachFunction<CoachSyncProfileMemoryResponse>(
+    COACH_SYNC_PROFILE_MEMORY_FUNCTION_NAME,
+    {},
+  );
+
+  return isRecord(response)
+    ? normalizePersistedInferredPersona(response.profile_memory ?? null)
+    : null;
+}
+
 const COACH_METRIC_SPECS: Record<ScanType, CoachMetricSpec[]> = {
   health: [
     { metric: 'face_score', interpretationHint: 'higher_is_better', tolerance: 2 },
@@ -1035,6 +1142,21 @@ const COACH_METRIC_SPECS: Record<ScanType, CoachMetricSpec[]> = {
       interpretationHint: 'lower_is_better',
       tolerance: 2,
     },
+    {
+      metric: 'global_body_fat_estimate_percent',
+      interpretationHint: 'lower_is_better',
+      tolerance: 1,
+    },
+    {
+      metric: 'global_facial_fat_estimate_percent',
+      interpretationHint: 'lower_is_better',
+      tolerance: 1,
+    },
+    {
+      metric: 'global_water_retention_estimate_percent',
+      interpretationHint: 'lower_is_better',
+      tolerance: 1,
+    },
   ],
 };
 
@@ -1101,7 +1223,12 @@ const SECONDARY_TREND_METRICS_BY_SCAN_TYPE: Record<ScanType, string[]> = {
     'whole_grain_indicator_score',
     'meal_freshness_score',
   ],
-  super: ['global_risk_score'],
+  super: [
+    'global_risk_score',
+    'global_body_fat_estimate_percent',
+    'global_facial_fat_estimate_percent',
+    'global_water_retention_estimate_percent',
+  ],
 };
 
 function normalizeLooseToken(value: string) {
@@ -1358,6 +1485,23 @@ function createCoachRichKeyMetrics(
         disclaimer_key: normalized.disclaimer_key,
         detected_conditions: normalized.detected_conditions,
       };
+    case 'fat_distribution_scan_v2':
+      return {
+        global_body_fat_estimate_percent:
+          normalized.global_body_fat_estimate_percent,
+        global_facial_fat_estimate_percent:
+          normalized.global_facial_fat_estimate_percent,
+        global_water_retention_estimate_percent:
+          normalized.global_water_retention_estimate_percent,
+        analysis_summary: normalized.analysis_summary,
+        dominant_storage_pattern: normalized.dominant_storage_pattern,
+        priority_zones: Array.isArray(normalized.priority_zones)
+          ? normalized.priority_zones
+          : [],
+        area_count: Array.isArray(normalized.areas_analysis)
+          ? normalized.areas_analysis.length
+          : 0,
+      };
     default:
       throw new Error('Unsupported coach analysis type');
   }
@@ -1435,6 +1579,22 @@ function createCoachDigestMetrics(
             severity_key: condition.severity_key,
             probability: condition.probability,
           })),
+      };
+    case 'fat_distribution_scan_v2':
+      return {
+        global_body_fat_estimate_percent:
+          normalized.global_body_fat_estimate_percent,
+        global_facial_fat_estimate_percent:
+          normalized.global_facial_fat_estimate_percent,
+        global_water_retention_estimate_percent:
+          normalized.global_water_retention_estimate_percent,
+        dominant_storage_pattern: normalized.dominant_storage_pattern,
+        priority_zones: Array.isArray(normalized.priority_zones)
+          ? normalized.priority_zones.slice(0, 4)
+          : [],
+        area_count: Array.isArray(normalized.areas_analysis)
+          ? normalized.areas_analysis.length
+          : 0,
       };
     default:
       return {};
@@ -1603,6 +1763,42 @@ function createCoachRawFallbackFields(
             }
           : {}),
         ...(conditionTexts.length > 0 ? { condition_texts: conditionTexts } : {}),
+      });
+    }
+    case 'fat_distribution_scan_v2': {
+      const analysisSummaryText = resolveFallbackText(
+        raw.analysis_summary_i18n ?? raw.analysis_summary,
+      );
+      const dominantStoragePatternText = resolveFallbackText(
+        raw.dominant_storage_pattern_i18n ?? raw.dominant_storage_pattern,
+      );
+      const disclaimerText = resolveFallbackText(
+        raw.disclaimer_text_i18n ?? raw.disclaimer_text,
+      );
+      const areaTexts = Array.isArray(raw.areas_analysis)
+        ? raw.areas_analysis
+            .filter(isRecord)
+            .slice(0, 4)
+            .map((area) =>
+              finalizeFallbackFields({
+                area_name: resolveFallbackText(area.area_name),
+                dominant_type: resolveFallbackText(area.dominant_type),
+                explanation: resolveFallbackText(area.explanation),
+                actionable_advice: resolveFallbackText(area.actionable_advice),
+              }),
+            )
+            .filter((item): item is Record<string, unknown> => !!item)
+        : [];
+
+      return finalizeFallbackFields({
+        ...(analysisSummaryText
+          ? { analysis_summary_text: analysisSummaryText }
+          : {}),
+        ...(dominantStoragePatternText
+          ? { dominant_storage_pattern_text: dominantStoragePatternText }
+          : {}),
+        ...(disclaimerText ? { disclaimer_text: disclaimerText } : {}),
+        ...(areaTexts.length > 0 ? { area_texts: areaTexts } : {}),
       });
     }
     default:
@@ -2098,6 +2294,33 @@ function buildCoachRelevantFlags(
       if (hasNewSuperCondition(currentScan, previousScan)) {
         flags.add('new_condition_detected');
       }
+
+      if (currentScan.normalized.scan_type === 'fat_distribution_scan_v2') {
+        const bodyFatEstimate = readNumericMetricValue(
+          currentScan.key_metrics,
+          'global_body_fat_estimate_percent',
+        );
+        const facialFatEstimate = readNumericMetricValue(
+          currentScan.key_metrics,
+          'global_facial_fat_estimate_percent',
+        );
+        const waterRetentionEstimate = readNumericMetricValue(
+          currentScan.key_metrics,
+          'global_water_retention_estimate_percent',
+        );
+
+        if (bodyFatEstimate !== null && bodyFatEstimate >= 30) {
+          flags.add('high_body_fat');
+        }
+
+        if (facialFatEstimate !== null && facialFatEstimate >= 20) {
+          flags.add('high_facial_fat');
+        }
+
+        if (waterRetentionEstimate !== null && waterRetentionEstimate >= 16) {
+          flags.add('high_water_retention');
+        }
+      }
       break;
     }
     default:
@@ -2386,7 +2609,7 @@ function buildPriorScans(
     .filter((item): item is CoachScanRichContext => !!item);
 }
 
-function parseCoachEntryRow(row: unknown): CoachEntry | null {
+export function parseCoachEntryRow(row: unknown): CoachEntry | null {
   if (!isRecord(row)) {
     return null;
   }
@@ -2406,8 +2629,16 @@ function parseCoachEntryRow(row: unknown): CoachEntry | null {
     ? row.request_payload_json
     : null;
   const promptType =
-    normalizeCoachPromptType(row.prompt_type) ??
-    normalizeCoachPromptType(requestPayloadJson?.prompt_type);
+    normalizeCoachGenerationPromptType(row.prompt_type) ??
+    normalizeCoachGenerationPromptType(requestPayloadJson?.prompt_type);
+  const requestQuestionKey = normalizeCoachQuestionKey(
+    requestPayloadJson?.question_key,
+  );
+  const rawQuestionKey =
+    normalizeCoachQuestionKey(row.question_key) ?? requestQuestionKey;
+  const rawQuestionText =
+    normalizeCoachQuestionText(row.question_text) ??
+    normalizeCoachQuestionText(requestPayloadJson?.question_text);
 
   if (!id || !createdAt) {
     return null;
@@ -2434,6 +2665,25 @@ function parseCoachEntryRow(row: unknown): CoachEntry | null {
         fallbackTitle: title,
       }).content
     : null;
+  const mergedContent = mergeCoachStructuredContentWithBodyFallback(
+    parsedContent,
+    body,
+    {
+      fallbackTitle: title,
+      locale,
+    },
+  );
+  const resolvedQuestionSelection = promptType
+    ? resolveCoachQuestionSelection({
+        promptType,
+        questionKey: rawQuestionKey,
+        questionText: rawQuestionText,
+        locale,
+      })
+    : {
+        questionKey: rawQuestionKey,
+        questionText: rawQuestionText,
+      };
 
   return {
     id,
@@ -2444,8 +2694,10 @@ function parseCoachEntryRow(row: unknown): CoachEntry | null {
     persona_key: readCoachPersonaKey(rawPersonaKey),
     has_valid_persona: hasValidPersona,
     prompt_type: promptType,
+    question_key: resolvedQuestionSelection.questionKey ?? null,
+    question_text: resolvedQuestionSelection.questionText ?? null,
     response_version: responseVersion,
-    content: parsedContent,
+    content: mergedContent,
     cta_label: readOptionalString(row.cta_label),
     cta_route: readOptionalString(row.cta_route),
     created_at: createdAt,
@@ -2546,7 +2798,7 @@ function parseCoachHistoryPageRow(row: unknown): RenderableCoachEntry | null {
   return isRenderableCoachEntry(entry) ? entry : null;
 }
 
-function parseCoachHistorySummaryRow(row: unknown): CoachHistorySummary {
+export function parseCoachHistorySummaryRow(row: unknown): CoachHistorySummary {
   if (!isRecord(row)) {
     return {
       total_count: 0,
@@ -2582,6 +2834,7 @@ function parseCoachGenerateResponse(
   }
 
   const title = readOptionalString(payload.title);
+  const promptType = normalizeCoachGenerationPromptType(payload.prompt_type);
   const responseVersion: CoachResponseVersion = isCoachResponseVersion(
     payload.response_version,
   )
@@ -2591,14 +2844,38 @@ function parseCoachGenerateResponse(
   const parsedContent = contentSource
     ? parseCoachStructuredContent(contentSource, { fallbackTitle: title }).content
     : null;
+  const body = readOptionalString(payload.body);
+  const mergedContent = mergeCoachStructuredContentWithBodyFallback(
+    parsedContent,
+    body,
+    {
+      fallbackTitle: title,
+      locale,
+    },
+  );
+  const rawQuestionKey = normalizeCoachQuestionKey(payload.question_key);
+  const rawQuestionText = normalizeCoachQuestionText(payload.question_text);
+  const resolvedQuestionSelection = promptType
+    ? resolveCoachQuestionSelection({
+        promptType,
+        questionKey: rawQuestionKey,
+        questionText: rawQuestionText,
+        locale,
+      })
+    : {
+        questionKey: rawQuestionKey,
+        questionText: rawQuestionText,
+      };
 
   return {
     success: true,
     cached: payload.cached === true,
     entry_id: entryId,
     persona_key: readCoachPersonaKey(payload.persona_key),
-    prompt_type: normalizeCoachPromptType(payload.prompt_type),
-    response_version: parsedContent ? 2 : responseVersion,
+    prompt_type: promptType,
+    question_key: resolvedQuestionSelection.questionKey ?? null,
+    question_text: resolvedQuestionSelection.questionText ?? null,
+    response_version: mergedContent ? 2 : responseVersion,
     status:
       payload.status === 'pending' ||
       payload.status === 'ready' ||
@@ -2606,12 +2883,12 @@ function parseCoachGenerateResponse(
         ? payload.status
         : 'error',
     title,
-    body: readOptionalString(payload.body),
+    body,
     disclaimer:
       readOptionalString(payload.disclaimer) ?? getDefaultCoachDisclaimer(locale),
     cta_label: readOptionalString(payload.cta_label),
     cta_route: readOptionalString(payload.cta_route),
-    content: parsedContent,
+    content: mergedContent,
     source: readOptionalString(payload.source),
     expires_at: readOptionalString(payload.expires_at),
     response_payload_json: isRecord(payload.response_payload_json)
@@ -2650,23 +2927,10 @@ export function parseCoachSourceScan(row: unknown): CoachSourceScan | null {
     return null;
   }
 
-  if (
-    scanType === 'super' &&
-    getAnalysisResultScanType(scanRow.analysis_result) === 'fat_distribution_scan_v2'
-  ) {
-    // MVP bypass: do not derive legacy Coach semantics from the new Super Scan format.
-    return null;
-  }
-
   const normalized = tryNormalizeAnalysisResult(scanRow.analysis_result, {
     expectedScanType: scanType,
   });
   if (!normalized) {
-    return null;
-  }
-
-  if (normalized.scan_type === 'fat_distribution_scan_v2') {
-    // MVP bypass: the new Super format is stored, but coach still consumes legacy semantics.
     return null;
   }
 
@@ -2699,10 +2963,35 @@ function findLatestScanByType(scans: CoachSourceScan[], scanType: ScanType) {
   return scans.find((scan) => scan.scan_type === scanType) ?? null;
 }
 
+function normalizeSelectedCoachScanId(value: unknown) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return normalized.length > 0 && normalized.length <= 120
+    ? normalized
+    : null;
+}
+
+function coachScanIdMatches(scan: CoachSourceScan, scanId: string) {
+  return scan.id === scanId || scan.digest.scan_id === scanId;
+}
+
 function resolveSelectedScanForPrompt(
-  promptType: CoachPromptType,
+  promptType: CoachGenerationPromptType,
   scans: CoachSourceScan[],
+  selectedScanId?: string | null,
 ) {
+  const normalizedSelectedScanId = normalizeSelectedCoachScanId(selectedScanId);
+  const selectedScan = normalizedSelectedScanId
+    ? scans.find((scan) => coachScanIdMatches(scan, normalizedSelectedScanId)) ??
+      null
+    : null;
+  if (selectedScan) {
+    return selectedScan;
+  }
+
   switch (promptType) {
     case 'nutrition_focus':
       return findLatestScanByType(scans, 'nutrition') ?? scans[0] ?? null;
@@ -2736,8 +3025,9 @@ function resolveSelectedScanForPrompt(
 }
 
 function selectRecentScansForPrompt(
-  promptType: CoachPromptType,
+  promptType: CoachGenerationPromptType,
   scans: CoachSourceScan[],
+  selectedScan?: CoachSourceScan | null,
 ): CoachSourceScan[] {
   const quota = getCoachPromptScanQuota(promptType);
   const windowedScans =
@@ -2746,7 +3036,13 @@ function selectRecentScansForPrompt(
       : scans;
 
   if (!quota.typeFilter || quota.typeFilter.length === 0) {
-    return windowedScans.slice(0, quota.recentLimit);
+    const selectedFirst = selectedScan
+      ? [
+          selectedScan,
+          ...windowedScans.filter((scan) => scan.id !== selectedScan.id),
+        ]
+      : windowedScans;
+    return selectedFirst.slice(0, quota.recentLimit);
   }
 
   const preferredSet = new Set<string>(quota.typeFilter);
@@ -2761,7 +3057,10 @@ function selectRecentScansForPrompt(
   }
 
   const merged = [...preferred, ...rest];
-  return merged.slice(0, quota.recentLimit);
+  const selectedFirst = selectedScan
+    ? [selectedScan, ...merged.filter((scan) => scan.id !== selectedScan.id)]
+    : merged;
+  return selectedFirst.slice(0, quota.recentLimit);
 }
 
 function getScansWithinLastDays(scans: CoachSourceScan[], days: number) {
@@ -4078,20 +4377,40 @@ export function inferProfileFromScans(
 }
 
 export function buildCoachPayload(
-  promptType: CoachPromptType,
+  promptType: CoachGenerationPromptType,
   scans: CoachSourceScan[],
+  options: {
+    coachProfileMemory?: PersistedInferredPersona | null;
+    locale?: string | null;
+    questionKey?: CoachQuestionKey | null;
+    questionText?: string | null;
+    selectedScanId?: string | null;
+    scanIntent?: ScanCoachIntent | CoachScanIntentPayload | null;
+  } = {},
 ): CoachGuidancePayload {
   const quota = getCoachPromptScanQuota(promptType);
-  const selectedScan = resolveSelectedScanForPrompt(promptType, scans);
+  const visiblePromptType = resolveVisibleCoachPromptType(promptType);
+  const requestedSelectedScanId =
+    normalizeSelectedCoachScanId(options.selectedScanId);
+  const scanIntentPayload = normalizeCoachScanIntentPayload(options.scanIntent);
+  const selectedScan = resolveSelectedScanForPrompt(
+    promptType,
+    scans,
+    requestedSelectedScanId,
+  );
   const selectedScanPrevious = selectedScan
     ? findPreviousScanByType(scans, selectedScan)
     : null;
   const scansWithinWeek = getScansWithinLastDays(scans, 7);
-  const recentScans = selectRecentScansForPrompt(promptType, scans);
+  const recentScans = selectRecentScansForPrompt(
+    promptType,
+    scans,
+    selectedScan,
+  );
   const richContextByScanId = buildRichContextByScanId(scans);
   const latestByType = buildLatestByTypeRichContexts(scans, richContextByScanId);
   const byType =
-    promptType === 'weekly_plan' || promptType === 'trend_review'
+    visiblePromptType === 'weekly_plan' || visiblePromptType === 'trend_review'
       ? {
           health: findLatestScanByType(scans, 'health')?.digest ?? null,
           body: findLatestScanByType(scans, 'body')?.digest ?? null,
@@ -4099,12 +4418,30 @@ export function buildCoachPayload(
           super: findLatestScanByType(scans, 'super')?.digest ?? null,
         }
       : undefined;
-
+  const questionSelection = resolveCoachQuestionSelection({
+    promptType,
+    questionKey: options.questionKey,
+    questionText: options.questionText,
+    locale: options.locale,
+  });
+  const questionHints = resolveCoachQuestionHints({
+    promptType,
+    questionKey: questionSelection.questionKey,
+    questionText: questionSelection.questionText,
+    locale: options.locale,
+  });
   return {
     payload_version: 2,
     prompt_type: promptType,
+    question_key: questionSelection.questionKey ?? null,
+    question_text: questionSelection.questionText,
+    question_hints: questionHints,
     generated_at: new Date().toISOString(),
     scan_count_7d: scansWithinWeek.length,
+    ...(requestedSelectedScanId
+      ? { selected_scan_id: requestedSelectedScanId }
+      : {}),
+    ...(scanIntentPayload ? { scan_intent: scanIntentPayload } : {}),
     selected_scan: selectedScan?.digest ?? null,
     recent_scans: recentScans.map((scan) => scan.digest),
     latest_scan: selectedScan
@@ -4123,6 +4460,9 @@ export function buildCoachPayload(
     ),
     trend_summary: buildTrendSummary(selectedScan, scans),
     inferred_persona: inferProfileFromScans(scans, scansWithinWeek.length),
+    coach_profile_memory: normalizePersistedInferredPersona(
+      options.coachProfileMemory ?? null,
+    ),
     ...(byType ? { by_type: byType } : {}),
   };
 }
@@ -4138,6 +4478,8 @@ function buildGuidanceResultFromEntry(
     entry_id: entry.id,
     persona_key: entry.persona_key,
     prompt_type: entry.prompt_type ?? payload.prompt_type ?? null,
+    question_key: entry.question_key ?? payload.question_key ?? null,
+    question_text: entry.question_text ?? payload.question_text ?? null,
     response_version: entry.content ? 2 : (entry.response_version ?? 1),
     status: entry.status ?? 'ready',
     title: entry.title,
@@ -4151,6 +4493,111 @@ function buildGuidanceResultFromEntry(
     response_payload_json: entry.response_payload_json ?? {},
     quota: null,
     fallback,
+    payload,
+  };
+}
+
+function buildCoachGenerateRequestPayload(options: {
+  payload: CoachGuidancePayload;
+  personaKey: CoachPersonaKey;
+  locale?: string | null;
+  forceRefresh?: boolean;
+}) {
+  return {
+    payload: options.payload,
+    persona_key: options.personaKey,
+    ...(options.locale ? { locale: options.locale } : {}),
+    ...(options.forceRefresh ? { force_refresh: true as const } : {}),
+  };
+}
+
+function buildLegacyCoachGenerateRequestPayload(
+  requestPayload: ReturnType<typeof buildCoachGenerateRequestPayload>,
+) {
+  const {
+    question_key: _questionKey,
+    question_text: _questionText,
+    question_hints: _questionHints,
+    selected_scan_id: _selectedScanId,
+    scan_intent: _scanIntent,
+    ...legacyPayload
+  } = requestPayload.payload;
+
+  return {
+    ...requestPayload,
+    payload: legacyPayload,
+  };
+}
+
+function buildLatestScanCompatibleCoachGenerateRequestPayload(
+  requestPayload: ReturnType<typeof buildCoachGenerateRequestPayload>,
+) {
+  const legacyRequestPayload = buildLegacyCoachGenerateRequestPayload(
+    requestPayload,
+  );
+
+  return {
+    ...legacyRequestPayload,
+    payload: {
+      ...legacyRequestPayload.payload,
+      prompt_type: 'latest_scan' as const,
+    },
+  };
+}
+
+function shouldRetryCoachGenerationWithLegacyPayload(error: unknown) {
+  return (
+    error instanceof CoachServiceError &&
+    error.functionName === COACH_FUNCTION_NAME &&
+    error.status === 400 &&
+    error.code === 'invalid_coach_payload' &&
+    error.message === 'payload contains unsupported fields'
+  );
+}
+
+function shouldRetryLatestScanIssueResolutionAsLatestScan(
+  error: unknown,
+  requestPayload: ReturnType<typeof buildCoachGenerateRequestPayload>,
+) {
+  return (
+    requestPayload.payload.prompt_type ===
+      LATEST_SCAN_ISSUE_RESOLUTION_PROMPT_TYPE &&
+    error instanceof CoachServiceError &&
+    error.functionName === COACH_FUNCTION_NAME &&
+    error.status === 400 &&
+    error.code === 'invalid_coach_payload' &&
+    error.message === 'payload.prompt_type is not supported'
+  );
+}
+
+function buildCoachGuidanceResult(
+  response: CoachGenerateResponse,
+  payload: CoachGuidancePayload,
+  responsePayload: unknown,
+): CoachGuidanceResult {
+  const rawResponsePayload = isRecord(responsePayload) ? responsePayload : null;
+  const shouldBackfillQuestionKey =
+    !rawResponsePayload ||
+    !Object.prototype.hasOwnProperty.call(rawResponsePayload, 'question_key') ||
+    rawResponsePayload.question_key === null ||
+    rawResponsePayload.question_key === undefined;
+  const shouldBackfillQuestionText =
+    !rawResponsePayload ||
+    !Object.prototype.hasOwnProperty.call(rawResponsePayload, 'question_text') ||
+    rawResponsePayload.question_text === null ||
+    rawResponsePayload.question_text === undefined;
+
+  return {
+    ...response,
+    prompt_type: response.prompt_type ?? payload.prompt_type,
+    question_key: shouldBackfillQuestionKey
+      ? payload.question_key ?? response.question_key ?? null
+      : response.question_key ?? null,
+    question_text: shouldBackfillQuestionText
+      ? payload.question_text ?? response.question_text ?? null
+      : response.question_text ?? null,
+    response_version: response.content ? 2 : (response.response_version ?? 1),
+    fallback: false,
     payload,
   };
 }
@@ -4335,15 +4782,86 @@ export async function fetchCoachHistorySummary(options: {
   }
 }
 
+function parseCoachScreenSnapshotResponse(
+  payload: unknown,
+): CoachScreenSnapshot {
+  if (!isRecord(payload) || payload.success !== true) {
+    throw createCoachServiceError('Coach snapshot returned an invalid payload.', {
+      code: 'coach_snapshot_invalid_response',
+      status: 502,
+      details: payload,
+      functionName: COACH_SCREEN_SNAPSHOT_FUNCTION_NAME,
+    });
+  }
+
+  const quota = parseCoachQuotaStatus(payload.quota);
+  if (!quota) {
+    throw createCoachServiceError('Coach snapshot is missing quota status.', {
+      code: 'coach_snapshot_invalid_quota',
+      status: 502,
+      details: payload,
+      functionName: COACH_SCREEN_SNAPSHOT_FUNCTION_NAME,
+    });
+  }
+
+  const entries = Array.isArray(payload.entries)
+    ? payload.entries
+        .map(parseCoachEntryRow)
+        .filter((item): item is CoachEntry => item !== null)
+    : [];
+  const recentScans = Array.isArray(payload.recent_scans)
+    ? payload.recent_scans
+        .map(parseCoachSourceScan)
+        .filter((item): item is CoachSourceScan => item !== null)
+        .slice(0, RECENT_COACH_SCAN_LIMIT)
+    : [];
+  const latestReadyEntry = parseCoachEntryRow(payload.latest_ready_entry);
+
+  return {
+    entries,
+    quota,
+    recentScans,
+    latestReadyEntry: isRenderableCoachEntry(latestReadyEntry)
+      ? latestReadyEntry
+      : null,
+    historySummary: parseCoachHistorySummaryRow(payload.history_summary),
+    requestId: readOptionalString(payload.request_id) ?? undefined,
+  };
+}
+
+export async function fetchCoachScreenSnapshot(options: {
+  personaKey?: CoachPersonaKey | null;
+  locale?: string | null;
+  excludeEntryId?: string | null;
+  entriesLimit?: number;
+} = {}): Promise<CoachScreenSnapshot> {
+  const personaKey = options.personaKey
+    ? readCoachPersonaKey(options.personaKey)
+    : null;
+  const normalizedLocale = normalizeCoachLocale(options.locale);
+
+  const payload = await invokeAuthedCoachFunction<CoachScreenSnapshotResponse>(
+    COACH_SCREEN_SNAPSHOT_FUNCTION_NAME,
+    {
+      ...(personaKey ? { persona_key: personaKey } : {}),
+      ...(normalizedLocale ? { locale: normalizedLocale } : {}),
+      ...(options.excludeEntryId ? { exclude_entry_id: options.excludeEntryId } : {}),
+      ...(typeof options.entriesLimit === 'number'
+        ? { entries_limit: options.entriesLimit }
+        : {}),
+    },
+  );
+
+  return parseCoachScreenSnapshotResponse(payload);
+}
+
 export async function fetchLatestReadyCoachEntry(options: {
   personaKey?: CoachPersonaKey | null;
-  promptType?: CoachPromptType | null;
+  promptType?: CoachGenerationPromptType | null;
   locale?: string;
 } = {}) {
   const personaKey = options.personaKey ?? null;
-  const promptType = isCoachPromptType(options.promptType)
-    ? options.promptType
-    : null;
+  const promptType = normalizeCoachGenerationPromptType(options.promptType);
   const normalizedLocale = normalizeCoachLocale(options.locale);
 
   try {
@@ -4469,18 +4987,100 @@ export async function fetchRecentCoachScans(
   }
 }
 
+function sortCoachScansByCapturedAtDesc(scans: CoachSourceScan[]) {
+  return scans
+    .map((scan, index) => ({ scan, index }))
+    .sort((left, right) => {
+      const leftTime = Date.parse(left.scan.captured_at);
+      const rightTime = Date.parse(right.scan.captured_at);
+      const timeDelta =
+        (Number.isFinite(rightTime) ? rightTime : 0) -
+        (Number.isFinite(leftTime) ? leftTime : 0);
+
+      return timeDelta !== 0 ? timeDelta : left.index - right.index;
+    })
+    .map((item) => item.scan);
+}
+
+function mergeSelectedCoachScan(
+  scans: CoachSourceScan[],
+  selectedScan: CoachSourceScan | null,
+) {
+  if (!selectedScan) {
+    return scans;
+  }
+
+  return sortCoachScansByCapturedAtDesc([
+    selectedScan,
+    ...scans.filter((scan) => scan.id !== selectedScan.id),
+  ]);
+}
+
+async function fetchCoachScanById(scanId: string) {
+  const { data, error } = await supabase
+    .from('scans')
+    .select('id, scan_type, analysis_result, analyzed_at, created_at')
+    .eq('id', scanId)
+    .maybeSingle();
+
+  if (error) {
+    throw createCoachScansReadError(error);
+  }
+
+  return parseCoachSourceScan(data);
+}
+
+async function fetchCoachScansForGeneration(selectedScanId?: string | null) {
+  const scans = await fetchRecentCoachScans();
+  const normalizedSelectedScanId = normalizeSelectedCoachScanId(selectedScanId);
+  if (
+    !normalizedSelectedScanId ||
+    scans.some((scan) => coachScanIdMatches(scan, normalizedSelectedScanId))
+  ) {
+    return scans;
+  }
+
+  try {
+    const selectedScan = await fetchCoachScanById(normalizedSelectedScanId);
+    return mergeSelectedCoachScan(scans, selectedScan);
+  } catch (error) {
+    logOperationalError('[Coach] Failed to fetch selected scan context', error, {
+      scan_id: normalizedSelectedScanId,
+    });
+    return scans;
+  }
+}
+
 export async function generateCoachGuidance(options: {
-  promptType: CoachPromptType;
+  promptType: CoachGenerationPromptType;
   personaKey: CoachPersonaKey;
   locale?: string;
   forceRefresh?: boolean;
+  coachProfileMemory?: PersistedInferredPersona | null;
+  questionKey?: CoachQuestionKey | null;
+  questionText?: string | null;
+  scanId?: string | null;
+  selectedScanId?: string | null;
+  scanIntent?: ScanCoachIntent | CoachScanIntentPayload | null;
 }): Promise<CoachGuidanceResult> {
   const personaKey = readCoachPersonaKey(options.personaKey);
   const normalizedLocale = normalizeCoachLocale(options.locale);
+  const requestedSelectedScanId =
+    normalizeSelectedCoachScanId(options.selectedScanId ?? options.scanId);
   let payload: CoachGuidancePayload | null = null;
+  let resolvedCoachProfileMemory = normalizePersistedInferredPersona(
+    options.coachProfileMemory ?? null,
+  );
 
   try {
-    const scans = await fetchRecentCoachScans();
+    try {
+      const syncedCoachProfileMemory = await syncCoachProfileMemory();
+      resolvedCoachProfileMemory = syncedCoachProfileMemory;
+    } catch (error) {
+      logOperationalError('[Coach] Failed to sync coach profile memory', error);
+    }
+
+    const scans = await fetchCoachScansForGeneration(requestedSelectedScanId);
     if (scans.length === 0) {
       throw createCoachServiceError(
         'Coach requires at least one usable scan before generating guidance.',
@@ -4494,32 +5094,116 @@ export async function generateCoachGuidance(options: {
       );
     }
 
-    const nextPayload = buildCoachPayload(options.promptType, scans);
+    const nextPayload = buildCoachPayload(options.promptType, scans, {
+      coachProfileMemory: resolvedCoachProfileMemory,
+      locale: normalizedLocale,
+      questionKey: options.questionKey,
+      questionText: options.questionText,
+      selectedScanId: requestedSelectedScanId,
+      scanIntent: options.scanIntent,
+    });
     payload = nextPayload;
 
-    const response = parseCoachGenerateResponse(
-      await invokeAuthedCoachFunction<CoachGenerateResponse>(
-        COACH_FUNCTION_NAME,
-        {
-          payload: nextPayload,
-          persona_key: personaKey,
-          ...(normalizedLocale ? { locale: normalizedLocale } : {}),
-          ...(options.forceRefresh ? { force_refresh: true } : {}),
-        },
-      ),
-      normalizedLocale,
-    );
-
-    return {
-      ...response,
-      prompt_type: response.prompt_type ?? options.promptType,
-      response_version: response.content ? 2 : (response.response_version ?? 1),
-      fallback: false,
+    const requestPayload = buildCoachGenerateRequestPayload({
       payload: nextPayload,
-    };
+      personaKey,
+      locale: normalizedLocale,
+      forceRefresh: options.forceRefresh,
+    });
+    let responsePayload: CoachGenerateResponse;
+
+    try {
+      responsePayload = await invokeAuthedCoachFunction<CoachGenerateResponse>(
+        COACH_FUNCTION_NAME,
+        requestPayload,
+      );
+    } catch (error) {
+      if (shouldRetryLatestScanIssueResolutionAsLatestScan(error, requestPayload)) {
+        if (shouldDebugCoachService()) {
+          console.log(
+            '[Coach] retrying generation with latest_scan prompt compatibility',
+            {
+              prompt_type: options.promptType,
+              fallback_prompt_type: 'latest_scan',
+              persona_key: personaKey,
+              locale: normalizedLocale,
+              ...getCoachServiceErrorDebugInfo(error),
+            },
+          );
+        }
+
+        responsePayload = await invokeAuthedCoachFunction<CoachGenerateResponse>(
+          COACH_FUNCTION_NAME,
+          buildLatestScanCompatibleCoachGenerateRequestPayload(requestPayload),
+        );
+      } else {
+        if (!shouldRetryCoachGenerationWithLegacyPayload(error)) {
+          throw error;
+        }
+
+        if (shouldDebugCoachService()) {
+          console.log('[Coach] retrying generation with legacy payload compatibility', {
+            prompt_type: options.promptType,
+            persona_key: personaKey,
+            locale: normalizedLocale,
+            ...getCoachServiceErrorDebugInfo(error),
+          });
+        }
+
+        const legacyRequestPayload = buildLegacyCoachGenerateRequestPayload(
+          requestPayload,
+        );
+
+        try {
+          responsePayload = await invokeAuthedCoachFunction<CoachGenerateResponse>(
+            COACH_FUNCTION_NAME,
+            legacyRequestPayload,
+          );
+        } catch (legacyError) {
+          if (
+            !shouldRetryLatestScanIssueResolutionAsLatestScan(
+              legacyError,
+              legacyRequestPayload,
+            )
+          ) {
+            throw legacyError;
+          }
+
+          if (shouldDebugCoachService()) {
+            console.log(
+              '[Coach] retrying generation with latest_scan prompt compatibility',
+              {
+                prompt_type: options.promptType,
+                fallback_prompt_type: 'latest_scan',
+                persona_key: personaKey,
+                locale: normalizedLocale,
+                ...getCoachServiceErrorDebugInfo(legacyError),
+              },
+            );
+          }
+
+          responsePayload = await invokeAuthedCoachFunction<CoachGenerateResponse>(
+            COACH_FUNCTION_NAME,
+            buildLatestScanCompatibleCoachGenerateRequestPayload(requestPayload),
+          );
+        }
+      }
+    }
+
+    const response = parseCoachGenerateResponse(responsePayload, normalizedLocale);
+
+    return buildCoachGuidanceResult(response, nextPayload, responsePayload);
   } catch (error) {
     const resolvedPayload =
-      payload ?? buildCoachPayload(options.promptType, []);
+      payload ??
+      buildCoachPayload(options.promptType, [], {
+        coachProfileMemory: resolvedCoachProfileMemory,
+        locale: normalizedLocale,
+        questionKey: options.questionKey,
+        questionText: options.questionText,
+        selectedScanId: requestedSelectedScanId,
+        scanIntent: options.scanIntent,
+      });
     const shouldUseFallback = shouldFallbackToCachedCoachEntry(error);
     if (shouldDebugCoachService()) {
       const errorDebugInfo = getCoachServiceErrorDebugInfo(error);

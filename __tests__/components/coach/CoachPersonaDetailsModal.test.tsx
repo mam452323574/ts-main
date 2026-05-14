@@ -85,8 +85,10 @@ describe('CoachPersonaDetailsModal', () => {
     );
 
     expect(screen.getByTestId('coach-persona-details-locked-callout')).toBeTruthy();
-    expect(screen.getByText('coach.persona_locked_title')).toBeTruthy();
-    expect(screen.getByText('coach.persona_unlock_cta')).toBeTruthy();
+    expect(
+      screen.getByText('Disponible avec Health Scan Premium'),
+    ).toBeTruthy();
+    expect(screen.getByText('Debloquer ce coach')).toBeTruthy();
     expect(screen.getByText('Plus tard')).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('coach-persona-details-primary-cta'));

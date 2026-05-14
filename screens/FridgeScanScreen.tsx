@@ -78,11 +78,145 @@ type ReviewState = {
   source: FridgeScanCaptureSource;
 } | null;
 
+type ReviewImageFallback = {
+  imageUri: string;
+  base64: string;
+  width: number;
+  height: number;
+  source: FridgeScanCaptureSource;
+};
+
 type FridgeScanEligibilityLike = {
   message?: string;
   message_key?: string;
   next_available_date?: number;
 };
+
+const FRIDGE_SCAN_SUBMIT_FUNCTION_NAME = 'fridge-scan-submit';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function readFridgeScanErrorStage(error: ApiError) {
+  if (!isRecord(error.context)) {
+    return null;
+  }
+
+  const stage = error.context.stage;
+  return typeof stage === 'string' && stage.trim().length > 0
+    ? stage.trim()
+    : null;
+}
+
+function readFridgeScanErrorFunctionName(error: ApiError) {
+  if (!isRecord(error.context)) {
+    return null;
+  }
+
+  const functionName = error.context.functionName;
+  return typeof functionName === 'string' && functionName.trim().length > 0
+    ? functionName.trim()
+    : null;
+}
+
+function isFridgeScanNetworkError(error: unknown) {
+  if (error instanceof ApiError) {
+    return (
+      error.type === 'NETWORK' ||
+      error.code === 'edge_function_network_error' ||
+      ApiError.isNetworkError(error.originalError ?? error)
+    );
+  }
+
+  return ApiError.isNetworkError(error);
+}
+
+function shouldShowFridgeScanDevDebugInfo() {
+  const nodeEnv =
+    typeof process !== 'undefined' ? process.env.NODE_ENV : undefined;
+
+  return (
+    typeof __DEV__ !== 'undefined' &&
+    __DEV__ &&
+    nodeEnv !== 'test'
+  );
+}
+
+function buildFridgeScanDevDebugInfo(error: unknown) {
+  if (!shouldShowFridgeScanDevDebugInfo()) {
+    return null;
+  }
+
+  const parts: string[] = [];
+
+  if (error instanceof ApiError) {
+    parts.push(`type=${error.type}`);
+
+    if (error.code) {
+      parts.push(`code=${error.code}`);
+    }
+
+    if (typeof error.status === 'number') {
+      parts.push(`status=${error.status}`);
+    }
+
+    if (error.requestId) {
+      parts.push(`requestId=${error.requestId}`);
+    }
+
+    const stage = readFridgeScanErrorStage(error);
+    if (stage) {
+      parts.push(`stage=${stage}`);
+    }
+
+    const functionName = readFridgeScanErrorFunctionName(error);
+    if (functionName) {
+      parts.push(`function=${functionName}`);
+    }
+  } else if (error instanceof Error && error.message) {
+    parts.push(`message=${error.message}`);
+  }
+
+  return parts.length > 0 ? `Debug: ${parts.join(' | ')}` : null;
+}
+
+function appendFridgeScanDevDebugInfo(message: string, error: unknown) {
+  const debugInfo = buildFridgeScanDevDebugInfo(error);
+  return debugInfo ? `${message}\n\n${debugInfo}` : message;
+}
+
+function buildFridgeScanGalleryPickerOptions(): ImagePicker.ImagePickerOptions {
+  const preferredAssetRepresentationMode =
+    Platform.OS === 'ios'
+      ? ImagePicker.UIImagePickerPreferredAssetRepresentationMode?.Compatible
+      : undefined;
+
+  return {
+    mediaTypes: ['images'],
+    quality: 0.85,
+    base64: true,
+    ...(preferredAssetRepresentationMode
+      ? { preferredAssetRepresentationMode }
+      : {}),
+  };
+}
+
+function readGalleryImageFallback(
+  asset: ImagePicker.ImagePickerAsset,
+): ReviewImageFallback | null {
+  if (!asset.base64) {
+    return null;
+  }
+
+  return {
+    imageUri: asset.uri,
+    base64: asset.base64,
+    width: asset.width,
+    height: asset.height,
+    source: 'gallery',
+  };
+}
 
 export default function FridgeScanScreen() {
   const router = useRouter();
@@ -104,6 +238,7 @@ export default function FridgeScanScreen() {
     DEFAULT_FRIDGE_MEAL_MODE,
   );
   const cameraRef = useRef<CameraView>(null);
+  const reviewImageFallbackRef = useRef<ReviewImageFallback | null>(null);
   const frameWidth = Math.min(windowWidth - SPACING.page * 2, 362);
   const frameHeight = Math.min(
     frameWidth * FRIDGE_GUIDE_HEIGHT_RATIO,
@@ -169,6 +304,7 @@ export default function FridgeScanScreen() {
     setReview(null);
     setSubmission(null);
     setIsSubmitting(false);
+    reviewImageFallbackRef.current = null;
   }, []);
 
   const handleCapture = useCallback(async () => {
@@ -186,6 +322,7 @@ export default function FridgeScanScreen() {
       }
 
       setSubmission(null);
+      reviewImageFallbackRef.current = null;
       setReview({
         imageUri: photo.uri,
         source: 'camera',
@@ -203,18 +340,19 @@ export default function FridgeScanScreen() {
 
   const handlePickFromGallery = useCallback(async () => {
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        quality: 1,
-      });
+      const result = await ImagePicker.launchImageLibraryAsync(
+        buildFridgeScanGalleryPickerOptions(),
+      );
 
       if (result.canceled || !result.assets?.[0]?.uri) {
         return;
       }
 
+      const asset = result.assets[0];
       setSubmission(null);
+      reviewImageFallbackRef.current = readGalleryImageFallback(asset);
       setReview({
-        imageUri: result.assets[0].uri,
+        imageUri: asset.uri,
         source: 'gallery',
       });
     } catch {
@@ -243,6 +381,19 @@ export default function FridgeScanScreen() {
     }
 
     setIsSubmitting(true);
+    const reviewImageFallback =
+      reviewImageFallbackRef.current?.imageUri === review.imageUri &&
+      reviewImageFallbackRef.current.source === review.source
+        ? reviewImageFallbackRef.current
+        : null;
+    const preEncodedJpeg = reviewImageFallback
+      ? {
+          base64: reviewImageFallback.base64,
+          width: reviewImageFallback.width,
+          height: reviewImageFallback.height,
+          source: reviewImageFallback.source,
+        }
+      : undefined;
     logOperationalInfo('[FridgeScanScreen] Fridge scan submission started', {
       source: review.source,
       selected_mode: selectedMode,
@@ -255,6 +406,7 @@ export default function FridgeScanScreen() {
         source: review.source,
         selectedMode,
         locale,
+        ...(preEncodedJpeg ? { preEncodedJpeg } : {}),
         clientMetadata: {
           screen: 'fridge_scan',
           submitted_from: 'review_sheet',
@@ -313,6 +465,105 @@ export default function FridgeScanScreen() {
           undefined,
           { variant: 'warning' },
         );
+      } else if (
+        error instanceof ApiError &&
+        readFridgeScanErrorStage(error) === 'image_normalization'
+      ) {
+        logOperationalError(
+          '[FridgeScanScreen] Fridge scan image processing failed',
+          error,
+          {
+            failure_bucket: 'image_normalization',
+            function_name: readFridgeScanErrorFunctionName(error) ?? undefined,
+            selected_mode: selectedMode,
+            source: review.source,
+            locale,
+          },
+        );
+        showAlert(
+          t('common.error'),
+          appendFridgeScanDevDebugInfo(
+            t('fridge_scan.submission_image_error'),
+            error,
+          ),
+          undefined,
+          undefined,
+          { variant: 'warning' },
+        );
+      } else if (
+        error instanceof ApiError &&
+        (error.type === 'AUTH' ||
+          error.code === 'auth_session_missing' ||
+          error.status === 401)
+      ) {
+        logOperationalError(
+          '[FridgeScanScreen] Fridge scan submission blocked by auth',
+          error,
+          {
+            failure_bucket: 'auth',
+            function_name: readFridgeScanErrorFunctionName(error) ?? undefined,
+            selected_mode: selectedMode,
+            source: review.source,
+            locale,
+          },
+        );
+        showAlert(
+          t('common.error'),
+          appendFridgeScanDevDebugInfo(
+            t('fridge_scan.submission_auth_error'),
+            error,
+          ),
+          undefined,
+          undefined,
+          { variant: 'warning' },
+        );
+      } else if (isFridgeScanNetworkError(error)) {
+        logOperationalError(
+          '[FridgeScanScreen] Fridge scan submission network failure',
+          error,
+          {
+            failure_bucket: 'network',
+            selected_mode: selectedMode,
+            source: review.source,
+            locale,
+          },
+        );
+        showAlert(
+          t('common.error'),
+          appendFridgeScanDevDebugInfo(
+            t('fridge_scan.submission_network_error'),
+            error,
+          ),
+          undefined,
+          undefined,
+          { variant: 'warning' },
+        );
+      } else if (
+        error instanceof ApiError &&
+        readFridgeScanErrorFunctionName(error) ===
+          FRIDGE_SCAN_SUBMIT_FUNCTION_NAME
+      ) {
+        logOperationalError(
+          '[FridgeScanScreen] Fridge scan submission server failure',
+          error,
+          {
+            failure_bucket: 'edge_function',
+            function_name: readFridgeScanErrorFunctionName(error) ?? undefined,
+            selected_mode: selectedMode,
+            source: review.source,
+            locale,
+          },
+        );
+        showAlert(
+          t('common.error'),
+          appendFridgeScanDevDebugInfo(
+            t('fridge_scan.submission_service_error'),
+            error,
+          ),
+          undefined,
+          undefined,
+          { variant: 'warning' },
+        );
       } else {
         logOperationalError('[FridgeScanScreen] Fridge scan submission failed', error, {
           function_name:
@@ -325,7 +576,10 @@ export default function FridgeScanScreen() {
         });
         showAlert(
           t('common.error'),
-          t('fridge_scan.submission_error'),
+          appendFridgeScanDevDebugInfo(
+            t('fridge_scan.submission_error'),
+            error,
+          ),
           undefined,
           undefined,
           { variant: 'warning' },
@@ -762,7 +1016,7 @@ const createStyles = (
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: '#050505',
+      backgroundColor: chefFlowTheme.screenBackground,
     },
     camera: {
       ...StyleSheet.absoluteFillObject,
@@ -784,9 +1038,9 @@ const createStyles = (
       width: 42,
       height: 42,
       borderRadius: 21,
-      backgroundColor: 'rgba(12, 14, 19, 0.74)',
+      backgroundColor: chefFlowTheme.chromeButtonBackground,
       borderWidth: 1,
-      borderColor: 'rgba(255, 255, 255, 0.12)',
+      borderColor: chefFlowTheme.chromeButtonBorder,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -853,9 +1107,9 @@ const createStyles = (
       borderRadius: 28,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: 'rgba(255, 255, 255, 0.18)',
+      backgroundColor: chefFlowTheme.chromeButtonBackground,
       borderWidth: 1,
-      borderColor: 'rgba(255, 255, 255, 0.26)',
+      borderColor: chefFlowTheme.chromeButtonBorder,
     },
     captureButton: {
       alignItems: 'center',
@@ -866,7 +1120,7 @@ const createStyles = (
       height: 84,
       borderRadius: 42,
       borderWidth: 4,
-      borderColor: '#FFFFFF',
+      borderColor: chefFlowTheme.textInverse,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: 'rgba(255, 255, 255, 0.08)',
@@ -875,7 +1129,7 @@ const createStyles = (
       width: 66,
       height: 66,
       borderRadius: 33,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: chefFlowTheme.textInverse,
     },
     feedbackOverlay: {
       ...StyleSheet.absoluteFillObject,

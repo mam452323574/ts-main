@@ -240,7 +240,7 @@ describe('ScanPreviewScreen', () => {
     expect(screen.getByText('Annuler')).toBeTruthy();
   });
 
-  it('uses light theme surfaces for the action panel and loading progress UI', async () => {
+  it('keeps the preview dark-first even when the app theme is light', async () => {
     mockCreateScanWithAnalysis.mockImplementation(() => new Promise(() => {}));
 
     render(<ScanPreviewScreen />);
@@ -251,9 +251,9 @@ describe('ScanPreviewScreen', () => {
       screen.getByText('Annuler').props.style,
     );
 
-    expect(actionPanel.props.tint).toBe('light');
+    expect(actionPanel.props.tint).toBe('dark');
     expect(actionPanelStyle.backgroundColor).not.toBe('rgba(20, 20, 22, 0.4)');
-    expect(cancelTextStyle.color).toBe('#1C1C1E');
+    expect(cancelTextStyle.color).not.toBe('#1C1C1E');
 
     fireEvent.press(screen.getByTestId('confirm-button'));
 
@@ -274,7 +274,7 @@ describe('ScanPreviewScreen', () => {
     );
   });
 
-  it('uses compact Android safe-area paddings for the preview and loading overlay', async () => {
+  it('keeps Android preview spacing while using tight loading metrics for limited usable height', async () => {
     Object.defineProperty(Platform, 'OS', {
       value: 'android',
       configurable: true,
@@ -311,26 +311,337 @@ describe('ScanPreviewScreen', () => {
     const progressCardStyle = StyleSheet.flatten(
       screen.getByTestId('scan-preview-progress-card').props.style,
     );
+    const vignetteStyle = StyleSheet.flatten(
+      screen.getByTestId('scan-preview-loading-vignette').props.style,
+    );
 
     expect(imageContainerStyle).toEqual(
       expect.objectContaining({
-        paddingTop: 24 + 60,
+        paddingTop: 24 + 52,
         paddingBottom: SPACING.sm + 236,
       }),
     );
     expect(loadingOverlayStyle).toEqual(
       expect.objectContaining({
-        paddingTop: 24 + 72,
+        paddingTop: 24 + 18,
+      }),
+    );
+    expect(vignetteStyle).toEqual(
+      expect.objectContaining({
+        height: 104,
       }),
     );
     expect(progressCardStyle).toEqual(
       expect.objectContaining({
-        minHeight: 368,
-        paddingVertical: 40,
-        paddingHorizontal: 24,
+        minHeight: 0,
+        paddingVertical: 14,
+        paddingHorizontal: 18,
       }),
     );
   });
+
+  it('uses compact loading metrics on iPhone-style safe areas', async () => {
+    Object.defineProperty(Platform, 'OS', {
+      value: 'ios',
+      configurable: true,
+    });
+    useWindowDimensionsSpy.mockReturnValue({
+      width: 390,
+      height: 844,
+      scale: 3,
+      fontScale: 1,
+    });
+    mockUseSafeAreaInsets.mockReturnValue({
+      top: 47,
+      bottom: 34,
+      left: 0,
+      right: 0,
+    });
+    mockCreateScanWithAnalysis.mockImplementation(() => new Promise(() => {}));
+
+    render(<ScanPreviewScreen />);
+
+    fireEvent.press(screen.getByTestId('confirm-button'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('scan-preview-loading-overlay')).toBeTruthy();
+    });
+
+    const loadingOverlayStyle = StyleSheet.flatten(
+      screen.getByTestId('scan-preview-loading-overlay').props.style,
+    );
+    const vignetteStyle = StyleSheet.flatten(
+      screen.getByTestId('scan-preview-loading-vignette').props.style,
+    );
+    const progressCardStyle = StyleSheet.flatten(
+      screen.getByTestId('scan-preview-progress-card').props.style,
+    );
+    const percentageStyle = StyleSheet.flatten(
+      screen.getByTestId('scan-preview-loading-percentage').props.style,
+    );
+
+    expect(screen.queryByTestId('scan-preview-loading-scroll-view')).toBeNull();
+    expect(loadingOverlayStyle).toEqual(
+      expect.objectContaining({
+        paddingTop: 47 + 28,
+      }),
+    );
+    expect(vignetteStyle).toEqual(
+      expect.objectContaining({
+        height: 132,
+      }),
+    );
+    expect(progressCardStyle).toEqual(
+      expect.objectContaining({
+        minHeight: 304,
+        paddingVertical: 20,
+      }),
+    );
+    expect(percentageStyle).toEqual(
+      expect.objectContaining({
+        fontSize: 60,
+        lineHeight: 66,
+      }),
+    );
+  });
+
+  it('keeps the full loading hierarchy visible on small iPhone heights', async () => {
+    Object.defineProperty(Platform, 'OS', {
+      value: 'ios',
+      configurable: true,
+    });
+    useWindowDimensionsSpy.mockReturnValue({
+      width: 375,
+      height: 667,
+      scale: 2,
+      fontScale: 1,
+    });
+    mockUseSafeAreaInsets.mockReturnValue({
+      top: 20,
+      bottom: 0,
+      left: 0,
+      right: 0,
+    });
+    mockCreateScanWithAnalysis.mockImplementation(() => new Promise(() => {}));
+
+    render(<ScanPreviewScreen />);
+
+    fireEvent.press(screen.getByTestId('confirm-button'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('scan-preview-loading-overlay')).toBeTruthy();
+    });
+
+    const vignetteStyle = StyleSheet.flatten(
+      screen.getByTestId('scan-preview-loading-vignette').props.style,
+    );
+    const progressCardStyle = StyleSheet.flatten(
+      screen.getByTestId('scan-preview-progress-card').props.style,
+    );
+    const percentageStyle = StyleSheet.flatten(
+      screen.getByTestId('scan-preview-loading-percentage').props.style,
+    );
+
+    expect(screen.queryByTestId('scan-preview-loading-scroll-view')).toBeNull();
+    expect(vignetteStyle).toEqual(
+      expect.objectContaining({
+        height: 104,
+      }),
+    );
+    expect(progressCardStyle).toEqual(
+      expect.objectContaining({
+        paddingVertical: 14,
+      }),
+    );
+    expect(percentageStyle).toEqual(
+      expect.objectContaining({
+        fontSize: 46,
+      }),
+    );
+    expect(screen.getByTestId('scan-preview-loading-vignette')).toBeTruthy();
+    expect(screen.getByTestId('scan-preview-loading-percentage')).toBeTruthy();
+    expect(screen.getByTestId('scan-preview-step-verification')).toBeTruthy();
+    expect(screen.getByTestId('scan-preview-step-upload')).toBeTruthy();
+    expect(screen.getByTestId('scan-preview-step-analysis')).toBeTruthy();
+    expect(screen.getByTestId('scan-preview-step-preparing')).toBeTruthy();
+    expect(screen.getByTestId('scan-preview-trust-line')).toBeTruthy();
+    expect(screen.getByText('Indicateurs en cours')).toBeTruthy();
+    expect(screen.getByText('Hydratation')).toBeTruthy();
+  });
+
+  it('uses the ScrollView fallback only on ultra-tight heights', async () => {
+    Object.defineProperty(Platform, 'OS', {
+      value: 'ios',
+      configurable: true,
+    });
+    useWindowDimensionsSpy.mockReturnValue({
+      width: 320,
+      height: 568,
+      scale: 2,
+      fontScale: 1,
+    });
+    mockUseSafeAreaInsets.mockReturnValue({
+      top: 20,
+      bottom: 0,
+      left: 0,
+      right: 0,
+    });
+    mockCreateScanWithAnalysis.mockImplementation(() => new Promise(() => {}));
+
+    render(<ScanPreviewScreen />);
+
+    fireEvent.press(screen.getByTestId('confirm-button'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('scan-preview-loading-scroll-view')).toBeTruthy();
+    });
+
+    const scrollView = screen.getByTestId('scan-preview-loading-scroll-view');
+    const vignetteStyle = StyleSheet.flatten(
+      screen.getByTestId('scan-preview-loading-vignette').props.style,
+    );
+    const progressCardStyle = StyleSheet.flatten(
+      screen.getByTestId('scan-preview-progress-card').props.style,
+    );
+    const percentageStyle = StyleSheet.flatten(
+      screen.getByTestId('scan-preview-loading-percentage').props.style,
+    );
+
+    expect(scrollView.props.showsVerticalScrollIndicator).toBe(false);
+    expect(scrollView.props.bounces).toBe(false);
+    expect(vignetteStyle).toEqual(
+      expect.objectContaining({
+        height: 88,
+      }),
+    );
+    expect(progressCardStyle).toEqual(
+      expect.objectContaining({
+        paddingVertical: 12,
+      }),
+    );
+    expect(percentageStyle).toEqual(
+      expect.objectContaining({
+        fontSize: 40,
+      }),
+    );
+  });
+
+  it('keeps regular premium loading metrics on tall iPhones', async () => {
+    Object.defineProperty(Platform, 'OS', {
+      value: 'ios',
+      configurable: true,
+    });
+    useWindowDimensionsSpy.mockReturnValue({
+      width: 430,
+      height: 932,
+      scale: 3,
+      fontScale: 1,
+    });
+    mockUseSafeAreaInsets.mockReturnValue({
+      top: 59,
+      bottom: 34,
+      left: 0,
+      right: 0,
+    });
+    mockCreateScanWithAnalysis.mockImplementation(() => new Promise(() => {}));
+
+    render(<ScanPreviewScreen />);
+
+    fireEvent.press(screen.getByTestId('confirm-button'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('scan-preview-loading-overlay')).toBeTruthy();
+    });
+
+    const loadingOverlayStyle = StyleSheet.flatten(
+      screen.getByTestId('scan-preview-loading-overlay').props.style,
+    );
+    const vignetteStyle = StyleSheet.flatten(
+      screen.getByTestId('scan-preview-loading-vignette').props.style,
+    );
+    const progressCardStyle = StyleSheet.flatten(
+      screen.getByTestId('scan-preview-progress-card').props.style,
+    );
+    const percentageStyle = StyleSheet.flatten(
+      screen.getByTestId('scan-preview-loading-percentage').props.style,
+    );
+
+    expect(screen.queryByTestId('scan-preview-loading-scroll-view')).toBeNull();
+    expect(loadingOverlayStyle).toEqual(
+      expect.objectContaining({
+        paddingTop: 59 + 48,
+      }),
+    );
+    expect(vignetteStyle).toEqual(
+      expect.objectContaining({
+        height: 176,
+      }),
+    );
+    expect(progressCardStyle).toEqual(
+      expect.objectContaining({
+        minHeight: 356,
+        paddingVertical: 28,
+      }),
+    );
+    expect(percentageStyle).toEqual(
+      expect.objectContaining({
+        fontSize: 70,
+      }),
+    );
+  });
+
+  it('renders the editorial loading state with health insight chips', async () => {
+    mockCreateScanWithAnalysis.mockImplementation(() => new Promise(() => {}));
+
+    render(<ScanPreviewScreen />);
+
+    fireEvent.press(screen.getByTestId('confirm-button'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('scan-preview-loading-overlay')).toBeTruthy();
+    });
+
+    expect(screen.getByTestId('scan-preview-loading-phase-eyebrow').props.children).toBe(
+      'Lecture du visage',
+    );
+    expect(screen.getByTestId('scan-preview-loading-phase-headline').props.children).toBe(
+      'Vérification de la photo',
+    );
+    expect(screen.getByTestId('scan-preview-loading-percentage').props.children).toBe(
+      '0%',
+    );
+    expect(screen.getByText('Hydratation')).toBeTruthy();
+    expect(screen.getByText('Symétrie')).toBeTruthy();
+    expect(screen.getByText('Éclat')).toBeTruthy();
+  });
+
+  it.each([
+    ['body', 'Lecture du corps', 'Posture'],
+    ['nutrition', 'Lecture nutrition', 'Calories'],
+    ['super', 'Synthèse premium', 'Score global'],
+  ] as const)(
+    'shows scan-type specific loading vocabulary for %s scans',
+    async (scanType, eyebrow, chipLabel) => {
+      mockUseLocalSearchParams.mockReturnValue({
+        imageUri: 'file:///test-image.jpg',
+        scanType,
+      });
+      mockCreateScanWithAnalysis.mockImplementation(() => new Promise(() => {}));
+
+      render(<ScanPreviewScreen />);
+
+      fireEvent.press(screen.getByTestId('confirm-button'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('scan-preview-loading-overlay')).toBeTruthy();
+      });
+
+      expect(
+        screen.getByTestId('scan-preview-loading-phase-eyebrow').props.children,
+      ).toBe(eyebrow);
+      expect(screen.getByText(chipLabel)).toBeTruthy();
+    },
+  );
 
   it('navigates back when X button is pressed', () => {
     render(<ScanPreviewScreen />);
@@ -649,6 +960,38 @@ describe('ScanPreviewScreen', () => {
         fireEvent.press(button);
       });
       expect(mockCreateScanWithAnalysis).toHaveBeenCalledTimes(1);
+    });
+
+    it('switches to the report-ready phase at 100% before navigation', async () => {
+      mockCreateScanWithAnalysis.mockResolvedValue({
+        scan: {
+          id: 'scan-123',
+          analysis_result: { scan_type: 'face', face_score: 85 },
+        },
+        analysisSucceeded: true,
+      });
+
+      render(<ScanPreviewScreen />);
+
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('confirm-button'));
+      });
+
+      await waitFor(() => {
+        expect(mockCreateScanWithAnalysis).toHaveBeenCalled();
+      });
+
+      await act(async () => {
+        jest.advanceTimersByTime(5500);
+      });
+
+      expect(screen.getByTestId('scan-preview-loading-percentage').props.children).toBe(
+        '100%',
+      );
+      expect(
+        screen.getByTestId('scan-preview-loading-phase-headline').props.children,
+      ).toBe('Préparation du résultat');
+      expect(mockReplace).not.toHaveBeenCalled();
     });
 
     it('navigates to scan result after successful scan', async () => {
@@ -1043,7 +1386,7 @@ describe('ScanPreviewScreen', () => {
 
       render(<ScanPreviewScreen />);
 
-      expect(screen.getByText('Corps')).toBeTruthy();
+      expect(screen.getAllByText('Corps').length).toBeGreaterThan(0);
     });
 
     it('displays nutrition scan type correctly', () => {
@@ -1054,7 +1397,7 @@ describe('ScanPreviewScreen', () => {
 
       render(<ScanPreviewScreen />);
 
-      expect(screen.getByText('Nutrition')).toBeTruthy();
+      expect(screen.getAllByText('Nutrition').length).toBeGreaterThan(0);
     });
   });
 });

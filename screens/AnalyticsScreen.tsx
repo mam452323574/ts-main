@@ -7,13 +7,14 @@ import {
   TouchableOpacity,
   RefreshControl,
   useWindowDimensions,
+  InteractionManager,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LineChart } from 'react-native-chart-kit';
-import { Crown, Activity, Utensils, Heart, ChevronLeft } from 'lucide-react-native';
+import { Crown, Activity, Utensils, Heart } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
-import { useAnalytics } from '@/hooks/queries';
+import { useAnalytics } from '@/hooks/queries/useAnalytics';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import {
@@ -22,10 +23,13 @@ import {
   FaceScoreHistoryItem,
   NutritionHistoryItem,
 } from '@/types';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ErrorMessage } from '@/components/ErrorMessage';
-import { SIZES, SPACING, BORDER_RADIUS, FONT_WEIGHTS, SHADOWS, withAlpha } from '@/constants/theme';
+import { AppScreen } from '@/components/AppScreen';
+import { SIZES, SPACING, BORDER_RADIUS, FONT_WEIGHTS, getMainPageChrome, getObsidianSurface, withAlpha } from '@/constants/theme';
 import { ContextualPaywall } from '@/components/ContextualPaywall';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { ScreenState } from '@/components/ScreenState';
+import { SegmentedControl } from '@/components/SegmentedControl';
 import {
   ANALYTICS_LIKE_LINE_CHART_PROPS,
   createAnalyticsLikeLineChartConfig,
@@ -448,11 +452,15 @@ const getDenseXAxisLayout = (
 export default function AnalyticsScreen() {
   const router = useRouter();
   const { userProfile } = useAuth();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { t, locale } = useLanguage();
   const { width: screenWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const mainPageChrome = useMemo(
+    () => getMainPageChrome(colors, isDark, 'analytics'),
+    [colors, isDark],
+  );
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const [period, setPeriod] = useState<AnalyticsPeriod>('7days');
   const [paywallVisible, setPaywallVisible] = useState(false);
   const [measuredDenseLabelWidth, setMeasuredDenseLabelWidth] = useState(0);
@@ -461,10 +469,12 @@ export default function AnalyticsScreen() {
   const [nutritionMetricId, setNutritionMetricId] = useState(
     NUTRITION_CHART_METRICS[0].id,
   );
+  const [chartsReady, setChartsReady] = useState(false);
   const { showAlert, alertElement } = useCustomAlert();
   const isPremium = hasPremiumAccessFromProfile(userProfile);
 
   const { data, isLoading, error, refetch } = useAnalytics(period);
+  const isInitialLoading = isLoading && !data && !error;
 
   const [isManualRefresh, setIsManualRefresh] = useState(false);
 
@@ -473,6 +483,17 @@ export default function AnalyticsScreen() {
     await refetch();
     setIsManualRefresh(false);
   }, [refetch]);
+
+  useEffect(() => {
+    setChartsReady(false);
+    const task = InteractionManager.runAfterInteractions(() => {
+      setChartsReady(true);
+    });
+
+    return () => {
+      task.cancel?.();
+    };
+  }, [period, data]);
 
   const handlePeriodSelect = (selectedPeriod: AnalyticsPeriod, requiresPremium: boolean) => {
     if (requiresPremium && !isPremium) {
@@ -519,18 +540,20 @@ export default function AnalyticsScreen() {
     healthScoreHistory.length > 0 ||
     bodyScoreHistory.length > 0 ||
     nutritionHistory.length > 0;
+  const analyticsChartLineColor = mainPageChrome.chart.line;
+  const analyticsIconColor = mainPageChrome.accentColor;
 
   const chartConfig = useMemo(() => createAnalyticsLikeLineChartConfig({
-    backgroundColor: colors.cardBackground,
-    lineColor: '#0A84FF',
+    backgroundColor: mainPageChrome.elevatedSurface.backgroundColor,
+    lineColor: analyticsChartLineColor,
     labelColor: colors.gray,
-    fillShadowGradientFrom: colors.primary,
-    fillShadowGradientTo: colors.cardBackground,
-    fillShadowGradientOpacity: 0.2,
-    backgroundLineColor: colors.gray,
-    dotStrokeColor: colors.cardBackground,
+    fillShadowGradientFrom: withAlpha(colors.primaryText, isDark ? 0.12 : 0.08),
+    fillShadowGradientTo: mainPageChrome.surface.backgroundColor,
+    fillShadowGradientOpacity: 0.08,
+    backgroundLineColor: withAlpha(colors.primaryText, 0.14),
+    dotStrokeColor: mainPageChrome.elevatedSurface.backgroundColor,
     borderRadius: BORDER_RADIUS.lg,
-  }), [colors]);
+  }), [analyticsChartLineColor, colors.gray, colors.primaryText, isDark, mainPageChrome]);
 
   const bucketSize = getBucketSize(period);
   const maxLabels = getMaxLabels(period);
@@ -626,7 +649,7 @@ export default function AnalyticsScreen() {
   const buildChartData = useCallback(
     (
       aggregated: AggregatedChartPoint[],
-      colorRgba: string,
+      lineColor: string,
       scale: ChartScaleKind,
     ) => {
       if (aggregated.length === 0) return null;
@@ -645,7 +668,7 @@ export default function AnalyticsScreen() {
         datasets: [
           {
             data: aggregated.map((item) => sanitizeChartValue(item.value, ceiling)),
-            color: (opacity = 1) => colorRgba.replace('OPACITY', String(opacity)),
+            color: (opacity = 1) => withAlpha(lineColor, opacity),
             strokeWidth: 3,
           },
           { data: [0], withDots: false, strokeWidth: 0, color: () => 'transparent' },
@@ -665,34 +688,31 @@ export default function AnalyticsScreen() {
     return {
       healthScoreData: buildChartData(
         aggregatedHistory.healthAgg,
-        'rgba(50, 173, 230, OPACITY)',
+        analyticsChartLineColor,
         selectedHealthMetric.scale,
       ),
       physicalEvolutionData: buildChartData(
         aggregatedHistory.bodyAgg,
-        'rgba(0, 122, 255, OPACITY)',
+        analyticsChartLineColor,
         selectedBodyMetric.scale,
       ),
       nutritionScoreData: buildChartData(
         aggregatedHistory.nutritionAgg,
-        'rgba(52, 199, 89, OPACITY)',
+        analyticsChartLineColor,
         selectedNutritionMetric.scale,
       ),
     };
   }, [
     aggregatedHistory,
+    analyticsChartLineColor,
     buildChartData,
     selectedHealthMetric.scale,
     selectedBodyMetric.scale,
     selectedNutritionMetric.scale,
   ]);
 
-  if (isLoading) {
-    return <LoadingSpinner />;
-  }
-
   return (
-    <View style={styles.container}>
+    <AppScreen topInset={false} bottomInset={false} style={styles.container}>
       {alertElement}
       {isDensePeriod && denseMeasurementLabel ? (
         <View pointerEvents="none" style={styles.labelMeasurementContainer}>
@@ -710,22 +730,12 @@ export default function AnalyticsScreen() {
         </View>
       ) : null}
 
-      <View style={[styles.header, { paddingTop: insets.top + SPACING.md }]}>
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel={t('common.back')}
-          onPress={() => router.back()}
-          style={styles.headerBackButton}
-          hitSlop={8}
-          testID="analytics-back-button"
-        >
-          <ChevronLeft color={colors.primaryText} size={20} />
-        </TouchableOpacity>
-        <View style={styles.headerCopy}>
-          <Text style={styles.headerTitle}>{t('analytics.title')}</Text>
-          <Text style={styles.headerSubtitle}>{t('analytics.subtitle')}</Text>
-        </View>
-      </View>
+      <ScreenHeader
+        title={t('analytics.title')}
+        subtitle={t('analytics.subtitle')}
+        onBack={() => router.back()}
+        testID="analytics-screen-header"
+      />
 
       <ScrollView
         style={styles.listContainer}
@@ -737,41 +747,27 @@ export default function AnalyticsScreen() {
         }
       >
         <View style={styles.periodSelectorContainer}>
-          <View style={styles.periodSelector}>
-            {PERIODS.map((periodOption) => (
-              <TouchableOpacity
-                key={periodOption.value}
-                style={[
-                  styles.periodButton,
-                  period === periodOption.value && styles.periodButtonActive,
-                ]}
-                onPress={() => handlePeriodSelect(periodOption.value, periodOption.premium)}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel={t(periodOption.labelKey)}
-                accessibilityState={{ selected: period === periodOption.value }}
-                accessibilityHint={periodOption.premium && !isPremium ? t('analytics.premium_feature') : undefined}
-              >
-                {periodOption.premium && !isPremium && (
-                  <Crown
-                    color={period === periodOption.value ? colors.white : colors.gold}
-                    size={12}
-                    fill={period === periodOption.value ? colors.white : colors.gold}
-                    style={styles.crownIcon}
-                  />
-                )}
-                <Text
-                  style={[
-                    styles.periodButtonText,
-                    period === periodOption.value && styles.periodButtonTextActive,
-                    periodOption.premium && !isPremium && styles.periodButtonTextPremium,
-                  ]}
-                >
-                  {t(periodOption.labelKey)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <SegmentedControl<AnalyticsPeriod>
+            value={period}
+            onChange={(nextPeriod) => {
+              const option = PERIODS.find((item) => item.value === nextPeriod);
+              handlePeriodSelect(nextPeriod, option?.premium ?? false);
+            }}
+            options={PERIODS.map((periodOption) => ({
+              value: periodOption.value,
+              label: t(periodOption.labelKey),
+              premium: periodOption.premium && !isPremium,
+              icon: periodOption.premium && !isPremium ? (
+                <Crown size={12} fill={colors.gold} />
+              ) : undefined,
+              accessibilityLabel: t(periodOption.labelKey),
+              accessibilityHint:
+                periodOption.premium && !isPremium
+                  ? t('analytics.premium_feature')
+                  : undefined,
+            }))}
+            testID="analytics-period-selector"
+          />
         </View>
 
         {error && (
@@ -784,9 +780,27 @@ export default function AnalyticsScreen() {
           </View>
         )}
 
-        {!hasData && !error && (
+        {isInitialLoading && (
           <View style={styles.emptyStateCard}>
-            <Text style={styles.emptyStateText}>{t('analytics.empty_state')}</Text>
+            <ScreenState
+              tone="loading"
+              layout="inline"
+              title={t('common.loading')}
+              surfaceVariant="inset"
+              testID="analytics-loading-state"
+            />
+          </View>
+        )}
+
+        {!hasData && !error && !isInitialLoading && (
+          <View style={styles.emptyStateCard}>
+            <ScreenState
+              tone="empty"
+              layout="inline"
+              title={t('analytics.empty_state')}
+              surfaceVariant="inset"
+              testID="analytics-empty-state"
+            />
           </View>
         )}
 
@@ -800,7 +814,7 @@ export default function AnalyticsScreen() {
           }
         >
           <View style={styles.chartHeaderWithIcon}>
-            <Heart color="#32ADE6" size={20} />
+            <Heart color={analyticsIconColor} size={20} />
             <Text style={styles.chartTitle}>{t('analytics.health_score')}</Text>
           </View>
           <Text style={styles.chartSubtitle}>{t('analytics.health_score_subtitle')}</Text>
@@ -838,15 +852,15 @@ export default function AnalyticsScreen() {
               );
             })}
           </ScrollView>
-          {healthScoreData ? (
+          {healthScoreData && chartsReady ? (
             <LineChart
               data={healthScoreData}
               width={chartWidth}
               height={220}
               chartConfig={{
                 ...chartConfig,
-                fillShadowGradientFrom: '#32ADE6',
-                fillShadowGradientTo: colors.cardBackground,
+                fillShadowGradientFrom: withAlpha(colors.primaryText, isDark ? 0.12 : 0.08),
+                fillShadowGradientTo: mainPageChrome.elevatedSurface.backgroundColor,
               }}
               {...ANALYTICS_LIKE_LINE_CHART_PROPS}
               style={chartStyle}
@@ -871,7 +885,7 @@ export default function AnalyticsScreen() {
           }
         >
           <View style={styles.chartHeaderWithIcon}>
-            <Activity color="#007AFF" size={20} />
+            <Activity color={analyticsIconColor} size={20} />
             <Text style={styles.chartTitle}>{t('analytics.physical_evolution')}</Text>
           </View>
           <Text style={styles.chartSubtitle}>{t('analytics.physical_evolution_subtitle')}</Text>
@@ -909,15 +923,15 @@ export default function AnalyticsScreen() {
               );
             })}
           </ScrollView>
-          {physicalEvolutionData ? (
+          {physicalEvolutionData && chartsReady ? (
             <LineChart
               data={physicalEvolutionData}
               width={chartWidth}
               height={220}
               chartConfig={{
                 ...chartConfig,
-                fillShadowGradientFrom: '#007AFF',
-                fillShadowGradientTo: colors.cardBackground,
+                fillShadowGradientFrom: withAlpha(colors.primaryText, isDark ? 0.12 : 0.08),
+                fillShadowGradientTo: mainPageChrome.elevatedSurface.backgroundColor,
               }}
               {...ANALYTICS_LIKE_LINE_CHART_PROPS}
               style={chartStyle}
@@ -941,7 +955,7 @@ export default function AnalyticsScreen() {
           }
         >
           <View style={styles.chartHeaderWithIcon}>
-            <Utensils color="#34C759" size={20} />
+            <Utensils color={analyticsIconColor} size={20} />
             <Text style={styles.chartTitle}>{t('analytics.nutrition_score')}</Text>
           </View>
           <Text style={styles.chartSubtitle}>{t('analytics.nutrition_score_subtitle')}</Text>
@@ -979,15 +993,15 @@ export default function AnalyticsScreen() {
               );
             })}
           </ScrollView>
-          {nutritionScoreData ? (
+          {nutritionScoreData && chartsReady ? (
             <LineChart
               data={nutritionScoreData}
               width={chartWidth}
               height={220}
               chartConfig={{
                 ...chartConfig,
-                fillShadowGradientFrom: '#34C759',
-                fillShadowGradientTo: colors.cardBackground,
+                fillShadowGradientFrom: withAlpha(colors.primaryText, isDark ? 0.12 : 0.08),
+                fillShadowGradientTo: mainPageChrome.elevatedSurface.backgroundColor,
               }}
               {...ANALYTICS_LIKE_LINE_CHART_PROPS}
               style={chartStyle}
@@ -1011,18 +1025,28 @@ export default function AnalyticsScreen() {
         description={t('premium.subscription_page.contextual_analytics_body')}
         primaryButtonText={t('premium.subscription_page.contextual_cta')}
       />
-    </View>
+    </AppScreen>
   );
 }
 
-const createStyles = (colors: any) => StyleSheet.create({
+const createStyles = (colors: any, isDark: boolean) => {
+  const chrome = getMainPageChrome(colors, isDark, 'analytics');
+  const selectorSurface = getObsidianSurface(colors, {
+    accentColor: colors.primaryText,
+    intensity: 'flat',
+    backgroundAlpha: 0.035,
+    borderAlpha: 0.08,
+    shadowOpacity: 0.06,
+  });
+
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.cardBackground,
+    backgroundColor: chrome.canvas,
   },
   listContainer: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: chrome.canvas,
   },
   header: {
     flexDirection: 'row',
@@ -1031,18 +1055,19 @@ const createStyles = (colors: any) => StyleSheet.create({
     paddingHorizontal: SPACING.page,
     paddingTop: SPACING.md,
     paddingBottom: SPACING.md,
-    backgroundColor: colors.cardBackground,
-    ...SHADOWS.header,
+    backgroundColor: chrome.headerBackground,
+    borderBottomWidth: 1,
+    borderBottomColor: chrome.headerBorder,
   },
   headerBackButton: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: BORDER_RADIUS.full,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.cardBackground,
+    backgroundColor: colors.surfaceMuted ?? colors.cardBackground,
     borderWidth: 1,
-    borderColor: withAlpha(colors.primaryText, 0.06),
+    borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
   },
   headerCopy: {
     flex: 1,
@@ -1059,13 +1084,18 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   periodSelectorContainer: {
     paddingHorizontal: SPACING.page,
-    paddingVertical: SPACING.lg,
+    paddingTop: SPACING.lg,
+    paddingBottom: SPACING.md,
+    backgroundColor: chrome.canvas,
   },
   periodSelector: {
     flexDirection: 'row',
-    backgroundColor: colors.lightGray,
-    borderRadius: BORDER_RADIUS.md,
+    backgroundColor: selectorSurface.backgroundColor,
+    borderRadius: BORDER_RADIUS.full,
     padding: 4,
+    borderWidth: 1,
+    borderColor: selectorSurface.borderColor,
+    ...selectorSurface.shadowStyle,
   },
   periodButton: {
     flex: 1,
@@ -1074,11 +1104,15 @@ const createStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.xs,
-    borderRadius: BORDER_RADIUS.md - 2,
+    borderRadius: BORDER_RADIUS.full,
   },
   periodButtonActive: {
-    backgroundColor: colors.cardBackground,
-    ...SHADOWS.card,
+    backgroundColor: colors.primaryText,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.16,
+    shadowRadius: 14,
+    elevation: 2,
   },
   periodButtonText: {
     fontSize: SIZES.text12,
@@ -1086,7 +1120,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: FONT_WEIGHTS.medium,
   },
   periodButtonTextActive: {
-    color: colors.primaryText,
+    color: colors.background,
     fontWeight: FONT_WEIGHTS.semiBold,
   },
   periodButtonTextPremium: {
@@ -1098,10 +1132,16 @@ const createStyles = (colors: any) => StyleSheet.create({
   chartCard: {
     marginHorizontal: SPACING.page,
     marginBottom: SPACING.lg,
-    backgroundColor: colors.cardBackground,
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.lg,
-    ...SHADOWS.card,
+    backgroundColor: chrome.elevatedSurface.backgroundColor,
+    borderRadius: BORDER_RADIUS.hero,
+    padding: SPACING.xl,
+    borderWidth: 1,
+    borderColor: chrome.elevatedSurface.borderColor,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: isDark ? 0.1 : 0.04,
+    shadowRadius: 16,
+    elevation: 1,
   },
   chartHeaderWithIcon: {
     flexDirection: 'row',
@@ -1117,7 +1157,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   chartSubtitle: {
     fontSize: SIZES.text12,
-    color: colors.gray,
+    color: withAlpha(colors.primaryText, 0.64),
     marginBottom: SPACING.md,
   },
   metricSelectorScroll: {
@@ -1130,24 +1170,27 @@ const createStyles = (colors: any) => StyleSheet.create({
   metricButton: {
     paddingVertical: SPACING.xs,
     paddingHorizontal: SPACING.md,
-    borderRadius: BORDER_RADIUS.md,
-    backgroundColor: colors.lightGray,
+    borderRadius: BORDER_RADIUS.full,
+    backgroundColor: chrome.chip.backgroundColor,
+    borderWidth: 1,
+    borderColor: chrome.chip.borderColor,
   },
   metricButtonActive: {
-    backgroundColor: withAlpha(colors.primary, 0.14),
+    backgroundColor: chrome.chipActive.backgroundColor,
+    borderColor: chrome.chipActive.borderColor,
   },
   metricButtonText: {
     fontSize: SIZES.text12,
-    color: colors.gray,
+    color: chrome.chip.textColor,
     fontWeight: FONT_WEIGHTS.medium,
   },
   metricButtonTextActive: {
-    color: colors.primaryText,
+    color: chrome.chipActive.textColor,
     fontWeight: FONT_WEIGHTS.semiBold,
   },
   chart: {
     marginLeft: -SPACING.md,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: BORDER_RADIUS.xl,
   },
   labelMeasurementContainer: {
     position: 'absolute',
@@ -1162,16 +1205,8 @@ const createStyles = (colors: any) => StyleSheet.create({
   emptyStateCard: {
     marginHorizontal: SPACING.page,
     marginBottom: SPACING.lg,
-    backgroundColor: colors.cardBackground,
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.xl,
-    alignItems: 'center',
-    ...SHADOWS.card,
-  },
-  emptyStateText: {
-    fontSize: SIZES.text14,
-    color: colors.gray,
-    textAlign: 'center',
+    borderRadius: BORDER_RADIUS.xl,
+    overflow: 'hidden',
   },
   errorContainer: {
     marginHorizontal: SPACING.page,
@@ -1184,12 +1219,15 @@ const createStyles = (colors: any) => StyleSheet.create({
     height: 200,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.lightGray,
-    borderRadius: BORDER_RADIUS.md,
+    backgroundColor: chrome.chart.emptyBackground,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    borderColor: chrome.chip.borderColor,
   },
   emptyChartText: {
     fontSize: SIZES.text14,
     color: colors.gray,
     textAlign: 'center',
   },
-});
+  });
+};

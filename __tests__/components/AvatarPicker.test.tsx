@@ -195,7 +195,7 @@ describe('AvatarPicker', () => {
 
     expect(mockShowAlert).toHaveBeenCalledWith(
       'Photo de profil',
-      'Choisissez une source',
+      'Choisissez une option',
       expect.any(Array),
     );
 
@@ -334,7 +334,7 @@ describe('AvatarPicker', () => {
     await waitFor(() => {
       expect(mockShowAlert).toHaveBeenCalledWith(
         'Erreur',
-        'Image trop volumineuse (max 5MB)',
+        'Image trop volumineuse. Maximum 5MB.',
       );
     });
     expect(mockOnAvatarSelected).not.toHaveBeenCalled();
@@ -393,8 +393,8 @@ describe('AvatarPicker', () => {
 
     await waitFor(() => {
       expect(mockShowAlert).toHaveBeenCalledWith(
-        'Permissions requises',
-        'Acces a la galerie requis',
+        'Permission requise',
+        "Veuillez autoriser l'accès à la galerie photo",
         [{ text: 'OK' }],
       );
     });
@@ -426,10 +426,10 @@ describe('AvatarPicker', () => {
     await flushScheduledPickerAction();
 
     const permissionButtons = (mockShowAlert.mock.calls[0]?.[2] ?? []) as AlertButton[];
-    expect(getButton(permissionButtons, 'Ouvrir les parametres')).toBeTruthy();
+    expect(getButton(permissionButtons, 'Ouvrir les paramètres')).toBeTruthy();
 
     await act(async () => {
-      getButton(permissionButtons, 'Ouvrir les parametres')?.onPress?.();
+      getButton(permissionButtons, 'Ouvrir les paramètres')?.onPress?.();
     });
 
     expect(openSettingsSpy).toHaveBeenCalled();
@@ -459,8 +459,8 @@ describe('AvatarPicker', () => {
 
     await waitFor(() => {
       expect(mockShowAlert).toHaveBeenCalledWith(
-        'Permissions requises',
-        'Acces a la camera requis',
+        'Permission requise',
+        "Veuillez autoriser l'accès à la caméra",
         [{ text: 'OK' }],
       );
     });
@@ -485,7 +485,7 @@ describe('AvatarPicker', () => {
     await waitFor(() => {
       expect(mockShowAlert).toHaveBeenCalledWith(
         'Erreur',
-        'Impossible d\'ouvrir le selecteur de photo pour le moment.',
+        'Impossible d\'ouvrir le sélecteur de photo pour le moment.',
         [{ text: 'OK' }],
       );
     });
@@ -509,7 +509,7 @@ describe('AvatarPicker', () => {
     await waitFor(() => {
       expect(mockShowAlert).toHaveBeenCalledWith(
         'Erreur',
-        'La camera n\'est pas disponible sur cet appareil.',
+        'La caméra n\'est pas disponible sur cet appareil.',
         [{ text: 'OK' }],
       );
     });

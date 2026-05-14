@@ -1,18 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import { Plus } from 'lucide-react-native';
 
-import { SocialCategoryPill } from '@/components/social/SocialCategoryPill';
+import { AppScreen } from '@/components/AppScreen';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { ScreenState } from '@/components/ScreenState';
+import { SegmentedControl } from '@/components/SegmentedControl';
+import { SocialPostActionSheet } from '@/components/social/SocialPostActionSheet';
 import { SocialPostCard } from '@/components/social/SocialPostCard';
 import { SocialProfilePreviewModal } from '@/components/social/SocialProfilePreviewModal';
 import { SOCIAL_REPORT_REASON_CODES } from '@/constants/social';
@@ -21,19 +24,21 @@ import {
   FONT_WEIGHTS,
   SIZES,
   SPACING,
+  getMainPageChrome,
   withAlpha,
 } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useFeatureFlags } from '@/hooks/queries/useFeatureFlags';
 import {
   flattenSocialFeedPages,
-  useFeatureFlags,
   useSocialFeed,
-  useSocialMutations,
-} from '@/hooks/queries';
+} from '@/hooks/queries/useSocialFeed';
+import { useSocialMutations } from '@/hooks/queries/useSocialMutations';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { trackEvent, trackFailureEvent } from '@/services/analytics';
+import { getMainTabBarMetrics } from '@/utils/mainTabBarMetrics';
 import {
   resolveSocialCommentsGate,
   shouldEnableSocialComments,
@@ -55,9 +60,6 @@ import type {
 } from '@/types';
 
 const SOCIAL_FAB_SIZE = 60;
-const SOCIAL_FAB_BOTTOM_OFFSET = SPACING.xl;
-const SOCIAL_FEED_BOTTOM_PADDING =
-  SOCIAL_FAB_SIZE + SOCIAL_FAB_BOTTOM_OFFSET + SPACING.md;
 const SOCIAL_FILTER_CATEGORIES = [
   'all',
   'before_after',
@@ -67,8 +69,10 @@ const SOCIAL_FILTER_CATEGORIES = [
 
 export default function SocialScreen() {
   const router = useRouter();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { t } = useLanguage();
+  const insets = useSafeAreaInsets();
+  const tabBarMetrics = getMainTabBarMetrics(insets.bottom);
   const { userProfile } = useAuth();
   const { alertElement, showAlert } = useCustomAlert();
   const featureFlagsQuery = useFeatureFlags();
@@ -89,7 +93,21 @@ export default function SocialScreen() {
     username?: string | null;
     avatarUrl?: string | null;
   } | null>(null);
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const [postActionSheetTarget, setPostActionSheetTarget] =
+    useState<SocialPost | null>(null);
+  const styles = useMemo(
+    () => createStyles(colors, isDark, tabBarMetrics.controlBottomOffset),
+    [colors, isDark, tabBarMetrics.controlBottomOffset],
+  );
+  const categoryOptions = useMemo(
+    () =>
+      SOCIAL_FILTER_CATEGORIES.map((category) => ({
+        value: category,
+        label: t(`social.categories.${category}`),
+        testID: `social-pill-${category}`,
+      })),
+    [t],
+  );
   const {
     data,
     error: feedError,
@@ -545,48 +563,40 @@ export default function SocialScreen() {
   }, [clearReactionError, handleManualRefresh]);
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={styles.container}>
+    <AppScreen bottomInset={false} style={styles.container}>
       {alertElement}
-      <View style={styles.header}>
-        <Text style={styles.title}>{t('social.feed_title')}</Text>
-      </View>
+      <ScreenHeader
+        title={t('social.feed_title')}
+        variant="inline"
+        topInset={false}
+        style={styles.header}
+        testID="social-screen-header"
+      />
 
-      <View style={styles.filtersSection}>
-        <View style={styles.filtersCard}>
-          <ScrollView
-            horizontal
-            contentContainerStyle={styles.filtersRow}
-            showsHorizontalScrollIndicator={false}
-            testID="social-filters-scroll"
-          >
-            {SOCIAL_FILTER_CATEGORIES.map((category) => (
-              <SocialCategoryPill
-                key={category}
-                category={category}
-                compact
-                selected={selectedCategory === category}
-                onPress={() => {
-                  clearReactionError();
-                  setSelectedCategory(category);
-                }}
-              />
-            ))}
-          </ScrollView>
-        </View>
+      <View style={styles.filtersSection} testID="social-filters-control">
+        <SegmentedControl<SocialCategoryFilter>
+          value={selectedCategory}
+          onChange={(category) => {
+            clearReactionError();
+            setSelectedCategory(category);
+          }}
+          options={categoryOptions}
+          style={styles.filtersControl}
+          testID="social-filters-segments"
+        />
       </View>
 
       {backendError ? (
-        <View style={styles.errorCard} testID="social-error-state">
-          <Text style={styles.errorTitle}>{backendErrorTitle}</Text>
-          <Text style={styles.errorBody}>{backendError.message}</Text>
-          <TouchableOpacity
-            accessibilityRole="button"
-            onPress={handleRetryBackendRequest}
-            style={styles.errorButton}
-            testID="social-error-retry"
-          >
-            <Text style={styles.errorButtonLabel}>{t('common.retry')}</Text>
-          </TouchableOpacity>
+        <View style={styles.stateWrap}>
+          <ScreenState
+            tone="error"
+            title={backendErrorTitle}
+            message={backendError.message}
+            actionLabel={t('common.retry')}
+            onAction={handleRetryBackendRequest}
+            testID="social-error-state"
+            actionTestID="social-error-retry"
+          />
         </View>
       ) : null}
 
@@ -630,14 +640,19 @@ export default function SocialScreen() {
         ItemSeparatorComponent={() => <View style={styles.itemSeparator} />}
         ListEmptyComponent={
           !isFetched ? (
-            <View style={styles.emptyState}>
-              <ActivityIndicator color={colors.primary} />
-            </View>
+            <ScreenState
+              tone="loading"
+              layout="inline"
+              surfaceVariant="flat"
+              testID="social-feed-loading-state"
+            />
           ) : backendError ? null : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>{t('social.empty.title')}</Text>
-              <Text style={styles.emptyBody}>{t('social.empty.body')}</Text>
-            </View>
+            <ScreenState
+              tone="empty"
+              title={t('social.empty.title')}
+              message={t('social.empty.body')}
+              testID="social-empty-state"
+            />
           )
         }
         ListFooterComponent={
@@ -678,19 +693,43 @@ export default function SocialScreen() {
               onDeletePress={() => handleDeletePost(item)}
               onReportPress={() => handleReportPost(item)}
               onSharePress={item.asset_url ? () => void handleSharePost(item) : null}
+              onMorePress={() => setPostActionSheetTarget(item)}
             />
           );
         }}
         testID="social-feed-list"
       />
 
-      <SocialProfilePreviewModal
-        visible={profilePreviewTarget !== null}
-        userId={profilePreviewTarget?.userId}
-        fallbackUsername={profilePreviewTarget?.username}
-        fallbackAvatarUrl={profilePreviewTarget?.avatarUrl}
-        onClose={() => setProfilePreviewTarget(null)}
-      />
+      {postActionSheetTarget ? (
+        <SocialPostActionSheet
+          visible
+          post={postActionSheetTarget}
+          currentUserId={userProfile?.id}
+          deleteDisabled={isDeletePending(postActionSheetTarget.id)}
+          reactionsDisabled={isReactionPending(postActionSheetTarget.id)}
+          onClose={() => setPostActionSheetTarget(null)}
+          onDeletePress={() => handleDeletePost(postActionSheetTarget)}
+          onReportPress={() => handleReportPost(postActionSheetTarget)}
+          onNotInterestedPress={() =>
+            handleSetReaction(
+              postActionSheetTarget,
+              postActionSheetTarget.viewer_reaction === 'dislike'
+                ? 'neutral'
+                : 'dislike',
+            )
+          }
+        />
+      ) : null}
+
+      {profilePreviewTarget ? (
+        <SocialProfilePreviewModal
+          visible
+          userId={profilePreviewTarget.userId}
+          fallbackUsername={profilePreviewTarget.username}
+          fallbackAvatarUrl={profilePreviewTarget.avatarUrl}
+          onClose={() => setProfilePreviewTarget(null)}
+        />
+      ) : null}
 
       <TouchableOpacity
         accessibilityRole="button"
@@ -698,48 +737,44 @@ export default function SocialScreen() {
         style={styles.fab}
         testID="social-compose-fab"
       >
-        <Plus color={colors.white} size={24} />
+        <Plus color={colors.background} size={24} />
       </TouchableOpacity>
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 
-const createStyles = (colors: any) =>
-  StyleSheet.create({
+const createStyles = (colors: any, isDark: boolean, tabBarControlBottomOffset: number) => {
+  const chrome = getMainPageChrome(colors, isDark, 'social');
+  const topBandBackground = isDark ? colors.background : chrome.canvas;
+
+  return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: chrome.canvas,
     },
     header: {
-      paddingHorizontal: SPACING.page,
-      paddingTop: SPACING.sm,
-      paddingBottom: SPACING.xs,
-    },
-    title: {
-      fontSize: SIZES.xl,
-      fontWeight: FONT_WEIGHTS.bold,
-      color: colors.primaryText,
+      backgroundColor: topBandBackground,
+      borderBottomWidth: 0,
+      borderBottomColor: topBandBackground,
     },
     filtersSection: {
       paddingHorizontal: SPACING.page,
-      paddingBottom: SPACING.sm,
+      paddingTop: SPACING.md,
+      paddingBottom: SPACING.md,
+      backgroundColor: topBandBackground,
     },
-    filtersCard: {
-      borderRadius: BORDER_RADIUS.xl,
-      backgroundColor: colors.cardBackground,
-      borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.06),
-    },
-    filtersRow: {
-      alignItems: 'center',
-      gap: SPACING.xs,
-      paddingHorizontal: SPACING.sm,
-      paddingVertical: SPACING.sm,
+    filtersControl: {
+      width: '100%',
+      backgroundColor: chrome.mutedSurface.backgroundColor,
+      borderColor: chrome.mutedSurface.borderColor,
     },
     listContent: {
+      paddingTop: SPACING.sm,
+      paddingBottom: SOCIAL_FAB_SIZE + tabBarControlBottomOffset + SPACING.md,
+    },
+    stateWrap: {
       paddingHorizontal: SPACING.page,
-      paddingTop: SPACING.xs,
-      paddingBottom: SOCIAL_FEED_BOTTOM_PADDING,
+      marginBottom: SPACING.sm,
     },
     itemSeparator: {
       height: SPACING.md,
@@ -749,10 +784,11 @@ const createStyles = (colors: any) =>
       marginBottom: SPACING.sm,
       padding: SPACING.md,
       borderRadius: BORDER_RADIUS.xl,
-      backgroundColor: colors.cardBackground,
+      backgroundColor: chrome.elevatedSurface.backgroundColor,
       borderWidth: 1,
       borderColor: withAlpha(colors.error, 0.2),
       gap: SPACING.sm,
+      ...chrome.elevatedSurface.shadowStyle,
     },
     errorTitle: {
       fontSize: SIZES.text16,
@@ -783,10 +819,11 @@ const createStyles = (colors: any) =>
       marginBottom: SPACING.sm,
       padding: SPACING.md,
       borderRadius: BORDER_RADIUS.xl,
-      backgroundColor: colors.cardBackground,
+      backgroundColor: chrome.elevatedSurface.backgroundColor,
       borderWidth: 1,
       borderColor: withAlpha(colors.warning, 0.22),
       gap: SPACING.xs,
+      ...chrome.elevatedSurface.shadowStyle,
     },
     reactionErrorHeader: {
       flexDirection: 'row',
@@ -850,19 +887,20 @@ const createStyles = (colors: any) =>
     fab: {
       position: 'absolute',
       right: SPACING.page,
-      bottom: SOCIAL_FAB_BOTTOM_OFFSET,
+      bottom: tabBarControlBottomOffset,
       width: SOCIAL_FAB_SIZE,
       height: SOCIAL_FAB_SIZE,
       borderRadius: SOCIAL_FAB_SIZE / 2,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.primary,
-      shadowColor: colors.primary,
-      shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.22,
-      shadowRadius: 18,
+      backgroundColor: chrome.ctaPrimary.backgroundColor,
+      shadowColor: chrome.ctaPrimary.shadowColor,
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: isDark ? 0.26 : 0.14,
+      shadowRadius: 22,
       elevation: 6,
       borderWidth: 1,
-      borderColor: withAlpha(colors.cardBackground, 0.92),
+      borderColor: chrome.ctaPrimary.borderColor,
     },
   });
+};

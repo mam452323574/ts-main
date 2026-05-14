@@ -24,7 +24,11 @@ import { AppScreen } from '@/components/AppScreen';
 import { AvatarPicker } from '@/components/AvatarPicker';
 import { Button } from '@/components/Button';
 import { CoachFeatureIcon } from '@/components/FeatureIcons';
-import { OnboardingSlide, PhoneMockup } from '@/components/auth';
+import {
+  OnboardingHeroStage,
+  OnboardingSlide,
+  PhoneMockup,
+} from '@/components/auth';
 import {
   buildOnboardingPalette,
   type OnboardingPalette,
@@ -33,6 +37,7 @@ import { FridgeScanIllustration } from '@/components/home/FridgeScanIllustration
 import { NativePagerView } from '@/components/NativePagerView';
 import {
   BORDER_RADIUS,
+  FONT_FAMILIES,
   SHADOWS,
   SIZES,
   SPACING,
@@ -46,7 +51,8 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useFeatureFlags, useGrowthExperience } from '@/hooks/queries';
+import { useFeatureFlags } from '@/hooks/queries/useFeatureFlags';
+import { useGrowthExperience } from '@/hooks/queries/useGrowthExperience';
 import { usePostSignupOnboardingPending } from '@/hooks/usePostSignupOnboardingPending';
 import {
   ensureGrowthExperience,
@@ -57,9 +63,7 @@ import {
   hasPremiumEntitlement,
 } from '@/services/revenueCatOfferings';
 import {
-  clearPostSignupOnboardingAvatarHandled,
   clearPostSignupOnboardingPending,
-  hasPostSignupOnboardingAvatarHandled,
 } from '@/utils/postSignupOnboarding';
 import { entryOfferSession } from '@/utils/entryOfferSession';
 import { getMinimumBottomInsetPadding } from '@/utils/mobileLayout';
@@ -80,7 +84,7 @@ export default function PostSignupOnboardingScreen() {
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const { colors, isDark } = useTheme();
-  const { locale, t } = useLanguage();
+  const { t } = useLanguage();
   const {
     user,
     userProfile,
@@ -93,8 +97,6 @@ export default function PostSignupOnboardingScreen() {
   const { isPending, isLoading: isPendingLoading } =
     usePostSignupOnboardingPending(user?.id);
 
-  const [stage, setStage] = useState<'avatar' | 'slides'>('avatar');
-  const [isAvatarHandledLoading, setIsAvatarHandledLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(0);
   const [completing, setCompleting] = useState(false);
   const [updatingAvatar, setUpdatingAvatar] = useState(false);
@@ -192,24 +194,6 @@ export default function PostSignupOnboardingScreen() {
         ),
       },
       {
-        key: 'social',
-        eyebrow: t('onboarding.slide_3_eyebrow'),
-        title: t('onboarding.slide_3_title'),
-        subtitle: t('onboarding.slide_3_subtitle'),
-        bullets: [
-          t('onboarding.slide_3_bullet_1'),
-          t('onboarding.slide_3_bullet_2'),
-          t('onboarding.slide_3_bullet_3'),
-        ],
-        preview: (
-          <SocialPreview
-            colors={colors}
-            isDark={isDark}
-            palette={onboardingPalette}
-          />
-        ),
-      },
-      {
         key: 'analytics',
         eyebrow: t('onboarding.slide_4_eyebrow'),
         title: t('onboarding.slide_4_title'),
@@ -221,6 +205,24 @@ export default function PostSignupOnboardingScreen() {
         ],
         preview: (
           <AnalyticsPreview
+            colors={colors}
+            isDark={isDark}
+            palette={onboardingPalette}
+          />
+        ),
+      },
+      {
+        key: 'social',
+        eyebrow: t('onboarding.slide_3_eyebrow'),
+        title: t('onboarding.slide_3_title'),
+        subtitle: t('onboarding.slide_3_subtitle'),
+        bullets: [
+          t('onboarding.slide_3_bullet_1'),
+          t('onboarding.slide_3_bullet_2'),
+          t('onboarding.slide_3_bullet_3'),
+        ],
+        preview: (
+          <SocialPreview
             colors={colors}
             isDark={isDark}
             palette={onboardingPalette}
@@ -252,49 +254,9 @@ export default function PostSignupOnboardingScreen() {
   const hasAvatar = Boolean(
     selectedAvatarReference ?? userProfile?.avatar_url,
   );
-  const isAvatarStage = stage === 'avatar';
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadAvatarHandledState = async () => {
-      if (!user?.id) {
-        if (isMounted) {
-          setIsAvatarHandledLoading(false);
-        }
-        return;
-      }
-
-      try {
-        const avatarHandled = await hasPostSignupOnboardingAvatarHandled(
-          user.id,
-        );
-        if (!isMounted) {
-          return;
-        }
-
-        if (avatarHandled) {
-          setStage('slides');
-          setCurrentPage(0);
-        }
-      } catch (avatarHandledError) {
-        console.error(
-          '[PostSignupOnboarding] Failed to read avatar handled flag:',
-          avatarHandledError,
-        );
-      } finally {
-        if (isMounted) {
-          setIsAvatarHandledLoading(false);
-        }
-      }
-    };
-
-    void loadAvatarHandledState();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [user?.id]);
+  const currentSlide = slides[currentPage];
+  const shouldShowSocialAvatarPrompt =
+    currentSlide?.key === 'social' && !hasAvatar;
 
   useEffect(() => {
     if (Platform.OS !== 'android') {
@@ -342,32 +304,7 @@ export default function PostSignupOnboardingScreen() {
     }
   };
 
-  const handleAvatarStepContinue = () => {
-    if (updatingAvatar || !hasAvatar) {
-      return;
-    }
-
-    setError(null);
-    setCurrentPage(0);
-    setStage('slides');
-  };
-
-  const handleAvatarStepSkip = () => {
-    if (updatingAvatar) {
-      return;
-    }
-
-    setError(null);
-    setCurrentPage(0);
-    setStage('slides');
-  };
-
   const handlePrimaryAction = async () => {
-    if (isAvatarStage) {
-      handleAvatarStepContinue();
-      return;
-    }
-
     if (currentPage < TOTAL_SLIDES - 1) {
       goToPage(currentPage + 1);
       return;
@@ -383,7 +320,6 @@ export default function PostSignupOnboardingScreen() {
 
       await markTutorialSeen();
       await clearPostSignupOnboardingPending(user.id);
-      await clearPostSignupOnboardingAvatarHandled(user.id);
 
       const ensuredGrowthExperience =
         growthExperience ??
@@ -440,11 +376,7 @@ export default function PostSignupOnboardingScreen() {
   };
 
   const renderSlide = (slide: SlideContent) => {
-    const promoAsset = getOnboardingPromoAsset(
-      onboardingThemeVariant,
-      locale,
-      slide.key,
-    );
+    const promoAsset = getOnboardingPromoAsset(onboardingThemeVariant, slide.key);
 
     return (
       <View
@@ -481,36 +413,6 @@ export default function PostSignupOnboardingScreen() {
     );
   };
 
-  const renderAvatarStep = () => (
-    <View style={styles.stepWrap} testID="post-signup-avatar-step">
-      <LinearGradient
-        colors={onboardingPalette.cardGradient}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.profileCard}
-      >
-        <Text style={styles.profileCardTitle}>
-          {hasAvatar
-            ? t('onboarding.avatar_change_title')
-            : t('onboarding.avatar_title')}
-        </Text>
-        <Text style={styles.profileCardSubtitle}>
-          {hasAvatar
-            ? t('onboarding.avatar_change_subtitle')
-            : t('onboarding.avatar_subtitle')}
-        </Text>
-        {user ? (
-          <AvatarPicker
-            userId={user.id}
-            currentAvatarUrl={selectedAvatarReference ?? userProfile?.avatar_url}
-            onAvatarSelected={handleAvatarSelected}
-            size={140}
-          />
-        ) : null}
-      </LinearGradient>
-    </View>
-  );
-
   const renderSlidesStep = () => (
     <View style={styles.stepWrap} testID="post-signup-slides-step">
       {Platform.OS === 'web' ? (
@@ -536,9 +438,7 @@ export default function PostSignupOnboardingScreen() {
   );
 
   if (
-    isPendingLoading ||
-    isAvatarHandledLoading ||
-    !userProfile?.username
+    isPendingLoading || !userProfile?.username
   ) {
     return (
       <AppScreen style={styles.container} topInset={false} bottomInset={false}>
@@ -571,18 +471,18 @@ export default function PostSignupOnboardingScreen() {
           <View
             style={[
               styles.header,
-              !isAvatarStage ? styles.headerSlides : null,
+              styles.headerSlides,
             ]}
           >
             <Text
               style={[
                 styles.brand,
-                !isAvatarStage ? styles.brandSlides : null,
+                styles.brandSlides,
               ]}
             >
               HEALTH SCAN
             </Text>
-            {!isAvatarStage && currentPage < TOTAL_SLIDES - 1 ? (
+            {currentPage < TOTAL_SLIDES - 1 ? (
               <Pressable
                 onPress={handleSkipSlides}
                 disabled={completing}
@@ -608,29 +508,25 @@ export default function PostSignupOnboardingScreen() {
             )}
           </View>
 
-          <View style={styles.pagerWrap}>
-            {isAvatarStage ? renderAvatarStep() : renderSlidesStep()}
-          </View>
+          <View style={styles.pagerWrap}>{renderSlidesStep()}</View>
 
           <View
             style={[
               styles.footer,
-              !isAvatarStage ? styles.footerSlides : null,
+              styles.footerSlides,
             ]}
           >
-            {!isAvatarStage ? (
-              <View style={styles.progressRow}>
-                {slides.map((slide, index) => (
-                  <View
-                    key={slide.key}
-                    style={[
-                      styles.progressDot,
-                      index === currentPage && styles.progressDotActive,
-                    ]}
-                  />
-                ))}
-              </View>
-            ) : null}
+            <View style={styles.progressRow}>
+              {slides.map((slide, index) => (
+                <View
+                  key={slide.key}
+                  style={[
+                    styles.progressDot,
+                    index === currentPage && styles.progressDotActive,
+                  ]}
+                />
+              ))}
+            </View>
 
             {error ? (
               <View style={styles.errorContainer}>
@@ -638,32 +534,42 @@ export default function PostSignupOnboardingScreen() {
               </View>
             ) : null}
 
-            {isAvatarStage && !hasAvatar ? (
-              <Pressable
-                accessibilityRole="button"
-                disabled={updatingAvatar}
-                onPress={handleAvatarStepSkip}
-                style={({ pressed }) => [
-                  styles.skipAvatarButton,
-                  pressed && styles.skipAvatarPressed,
-                ]}
-                testID="post-signup-skip-avatar"
+            {shouldShowSocialAvatarPrompt && user ? (
+              <LinearGradient
+                colors={onboardingPalette.cardGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.socialAvatarPrompt}
+                testID="post-signup-social-avatar-prompt"
               >
-                <Text style={styles.skipAvatarLabel}>
-                  {t('onboarding.avatar_skip')}
-                </Text>
-              </Pressable>
+                <View style={styles.socialAvatarPromptCopy}>
+                  <Text style={styles.socialAvatarPromptTitle}>
+                    {t('onboarding.social_avatar_prompt_title')}
+                  </Text>
+                  <Text style={styles.socialAvatarPromptSubtitle}>
+                    {t('onboarding.social_avatar_prompt_subtitle')}
+                  </Text>
+                </View>
+                <AvatarPicker
+                  userId={user.id}
+                  currentAvatarUrl={
+                    selectedAvatarReference ?? userProfile?.avatar_url
+                  }
+                  onAvatarSelected={handleAvatarSelected}
+                  size={88}
+                />
+              </LinearGradient>
             ) : null}
 
             <Button
               title={
-                !isAvatarStage && currentPage === TOTAL_SLIDES - 1
+                currentPage === TOTAL_SLIDES - 1
                   ? t('onboarding.enter_app')
                   : t('common.next')
               }
               onPress={handlePrimaryAction}
-              loading={!isAvatarStage && completing}
-              disabled={isAvatarStage && (updatingAvatar || !hasAvatar)}
+              loading={completing}
+              disabled={completing}
               variant="premium"
               size="lg"
             />
@@ -753,7 +659,11 @@ function PromoHeroSlide({
         style={styles.promoHeroAmbientGradient}
       />
 
-      <View style={styles.promoHeroStage}>
+      <OnboardingHeroStage
+        accentColor={accentColor}
+        style={styles.promoHeroStage}
+        contentStyle={styles.promoHeroStageContent}
+      >
         <Image
           source={source}
           resizeMode="cover"
@@ -788,8 +698,17 @@ function PromoHeroSlide({
           <Text style={styles.promoHeroSubtitle} numberOfLines={2}>
             {slide.subtitle}
           </Text>
+          <View style={styles.promoHeroBulletRow}>
+            {slide.bullets.map((bullet) => (
+              <View key={bullet} style={styles.promoHeroBullet}>
+                <Text style={styles.promoHeroBulletText} numberOfLines={1}>
+                  {bullet}
+                </Text>
+              </View>
+            ))}
+          </View>
         </View>
-      </View>
+      </OnboardingHeroStage>
     </View>
   );
 }
@@ -1142,8 +1061,9 @@ const createStyles = (
     brand: {
       fontSize: SIZES.text12,
       fontWeight: '700',
-      letterSpacing: 3,
-      color: palette.textSecondary,
+      fontFamily: FONT_FAMILIES.display,
+      letterSpacing: 2.4,
+      color: palette.accentSecondary,
     },
     brandSlides: {
       opacity: 0.72,
@@ -1153,9 +1073,13 @@ const createStyles = (
       height: 1,
     },
     skipSlidesButton: {
+      minHeight: 36,
       paddingHorizontal: SPACING.md,
       paddingVertical: SPACING.xs,
       borderRadius: BORDER_RADIUS.pill,
+      backgroundColor: palette.secondaryActionFill,
+      borderWidth: 1,
+      borderColor: palette.secondaryActionBorder,
     },
     skipSlidesPressed: {
       backgroundColor: palette.accentSofter,
@@ -1193,7 +1117,7 @@ const createStyles = (
     promoHeroWrap: {
       flex: 1,
       minHeight: 0,
-      marginHorizontal: isCompactAndroidLayout ? -SPACING.md : -SPACING.lg,
+      marginHorizontal: isCompactAndroidLayout ? -SPACING.sm : -SPACING.md,
       paddingTop: isCompactAndroidLayout ? 0 : SPACING.xs,
       alignItems: 'center',
       justifyContent: 'flex-start',
@@ -1230,15 +1154,9 @@ const createStyles = (
       minHeight: promoHeroMinHeight,
       maxHeight: '100%',
       borderRadius: isCompactAndroidLayout ? 18 : 22,
-      borderWidth: 0,
-      backgroundColor: palette.surface,
-      overflow: 'hidden',
-      ...SHADOWS.soft,
-      shadowColor: palette.accent,
-      shadowOpacity: isDark ? 0.08 : 0.04,
-      shadowRadius: isCompactAndroidLayout ? 8 : 12,
-      shadowOffset: { width: 0, height: 5 },
-      elevation: isDark ? 2 : 1,
+    },
+    promoHeroStageContent: {
+      padding: 0,
     },
     promoHeroImage: {
       position: 'absolute',
@@ -1280,9 +1198,9 @@ const createStyles = (
     promoHeroTitle: {
       fontSize: isCompactAndroidLayout ? 28 : 32,
       lineHeight: isCompactAndroidLayout ? 32 : 36,
-      fontWeight: '800',
+      fontFamily: FONT_FAMILIES.display,
       color: palette.textPrimary,
-      letterSpacing: 0,
+      letterSpacing: -0.3,
     },
     promoHeroSubtitle: {
       fontSize: isCompactAndroidLayout ? SIZES.sm : SIZES.md,
@@ -1291,60 +1209,68 @@ const createStyles = (
       color: palette.textSecondary,
       maxWidth: 420,
     },
+    promoHeroBulletRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginTop: SPACING.xs,
+      maxWidth: 420,
+    },
+    promoHeroBullet: {
+      paddingHorizontal: SPACING.sm,
+      paddingVertical: 6,
+      borderRadius: BORDER_RADIUS.pill,
+      backgroundColor: withAlpha(palette.surfaceGlass, isDark ? 0.84 : 0.74),
+      borderWidth: 1,
+      borderColor: withAlpha(palette.textPrimary, isDark ? 0.12 : 0.08),
+    },
+    promoHeroBulletText: {
+      fontSize: SIZES.xs,
+      fontWeight: '700',
+      letterSpacing: 0.4,
+      color: palette.textPrimary,
+    },
     fallbackSlideWrap: {
       flex: 1,
     },
-    profileCard: {
-      flex: 1,
-      justifyContent: 'center',
-      paddingHorizontal: isCompactAndroidLayout ? SPACING.lg : SPACING.xl,
-      paddingVertical: isCompactAndroidLayout ? SPACING.xxl : SPACING.xxxl,
+    socialAvatarPrompt: {
+      paddingHorizontal: isCompactAndroidLayout ? SPACING.md : SPACING.lg,
+      paddingVertical: isCompactAndroidLayout ? SPACING.md : SPACING.lg,
       borderRadius: BORDER_RADIUS.hero,
       borderWidth: 1,
       borderColor: palette.borderStrong,
-      backgroundColor: palette.surface,
+      backgroundColor: palette.surfaceGlass,
       alignItems: 'center',
-      gap: SPACING.lg,
+      gap: SPACING.md,
       ...SHADOWS.soft,
       shadowColor: palette.accent,
-      shadowOpacity: isDark ? 0.2 : 0.18,
-      shadowRadius: 22,
-      shadowOffset: { width: 0, height: 12 },
+      shadowOpacity: isDark ? 0.16 : 0.14,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 10 },
       overflow: 'hidden',
     },
-    profileCardTitle: {
-      fontSize: 32,
-      lineHeight: 38,
-      fontWeight: '700',
+    socialAvatarPromptCopy: {
+      gap: SPACING.xs,
+      alignItems: 'center',
+    },
+    socialAvatarPromptTitle: {
+      fontSize: isCompactAndroidLayout ? SIZES.lg : SIZES.xl,
+      lineHeight: isCompactAndroidLayout ? 24 : 28,
+      fontFamily: FONT_FAMILIES.display,
       color: palette.textPrimary,
       textAlign: 'center',
-      letterSpacing: 0,
+      letterSpacing: -0.2,
     },
-    profileCardSubtitle: {
-      fontSize: SIZES.lg,
-      lineHeight: 28,
+    socialAvatarPromptSubtitle: {
+      fontSize: SIZES.sm,
+      lineHeight: 20,
       color: palette.textSecondary,
       textAlign: 'center',
-      maxWidth: 420,
-    },
-    skipAvatarButton: {
-      minHeight: 44,
-      justifyContent: 'center',
-      paddingHorizontal: SPACING.md,
-      alignSelf: 'center',
-      borderRadius: BORDER_RADIUS.pill,
-    },
-    skipAvatarPressed: {
-      backgroundColor: palette.accentSofter,
-    },
-    skipAvatarLabel: {
-      color: palette.textSecondary,
-      fontSize: SIZES.sm,
-      fontWeight: '600',
     },
     footer: {
       gap: isCompactAndroidLayout ? SPACING.md : SPACING.lg,
       paddingTop: isCompactAndroidLayout ? SPACING.md : SPACING.lg,
+      paddingHorizontal: isCompactAndroidLayout ? SPACING.xs : SPACING.sm,
     },
     footerSlides: {
       gap: isCompactAndroidLayout ? SPACING.sm : SPACING.md,
@@ -1355,16 +1281,22 @@ const createStyles = (
       justifyContent: 'center',
       alignSelf: 'center',
       gap: 6,
+      paddingHorizontal: SPACING.sm,
+      paddingVertical: SPACING.xs,
+      borderRadius: BORDER_RADIUS.pill,
+      backgroundColor: palette.secondaryActionFill,
+      borderWidth: 1,
+      borderColor: palette.secondaryActionBorder,
     },
     progressDot: {
       width: 14,
-      height: 3,
+      height: 4,
       borderRadius: 999,
-      backgroundColor: palette.inactive,
+      backgroundColor: palette.progressInactive,
     },
     progressDotActive: {
-      width: 26,
-      backgroundColor: palette.accent,
+      width: 28,
+      backgroundColor: palette.progressActive,
     },
     errorContainer: {
       paddingHorizontal: SPACING.md,

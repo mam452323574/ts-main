@@ -2,6 +2,8 @@ import React from 'react';
 import { renderHook, waitFor } from '@testing-library/react-native';
 import { useNotifications } from '@/hooks/useNotifications';
 
+const mockDismissAllModalsAndNavigate = jest.fn();
+
 // Mock expo-notifications
 jest.mock('expo-notifications', () => ({
   setNotificationHandler: jest.fn(),
@@ -25,6 +27,13 @@ jest.mock('expo-notifications', () => ({
 // Mock expo-device
 jest.mock('expo-device', () => ({
   isDevice: true,
+}));
+
+jest.mock('@/services/navigation', () => ({
+  navigationService: {
+    dismissAllModalsAndNavigate: (...args: unknown[]) =>
+      mockDismissAllModalsAndNavigate(...args),
+  },
 }));
 
 // Mock supabase
@@ -303,6 +312,90 @@ describe('useNotifications', () => {
           expect.any(Function)
         );
       });
+    });
+
+    it('routes scan ready responses to /(tabs)', async () => {
+      const Notifications = require('expo-notifications');
+      mockUseAuth.mockReturnValue({ user: mockUser });
+
+      renderHook(() => useNotifications());
+
+      await waitFor(() => {
+        expect(Notifications.addNotificationResponseReceivedListener).toHaveBeenCalledWith(
+          expect.any(Function)
+        );
+      });
+
+      const responseCallback =
+        Notifications.addNotificationResponseReceivedListener.mock.calls[0][0];
+
+      responseCallback({
+        notification: {
+          request: {
+            content: {
+              data: { type: 'scan_ready' },
+            },
+          },
+        },
+      });
+
+      expect(mockDismissAllModalsAndNavigate).toHaveBeenCalledWith('/(tabs)');
+    });
+
+    it('routes achievement responses to /notifications', async () => {
+      const Notifications = require('expo-notifications');
+      mockUseAuth.mockReturnValue({ user: mockUser });
+
+      renderHook(() => useNotifications());
+
+      await waitFor(() => {
+        expect(Notifications.addNotificationResponseReceivedListener).toHaveBeenCalledWith(
+          expect.any(Function)
+        );
+      });
+
+      const responseCallback =
+        Notifications.addNotificationResponseReceivedListener.mock.calls[0][0];
+
+      responseCallback({
+        notification: {
+          request: {
+            content: {
+              data: { type: 'achievement' },
+            },
+          },
+        },
+      });
+
+      expect(mockDismissAllModalsAndNavigate).toHaveBeenCalledWith('/notifications');
+    });
+
+    it('routes invalid notification payloads to /notifications', async () => {
+      const Notifications = require('expo-notifications');
+      mockUseAuth.mockReturnValue({ user: mockUser });
+
+      renderHook(() => useNotifications());
+
+      await waitFor(() => {
+        expect(Notifications.addNotificationResponseReceivedListener).toHaveBeenCalledWith(
+          expect.any(Function)
+        );
+      });
+
+      const responseCallback =
+        Notifications.addNotificationResponseReceivedListener.mock.calls[0][0];
+
+      responseCallback({
+        notification: {
+          request: {
+            content: {
+              data: { foo: 'bar' },
+            },
+          },
+        },
+      });
+
+      expect(mockDismissAllModalsAndNavigate).toHaveBeenCalledWith('/notifications');
     });
   });
 });

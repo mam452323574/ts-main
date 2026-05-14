@@ -1,22 +1,29 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+  type ReactNode,
+} from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Image,
+  ScrollView,
   TouchableOpacity,
   Animated,
   Easing,
-  Platform,
   useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   X,
-  Activity,
   Utensils,
   PersonStanding,
+  ShieldCheck,
   Smile,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -24,193 +31,387 @@ import { BlurView } from 'expo-blur';
 import { ApiService, ApiError, ApiErrorType } from '@/services/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { SuperScanFeatureIcon } from '@/components/FeatureIcons';
-import { SuccessConfetti } from '@/components/SuccessConfetti';
 import { useBadges } from '@/contexts/BadgeContext';
 import { useGamification } from '@/contexts/GamificationContext';
 import { ScanType } from '@/types';
 import { SCAN_PREVIEW_MIN_LOADING_MS, SCAN_TYPE_LABELS } from '@/constants/scan';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { SIZES, SPACING, BORDER_RADIUS, FONT_WEIGHTS } from '@/constants/theme';
+import {
+  SIZES,
+  SPACING,
+  BORDER_RADIUS,
+  FONTS,
+  FONT_WEIGHTS,
+  withAlpha,
+} from '@/constants/theme';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { primeCoachScansCache } from '@/utils/coachScanQueries';
 import { getMinimumBottomInsetPadding } from '@/utils/mobileLayout';
-import { logExpectedFailure, logOperationalError } from '@/utils/observability';
+import {
+  logExpectedFailure,
+  logOperationalError,
+} from '@/utils/observability';
 import { invalidateScanRelatedQueries } from '@/utils/scanRelatedQueries';
 import {
+  resolveScanCaptureVisualTheme,
   resolveScanFlowAccentTheme,
   resolveScanPreviewVisualTheme,
 } from '@/utils/scanFlowVisualTheme';
+import {
+  SCAN_PREVIEW_LOADING_PHASES,
+  resolveScanPreviewLoadingContent,
+  type ScanPreviewLoadingPhaseKey,
+} from '@/utils/scanPreviewLoadingConfig';
 
-// Erreurs business attendues (quota, mismatch, session) → log warn au lieu d'error
-// pour ne pas polluer la console dev avec des stack traces sur du flow normal.
 const EXPECTED_SCAN_ERROR_TYPES: ReadonlySet<ApiErrorType> = new Set([
   'VALIDATION',
   'TYPE_MISMATCH',
   'AUTH',
 ]);
 
-// Loading step messages for different languages and scan types (with emojis)
-const LOADING_STEPS: Record<string, Record<ScanType, string[]>> = {
-  fr: {
-    health: [
-      '🔍 Scan du visage...',
-      '🧬 Analyse de la peau...',
-      '📐 Détection des symétries...',
-      '✨ Finalisation du score...',
-    ],
-    body: [
-      '📸 Scan de la silhouette...',
-      '⚖️ Estimation de la masse...',
-      '🧘 Analyse de la posture...',
-      '📊 Calcul des indicateurs...',
-    ],
-    nutrition: [
-      '🍽️ Reconnaissance du plat...',
-      '🔥 Estimation calorique...',
-      '🥗 Analyse des nutriments...',
-      '⭐ Score nutritionnel...',
-    ],
-    super: [
-      '🚀 Scan complet initié...',
-      '🤖 Analyse croisée IA...',
-      '🧠 Détection biométrique...',
-      '🎯 Synthèse globale...',
-    ],
+const VALID_SCAN_TYPES: ScanType[] = ['body', 'health', 'nutrition', 'super'];
+
+function renderScanTypeIcon(scanType: ScanType, color: string, size: number) {
+  if (scanType === 'super') {
+    return <SuperScanFeatureIcon color={color} size={size} />;
+  }
+
+  if (scanType === 'health') {
+    return <Smile color={color} size={size} />;
+  }
+
+  if (scanType === 'body') {
+    return <PersonStanding color={color} size={size} />;
+  }
+
+  return <Utensils color={color} size={size} />;
+}
+
+function getLocalizedPreviewStepLabels(
+  locale: string,
+): Record<ScanPreviewLoadingPhaseKey, string> {
+  if (locale.startsWith('fr')) {
+    return {
+      verification: 'Vérification',
+      upload: 'Envoi sécurisé',
+      analysis: 'Analyse',
+      preparing: 'Résultat',
+    };
+  }
+
+  return {
+    verification: 'Verification',
+    upload: 'Secure upload',
+    analysis: 'Analysis',
+    preparing: 'Results',
+  };
+}
+
+function getPreviewTrustLine(locale: string) {
+  if (locale.startsWith('fr')) {
+    return 'Photo chiffrée et analysée dans un flux sécurisé.';
+  }
+
+  return 'Encrypted photo handling with a secure analysis pipeline.';
+}
+
+type ScanPreviewLoadingDensity = 'regular' | 'compact' | 'tight' | 'ultraTight';
+
+interface ScanPreviewLoadingDensityMetrics {
+  topPadding: number;
+  bottomPadding: number;
+  horizontalPadding: number;
+  heroMaxWidth: number;
+  heroMarginBottom: number;
+  heroHeight: number;
+  heroRadius: number;
+  metaInset: number;
+  metaPaddingHorizontal: number;
+  metaPaddingVertical: number;
+  metaIconSize: number;
+  metaIconGlyphSize: number;
+  metaTextSize: number;
+  progressMaxWidth: number;
+  progressMinHeight: number;
+  progressRadius: number;
+  progressPaddingVertical: number;
+  progressPaddingHorizontal: number;
+  eyebrowSize: number;
+  eyebrowMarginBottom: number;
+  percentageSize: number;
+  percentageLineHeight: number;
+  percentageMarginBottom: number;
+  headlineSize: number;
+  headlineLineHeight: number;
+  headlineMarginBottom: number;
+  subtextSize: number;
+  subtextLineHeight: number;
+  subtextPaddingHorizontal: number;
+  subtextMarginBottom: number;
+  progressBarHeight: number;
+  progressBarMarginBottom: number;
+  stepsGap: number;
+  stepsMarginBottom: number;
+  stepPillGap: number;
+  stepPillPaddingHorizontal: number;
+  stepPillPaddingVertical: number;
+  stepTextSize: number;
+  trustLineGap: number;
+  trustLinePaddingHorizontal: number;
+  trustLinePaddingVertical: number;
+  trustLineRadius: number;
+  trustLineMarginBottom: number;
+  trustIconSize: number;
+  trustTextSize: number;
+  trustTextLineHeight: number;
+  insightsLabelSize: number;
+  insightsLabelMarginBottom: number;
+  chipsGap: number;
+  chipPaddingHorizontal: number;
+  chipPaddingVertical: number;
+  chipTextSize: number;
+}
+
+const SCAN_PREVIEW_LOADING_DENSITY_METRICS: Record<
+  ScanPreviewLoadingDensity,
+  ScanPreviewLoadingDensityMetrics
+> = {
+  regular: {
+    topPadding: 48,
+    bottomPadding: SPACING.xl,
+    horizontalPadding: SPACING.xl,
+    heroMaxWidth: 380,
+    heroMarginBottom: SPACING.xl,
+    heroHeight: 176,
+    heroRadius: BORDER_RADIUS.hero,
+    metaInset: SPACING.lg,
+    metaPaddingHorizontal: SPACING.md,
+    metaPaddingVertical: SPACING.sm,
+    metaIconSize: 28,
+    metaIconGlyphSize: 16,
+    metaTextSize: SIZES.text14,
+    progressMaxWidth: 420,
+    progressMinHeight: 356,
+    progressRadius: 36,
+    progressPaddingVertical: 28,
+    progressPaddingHorizontal: 28,
+    eyebrowSize: SIZES.text12,
+    eyebrowMarginBottom: SPACING.sm,
+    percentageSize: 70,
+    percentageLineHeight: 76,
+    percentageMarginBottom: SPACING.xs,
+    headlineSize: SIZES.xl,
+    headlineLineHeight: 30,
+    headlineMarginBottom: SPACING.md,
+    subtextSize: SIZES.text14,
+    subtextLineHeight: 21,
+    subtextPaddingHorizontal: SPACING.lg,
+    subtextMarginBottom: SPACING.lg,
+    progressBarHeight: 8,
+    progressBarMarginBottom: SPACING.lg,
+    stepsGap: SPACING.sm,
+    stepsMarginBottom: SPACING.lg,
+    stepPillGap: 8,
+    stepPillPaddingHorizontal: SPACING.sm + 2,
+    stepPillPaddingVertical: SPACING.sm,
+    stepTextSize: SIZES.text12,
+    trustLineGap: SPACING.sm,
+    trustLinePaddingHorizontal: SPACING.md,
+    trustLinePaddingVertical: SPACING.md,
+    trustLineRadius: BORDER_RADIUS.xl,
+    trustLineMarginBottom: SPACING.lg,
+    trustIconSize: 16,
+    trustTextSize: SIZES.text12,
+    trustTextLineHeight: 18,
+    insightsLabelSize: SIZES.text12,
+    insightsLabelMarginBottom: SPACING.md,
+    chipsGap: SPACING.sm,
+    chipPaddingHorizontal: SPACING.md,
+    chipPaddingVertical: SPACING.sm,
+    chipTextSize: SIZES.text14,
   },
-  en: {
-    health: [
-      '🔍 Scanning face...',
-      '🧬 Analyzing skin...',
-      '📐 Detecting symmetry...',
-      '✨ Finalizing score...',
-    ],
-    body: [
-      '📸 Scanning body shape...',
-      '⚖️ Estimating mass...',
-      '🧘 Analyzing posture...',
-      '📊 Calculating metrics...',
-    ],
-    nutrition: [
-      '🍽️ Identifying dish...',
-      '🔥 Estimating calories...',
-      '🥗 Analyzing nutrients...',
-      '⭐ Nutrition score...',
-    ],
-    super: [
-      '🚀 Full scan initiated...',
-      '🤖 Cross-referencing AI...',
-      '🧠 Biometric detection...',
-      '🎯 Global synthesis...',
-    ],
+  compact: {
+    topPadding: 28,
+    bottomPadding: SPACING.lg,
+    horizontalPadding: SPACING.lg,
+    heroMaxWidth: 340,
+    heroMarginBottom: SPACING.lg,
+    heroHeight: 132,
+    heroRadius: 30,
+    metaInset: SPACING.md,
+    metaPaddingHorizontal: SPACING.sm + 2,
+    metaPaddingVertical: 7,
+    metaIconSize: 26,
+    metaIconGlyphSize: 15,
+    metaTextSize: 13,
+    progressMaxWidth: 390,
+    progressMinHeight: 304,
+    progressRadius: 32,
+    progressPaddingVertical: 20,
+    progressPaddingHorizontal: 22,
+    eyebrowSize: SIZES.text12,
+    eyebrowMarginBottom: 6,
+    percentageSize: 60,
+    percentageLineHeight: 66,
+    percentageMarginBottom: 3,
+    headlineSize: SIZES.text20,
+    headlineLineHeight: 25,
+    headlineMarginBottom: SPACING.sm,
+    subtextSize: 13,
+    subtextLineHeight: 19,
+    subtextPaddingHorizontal: SPACING.sm,
+    subtextMarginBottom: SPACING.md,
+    progressBarHeight: 7,
+    progressBarMarginBottom: SPACING.md,
+    stepsGap: 7,
+    stepsMarginBottom: SPACING.md,
+    stepPillGap: 7,
+    stepPillPaddingHorizontal: 9,
+    stepPillPaddingVertical: 6,
+    stepTextSize: SIZES.text12,
+    trustLineGap: SPACING.sm,
+    trustLinePaddingHorizontal: SPACING.md,
+    trustLinePaddingVertical: 10,
+    trustLineRadius: 22,
+    trustLineMarginBottom: SPACING.md,
+    trustIconSize: 15,
+    trustTextSize: SIZES.text12,
+    trustTextLineHeight: 18,
+    insightsLabelSize: SIZES.text12,
+    insightsLabelMarginBottom: SPACING.sm,
+    chipsGap: SPACING.sm,
+    chipPaddingHorizontal: SPACING.md,
+    chipPaddingVertical: 7,
+    chipTextSize: 13,
   },
-  de: {
-    health: [
-      '🔍 Gesichtsscan...',
-      '🧬 Hautanalyse...',
-      '📐 Symmetrieerkennung...',
-      '✨ Punkteberechnung...',
-    ],
-    body: [
-      '📸 Körperscan...',
-      '⚖️ Masseschätzung...',
-      '🧘 Haltungsanalyse...',
-      '📊 Kennzahlen berechnen...',
-    ],
-    nutrition: [
-      '🍽️ Gericht erkennen...',
-      '🔥 Kalorienschätzung...',
-      '🥗 Nährstoffanalyse...',
-      '⭐ Ernährungswert...',
-    ],
-    super: [
-      '🚀 Vollständiger Scan...',
-      '🤖 KI-Kreuzanalyse...',
-      '🧠 Biometrische Erkennung...',
-      '🎯 Gesamtauswertung...',
-    ],
+  tight: {
+    topPadding: 18,
+    bottomPadding: SPACING.sm,
+    horizontalPadding: SPACING.md,
+    heroMaxWidth: 304,
+    heroMarginBottom: SPACING.md,
+    heroHeight: 104,
+    heroRadius: 26,
+    metaInset: SPACING.sm,
+    metaPaddingHorizontal: SPACING.sm,
+    metaPaddingVertical: 6,
+    metaIconSize: 24,
+    metaIconGlyphSize: 14,
+    metaTextSize: SIZES.text12,
+    progressMaxWidth: 360,
+    progressMinHeight: 0,
+    progressRadius: 28,
+    progressPaddingVertical: 14,
+    progressPaddingHorizontal: 18,
+    eyebrowSize: 11,
+    eyebrowMarginBottom: 4,
+    percentageSize: 46,
+    percentageLineHeight: 52,
+    percentageMarginBottom: 2,
+    headlineSize: SIZES.text18,
+    headlineLineHeight: 22,
+    headlineMarginBottom: SPACING.sm,
+    subtextSize: 12,
+    subtextLineHeight: 18,
+    subtextPaddingHorizontal: 0,
+    subtextMarginBottom: SPACING.sm,
+    progressBarHeight: 6,
+    progressBarMarginBottom: SPACING.sm,
+    stepsGap: 6,
+    stepsMarginBottom: SPACING.sm,
+    stepPillGap: 6,
+    stepPillPaddingHorizontal: 8,
+    stepPillPaddingVertical: 5,
+    stepTextSize: 11,
+    trustLineGap: 6,
+    trustLinePaddingHorizontal: SPACING.sm,
+    trustLinePaddingVertical: 8,
+    trustLineRadius: BORDER_RADIUS.lg,
+    trustLineMarginBottom: SPACING.sm,
+    trustIconSize: 14,
+    trustTextSize: 11,
+    trustTextLineHeight: 16,
+    insightsLabelSize: 11,
+    insightsLabelMarginBottom: SPACING.sm,
+    chipsGap: 6,
+    chipPaddingHorizontal: SPACING.sm,
+    chipPaddingVertical: 6,
+    chipTextSize: SIZES.text12,
   },
-  es: {
-    health: [
-      '🔍 Escaneando rostro...',
-      '🧬 Análisis de piel...',
-      '📐 Detectando simetría...',
-      '✨ Finalizando puntuación...',
-    ],
-    body: [
-      '📸 Escaneando cuerpo...',
-      '⚖️ Estimación de masa...',
-      '🧘 Análisis de postura...',
-      '📊 Calculando métricas...',
-    ],
-    nutrition: [
-      '🍽️ Identificando plato...',
-      '🔥 Estimación calórica...',
-      '🥗 Análisis de nutrientes...',
-      '⭐ Puntuación nutricional...',
-    ],
-    super: [
-      '🚀 Escaneo completo...',
-      '🤖 Análisis IA cruzado...',
-      '🧠 Detección biométrica...',
-      '🎯 Síntesis global...',
-    ],
-  },
-  it: {
-    health: [
-      '🔍 Scansione volto...',
-      '🧬 Analisi della pelle...',
-      '📐 Rilevamento simmetria...',
-      '✨ Calcolo punteggio...',
-    ],
-    body: [
-      '📸 Scansione corpo...',
-      '⚖️ Stima della massa...',
-      '🧘 Analisi postura...',
-      '📊 Calcolo metriche...',
-    ],
-    nutrition: [
-      '🍽️ Identificazione piatto...',
-      '🔥 Stima calorie...',
-      '🥗 Analisi nutrienti...',
-      '⭐ Punteggio nutrizionale...',
-    ],
-    super: [
-      '🚀 Scansione completa...',
-      '🤖 Analisi IA incrociata...',
-      '🧠 Rilevamento biometrico...',
-      '🎯 Sintesi globale...',
-    ],
-  },
-  pt: {
-    health: [
-      '🔍 Escanear rosto...',
-      '🧬 Análise da pele...',
-      '📐 Detecção de simetria...',
-      '✨ Finalizando pontuação...',
-    ],
-    body: [
-      '📸 Escanear corpo...',
-      '⚖️ Estimativa de massa...',
-      '🧘 Análise de postura...',
-      '📊 Calculando métricas...',
-    ],
-    nutrition: [
-      '🍽️ Identificando prato...',
-      '🔥 Estimativa calórica...',
-      '🥗 Análise de nutrientes...',
-      '⭐ Pontuação nutricional...',
-    ],
-    super: [
-      '🚀 Escaneamento completo...',
-      '🤖 Análise cruzada de IA...',
-      '🧠 Detecção biométrica...',
-      '🎯 Síntese global...',
-    ],
+  ultraTight: {
+    topPadding: 10,
+    bottomPadding: SPACING.sm,
+    horizontalPadding: SPACING.md,
+    heroMaxWidth: 284,
+    heroMarginBottom: SPACING.sm,
+    heroHeight: 88,
+    heroRadius: 24,
+    metaInset: SPACING.sm,
+    metaPaddingHorizontal: 7,
+    metaPaddingVertical: 5,
+    metaIconSize: 22,
+    metaIconGlyphSize: 13,
+    metaTextSize: 11,
+    progressMaxWidth: 344,
+    progressMinHeight: 0,
+    progressRadius: 24,
+    progressPaddingVertical: 12,
+    progressPaddingHorizontal: 16,
+    eyebrowSize: 10,
+    eyebrowMarginBottom: 3,
+    percentageSize: 40,
+    percentageLineHeight: 46,
+    percentageMarginBottom: 1,
+    headlineSize: SIZES.text16,
+    headlineLineHeight: 20,
+    headlineMarginBottom: 6,
+    subtextSize: 11,
+    subtextLineHeight: 16,
+    subtextPaddingHorizontal: 0,
+    subtextMarginBottom: 6,
+    progressBarHeight: 5,
+    progressBarMarginBottom: 6,
+    stepsGap: 5,
+    stepsMarginBottom: 6,
+    stepPillGap: 5,
+    stepPillPaddingHorizontal: 7,
+    stepPillPaddingVertical: 4,
+    stepTextSize: 10,
+    trustLineGap: 6,
+    trustLinePaddingHorizontal: SPACING.sm,
+    trustLinePaddingVertical: 7,
+    trustLineRadius: BORDER_RADIUS.md,
+    trustLineMarginBottom: 6,
+    trustIconSize: 13,
+    trustTextSize: 10,
+    trustTextLineHeight: 15,
+    insightsLabelSize: 10,
+    insightsLabelMarginBottom: 6,
+    chipsGap: 5,
+    chipPaddingHorizontal: 7,
+    chipPaddingVertical: 5,
+    chipTextSize: 11,
   },
 };
 
-const VALID_SCAN_TYPES: ScanType[] = ['body', 'health', 'nutrition', 'super'];
+function resolveScanPreviewLoadingDensity(
+  usableHeight: number,
+): ScanPreviewLoadingDensity {
+  if (usableHeight < 620) {
+    return 'ultraTight';
+  }
+
+  if (usableHeight < 700) {
+    return 'tight';
+  }
+
+  if (usableHeight < 800) {
+    return 'compact';
+  }
+
+  return 'regular';
+}
 
 export default function ScanPreviewScreen() {
   const router = useRouter();
@@ -222,41 +423,82 @@ export default function ScanPreviewScreen() {
   const params = useLocalSearchParams();
   const imageUri = params.imageUri as string;
   const scanType = params.scanType as ScanType;
+  const resolvedScanType = VALID_SCAN_TYPES.includes(scanType)
+    ? scanType
+    : 'health';
+  const scanTypeLabel = t(SCAN_TYPE_LABELS[resolvedScanType]);
+  const resolvedLocale = locale || 'fr';
 
   const [loading, setLoading] = useState(false);
-  const [showConfetti, setShowConfetti] = useState(false);
   const { showAlert, alertElement } = useCustomAlert();
   const { setBadge } = useBadges();
   const { incrementScanCount } = useGamification();
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isCompactAndroidLayout =
-    Platform.OS === 'android' && windowHeight < 760;
+  const isCompactVerticalLayout = windowHeight < 760;
+  const isTightVerticalLayout = windowHeight < 700;
+  const safeBottomInset = getMinimumBottomInsetPadding(
+    insets.bottom,
+    SPACING.sm,
+  );
+  const loadingUsableHeight = windowHeight - insets.top - safeBottomInset;
+  const loadingDensity =
+    resolveScanPreviewLoadingDensity(loadingUsableHeight);
+  const loadingMetrics =
+    SCAN_PREVIEW_LOADING_DENSITY_METRICS[loadingDensity];
   const previewTheme = useMemo(
     () => resolveScanPreviewVisualTheme(colors, isDark),
     [colors, isDark],
   );
-  const styles = useMemo(
-    () => createStyles(insets, isCompactAndroidLayout, previewTheme),
-    [insets, isCompactAndroidLayout, previewTheme]
+  const captureTheme = useMemo(
+    () => resolveScanCaptureVisualTheme(colors, isDark),
+    [colors, isDark],
   );
   const accentTheme = useMemo(
-    () => resolveScanFlowAccentTheme(colors, isDark, scanType ?? 'health'),
-    [colors, isDark, scanType],
+    () => resolveScanFlowAccentTheme(colors, isDark, resolvedScanType),
+    [colors, isDark, resolvedScanType],
+  );
+  const styles = useMemo(
+    () =>
+      createStyles(
+        insets,
+        isCompactVerticalLayout,
+        isTightVerticalLayout,
+        loadingDensity,
+        loadingMetrics,
+        previewTheme,
+        captureTheme,
+        colors,
+      ),
+    [
+      captureTheme,
+      colors,
+      insets,
+      isCompactVerticalLayout,
+      isTightVerticalLayout,
+      loadingDensity,
+      loadingMetrics,
+      previewTheme,
+    ],
+  );
+  const previewStepLabels = useMemo(
+    () => getLocalizedPreviewStepLabels(resolvedLocale),
+    [resolvedLocale],
+  );
+  const trustLine = useMemo(
+    () => getPreviewTrustLine(resolvedLocale),
+    [resolvedLocale],
   );
 
-  // Simulated progress state
-  const [currentStep, setCurrentStep] = useState(0);
   const [isApiComplete, setIsApiComplete] = useState(false);
   const [displayProgress, setDisplayProgress] = useState(0);
   const progressAnim = useRef(new Animated.Value(0)).current;
-  const stepIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const completionGlowAnim = useRef(new Animated.Value(0)).current;
+  const resolvedProgress = isApiComplete ? 100 : displayProgress;
+  const loadingContent = useMemo(
+    () => resolveScanPreviewLoadingContent(resolvedScanType, resolvedProgress),
+    [resolvedProgress, resolvedScanType],
+  );
 
-  // Get loading steps based on language (default to English) and scan type
-  const stepsForLocale =
-    LOADING_STEPS[locale as keyof typeof LOADING_STEPS] || LOADING_STEPS.en;
-  const loadingSteps = stepsForLocale[scanType] || stepsForLocale.health; // Fallback to health if type missing
-
-  // Listen to progress animation changes
   useEffect(() => {
     const listenerId = progressAnim.addListener(({ value }) => {
       setDisplayProgress(Math.round(value));
@@ -266,7 +508,6 @@ export default function ScanPreviewScreen() {
     };
   }, [progressAnim]);
 
-  // Validation des parametres requis
   useEffect(() => {
     if (!imageUri || !scanType || !VALID_SCAN_TYPES.includes(scanType)) {
       showAlert(t('common.error'), t('scan_preview.error_validation'), [
@@ -276,225 +517,247 @@ export default function ScanPreviewScreen() {
         },
       ]);
     }
-  }, [imageUri, scanType, router]);
+  }, [imageUri, router, scanType, showAlert, t]);
 
   useEffect(() => {
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
-      if (stepIntervalRef.current) {
-        clearInterval(stepIntervalRef.current);
-      }
     };
   }, []);
 
-  // Simulated progress animation effect
   useEffect(() => {
-    if (loading && !isApiComplete) {
-      // Reset progress when loading starts
-      progressAnim.setValue(0);
-      setCurrentStep(0);
+    let animation: Animated.CompositeAnimation | undefined;
 
-      // Animate progress from 0 to 90% over 25 seconds for realism
-      Animated.timing(progressAnim, {
+    progressAnim.stopAnimation();
+
+    if (loading && !isApiComplete) {
+      progressAnim.setValue(0);
+      setDisplayProgress(0);
+
+      animation = Animated.timing(progressAnim, {
         toValue: 90,
         duration: 25000,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: false,
-      }).start();
-
-      // Cycle through steps every 1.2 seconds
-      stepIntervalRef.current = setInterval(() => {
-        setCurrentStep((prev) => {
-          const nextStep = (prev + 1) % loadingSteps.length;
-          return nextStep;
-        });
-      }, 1200);
+      });
+      animation.start();
     } else if (isApiComplete) {
-      // API completed - animate to 100%
-      if (stepIntervalRef.current) {
-        clearInterval(stepIntervalRef.current);
-      }
-      setCurrentStep(loadingSteps.length - 1); // Set to final step
+      setDisplayProgress(100);
 
-      Animated.timing(progressAnim, {
+      animation = Animated.timing(progressAnim, {
         toValue: 100,
         duration: 300,
         easing: Easing.out(Easing.ease),
         useNativeDriver: false,
-      }).start();
+      });
+      animation.start(({ finished }) => {
+        if (finished) {
+          setDisplayProgress(100);
+        }
+      });
     }
 
     return () => {
-      if (stepIntervalRef.current) {
-        clearInterval(stepIntervalRef.current);
-      }
+      animation?.stop();
     };
-  }, [loading, isApiComplete, loadingSteps.length]);
+  }, [isApiComplete, loading, progressAnim]);
 
-  const getResolvedApiErrorMessage = useCallback((error: ApiError, fallback: string) => {
-    if (error.message.startsWith('api_errors.')) {
-      return t(error.message);
+  useEffect(() => {
+    completionGlowAnim.stopAnimation();
+    completionGlowAnim.setValue(0);
+
+    if (!loading || !isApiComplete) {
+      return;
     }
 
-    return error.message || fallback;
-  }, [t]);
+    Animated.sequence([
+      Animated.timing(completionGlowAnim, {
+        toValue: 1,
+        duration: 340,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.timing(completionGlowAnim, {
+        toValue: 0.45,
+        duration: 420,
+        easing: Easing.inOut(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.timing(completionGlowAnim, {
+        toValue: 1,
+        duration: 320,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ]).start();
 
-  const resolveScanErrorAlert = useCallback((error: unknown) => {
-    if (error instanceof ApiError) {
-      switch (error.type) {
-        case 'TYPE_MISMATCH':
-          return {
-            title: t('scan_preview.error_title_type'),
-            message: getResolvedApiErrorMessage(
-              error,
-              t('scan_preview.error_msg_type'),
-            ),
-          };
-        case 'AUTH':
-          return {
-            title: t('scan_preview.error_title_session'),
-            message: t('scan_preview.error_msg_session'),
-          };
-        case 'NETWORK':
-          return {
-            title: t('scan_preview.error_title_network'),
-            message: t('scan_preview.error_msg_network'),
-          };
-        case 'TIMEOUT':
-          return {
-            title: t('scan_preview.error_title_timeout'),
-            message: t('scan_preview.error_msg_timeout'),
-          };
-        case 'UPLOAD':
-          return {
-            title: t('scan_preview.error_title_upload'),
-            message: t('scan_preview.error_msg_upload'),
-          };
-        case 'PROVIDER':
-          return {
-            title: t('scan_preview.error_title_provider'),
-            message: t('scan_preview.error_msg_provider'),
-          };
-        case 'DATABASE':
-        case 'EDGE_FUNCTION':
-          return {
-            title: t('scan_preview.error_title_server'),
-            message: t('scan_preview.error_msg_server'),
-          };
-        case 'VALIDATION':
-          return {
-            title: t('common.error'),
-            message: getResolvedApiErrorMessage(
-              error,
-              t('scan_preview.error_validation'),
-            ),
-          };
-        case 'ANALYSIS':
-        case 'UNKNOWN':
-        default:
-          return {
-            title: t('scan_preview.error_title_analysis'),
-            message: getResolvedApiErrorMessage(
-              error,
-              t('scan_preview.error_msg_default'),
-            ),
-          };
+    return () => {
+      completionGlowAnim.stopAnimation();
+    };
+  }, [completionGlowAnim, isApiComplete, loading]);
+
+  const getResolvedApiErrorMessage = useCallback(
+    (error: ApiError, fallback: string) => {
+      if (error.message.startsWith('api_errors.')) {
+        return t(error.message);
       }
-    }
 
-    if (error instanceof Error) {
+      return error.message || fallback;
+    },
+    [t],
+  );
+
+  const resolveScanErrorAlert = useCallback(
+    (error: unknown) => {
+      if (error instanceof ApiError) {
+        switch (error.type) {
+          case 'TYPE_MISMATCH':
+            return {
+              title: t('scan_preview.error_title_type'),
+              message: getResolvedApiErrorMessage(
+                error,
+                t('scan_preview.error_msg_type'),
+              ),
+            };
+          case 'AUTH':
+            return {
+              title: t('scan_preview.error_title_session'),
+              message: t('scan_preview.error_msg_session'),
+            };
+          case 'NETWORK':
+            return {
+              title: t('scan_preview.error_title_network'),
+              message: t('scan_preview.error_msg_network'),
+            };
+          case 'TIMEOUT':
+            return {
+              title: t('scan_preview.error_title_timeout'),
+              message: t('scan_preview.error_msg_timeout'),
+            };
+          case 'UPLOAD':
+            return {
+              title: t('scan_preview.error_title_upload'),
+              message: t('scan_preview.error_msg_upload'),
+            };
+          case 'PROVIDER':
+            return {
+              title: t('scan_preview.error_title_provider'),
+              message: t('scan_preview.error_msg_provider'),
+            };
+          case 'DATABASE':
+          case 'EDGE_FUNCTION':
+            return {
+              title: t('scan_preview.error_title_server'),
+              message: t('scan_preview.error_msg_server'),
+            };
+          case 'VALIDATION':
+            return {
+              title: t('common.error'),
+              message: getResolvedApiErrorMessage(
+                error,
+                t('scan_preview.error_validation'),
+              ),
+            };
+          case 'ANALYSIS':
+          case 'UNKNOWN':
+          default:
+            return {
+              title: t('scan_preview.error_title_analysis'),
+              message: getResolvedApiErrorMessage(
+                error,
+                t('scan_preview.error_msg_default'),
+              ),
+            };
+        }
+      }
+
+      if (error instanceof Error) {
+        return {
+          title: t('common.error'),
+          message: error.message || t('common.error'),
+        };
+      }
+
       return {
         title: t('common.error'),
-        message: error.message || t('common.error'),
+        message: t('common.error'),
       };
-    }
+    },
+    [getResolvedApiErrorMessage, t],
+  );
 
-    return {
-      title: t('common.error'),
-      message: t('common.error'),
-    };
-  }, [getResolvedApiErrorMessage, t]);
+  const showScanErrorAlert = useCallback(
+    (error: unknown) => {
+      const resolvedError = error instanceof ApiError ? error : undefined;
+      const logFn =
+        resolvedError && EXPECTED_SCAN_ERROR_TYPES.has(resolvedError.type)
+          ? logExpectedFailure
+          : logOperationalError;
 
-  const showScanErrorAlert = useCallback((error: unknown) => {
-    const resolvedError = error instanceof ApiError ? error : undefined;
-    const logFn =
-      resolvedError && EXPECTED_SCAN_ERROR_TYPES.has(resolvedError.type)
-        ? logExpectedFailure
-        : logOperationalError;
+      logFn('[ScanPreviewScreen] Scan flow failed', error, {
+        scan_type: resolvedScanType,
+        error_type: resolvedError?.type,
+        error_code: resolvedError?.code,
+        error_status: resolvedError?.status,
+        request_id: resolvedError?.requestId,
+      });
 
-    logFn('[ScanPreviewScreen] Scan flow failed', error, {
-      scan_type: scanType,
-      error_type: resolvedError?.type,
-      error_code: resolvedError?.code,
-      error_status: resolvedError?.status,
-      request_id: resolvedError?.requestId,
-    });
-
-    const { title, message } = resolveScanErrorAlert(error);
-    showAlert(title, message, [
-      {
-        text: t('common.retry'),
-        onPress: () => {
-          void handleConfirm();
+      const { title, message } = resolveScanErrorAlert(error);
+      showAlert(title, message, [
+        {
+          text: t('common.retry'),
+          onPress: () => {
+            void handleConfirm();
+          },
         },
-      },
-      {
-        text: t('common.back'),
-        style: 'cancel',
-        onPress: () => router.back(),
-      },
-    ]);
-  }, [resolveScanErrorAlert, router, scanType, showAlert, t, handleConfirm]);
+        {
+          text: t('common.back'),
+          style: 'cancel',
+          onPress: () => router.back(),
+        },
+      ]);
+    },
+    [handleConfirm, resolveScanErrorAlert, resolvedScanType, router, showAlert, t],
+  );
 
   async function handleConfirm() {
-    // Protection contre les doubles clics
-    if (loading) return;
+    if (loading) {
+      return;
+    }
 
     try {
       setLoading(true);
       setIsApiComplete(false);
-      const minimumLoadingMs = SCAN_PREVIEW_MIN_LOADING_MS[scanType];
+      const minimumLoadingMs = SCAN_PREVIEW_MIN_LOADING_MS[resolvedScanType];
 
-      // Force a minimum loading time tailored to the scan type to keep the UI aligned
-      // with the perceived analysis duration without affecting the backend flow.
       const [result] = await Promise.all([
-        ApiService.createScanWithAnalysis(imageUri, scanType, locale),
+        ApiService.createScanWithAnalysis(imageUri, resolvedScanType, locale),
         new Promise((resolve) => setTimeout(resolve, minimumLoadingMs)),
       ]);
 
-      // Vérifier si l'analyse a réussi
       if (result.analysisSucceeded && result.scan.analysis_result) {
-        // Succès - afficher confetti et naviguer vers les résultats
-        // NOTE: On ne met PAS setLoading(false) ici pour empêcher les doubles clics
-        // pendant l'animation et avant la navigation
-
         try {
           await incrementScanCount();
         } catch (error) {
           console.error(
             '[ScanPreviewScreen] Error incrementing local gamification count:',
-            error
+            error,
           );
         }
 
         primeCoachScansCache(queryClient, result.scan);
         await invalidateScanRelatedQueries(queryClient);
 
-        // Mark API as complete to trigger 100% progress
         setIsApiComplete(true);
-
-        // Small delay to show 100% progress before confetti
         await new Promise((resolve) => setTimeout(resolve, 300));
 
-        setShowConfetti(true);
         setBadge('coach');
 
         timeoutRef.current = setTimeout(() => {
-          // Router vers l'écran approprié selon le type de scan
           const targetPath =
-            scanType === 'super' ? '/super-scan-result' : '/scan-result';
+            resolvedScanType === 'super' ? '/super-scan-result' : '/scan-result';
           router.replace({
             pathname: targetPath,
             params: {
@@ -503,11 +766,9 @@ export default function ScanPreviewScreen() {
               ...(result.scan?.id ? { scanId: String(result.scan.id) } : {}),
             },
           });
-          // La navigation va démonter le composant, pas besoin de reset loading
         }, 1500);
       } else {
-        // Échec de l'analyse - afficher le message d'erreur approprié
-        setLoading(false); // On réactive le bouton pour permettre de réessayer
+        setLoading(false);
         showScanErrorAlert(result.analysisError);
       }
     } catch (err) {
@@ -516,14 +777,34 @@ export default function ScanPreviewScreen() {
     }
   }
 
+  const renderLoadingLayoutWrapper = (children: ReactNode) => {
+    if (loadingDensity === 'ultraTight') {
+      return (
+        <ScrollView
+          testID="scan-preview-loading-scroll-view"
+          style={styles.loadingScrollView}
+          contentContainerStyle={styles.loadingScrollContent}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          {children}
+        </ScrollView>
+      );
+    }
+
+    return <View style={styles.loadingStaticWrapper}>{children}</View>;
+  };
+
   return (
     <View
       style={[styles.container, { backgroundColor: previewTheme.screenBackground }]}
     >
       {alertElement}
-      <SuccessConfetti
-        active={showConfetti}
-        onAnimationEnd={() => setShowConfetti(false)}
+
+      <LinearGradient
+        colors={captureTheme.topScrimGradient}
+        pointerEvents="none"
+        style={styles.topScrim}
       />
 
       <View style={styles.header}>
@@ -532,16 +813,55 @@ export default function ScanPreviewScreen() {
           onPress={() => router.back()}
           testID="scan-preview-close-button"
         >
-          <X
-            color={previewTheme.closeButtonIcon}
-            size={20}
-            strokeWidth={2.5}
-          />
+          <X color={previewTheme.closeButtonIcon} size={20} strokeWidth={2.5} />
         </TouchableOpacity>
       </View>
 
       <View style={styles.imageContainer} testID="scan-preview-image-container">
-        <Image source={{ uri: imageUri }} style={styles.image} />
+        <View style={styles.imageFrame}>
+          <Image source={{ uri: imageUri }} style={styles.image} />
+          <LinearGradient
+            colors={accentTheme.heroPreviewGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <LinearGradient
+            colors={previewTheme.loadingHeroScrimGradient}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <View
+            style={[
+              styles.previewHeroMeta,
+              {
+                backgroundColor: accentTheme.heroPreviewMetaBackground,
+                borderColor: accentTheme.heroPreviewMetaBorder,
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.previewHeroMetaIcon,
+                {
+                  backgroundColor: accentTheme.accentSoftBackground,
+                  borderColor: accentTheme.vignetteFrameBorder,
+                },
+              ]}
+            >
+              {renderScanTypeIcon(resolvedScanType, accentTheme.accentColor, 16)}
+            </View>
+            <Text
+              style={[
+                styles.previewHeroMetaText,
+                { color: accentTheme.heroPreviewMetaText },
+              ]}
+            >
+              {scanTypeLabel}
+            </Text>
+          </View>
+        </View>
       </View>
 
       <BlurView
@@ -552,18 +872,69 @@ export default function ScanPreviewScreen() {
       >
         <View style={styles.buttonsContent}>
           <View style={styles.infoCard}>
+            <View style={styles.infoPillRow}>
+              <View
+                style={[
+                  styles.infoPill,
+                  {
+                    backgroundColor: accentTheme.chipBackground,
+                    borderColor: accentTheme.chipBorder,
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.infoPillIcon,
+                    {
+                      backgroundColor: accentTheme.accentSoftBackground,
+                      borderColor: accentTheme.vignetteFrameBorder,
+                    },
+                  ]}
+                >
+                  {renderScanTypeIcon(
+                    resolvedScanType,
+                    accentTheme.accentColor,
+                    14,
+                  )}
+                </View>
+                <Text
+                  style={[styles.infoPillText, { color: accentTheme.chipText }]}
+                >
+                  {scanTypeLabel}
+                </Text>
+              </View>
+
+              <View
+                style={[
+                  styles.infoPill,
+                  {
+                    backgroundColor: previewTheme.loadingTrustLineBackground,
+                    borderColor: previewTheme.loadingTrustLineBorder,
+                  },
+                ]}
+              >
+                <ShieldCheck
+                  color={accentTheme.trustLineAccent}
+                  size={14}
+                  strokeWidth={2}
+                />
+                <Text style={styles.infoPillMutedText}>
+                  {resolvedLocale.startsWith('fr') ? 'Flux securise' : 'Secure flow'}
+                </Text>
+              </View>
+            </View>
+
             <Text style={styles.infoLabel}>{t('scan_preview.type_label')}</Text>
-            <Text style={styles.infoValue}>
-              {t(SCAN_TYPE_LABELS[scanType])}
+            <Text style={styles.infoValue}>{scanTypeLabel}</Text>
+            <Text style={styles.infoBody}>
+              {resolvedLocale.startsWith('fr')
+                ? "On n'envoie la photo qu'au moment de confirmer l'analyse."
+                : 'The photo is only uploaded once you confirm the analysis.'}
             </Text>
           </View>
 
           <TouchableOpacity
-            style={[
-              styles.actionButton,
-              styles.primaryButton,
-              { backgroundColor: colors.primary },
-            ]}
+            style={[styles.actionButton, styles.primaryButton]}
             onPress={handleConfirm}
             disabled={loading}
             testID="confirm-button"
@@ -575,137 +946,294 @@ export default function ScanPreviewScreen() {
             </Text>
           </TouchableOpacity>
 
-          {!loading && (
+          {!loading ? (
             <TouchableOpacity
               style={[styles.actionButton, styles.secondaryButton]}
               onPress={() => router.back()}
             >
-              <Text style={styles.secondaryButtonText}>
-                {t('common.cancel')}
-              </Text>
+              <Text style={styles.secondaryButtonText}>{t('common.cancel')}</Text>
             </TouchableOpacity>
-          )}
+          ) : null}
         </View>
       </BlurView>
 
-      {loading && (
+      {loading ? (
         <View style={styles.loadingOverlay} testID="scan-preview-loading-overlay">
-          <View style={styles.progressContainer} testID="scan-preview-progress-card">
-            {/* Dynamic Icon */}
+          <LinearGradient
+            colors={previewTheme.loadingOverlayGradient}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+
+          {renderLoadingLayoutWrapper(
             <View
-              style={[
-                styles.iconContainer,
-                {
-                  borderColor: accentTheme.accentColor,
-                  backgroundColor: accentTheme.accentSoftBackground,
-                },
-              ]}
+              style={styles.loadingLayout}
+              testID="scan-preview-loading-layout"
             >
-              {scanType === 'super' ? (
-                <SuperScanFeatureIcon color={accentTheme.accentColor} size={32} />
-              ) : scanType === 'health' ? (
-                <Smile color={accentTheme.accentColor} size={32} />
-              ) : scanType === 'body' ? (
-                <PersonStanding color={accentTheme.accentColor} size={32} />
-              ) : (
-                <Utensils color={accentTheme.accentColor} size={32} />
-              )}
-            </View>
-
-            {/* Current Step Text - Main headline */}
-            <Text style={styles.loadingStepText}>
-              {loadingSteps[currentStep]}
-            </Text>
-
-            {/* Progress Bar with Gradient */}
-            <View style={styles.progressBarWrapper}>
-              <View style={styles.progressBarBackground}>
-                <Animated.View
-                  style={[
-                    styles.progressBarFillContainer,
-                    {
-                      width: progressAnim.interpolate({
-                        inputRange: [0, 100],
-                        outputRange: ['0%', '100%'],
-                      }),
-                    },
-                  ]}
-                >
-                  <LinearGradient
-                    colors={accentTheme.progressGradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.progressBarGradient}
-                  />
-                </Animated.View>
-              </View>
-
-              {/* Percentage Badge */}
-              <View
+            <View style={styles.loadingHeroShell}>
+              <Animated.View
+                pointerEvents="none"
                 style={[
-                  styles.percentageBadge,
+                  styles.completionGlow,
                   {
-                    backgroundColor: accentTheme.accentBadgeBackground,
+                    opacity: completionGlowAnim,
+                    transform: [
+                      {
+                        scale: completionGlowAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0.96, 1.04],
+                        }),
+                      },
+                    ],
+                    backgroundColor: accentTheme.completionGlowSoft,
+                    borderColor: accentTheme.completionGlow,
                   },
                 ]}
+              />
+
+              <View
+                style={[
+                  styles.loadingVignetteFrame,
+                  {
+                    backgroundColor: previewTheme.loadingVignetteBackground,
+                    borderColor: accentTheme.vignetteFrameBorder,
+                    shadowColor: previewTheme.loadingHeroShadowColor,
+                  },
+                ]}
+                testID="scan-preview-loading-vignette"
               >
-                <Text
+                <Image
+                  source={{ uri: imageUri }}
+                  style={styles.loadingVignetteImage}
+                  resizeMode="cover"
+                />
+                <LinearGradient
+                  colors={accentTheme.heroPreviewGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+                <LinearGradient
+                  colors={previewTheme.loadingHeroScrimGradient}
+                  start={{ x: 0.5, y: 0 }}
+                  end={{ x: 0.5, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+                <View
                   style={[
-                    styles.progressPercentage,
+                    styles.loadingVignetteMeta,
                     {
-                      color: accentTheme.accentColor,
+                      backgroundColor: previewTheme.loadingVignetteMetaBackground,
+                      borderColor: previewTheme.loadingVignetteMetaBorder,
                     },
                   ]}
                 >
-                  {displayProgress}%
-                </Text>
+                  <View
+                    style={[
+                      styles.loadingVignetteMetaIcon,
+                      {
+                        backgroundColor: accentTheme.accentSoftBackground,
+                        borderColor: accentTheme.vignetteFrameBorder,
+                      },
+                    ]}
+                    >
+                    {renderScanTypeIcon(
+                      resolvedScanType,
+                      accentTheme.accentColor,
+                      loadingMetrics.metaIconGlyphSize,
+                    )}
+                  </View>
+                  <Text style={styles.loadingVignetteMetaText}>
+                    {scanTypeLabel}
+                  </Text>
+                </View>
               </View>
             </View>
 
-            {/* Subtitle / Hint */}
-            <Text style={styles.loadingSubtext}>
-              {t('scan_preview.loading_text')}
-            </Text>
+            <View style={styles.progressCardFrame}>
+              <View style={styles.progressContainer} testID="scan-preview-progress-card">
+                <Text
+                  testID="scan-preview-loading-phase-eyebrow"
+                  style={styles.loadingEyebrow}
+                >
+                  {t(loadingContent.phaseEyebrowKey)}
+                </Text>
 
-            {/* Progress dots indicator */}
-            <View style={styles.dotsContainer}>
-              {loadingSteps.map((_, index) => (
+                <Text
+                  testID="scan-preview-loading-percentage"
+                  style={styles.progressDisplayValue}
+                >
+                  {`${resolvedProgress}%`}
+                </Text>
+
+                <Text
+                  testID="scan-preview-loading-phase-headline"
+                  style={styles.loadingPhaseHeadline}
+                >
+                  {t(loadingContent.phaseHeadlineKey)}
+                </Text>
+
+                <Text style={styles.loadingSubtext}>
+                  {t(loadingContent.phaseSubtextKey)}
+                </Text>
+
+                <View style={styles.progressBarWrapper}>
+                  <View style={styles.progressBarBackground}>
+                    <Animated.View
+                      style={[
+                        styles.progressBarFillContainer,
+                        {
+                          width: progressAnim.interpolate({
+                            inputRange: [0, 100],
+                            outputRange: ['0%', '100%'],
+                          }),
+                        },
+                      ]}
+                    >
+                      <LinearGradient
+                        colors={accentTheme.progressGradient}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.progressBarGradient}
+                      />
+                    </Animated.View>
+                  </View>
+                </View>
+
+                <View style={styles.loadingStepsRow}>
+                  {SCAN_PREVIEW_LOADING_PHASES.map((phase) => {
+                    const isActive = loadingContent.phaseKey === phase.key;
+                    const isCompleted = resolvedProgress > phase.maxProgress;
+
+                    return (
+                      <View
+                        key={phase.key}
+                        testID={`scan-preview-step-${phase.key}`}
+                        style={[
+                          styles.loadingStepPill,
+                          {
+                            backgroundColor: isActive || isCompleted
+                              ? accentTheme.accentSoftBackground
+                              : previewTheme.loadingStepBackground,
+                            borderColor: isActive || isCompleted
+                              ? accentTheme.vignetteFrameBorder
+                              : previewTheme.loadingStepBorder,
+                          },
+                        ]}
+                      >
+                        <View
+                          style={[
+                            styles.loadingStepDot,
+                            {
+                              backgroundColor: isActive
+                                ? accentTheme.dotActiveColor
+                                : isCompleted
+                                ? accentTheme.dotCompletedColor
+                                : previewTheme.dotBackground,
+                            },
+                          ]}
+                        />
+                        <Text
+                          style={[
+                            styles.loadingStepText,
+                            {
+                              color: isActive || isCompleted
+                                ? accentTheme.chipText
+                                : previewTheme.loadingStepLabel,
+                            },
+                          ]}
+                        >
+                          {previewStepLabels[phase.key]}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+
                 <View
-                  key={index}
                   style={[
-                    styles.dot,
-                    index === currentStep && styles.dotActive,
-                    index < currentStep && styles.dotCompleted,
-                    index === currentStep
-                      ? { backgroundColor: accentTheme.dotActiveColor }
-                      : null,
-                    index < currentStep
-                      ? { backgroundColor: accentTheme.dotCompletedColor }
-                      : null,
+                    styles.loadingTrustLine,
+                    {
+                      backgroundColor: previewTheme.loadingTrustLineBackground,
+                      borderColor: previewTheme.loadingTrustLineBorder,
+                    },
                   ]}
-                />
-              ))}
+                  testID="scan-preview-trust-line"
+                >
+                  <ShieldCheck
+                    color={accentTheme.trustLineAccent}
+                    size={loadingMetrics.trustIconSize}
+                    strokeWidth={2.1}
+                  />
+                  <Text style={styles.loadingTrustLineText}>{trustLine}</Text>
+                </View>
+
+                <Text style={styles.loadingInsightsLabel}>
+                  {t('scan_preview.loading.insights_label')}
+                </Text>
+
+                <View style={styles.loadingChipsRow}>
+                  {loadingContent.insightChipKeys.map((chipKey) => (
+                    <View
+                      key={chipKey}
+                      style={[
+                        styles.loadingChip,
+                        {
+                          backgroundColor: accentTheme.chipBackground,
+                          borderColor: accentTheme.chipBorder,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.loadingChipText,
+                          { color: accentTheme.chipText },
+                        ]}
+                      >
+                        {t(chipKey)}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
             </View>
-          </View>
+            </View>,
+          )}
         </View>
-      )}
+      ) : null}
     </View>
   );
 }
 
 const createStyles = (
   insets: { top: number; bottom: number },
-  isCompactAndroidLayout: boolean,
+  isCompactVerticalLayout: boolean,
+  isTightVerticalLayout: boolean,
+  loadingDensity: ScanPreviewLoadingDensity,
+  loadingMetrics: ScanPreviewLoadingDensityMetrics,
   previewTheme: ReturnType<typeof resolveScanPreviewVisualTheme>,
+  captureTheme: ReturnType<typeof resolveScanCaptureVisualTheme>,
+  colors: any,
 ) => {
   const safeBottomInset = getMinimumBottomInsetPadding(insets.bottom, SPACING.sm);
-  const imageBottomReserve = safeBottomInset + (isCompactAndroidLayout ? 236 : 280);
-  const imageTopPadding = insets.top + (isCompactAndroidLayout ? 60 : 72);
-  const loadingTopPadding = insets.top + (isCompactAndroidLayout ? 72 : 96);
+  const imageBottomReserve =
+    safeBottomInset + (isTightVerticalLayout ? 220 : isCompactVerticalLayout ? 236 : 304);
+  const imageTopPadding =
+    insets.top + (isTightVerticalLayout ? 44 : isCompactVerticalLayout ? 52 : 76);
+  const isUltraTightLoading = loadingDensity === 'ultraTight';
+  const loadingTopPadding = insets.top + loadingMetrics.topPadding;
 
   return StyleSheet.create({
     container: {
       flex: 1,
+    },
+    topScrim: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      height: 220,
     },
     header: {
       position: 'absolute',
@@ -714,67 +1242,154 @@ const createStyles = (
       zIndex: 10,
     },
     closeButton: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+      width: 38,
+      height: 38,
+      borderRadius: 19,
       backgroundColor: previewTheme.closeButtonBackground,
       justifyContent: 'center',
       alignItems: 'center',
       borderWidth: 1,
       borderColor: previewTheme.closeButtonBorder,
     },
-    headerTitle: {
-      fontSize: SIZES.text18,
-      fontWeight: FONT_WEIGHTS.bold,
-    },
     imageContainer: {
       flex: 1,
-      paddingHorizontal: 20, // Slightly reduced to increase image width
+      paddingHorizontal: isCompactVerticalLayout ? SPACING.lg : 20,
       paddingTop: imageTopPadding,
       paddingBottom: imageBottomReserve,
+    },
+    imageFrame: {
+      flex: 1,
+      borderRadius: 30,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: withAlpha(colors.white, 0.08),
+      backgroundColor: withAlpha(colors.white, 0.04),
+      shadowColor: previewTheme.loadingHeroShadowColor,
+      shadowOffset: { width: 0, height: 20 },
+      shadowOpacity: 0.24,
+      shadowRadius: 40,
+      elevation: 16,
     },
     image: {
       width: '100%',
       height: '100%',
-      borderRadius: 24,
-      overflow: 'hidden',
       resizeMode: 'cover',
+    },
+    previewHeroMeta: {
+      position: 'absolute',
+      left: SPACING.lg,
+      bottom: SPACING.lg,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.sm,
+      borderRadius: BORDER_RADIUS.pill,
+      borderWidth: 1,
+    },
+    previewHeroMetaIcon: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+    },
+    previewHeroMetaText: {
+      fontSize: SIZES.text14,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      letterSpacing: 0.2,
     },
     blurContainer: {
       position: 'absolute',
       bottom: 0,
       left: 0,
       right: 0,
-      borderTopLeftRadius: 32,
-      borderTopRightRadius: 32,
+      borderTopLeftRadius: 34,
+      borderTopRightRadius: 34,
       overflow: 'hidden',
       backgroundColor: previewTheme.actionPanelBackground,
       shadowColor: previewTheme.actionPanelShadowColor,
-      shadowOffset: { width: 0, height: -6 },
-      shadowOpacity: 0.08,
-      shadowRadius: 18,
-      elevation: 6,
+      shadowOffset: { width: 0, height: -8 },
+      shadowOpacity: 0.12,
+      shadowRadius: 22,
+      elevation: 8,
+      borderTopWidth: 1,
+      borderColor: withAlpha(colors.white, 0.08),
     },
     buttonsContent: {
-      paddingHorizontal: isCompactAndroidLayout ? SPACING.lg : SPACING.xl,
-      paddingTop: isCompactAndroidLayout ? SPACING.xl : SPACING.xxl,
+      paddingHorizontal: isCompactVerticalLayout ? SPACING.lg : SPACING.xl,
+      paddingTop: isCompactVerticalLayout ? SPACING.xl : SPACING.xxl,
       paddingBottom: safeBottomInset + SPACING.lg,
     },
     infoCard: {
       alignItems: 'center',
+      width: '100%',
+      paddingHorizontal: SPACING.lg,
+      paddingVertical: SPACING.lg,
+      borderRadius: BORDER_RADIUS.card,
+      borderWidth: 1,
+      borderColor: previewTheme.loadingTrustLineBorder,
+      backgroundColor: withAlpha(colors.white, 0.03),
       marginBottom: SPACING.xl,
+      gap: SPACING.xs,
+    },
+    infoPillRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+      gap: SPACING.sm,
+      marginBottom: SPACING.sm,
+    },
+    infoPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.xs,
+      paddingHorizontal: SPACING.sm + 2,
+      paddingVertical: SPACING.sm,
+      borderRadius: BORDER_RADIUS.pill,
+      borderWidth: 1,
+    },
+    infoPillIcon: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+    },
+    infoPillText: {
+      fontSize: SIZES.text12,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      fontFamily: FONTS.display,
+      letterSpacing: 0.2,
+    },
+    infoPillMutedText: {
+      fontSize: SIZES.text12,
+      fontWeight: FONT_WEIGHTS.medium,
+      color: previewTheme.loadingTrustLineText,
     },
     infoLabel: {
-      fontSize: 13,
+      fontSize: SIZES.text12,
       color: previewTheme.infoLabelColor,
-      fontWeight: '400',
-      marginBottom: 4,
+      fontWeight: FONT_WEIGHTS.medium,
+      fontFamily: FONTS.accent,
+      letterSpacing: 1,
+      textTransform: 'uppercase',
     },
     infoValue: {
-      fontSize: 24,
-      fontWeight: '700',
+      fontSize: 26,
+      fontWeight: FONT_WEIGHTS.bold,
+      fontFamily: FONTS.display,
       color: previewTheme.infoValueColor,
-      letterSpacing: 0.5,
+      letterSpacing: 0.4,
+    },
+    infoBody: {
+      fontSize: SIZES.text14,
+      lineHeight: 20,
+      textAlign: 'center',
+      color: previewTheme.loadingSubtext,
+      maxWidth: 320,
     },
     actionButton: {
       height: 56,
@@ -784,26 +1399,30 @@ const createStyles = (
       marginBottom: SPACING.md,
     },
     primaryButton: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.25,
-      shadowRadius: 8,
-      elevation: 5,
+      backgroundColor: captureTheme.primaryButtonBackground,
+      borderWidth: 1,
+      borderColor: captureTheme.primaryButtonBorder,
+      shadowColor: captureTheme.shadowColor,
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.22,
+      shadowRadius: 20,
+      elevation: 8,
     },
     primaryButtonText: {
-      color: '#FFFFFF',
+      color: captureTheme.primaryButtonText,
       fontSize: SIZES.text16,
-      fontWeight: '600',
+      fontWeight: FONT_WEIGHTS.semiBold,
     },
     secondaryButton: {
       backgroundColor: previewTheme.secondaryButtonBackground,
+      borderWidth: 1,
+      borderColor: withAlpha(colors.white, 0.08),
     },
     secondaryButtonText: {
       color: previewTheme.secondaryButtonText,
       fontSize: SIZES.text16,
-      fontWeight: '500',
+      fontWeight: FONT_WEIGHTS.medium,
     },
-    // Premium Loading Overlay Styles
     loadingOverlay: {
       ...StyleSheet.absoluteFillObject,
       backgroundColor: previewTheme.loadingOverlayBackground,
@@ -812,111 +1431,237 @@ const createStyles = (
       alignItems: 'center',
       zIndex: 999,
     },
+    loadingStaticWrapper: {
+      flex: 1,
+      width: '100%',
+    },
+    loadingScrollView: {
+      flex: 1,
+      width: '100%',
+    },
+    loadingScrollContent: {
+      flexGrow: 1,
+      justifyContent: 'center',
+    },
+    loadingLayout: {
+      flex: isUltraTightLoading ? 0 : 1,
+      width: '100%',
+      paddingBottom: safeBottomInset + loadingMetrics.bottomPadding,
+      paddingHorizontal: loadingMetrics.horizontalPadding,
+      alignItems: 'center',
+      justifyContent: loadingDensity === 'regular' ? 'flex-start' : 'center',
+    },
+    loadingHeroShell: {
+      position: 'relative',
+      width: '100%',
+      maxWidth: loadingMetrics.heroMaxWidth,
+      marginBottom: loadingMetrics.heroMarginBottom,
+    },
+    loadingVignetteFrame: {
+      width: '100%',
+      height: loadingMetrics.heroHeight,
+      borderRadius: loadingMetrics.heroRadius,
+      borderWidth: 1,
+      overflow: 'hidden',
+      shadowOffset: { width: 0, height: 18 },
+      shadowOpacity: 0.22,
+      shadowRadius: 30,
+      elevation: 18,
+    },
+    loadingVignetteImage: {
+      width: '100%',
+      height: '100%',
+    },
+    loadingVignetteMeta: {
+      position: 'absolute',
+      left: loadingMetrics.metaInset,
+      bottom: loadingMetrics.metaInset,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+      paddingHorizontal: loadingMetrics.metaPaddingHorizontal,
+      paddingVertical: loadingMetrics.metaPaddingVertical,
+      borderRadius: BORDER_RADIUS.pill,
+      borderWidth: 1,
+    },
+    loadingVignetteMetaIcon: {
+      width: loadingMetrics.metaIconSize,
+      height: loadingMetrics.metaIconSize,
+      borderRadius: loadingMetrics.metaIconSize / 2,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1,
+    },
+    loadingVignetteMetaText: {
+      color: previewTheme.loadingVignetteMetaText,
+      fontSize: loadingMetrics.metaTextSize,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      letterSpacing: 0.2,
+    },
+    progressCardFrame: {
+      width: '100%',
+      maxWidth: loadingMetrics.progressMaxWidth,
+    },
+    completionGlow: {
+      position: 'absolute',
+      top: -12,
+      right: -12,
+      bottom: -12,
+      left: -12,
+      borderRadius: 44,
+      borderWidth: 1,
+    },
     progressContainer: {
       alignItems: 'center',
       justifyContent: 'center',
-      width: '92%',
-      minHeight: isCompactAndroidLayout ? 368 : 420,
+      width: '100%',
+      minHeight: loadingMetrics.progressMinHeight,
       backgroundColor: previewTheme.progressCardBackground,
-      borderRadius: 36,
-      paddingVertical: isCompactAndroidLayout ? 40 : 56,
-      paddingHorizontal: isCompactAndroidLayout ? 24 : 32,
+      borderRadius: loadingMetrics.progressRadius,
+      paddingVertical: loadingMetrics.progressPaddingVertical,
+      paddingHorizontal: loadingMetrics.progressPaddingHorizontal,
       borderWidth: 1,
       borderColor: previewTheme.progressCardBorder,
       overflow: 'hidden',
       shadowColor: previewTheme.progressCardShadowColor,
-      shadowOffset: { width: 0, height: 16 },
-      shadowOpacity: 0.18,
-      shadowRadius: 32,
+      shadowOffset: { width: 0, height: 18 },
+      shadowOpacity: 0.2,
+      shadowRadius: 34,
       elevation: 30,
     },
-    iconContainer: {
-      width: 80,
-      height: 80,
-      borderRadius: 40,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginBottom: 32,
-      borderWidth: 1.5,
+    loadingEyebrow: {
+      fontSize: loadingMetrics.eyebrowSize,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      fontFamily: FONTS.accent,
+      letterSpacing: 0,
+      textTransform: 'uppercase',
+      color: previewTheme.loadingPhaseEyebrow,
+      textAlign: 'center',
+      marginBottom: loadingMetrics.eyebrowMarginBottom,
     },
-    loadingStepText: {
-      fontSize: 22,
-      fontWeight: '700',
+    progressDisplayValue: {
+      fontSize: loadingMetrics.percentageSize,
+      lineHeight: loadingMetrics.percentageLineHeight,
+      fontWeight: FONT_WEIGHTS.bold,
+      fontFamily: FONTS.display,
+      color: previewTheme.loadingProgressValue,
+      textAlign: 'center',
+      letterSpacing: 0,
+      marginBottom: loadingMetrics.percentageMarginBottom,
+    },
+    loadingPhaseHeadline: {
+      fontSize: loadingMetrics.headlineSize,
+      lineHeight: loadingMetrics.headlineLineHeight,
+      fontWeight: FONT_WEIGHTS.bold,
+      fontFamily: FONTS.display,
       color: previewTheme.loadingStepText,
       textAlign: 'center',
-      marginBottom: 32,
-      letterSpacing: 0.3,
+      marginBottom: loadingMetrics.headlineMarginBottom,
+      letterSpacing: 0,
+    },
+    loadingSubtext: {
+      fontSize: loadingMetrics.subtextSize,
+      color: previewTheme.loadingSubtext,
+      textAlign: 'center',
+      paddingHorizontal: loadingMetrics.subtextPaddingHorizontal,
+      marginBottom: loadingMetrics.subtextMarginBottom,
+      lineHeight: loadingMetrics.subtextLineHeight,
     },
     progressBarWrapper: {
       width: '100%',
-      marginBottom: 24,
+      marginBottom: loadingMetrics.progressBarMarginBottom,
     },
     progressBarBackground: {
       width: '100%',
-      height: 14,
+      height: loadingMetrics.progressBarHeight,
       backgroundColor: previewTheme.progressTrackBackground,
-      borderRadius: 7,
+      borderRadius: 999,
       overflow: 'hidden',
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: previewTheme.progressTrackBorder,
     },
     progressBarFillContainer: {
       height: '100%',
-      borderRadius: 7,
+      borderRadius: 999,
       overflow: 'hidden',
     },
     progressBarGradient: {
       flex: 1,
-      borderRadius: 7,
+      borderRadius: 999,
     },
-    progressBarFill: {
-      height: '100%',
-      backgroundColor: '#667eea',
-      borderRadius: 7,
+    loadingStepsRow: {
+      width: '100%',
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+      gap: loadingMetrics.stepsGap,
+      marginBottom: loadingMetrics.stepsMarginBottom,
     },
-    percentageBadge: {
-      alignSelf: 'flex-end',
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-      borderRadius: 14,
-      marginTop: 16,
+    loadingStepPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: loadingMetrics.stepPillGap,
+      paddingHorizontal: loadingMetrics.stepPillPaddingHorizontal,
+      paddingVertical: loadingMetrics.stepPillPaddingVertical,
+      borderRadius: BORDER_RADIUS.pill,
+      borderWidth: 1,
     },
-    progressPercentage: {
-      fontSize: 15,
-      fontWeight: '700',
-      letterSpacing: 0.5,
+    loadingStepDot: {
+      width: 7,
+      height: 7,
+      borderRadius: 999,
     },
-    loadingSubtext: {
-      fontSize: 14,
-      color: previewTheme.loadingSubtext,
-      textAlign: 'center',
-      paddingHorizontal: 24,
-      marginBottom: 24,
-      lineHeight: 20,
+    loadingStepText: {
+      fontSize: loadingMetrics.stepTextSize,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      fontFamily: FONTS.display,
+      letterSpacing: 0,
     },
-    loadingText: {
-      marginTop: SPACING.lg,
-      fontSize: SIZES.text16,
-      textAlign: 'center',
-      paddingHorizontal: SPACING.xl,
+    loadingTrustLine: {
+      width: '100%',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: loadingMetrics.trustLineGap,
+      paddingHorizontal: loadingMetrics.trustLinePaddingHorizontal,
+      paddingVertical: loadingMetrics.trustLinePaddingVertical,
+      borderRadius: loadingMetrics.trustLineRadius,
+      borderWidth: 1,
+      marginBottom: loadingMetrics.trustLineMarginBottom,
+    },
+    loadingTrustLineText: {
+      flex: 1,
+      fontSize: loadingMetrics.trustTextSize,
+      lineHeight: loadingMetrics.trustTextLineHeight,
+      color: previewTheme.loadingTrustLineText,
       fontWeight: FONT_WEIGHTS.medium,
     },
-    dotsContainer: {
+    loadingInsightsLabel: {
+      fontSize: loadingMetrics.insightsLabelSize,
+      fontWeight: FONT_WEIGHTS.medium,
+      fontFamily: FONTS.accent,
+      letterSpacing: 0,
+      textTransform: 'uppercase',
+      color: previewTheme.loadingInsightsLabel,
+      textAlign: 'center',
+      marginBottom: loadingMetrics.insightsLabelMarginBottom,
+    },
+    loadingChipsRow: {
       flexDirection: 'row',
+      flexWrap: 'wrap',
       justifyContent: 'center',
-      alignItems: 'center',
-      gap: 8,
+      gap: loadingMetrics.chipsGap,
     },
-    dot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      backgroundColor: previewTheme.dotBackground,
+    loadingChip: {
+      borderRadius: BORDER_RADIUS.pill,
+      borderWidth: 1,
+      paddingHorizontal: loadingMetrics.chipPaddingHorizontal,
+      paddingVertical: loadingMetrics.chipPaddingVertical,
     },
-    dotActive: {
-      width: 24,
-    },
-    dotCompleted: {
+    loadingChipText: {
+      fontSize: loadingMetrics.chipTextSize,
+      fontWeight: FONT_WEIGHTS.medium,
+      fontFamily: FONTS.display,
+      letterSpacing: 0,
     },
   });
 };

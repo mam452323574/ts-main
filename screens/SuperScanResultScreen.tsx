@@ -1,21 +1,48 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Animated,
+  Easing,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { AlertCircle, CheckCircle, Share2 } from 'lucide-react-native';
+import {
+  AlertCircle,
+  CheckCircle,
+  CirclePercent,
+  Droplets,
+  Lock,
+  ScanFace,
+} from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { SuperScanFeatureIcon } from '@/components/FeatureIcons';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { SuperScanAreaCard } from '@/components/SuperScanAreaCard';
 import { TrajectoryPreviewCard } from '@/components/TrajectoryPreviewCard';
 import { UrgencyModal } from '@/components/UrgencyModal';
 import { ConditionCard } from '@/components/ConditionCard';
+import { MetricCard } from '@/components/MetricCard';
+import { RadialScoreGauge } from '@/components/RadialScoreGauge';
+import { ResultActionRail } from '@/components/results/ResultActionRail';
+import { ResultHeroSurface } from '@/components/results/ResultHeroSurface';
+import { ResultNarrativeCard } from '@/components/results/ResultNarrativeCard';
+import { ResultPillBadge } from '@/components/results/ResultPillBadge';
+import { PremiumTeaserCard } from '@/components/results/PremiumTeaserCard';
+import { ScanCoachCtaCard } from '@/components/results/ScanCoachCtaCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
-import { useFeatureFlags, usePremiumPotential } from '@/hooks/queries';
+import { useFeatureFlags } from '@/hooks/queries/useFeatureFlags';
+import { usePremiumPotential } from '@/hooks/queries/usePremiumPotential';
 import { FatDistributionScanResult, SuperScanResult } from '@/types';
-import { FONT_WEIGHTS, SIZES, SPACING } from '@/constants/theme';
+import { FONT_WEIGHTS, SIZES, SPACING, mixColors, withAlpha } from '@/constants/theme';
 import {
   isSuperAnalysisType,
   tryNormalizeAnalysisResult,
@@ -26,12 +53,17 @@ import {
   buildResultTrajectoryViewModel,
   buildFatDistributionSuperScanResultViewModel,
   buildLegacySuperScanResultViewModel,
+  formatConditionProbability,
 } from '@/utils/resultViewModels';
 import {
   RESULT_TEXT_PROPS,
   getResultLayoutState,
   getResultSurfaceChrome,
 } from '@/utils/resultLayout';
+import {
+  localizeQualitativeLevel,
+  localizeSuperScanConditionLabel,
+} from '@/utils/resultLocalization';
 import { resolveResultItemTheme } from '@/utils/resultVisualTheme';
 import {
   normalizeSuperScanTextKey,
@@ -42,15 +74,23 @@ import {
   resolveLegacySuperScanPalette,
   resolveSuperScanAreaTheme,
 } from '@/utils/superScanVisualTheme';
+import { parseSafeNumber } from '@/utils/scanFormatters';
 import { resolvePremiumRenderStateFromProfile } from '@/utils/subscription';
+import {
+  buildCoachGenerationInputFromScanCoachIntent,
+  encodeScanCoachIntentParam,
+  scanCoachIntent,
+} from '@/utils/scanCoachIntent';
 
 type SuperScreenAnalysisData = SuperScanResult | FatDistributionScanResult;
 
 const parseAnalysisData = (
-  value: string | string[] | undefined
+  value: string | string[] | undefined,
 ): SuperScreenAnalysisData | null => {
   const parsed = safeParseJsonRouteParam(value);
-  if (parsed === null) return null;
+  if (parsed === null) {
+    return null;
+  }
 
   const normalized = tryNormalizeAnalysisResult(parsed);
   return normalized && isSuperAnalysisType(normalized.scan_type)
@@ -65,6 +105,21 @@ const parseRouteParam = (value: string | string[] | undefined) =>
       ? value[0]
       : undefined;
 
+function getSeverityAccent(
+  severity: 'low' | 'moderate' | 'high' | 'unknown',
+  colors: any,
+) {
+  if (severity === 'high') {
+    return colors.error;
+  }
+
+  if (severity === 'moderate') {
+    return colors.warning;
+  }
+
+  return colors.success;
+}
+
 export default function SuperScanResultScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -77,13 +132,19 @@ export default function SuperScanResultScreen() {
   const layout = useMemo(() => getResultLayoutState(width), [width]);
   const insets = useSafeAreaInsets();
 
-  const styles = useMemo(() => createStyles(colors, isDark, insets, layout), [colors, insets, isDark, layout]);
+  const styles = useMemo(
+    () => createStyles(colors, insets, isDark, layout),
+    [colors, insets, isDark, layout],
+  );
 
   const premiumRenderState = resolvePremiumRenderStateFromProfile(
     userProfile,
     authLoading,
   );
-  const analysisData = useMemo(() => parseAnalysisData(params.analysisData), [params.analysisData]);
+  const analysisData = useMemo(
+    () => parseAnalysisData(params.analysisData),
+    [params.analysisData],
+  );
   const legacyAnalysisData = analysisData?.scan_type === 'super_health_v2'
     ? (analysisData as SuperScanResult)
     : null;
@@ -91,16 +152,22 @@ export default function SuperScanResultScreen() {
     ? (analysisData as FatDistributionScanResult)
     : null;
   const scanId = parseRouteParam(params.scanId);
-  const imageUri =
-    typeof params.imageUri === 'string'
-      ? params.imageUri
-      : Array.isArray(params.imageUri)
-        ? params.imageUri[0]
-        : undefined;
+  const imageUri = parseRouteParam(params.imageUri);
   const { data: premiumPotential } = usePremiumPotential(
     'super',
     scanId ?? null,
     !!legacyAnalysisData,
+  );
+  const coachIntent = useMemo(
+    () =>
+      analysisData
+        ? scanCoachIntent(analysisData, {
+            locale,
+            scanId,
+            scanType: 'super',
+          })
+        : null,
+    [analysisData, locale, scanId],
   );
 
   const legacyViewModel = useMemo(() => {
@@ -113,7 +180,6 @@ export default function SuperScanResultScreen() {
       t,
     });
   }, [legacyAnalysisData, t]);
-
   const fatDistributionViewModel = useMemo(() => {
     if (!fatDistributionAnalysisData) {
       return null;
@@ -123,9 +189,9 @@ export default function SuperScanResultScreen() {
       analysisData: fatDistributionAnalysisData,
       t,
       locale,
+      premiumRenderState,
     });
-  }, [fatDistributionAnalysisData, locale, t]);
-
+  }, [fatDistributionAnalysisData, locale, premiumRenderState, t]);
   const trajectoryViewModel = useMemo(() => {
     if (!legacyAnalysisData) {
       return null;
@@ -146,11 +212,11 @@ export default function SuperScanResultScreen() {
   }, [
     legacyAnalysisData,
     locale,
-    premiumRenderState,
     premiumPotential?.currentScan?.analyzed_at,
     premiumPotential?.currentScan?.created_at,
     premiumPotential?.historicalAverage30d,
     premiumPotential?.recentScoreHistory,
+    premiumRenderState,
     t,
   ]);
 
@@ -181,12 +247,9 @@ export default function SuperScanResultScreen() {
     return resolveDefaultSuperScanPalette({ colors, isDark });
   }, [
     colors,
-    fatDistributionAnalysisData?.global_body_fat_estimate_percent,
-    fatDistributionAnalysisData?.global_facial_fat_estimate_percent,
-    fatDistributionAnalysisData?.global_water_retention_estimate_percent,
     isDark,
-    legacyAnalysisData?.global_risk_score,
-    legacyAnalysisData?.urgency_flag,
+    legacyAnalysisData,
+    fatDistributionAnalysisData,
   ]);
   const dominantFatMetricId = useMemo(
     () =>
@@ -199,32 +262,8 @@ export default function SuperScanResultScreen() {
               fatDistributionAnalysisData.global_water_retention_estimate_percent,
           })
         : null,
-    [
-      fatDistributionAnalysisData?.global_body_fat_estimate_percent,
-      fatDistributionAnalysisData?.global_facial_fat_estimate_percent,
-      fatDistributionAnalysisData?.global_water_retention_estimate_percent,
-    ],
+    [fatDistributionAnalysisData],
   );
-  const fatPrimaryMetricThemes = useMemo(() => {
-    if (!fatDistributionViewModel) {
-      return {};
-    }
-
-    return fatDistributionViewModel.primaryMetrics.reduce<
-      Record<string, ReturnType<typeof resolveResultItemTheme>>
-    >((accumulator, metric) => {
-      accumulator[metric.id] = resolveResultItemTheme({
-        colors,
-        isDark,
-        theme: resolveFatDistributionPrimaryMetricThemeSpec({
-          metricId: metric.id,
-          highlightedMetricId: dominantFatMetricId,
-        }),
-      });
-
-      return accumulator;
-    }, {});
-  }, [colors, dominantFatMetricId, fatDistributionViewModel, isDark]);
   const fatAreaThemes = useMemo(() => {
     if (!fatDistributionViewModel) {
       return [];
@@ -256,13 +295,82 @@ export default function SuperScanResultScreen() {
         areaThemeByName.get(normalizeSuperScanTextKey(zone)) ?? screenPalette,
     );
   }, [fatAreaThemes, fatDistributionViewModel, screenPalette]);
-  const sectionSurfaceStyle = useMemo(
-    () => ({
-      backgroundColor: screenPalette.sectionBackgroundColor,
-      borderColor: screenPalette.sectionBorderColor,
-    }),
-    [screenPalette.sectionBackgroundColor, screenPalette.sectionBorderColor],
+  const topLegacyConditions = useMemo(
+    () => legacyViewModel?.conditions.slice(0, 3) ?? [],
+    [legacyViewModel],
   );
+  const remainingLegacyConditions = useMemo(
+    () => legacyViewModel?.conditions.slice(3) ?? [],
+    [legacyViewModel],
+  );
+  const fatPrimaryMetricThemes = useMemo(() => {
+    if (!fatDistributionViewModel) {
+      return {};
+    }
+
+    return fatDistributionViewModel.primaryMetrics.reduce<Record<string, ReturnType<typeof resolveResultItemTheme>>>(
+      (accumulator, metric) => {
+        accumulator[metric.id] = resolveResultItemTheme({
+          colors,
+          isDark,
+          theme: resolveFatDistributionPrimaryMetricThemeSpec({
+            metricId: metric.id,
+            highlightedMetricId: dominantFatMetricId,
+          }),
+        });
+
+        return accumulator;
+      },
+      {},
+    );
+  }, [colors, dominantFatMetricId, fatDistributionViewModel, isDark]);
+  const fatHeroMetric = useMemo(() => {
+    if (!fatDistributionViewModel) {
+      return null;
+    }
+
+    return (
+      fatDistributionViewModel.primaryMetrics.find(
+        (metric) => metric.id === dominantFatMetricId,
+      ) ?? fatDistributionViewModel.primaryMetrics[0] ?? null
+    );
+  }, [dominantFatMetricId, fatDistributionViewModel]);
+  const fatHeroScore = useMemo(() => {
+    if (!fatHeroMetric || !fatDistributionAnalysisData) {
+      return 0;
+    }
+
+    switch (fatHeroMetric.id) {
+      case 'body_fat':
+        return Math.round(
+          parseSafeNumber(
+            fatDistributionAnalysisData.global_body_fat_estimate_percent,
+          ) ?? 0,
+        );
+      case 'facial_fat':
+        return Math.round(
+          parseSafeNumber(
+            fatDistributionAnalysisData.global_facial_fat_estimate_percent,
+          ) ?? 0,
+        );
+      case 'water_retention':
+      default:
+        return Math.round(
+          parseSafeNumber(
+            fatDistributionAnalysisData.global_water_retention_estimate_percent,
+          ) ?? 0,
+        );
+    }
+  }, [fatDistributionAnalysisData, fatHeroMetric]);
+  const fatDistributionHeroInsight =
+    premiumRenderState === 'unlocked' &&
+    fatDistributionViewModel?.dominantStoragePattern.trim() &&
+    fatDistributionViewModel.dominantStoragePattern.trim() !== '-'
+      ? fatDistributionViewModel.dominantStoragePattern
+      : undefined;
+  const shouldRenderFatDistributionSummary =
+    !!fatDistributionViewModel?.analysisSummary.trim() &&
+    fatDistributionViewModel.analysisSummary.trim() !== '-';
 
   const slideAnim = useRef(new Animated.Value(34)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -325,7 +433,37 @@ export default function SuperScanResultScreen() {
     });
   };
 
+  const handleCoachPress = () => {
+    if (!coachIntent) {
+      return;
+    }
+    const coachGenerationInput =
+      buildCoachGenerationInputFromScanCoachIntent(coachIntent, {
+        accountTier: userProfile?.account_tier,
+      });
+
+    router.push({
+      pathname: '/coach',
+      params: {
+        source: 'scan_result',
+        autoSubmit: '1',
+        ...(scanId ? { scanId } : {}),
+        scanType: 'super',
+        promptType: coachGenerationInput.promptType,
+        fallbackPromptType: coachIntent.fallback_prompt_type,
+        questionKey: coachGenerationInput.questionKey ?? '',
+        questionText: coachGenerationInput.questionText,
+        priorityMetric: coachIntent.priority_metric ?? '',
+        scanIntent: encodeScanCoachIntentParam(coachIntent),
+      },
+    } as any);
+  };
+
   const handleTrajectoryPress = () => {
+    router.push('/premium-upgrade');
+  };
+
+  const handlePremiumPress = () => {
     router.push('/premium-upgrade');
   };
 
@@ -351,27 +489,40 @@ export default function SuperScanResultScreen() {
       <View style={styles.container}>
         <LinearGradient
           colors={screenPalette.backgroundGradient}
-          start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          testID="super-scan-background-layer"
+          start={{ x: 0, y: 0 }}
           style={styles.backgroundLayer}
+          testID="super-scan-background-layer"
         />
-        <View style={styles.header}>
-          <View style={styles.headerSidePlaceholder} />
-          <Text {...RESULT_TEXT_PROPS} numberOfLines={1} style={styles.headerTitle}>
-            {t('scan.super.type_label')}
-          </Text>
-          <View style={styles.headerSidePlaceholder} />
-        </View>
+        <ScreenHeader
+          title={t('scan.super.type_label')}
+          centered
+          variant="inline"
+          style={styles.resultHeader}
+          testID="super-scan-result-screen-header"
+        />
 
-        <View style={styles.errorCard} testID="super-scan-empty-state">
-          <View style={styles.errorIconContainer}>
-            <AlertCircle color={colors.error} size={34} />
-          </View>
+        <View
+          style={[
+            styles.errorCard,
+            getResultSurfaceChrome({
+              colors,
+              isDark,
+              kind: 'hero',
+              accentColor: screenPalette.sectionAccentColor,
+              surfaceVariant: 'soft',
+            }),
+          ]}
+          testID="super-scan-empty-state"
+        >
+          <AlertCircle color={colors.error} size={34} />
           <Text {...RESULT_TEXT_PROPS} style={styles.errorText}>
             {t('common.results.no_data')}
           </Text>
-          <TouchableOpacity style={[styles.primaryButton, { backgroundColor: colors.primary }]} onPress={handleClose}>
+          <TouchableOpacity
+            onPress={handleClose}
+            style={[styles.primaryButton, { backgroundColor: colors.primaryText }]}
+          >
             <Text {...RESULT_TEXT_PROPS} style={styles.primaryButtonText}>
               {t('common.home_back')}
             </Text>
@@ -384,26 +535,27 @@ export default function SuperScanResultScreen() {
   return (
     <View style={styles.container}>
       {alertElement}
+
       <LinearGradient
         colors={screenPalette.backgroundGradient}
-        start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        testID="super-scan-background-layer"
+        start={{ x: 0, y: 0 }}
         style={styles.backgroundLayer}
+        testID="super-scan-background-layer"
       />
 
       <UrgencyModal
-        visible={!!legacyAnalysisData && showUrgencyModal}
         onDismiss={handleUrgencyDismiss}
+        visible={!!legacyAnalysisData && showUrgencyModal}
       />
 
-      <View style={styles.header}>
-        <View style={styles.headerSidePlaceholder} />
-        <Text {...RESULT_TEXT_PROPS} numberOfLines={1} style={styles.headerTitle}>
-          {t('scan.super.type_label')}
-        </Text>
-        <View style={styles.headerSidePlaceholder} />
-      </View>
+      <ScreenHeader
+        title={t('scan.super.type_label')}
+        centered
+        variant="inline"
+        style={styles.resultHeader}
+        testID="super-scan-result-screen-header"
+      />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <Animated.View
@@ -417,100 +569,192 @@ export default function SuperScanResultScreen() {
         >
           {legacyAnalysisData && legacyViewModel ? (
             <>
-              <LinearGradient
-                colors={screenPalette.heroGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[
-                  styles.scoreCard,
-                  {
-                    borderColor: screenPalette.heroBorderColor,
-                  },
-                ]}
-                testID="super-scan-score-card"
-              >
-                <View style={styles.heroTopRow}>
-                  <View
-                    style={[
-                      styles.metricBadge,
-                      {
-                        backgroundColor: screenPalette.heroBadgeBackgroundColor,
-                        borderColor: screenPalette.heroBadgeBorderColor,
-                      },
-                    ]}
-                  >
-                    <Text
-                      {...RESULT_TEXT_PROPS}
-                      numberOfLines={2}
-                      style={[
-                        styles.metricBadgeText,
-                        { color: screenPalette.heroBadgeTextColor },
-                      ]}
-                    >
-                      {t('scan.super.score_label')}
-                    </Text>
-                  </View>
-                  {legacyAnalysisData.urgency_flag ? (
-                    <View
-                      style={[
-                        styles.urgencyBadge,
-                        {
-                          backgroundColor: screenPalette.heroBadgeBackgroundColor,
-                          borderColor: screenPalette.accentColorSecondary,
-                        },
-                      ]}
-                    >
-                      <Text
-                        {...RESULT_TEXT_PROPS}
-                        testID="super-scan-urgency-badge-text"
-                        numberOfLines={1}
-                        style={[
-                          styles.urgencyBadgeText,
-                          { color: screenPalette.heroBadgeTextColor },
-                        ]}
-                      >
-                        {t('components.urgency.title')}
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-
-                <View style={styles.scoreMainRow}>
-                  <View
-                    style={[
-                      styles.scoreIconContainer,
-                      {
-                        backgroundColor: screenPalette.heroIconBackgroundColor,
-                        borderColor: screenPalette.heroIconBorderColor,
-                      },
-                    ]}
-                  >
-                    <SuperScanFeatureIcon
-                      color={screenPalette.heroIconColor}
-                      size={30}
+              <ResultHeroSurface
+                accentColor={screenPalette.sectionAccentColor}
+                headerContent={(
+                  <View style={styles.heroBadgeRow}>
+                    <ResultPillBadge
+                      accentColor={screenPalette.sectionAccentColor}
+                      icon={<SuperScanFeatureIcon color={screenPalette.heroIconColor} size={14} />}
+                      label={t('scan.super.type_label')}
+                      variant="premium"
                     />
+                    <ResultPillBadge
+                      label={t('common.results.ai_report')}
+                      variant="neutral"
+                    />
+                    {legacyAnalysisData.urgency_flag ? (
+                      <ResultPillBadge
+                        accentColor={colors.error}
+                        label={t('components.urgency.title')}
+                      />
+                    ) : null}
                   </View>
+                )}
+                subtitle={t('common.results.ai_complete')}
+                title={t('scan.super.score_label')}
+                visual={(
+                  <RadialScoreGauge
+                    color={screenPalette.scoreColor}
+                    label={t('scan.super.score_label')}
+                    score={legacyViewModel.globalRiskScore}
+                  />
+                )}
+              />
 
-                  <View style={styles.scoreTextContainer}>
-                    <View style={styles.scoreValueRow}>
-                      <Text
-                        {...RESULT_TEXT_PROPS}
-                        testID="super-scan-score-value"
-                        numberOfLines={1}
-                        style={[
-                          styles.scoreValue,
-                          { color: screenPalette.scoreColor },
-                        ]}
-                      >
-                        {legacyViewModel.globalRiskScore}
-                      </Text>
-                      <Text {...RESULT_TEXT_PROPS} testID="super-scan-score-suffix" numberOfLines={1} style={styles.scoreSuffix}>
-                        /100
-                      </Text>
-                    </View>
+              <ResultNarrativeCard
+                accentColor={screenPalette.sectionAccentColor}
+                eyebrow={t('scan.super.summary_label')}
+                title={legacyViewModel.analysisSummary}
+              />
+
+              {coachIntent ? (
+                <ScanCoachCtaCard
+                  accentColor={screenPalette.sectionAccentColor}
+                  intent={coachIntent}
+                  onPress={handleCoachPress}
+                  testID="super-scan-coach-cta"
+                  variant="hero"
+                />
+              ) : null}
+
+              {topLegacyConditions.length > 0 ? (
+                <View style={styles.sectionStack} testID="super-scan-priority-findings">
+                  <Text {...RESULT_TEXT_PROPS} style={styles.sectionTitle}>
+                    {t('scan.super.conditions_label')}
+                  </Text>
+
+                  <View style={styles.findingList}>
+                    {topLegacyConditions.map((condition, index) => {
+                      const accent = getSeverityAccent(condition.severity_key, colors);
+                      const label =
+                        condition.condition_fallback_text?.trim() ||
+                        localizeSuperScanConditionLabel(condition.condition_key, t, '-');
+                      const severity = localizeQualitativeLevel(
+                        'severity',
+                        condition.severity_key,
+                        t,
+                        '-',
+                      );
+                      const isPriorityLocked = premiumRenderState === 'locked';
+                      const isPriorityLoading = premiumRenderState === 'loading';
+                      const probabilityText =
+                        premiumRenderState === 'unlocked'
+                          ? formatConditionProbability(condition.probability, locale)
+                          : isPriorityLoading
+                            ? t('metric_card.loading_value')
+                            : t('metric_card.blurred_text');
+                      const priorityFindingContent = (
+                        <>
+                          <View style={styles.primaryFindingCopy}>
+                            <Text
+                              {...RESULT_TEXT_PROPS}
+                              numberOfLines={2}
+                              style={styles.primaryFindingTitle}
+                            >
+                              {label}
+                            </Text>
+                            <Text
+                              {...RESULT_TEXT_PROPS}
+                              numberOfLines={1}
+                              style={[styles.primaryFindingMeta, { color: accent }]}
+                            >
+                              {severity}
+                            </Text>
+                          </View>
+
+                          <View
+                            style={[
+                              styles.primaryFindingScoreChip,
+                              {
+                                backgroundColor: isDark
+                                  ? withAlpha(accent, 0.12)
+                                  : withAlpha(accent, 0.065),
+                              },
+                            ]}
+                          >
+                            {isPriorityLocked ? (
+                              <Lock color={accent} size={layout.isCompact ? 12 : 13} />
+                            ) : null}
+                            <Text
+                              {...RESULT_TEXT_PROPS}
+                              numberOfLines={1}
+                              style={[styles.primaryFindingScore, { color: accent }]}
+                            >
+                              {probabilityText}
+                            </Text>
+                            {isPriorityLocked || isPriorityLoading ? (
+                              <Text
+                                {...RESULT_TEXT_PROPS}
+                                numberOfLines={1}
+                                style={[styles.primaryFindingPremiumLabel, { color: accent }]}
+                              >
+                                {isPriorityLoading
+                                  ? t('metric_card.loading_label')
+                                  : t('metric_card.premium_label')}
+                              </Text>
+                            ) : null}
+                          </View>
+
+                          <Text
+                            {...RESULT_TEXT_PROPS}
+                            accessible={false}
+                            style={styles.testMarker}
+                          >
+                            {`${condition.severity_key}:${premiumRenderState}`}
+                          </Text>
+                        </>
+                      );
+                      const priorityFindingStyle = [
+                        styles.primaryFindingCard,
+                        {
+                          backgroundColor: mixColors(
+                            colors.cardBackground,
+                            accent,
+                            isDark ? 0.032 : 0.016,
+                          ),
+                          borderColor: withAlpha(accent, isDark ? 0.14 : 0.08),
+                        },
+                      ];
+
+                      return isPriorityLocked ? (
+                        <TouchableOpacity
+                          key={`${condition.condition_key}-${index}`}
+                          accessibilityRole="button"
+                          activeOpacity={0.86}
+                          onPress={handlePremiumPress}
+                          style={priorityFindingStyle}
+                        >
+                          {priorityFindingContent}
+                        </TouchableOpacity>
+                      ) : (
+                        <View
+                          key={`${condition.condition_key}-${index}`}
+                          style={priorityFindingStyle}
+                        >
+                          {priorityFindingContent}
+                        </View>
+                      );
+                    })}
                   </View>
                 </View>
-              </LinearGradient>
+              ) : (
+                <View testID="super-scan-ras">
+                  <ResultNarrativeCard
+                    accentColor={colors.success}
+                    body={t('scan.super.ras_description')}
+                    eyebrow={t('scan.super.summary_label')}
+                    title={t('scan.super.ras_subtitle')}
+                  >
+                    <View style={styles.emptyStateIconRow}>
+                      <CheckCircle color={colors.success} size={20} />
+                      <Text {...RESULT_TEXT_PROPS} style={[styles.emptyStateTitle, { color: colors.success }]}>
+                        {t('scan.super.ras_title')}
+                      </Text>
+                    </View>
+                  </ResultNarrativeCard>
+                </View>
+              )}
 
               {trajectoryViewModel?.shouldRender ? (
                 <TrajectoryPreviewCard
@@ -524,416 +768,257 @@ export default function SuperScanResultScreen() {
                 />
               ) : null}
 
-              <View
-                style={[
-                  styles.summaryCard,
-                  getResultSurfaceChrome({
-                    colors,
-                    isDark,
-                    kind: 'feature',
-                    accentColor: screenPalette.sectionAccentColor,
-                    surfaceVariant: screenPalette.sectionSurfaceVariant,
-                  }),
-                  sectionSurfaceStyle,
-                ]}
-                testID="super-scan-summary-card"
-              >
-                <Text {...RESULT_TEXT_PROPS} numberOfLines={1} style={styles.summaryLabel}>
-                  {t('scan.super.summary_label')}
-                </Text>
-                <Text {...RESULT_TEXT_PROPS} style={styles.summaryText}>
-                  {legacyViewModel.analysisSummary}
-                </Text>
-              </View>
-
-              <View
-                style={[
-                  styles.conditionsWrapper,
-                  getResultSurfaceChrome({
-                    colors,
-                    isDark,
-                    kind: 'feature',
-                    accentColor: screenPalette.sectionAccentColor,
-                    surfaceVariant: screenPalette.sectionSurfaceVariant,
-                  }),
-                  sectionSurfaceStyle,
-                ]}
-                testID="super-scan-conditions"
-              >
-                <View style={styles.conditionsHeader}>
-                  <Text {...RESULT_TEXT_PROPS} numberOfLines={2} style={styles.sectionTitle}>
-                    {t('scan.super.conditions_label')}
+              {remainingLegacyConditions.length > 0 ? (
+                <View style={styles.sectionStack}>
+                  <Text {...RESULT_TEXT_PROPS} style={styles.sectionTitle}>
+                    {t('common.results.deep_analysis_label')}
                   </Text>
-                  <View
-                    style={[
-                      styles.countBadge,
-                      {
-                        backgroundColor: screenPalette.countBadgeBackgroundColor,
-                      },
-                    ]}
-                  >
-                    <Text
-                      {...RESULT_TEXT_PROPS}
-                      numberOfLines={1}
-                      style={[
-                        styles.countBadgeText,
-                        { color: screenPalette.countBadgeTextColor },
-                      ]}
-                    >
-                      {legacyViewModel.conditions.length}
-                    </Text>
-                  </View>
-                </View>
 
-                {legacyViewModel.conditions.length === 0 ? (
-                  <View style={styles.rasCard} testID="super-scan-ras">
-                    <View style={styles.rasIconContainer}>
-                      <CheckCircle color={colors.success} size={48} strokeWidth={2} />
-                    </View>
-                    <Text {...RESULT_TEXT_PROPS} style={styles.rasTitle}>
-                      {t('scan.super.ras_title')}
-                    </Text>
-                    <Text {...RESULT_TEXT_PROPS} style={styles.rasSubtitle}>
-                      {t('scan.super.ras_subtitle')}
-                    </Text>
-                    <Text {...RESULT_TEXT_PROPS} style={styles.rasDescription}>
-                      {t('scan.super.ras_description')}
-                    </Text>
-                  </View>
-                ) : (
-                  // ConditionCard remains scoped to legacy super_health_v2 findings.
-                  legacyViewModel.conditions.map((condition, index) => (
+                  {remainingLegacyConditions.map((condition, index) => (
                     <ConditionCard
-                      key={`${condition.condition_key}-${index}`}
+                      key={`${condition.condition_key}-${index}-detail`}
                       condition={condition}
                       premiumRenderState={premiumRenderState}
                     />
-                  ))
-                )}
-              </View>
+                  ))}
+                </View>
+              ) : null}
 
-              <TouchableOpacity
-                style={[
-                  styles.shareButton,
-                  {
-                    borderColor: screenPalette.shareBorderColor,
-                    backgroundColor: screenPalette.shareBackgroundColor,
-                  },
-                ]}
-                disabled={isPreparingCommunityShare}
-                onPress={handleSharePress}
-                testID="super-scan-share-button"
-              >
-                <Share2 color={screenPalette.shareIconColor} size={18} />
-                <Text
-                  {...RESULT_TEXT_PROPS}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.84}
-                  numberOfLines={2}
-                  style={[
-                    styles.shareButtonText,
-                    { color: screenPalette.shareTextColor },
-                  ]}
-                >
-                  {t('share_story.actions.share_report')}
-                </Text>
-              </TouchableOpacity>
+              <ResultNarrativeCard
+                accentColor={screenPalette.sectionAccentColor}
+                body={legacyViewModel.disclaimerText}
+                eyebrow={t('common.results.attention')}
+              />
 
-              <TouchableOpacity
-                style={[styles.primaryButton, styles.primaryButtonLarge, { backgroundColor: colors.primary }]}
-                onPress={handleClose}
-                testID="super-scan-back-button"
-              >
-                <Text
-                  {...RESULT_TEXT_PROPS}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.86}
-                  numberOfLines={2}
-                  style={styles.primaryButtonText}
-                >
-                  {t('common.home_back')}
-                </Text>
-              </TouchableOpacity>
-
-              <View
-                style={[
-                  styles.disclaimerCard,
-                  {
-                    backgroundColor: screenPalette.disclaimerBackgroundColor,
-                    borderColor: screenPalette.disclaimerBorderColor,
-                  },
-                ]}
-              >
-                <Text
-                  {...RESULT_TEXT_PROPS}
-                  style={[
-                    styles.disclaimer,
-                    { color: screenPalette.disclaimerTextColor },
-                  ]}
-                >
-                  {legacyViewModel.disclaimerText}
-                </Text>
+              <View style={styles.actionStack}>
+                <ResultActionRail
+                  accentColor={screenPalette.sectionAccentColor}
+                  onPrimaryPress={handleClose}
+                  onSecondaryPress={handleSharePress}
+                  primaryLabel={t('common.home_back')}
+                  primaryTestID="super-scan-back-button"
+                  secondaryDisabled={isPreparingCommunityShare}
+                  secondaryLabel={t('share_story.actions.share_report')}
+                  secondaryTestID="super-scan-share-button"
+                />
               </View>
             </>
-          ) : fatDistributionViewModel ? (
-            <>
-              <View
-                style={[
-                  styles.summaryCard,
-                  getResultSurfaceChrome({
-                    colors,
-                    isDark,
-                    kind: 'feature',
-                    accentColor: screenPalette.sectionAccentColor,
-                    surfaceVariant: screenPalette.sectionSurfaceVariant,
-                  }),
-                  sectionSurfaceStyle,
-                ]}
-                testID="super-scan-fat-summary-card"
-              >
-                <Text {...RESULT_TEXT_PROPS} numberOfLines={1} style={styles.summaryLabel}>
-                  {t('scan.super.summary_label')}
-                </Text>
-                <Text
-                  {...RESULT_TEXT_PROPS}
-                  style={styles.summaryText}
-                  testID="super-scan-fat-summary"
-                >
-                  {fatDistributionViewModel.analysisSummary}
-                </Text>
-              </View>
+          ) : null}
 
-              <View
-                style={[
-                  styles.fatSectionCard,
-                  getResultSurfaceChrome({
-                    colors,
-                    isDark,
-                    kind: 'feature',
-                    accentColor: screenPalette.sectionAccentColor,
-                    surfaceVariant: screenPalette.sectionSurfaceVariant,
-                  }),
-                  sectionSurfaceStyle,
-                ]}
-                testID="super-scan-fat-main-metrics"
-              >
-                <Text {...RESULT_TEXT_PROPS} numberOfLines={2} style={styles.sectionTitle}>
+          {fatDistributionAnalysisData && fatDistributionViewModel ? (
+            <>
+              <ResultHeroSurface
+                accentColor={screenPalette.sectionAccentColor}
+                headerContent={(
+                  <View style={styles.heroBadgeRow}>
+                    <ResultPillBadge
+                      accentColor={screenPalette.sectionAccentColor}
+                      icon={<SuperScanFeatureIcon color={screenPalette.heroIconColor} size={14} />}
+                      label={t('scan.super.type_label')}
+                      variant="premium"
+                    />
+                    {fatHeroMetric ? (
+                      <ResultPillBadge
+                        accentColor={screenPalette.sectionAccentColor}
+                        label={fatHeroMetric.label}
+                      />
+                    ) : null}
+                  </View>
+                )}
+                insight={fatDistributionHeroInsight}
+                subtitle={t('scan.super.fat_distribution.main_metrics_title')}
+                title={
+                  premiumRenderState === 'unlocked'
+                    ? fatHeroMetric?.label ?? t('scan.super.type_label')
+                    : t('scan.super.type_label')
+                }
+                visual={(
+                  <RadialScoreGauge
+                    color={screenPalette.scoreColor}
+                    label={
+                      premiumRenderState === 'unlocked'
+                        ? fatHeroMetric?.label ?? t('scan.super.type_label')
+                        : t('scan.super.type_label')
+                    }
+                    score={premiumRenderState === 'unlocked' ? fatHeroScore : 0}
+                  />
+                )}
+              />
+
+                {shouldRenderFatDistributionSummary ? (
+                  <>
+                    <Text
+                      {...RESULT_TEXT_PROPS}
+                      testID="super-scan-fat-summary"
+                    accessible={false}
+                    style={styles.testMarker}
+                  >
+                    {fatDistributionViewModel.analysisSummary}
+                  </Text>
+                    <ResultNarrativeCard
+                      accentColor={screenPalette.sectionAccentColor}
+                      eyebrow={t('scan.super.summary_label')}
+                      title={fatDistributionViewModel.analysisSummary}
+                    />
+
+                    {coachIntent ? (
+                      <ScanCoachCtaCard
+                        accentColor={screenPalette.sectionAccentColor}
+                        intent={coachIntent}
+                        onPress={handleCoachPress}
+                        testID="super-scan-fat-coach-cta"
+                        variant="hero"
+                      />
+                    ) : null}
+                  </>
+                ) : coachIntent ? (
+                  <ScanCoachCtaCard
+                    accentColor={screenPalette.sectionAccentColor}
+                    intent={coachIntent}
+                    onPress={handleCoachPress}
+                    testID="super-scan-fat-coach-cta"
+                    variant="hero"
+                  />
+                ) : null}
+
+              <View style={styles.sectionStack}>
+                <Text {...RESULT_TEXT_PROPS} style={styles.sectionTitle}>
                   {t('scan.super.fat_distribution.main_metrics_title')}
                 </Text>
 
-                <View style={styles.fatMetricGrid}>
+                <View style={styles.metricGrid} testID="super-scan-fat-main-metrics">
                   {fatDistributionViewModel.primaryMetrics.map((metric) => {
                     const metricTheme = fatPrimaryMetricThemes[metric.id];
+                    const icon =
+                      metric.id === 'body_fat'
+                        ? <CirclePercent />
+                        : metric.id === 'facial_fat'
+                          ? <ScanFace />
+                          : <Droplets />;
 
                     return (
-                    <View
-                      key={metric.id}
-                      style={[
-                        styles.fatMetricCard,
-                        metricTheme
-                          ? {
-                              backgroundColor: metricTheme.cardBackgroundColor,
-                              borderColor: metricTheme.cardBorderColor,
-                            }
-                          : null,
-                      ]}
-                      testID={`super-scan-fat-metric-${metric.id}`}
-                    >
-                      <Text {...RESULT_TEXT_PROPS} numberOfLines={2} style={styles.fatMetricLabel}>
-                        {metric.label}
-                      </Text>
-                      <Text
-                        {...RESULT_TEXT_PROPS}
-                        numberOfLines={1}
-                        style={[
-                          styles.fatMetricValue,
-                          metricTheme
-                            ? {
-                                color: metricTheme.valueColor,
-                              }
-                            : null,
-                        ]}
+                      <View
+                        key={metric.id}
+                        style={styles.metricGridItem}
+                        testID={`super-scan-fat-metric-grid-item-${metric.id}`}
                       >
-                        {metric.value}
-                      </Text>
-                    </View>
+                        <MetricCard
+                          icon={icon}
+                          testID={`super-scan-fat-metric-${metric.id}`}
+                          theme={metricTheme}
+                          title={metric.label}
+                          value={metric.value}
+                          valueVariant="numeric"
+                          premiumRenderState={metric.premiumRenderState}
+                          onPremiumPress={handlePremiumPress}
+                        />
+                      </View>
                     );
                   })}
                 </View>
               </View>
 
-              <View
-                style={[
-                  styles.fatSectionCard,
-                  getResultSurfaceChrome({
-                    colors,
-                    isDark,
-                    kind: 'feature',
-                    accentColor: screenPalette.sectionAccentColor,
-                    surfaceVariant: screenPalette.sectionSurfaceVariant,
-                  }),
-                  sectionSurfaceStyle,
-                ]}
-                testID="super-scan-fat-pattern"
-              >
-                <Text {...RESULT_TEXT_PROPS} numberOfLines={2} style={styles.sectionTitle}>
-                  {t('scan.super.fat_distribution.dominant_storage_pattern')}
-                </Text>
-                <Text {...RESULT_TEXT_PROPS} style={styles.summaryText}>
-                  {fatDistributionViewModel.dominantStoragePattern}
-                </Text>
-              </View>
+              {premiumRenderState === 'unlocked' ? (
+                <ResultNarrativeCard
+                  accentColor={screenPalette.sectionAccentColor}
+                  eyebrow={t('scan.super.fat_distribution.priority_zones')}
+                >
+                  {fatDistributionViewModel.priorityZones.length > 0 ? (
+                    <View style={styles.priorityZonesWrap}>
+                      {fatDistributionViewModel.priorityZones.map((zone, index) => {
+                        const zoneTheme = priorityZoneThemes[index] ?? screenPalette;
 
-              <View
-                style={[
-                  styles.fatSectionCard,
-                  getResultSurfaceChrome({
-                    colors,
-                    isDark,
-                    kind: 'feature',
-                    accentColor: screenPalette.sectionAccentColor,
-                    surfaceVariant: screenPalette.sectionSurfaceVariant,
-                  }),
-                  sectionSurfaceStyle,
-                ]}
-                testID="super-scan-fat-priority-zones"
-              >
-                <Text {...RESULT_TEXT_PROPS} numberOfLines={2} style={styles.sectionTitle}>
-                  {t('scan.super.fat_distribution.priority_zones')}
-                </Text>
+                        return (
+                          <View
+                            key={`${zone}-${index}`}
+                            testID={`super-scan-fat-priority-zone-${index}`}
+                            style={[
+                              styles.priorityZoneChip,
+                              {
+                                backgroundColor: zoneTheme.chipBackgroundColor,
+                                borderColor: zoneTheme.chipBorderColor,
+                              },
+                            ]}
+                          >
+                            <Text
+                              {...RESULT_TEXT_PROPS}
+                              adjustsFontSizeToFit
+                              ellipsizeMode="tail"
+                              minimumFontScale={0.82}
+                              numberOfLines={1}
+                              style={[
+                                styles.priorityZoneText,
+                                { color: zoneTheme.chipTextColor },
+                              ]}
+                            >
+                              {zone}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  ) : (
+                    <Text
+                      {...RESULT_TEXT_PROPS}
+                      testID="super-scan-fat-priority-zones-empty"
+                      style={[styles.emptyStateBody, { color: screenPalette.subtleTextColor }]}
+                    >
+                      {t('scan.super.fat_distribution.no_priority_zones')}
+                    </Text>
+                  )}
+                </ResultNarrativeCard>
+              ) : (
+                <PremiumTeaserCard
+                  accentColor={screenPalette.sectionAccentColor}
+                  lineCount={3}
+                  onPress={premiumRenderState === 'locked' ? handlePremiumPress : undefined}
+                  premiumRenderState={premiumRenderState}
+                  testID="super-scan-fat-priority-zones-premium"
+                  title={t('scan.super.fat_distribution.priority_zones')}
+                />
+              )}
 
-                {fatDistributionViewModel.priorityZones.length > 0 ? (
-                  <View style={styles.priorityZonesWrap}>
-                    {fatDistributionViewModel.priorityZones.map((zone, index) => {
-                      const zoneTheme = priorityZoneThemes[index] ?? screenPalette;
-
-                      return (
-                       <View
-                         key={`${zone}-${index}`}
-                         style={[
-                           styles.priorityZoneChip,
-                           {
-                             backgroundColor: zoneTheme.chipBackgroundColor,
-                             borderColor: zoneTheme.chipBorderColor,
-                           },
-                         ]}
-                         testID={`super-scan-fat-priority-zone-${index}`}
-                       >
-                         <Text
-                           {...RESULT_TEXT_PROPS}
-                           style={[
-                             styles.priorityZoneText,
-                             { color: zoneTheme.chipTextColor },
-                           ]}
-                         >
-                           {zone}
-                         </Text>
-                       </View>
-                      );
-                    })}
-                  </View>
-                ) : (
-                  <Text
-                    {...RESULT_TEXT_PROPS}
-                    style={[
-                      styles.emptySectionText,
-                      { color: screenPalette.subtleTextColor },
-                    ]}
-                    testID="super-scan-fat-priority-zones-empty"
-                  >
-                    {t('scan.super.fat_distribution.no_priority_zones')}
-                  </Text>
-                )}
-              </View>
-
-              <View
-                style={[
-                  styles.fatSectionCard,
-                  getResultSurfaceChrome({
-                    colors,
-                    isDark,
-                    kind: 'feature',
-                    accentColor: screenPalette.sectionAccentColor,
-                    surfaceVariant: screenPalette.sectionSurfaceVariant,
-                  }),
-                  sectionSurfaceStyle,
-                ]}
-                testID="super-scan-fat-areas"
-              >
-                <Text {...RESULT_TEXT_PROPS} numberOfLines={2} style={styles.sectionTitle}>
+              <View style={styles.sectionStack}>
+                <Text {...RESULT_TEXT_PROPS} style={styles.sectionTitle}>
                   {t('scan.super.fat_distribution.areas_title')}
                 </Text>
 
-                <View style={styles.areaList}>
-                  {fatDistributionViewModel.areas.length > 0 ? (
-                    fatDistributionViewModel.areas.map((area, index) => (
-                      <SuperScanAreaCard
-                        key={area.id}
-                        area={area}
-                        labels={fatDistributionAreaLabels}
-                        testID={`super-scan-area-card-${index}`}
-                        theme={fatAreaThemes[index]}
-                      />
-                    ))
-                  ) : (
-                    <View
-                      style={[
-                        styles.emptyBlock,
-                        {
-                          backgroundColor: screenPalette.subtleBackgroundColor,
-                          borderColor: screenPalette.subtleBorderColor,
-                        },
-                      ]}
-                      testID="super-scan-fat-areas-empty"
-                    >
-                      <Text
-                        {...RESULT_TEXT_PROPS}
-                        style={[
-                          styles.emptySectionText,
-                          { color: screenPalette.subtleTextColor },
-                        ]}
-                      >
-                        {t('scan.super.fat_distribution.no_areas')}
-                      </Text>
-                    </View>
-                  )}
-                </View>
+                {fatDistributionViewModel.areas.length > 0 ? (
+                  fatDistributionViewModel.areas.map((area, index) => (
+                    <SuperScanAreaCard
+                      key={area.id}
+                      area={area}
+                      labels={fatDistributionAreaLabels}
+                      lockedTitle={t('scan.super.fat_distribution.areas_title')}
+                      onPremiumPress={handlePremiumPress}
+                      premiumRenderState={premiumRenderState}
+                      testID={`super-scan-area-card-${index}`}
+                      theme={fatAreaThemes[index]}
+                    />
+                  ))
+                ) : (
+                  <View testID="super-scan-fat-areas-empty">
+                    <ResultNarrativeCard
+                      accentColor={screenPalette.sectionAccentColor}
+                      body={t('scan.super.fat_distribution.no_areas')}
+                    />
+                  </View>
+                )}
               </View>
 
-              <TouchableOpacity
-                style={[styles.primaryButton, styles.primaryButtonLarge, { backgroundColor: colors.primary }]}
-                onPress={handleClose}
-                testID="super-scan-back-button"
-              >
-                <Text
-                  {...RESULT_TEXT_PROPS}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.86}
-                  numberOfLines={2}
-                  style={styles.primaryButtonText}
-                >
-                  {t('common.home_back')}
-                </Text>
-              </TouchableOpacity>
+              <ResultNarrativeCard
+                accentColor={screenPalette.sectionAccentColor}
+                body={fatDistributionViewModel.disclaimerText}
+                eyebrow={t('common.results.attention')}
+              />
 
-              <View
-                style={[
-                  styles.disclaimerCard,
-                  {
-                    backgroundColor: screenPalette.disclaimerBackgroundColor,
-                    borderColor: screenPalette.disclaimerBorderColor,
-                  },
-                ]}
-              >
-                <Text
-                  {...RESULT_TEXT_PROPS}
-                  style={[
-                    styles.disclaimer,
-                    { color: screenPalette.disclaimerTextColor },
-                  ]}
-                >
-                  {fatDistributionViewModel.disclaimerText}
-                </Text>
+              <View style={styles.actionStack}>
+                <ResultActionRail
+                  accentColor={screenPalette.sectionAccentColor}
+                  onPrimaryPress={handleClose}
+                  primaryLabel={t('common.home_back')}
+                  primaryTestID="super-scan-back-button"
+                />
               </View>
             </>
           ) : null}
@@ -945,9 +1030,9 @@ export default function SuperScanResultScreen() {
 
 const createStyles = (
   colors: any,
-  isDark: boolean,
   insets: any,
-  layout: ReturnType<typeof getResultLayoutState>
+  isDark: boolean,
+  layout: ReturnType<typeof getResultLayoutState>,
 ) =>
   StyleSheet.create({
     container: {
@@ -957,28 +1042,10 @@ const createStyles = (
     backgroundLayer: {
       ...StyleSheet.absoluteFillObject,
     },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: SPACING.page,
-      paddingTop: insets.top + SPACING.sm,
-      paddingBottom: SPACING.md,
-      minHeight: layout.headerMinHeight,
-    },
-    headerSidePlaceholder: {
-      width: layout.headerSlotSize,
-      height: layout.headerSlotSize,
-    },
-    headerTitle: {
-      flex: 1,
-      textAlign: 'center',
-      paddingHorizontal: SPACING.md,
-      fontSize: layout.headerTitleFontSize,
-      lineHeight: layout.headerTitleLineHeight,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.primaryText,
-      includeFontPadding: false,
+    resultHeader: {
+      backgroundColor: 'transparent',
+      borderBottomColor: 'transparent',
+      borderBottomWidth: 0,
     },
     scrollContent: {
       padding: SPACING.page,
@@ -987,191 +1054,110 @@ const createStyles = (
     content: {
       gap: layout.contentGap,
     },
-    errorCard: {
-      marginHorizontal: SPACING.page,
-      marginTop: SPACING.xxxl,
-      borderRadius: layout.heroRadius,
-      padding: layout.largeBlockPadding,
-      gap: SPACING.sm,
-      alignItems: 'center',
-      ...getResultSurfaceChrome({
-        colors,
-        isDark,
-        kind: 'hero',
-        accentColor: colors.error,
-      }),
-    },
-    errorIconContainer: {
-      width: 66,
-      height: 66,
-      borderRadius: 33,
-      backgroundColor: isDark ? 'rgba(255,69,58,0.16)' : '#FEECEC',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: SPACING.xs,
-    },
-    errorText: {
-      fontSize: layout.bodyTextFontSize,
-      color: colors.gray,
-      textAlign: 'center',
-      lineHeight: layout.bodyTextLineHeight,
-      includeFontPadding: false,
-    },
-    scoreCard: {
-      borderRadius: layout.heroRadius,
-      padding: layout.largeBlockPadding,
-      borderWidth: 1,
-      borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#F3E8C8',
-      shadowColor: '#0F172A',
-      shadowOffset: { width: 0, height: 14 },
-      shadowOpacity: isDark ? 0.3 : 0.1,
-      shadowRadius: 24,
-      elevation: 8,
-    },
-    heroTopRow: {
+    heroBadgeRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      alignItems: 'flex-start',
-      justifyContent: 'space-between',
+      gap: SPACING.xs,
+    },
+    sectionStack: {
+      gap: layout.sectionGap,
+    },
+    actionStack: {
+      gap: layout.sectionGap,
+    },
+    sectionTitle: {
+      fontSize: layout.sectionTitleFontSize,
+      lineHeight: layout.sectionTitleLineHeight,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      color: colors.primaryText,
+      includeFontPadding: false,
+    },
+    findingList: {
       gap: SPACING.sm,
-      marginBottom: layout.blockPadding,
     },
-    metricBadge: {
-      flex: 1,
-      minWidth: 0,
-      borderRadius: 9999,
-      borderWidth: 1,
-      paddingHorizontal: SPACING.md,
-      paddingVertical: layout.isCompact ? SPACING.xs + 1 : SPACING.xs + 2,
-      backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F7F9FF',
-    },
-    metricBadgeText: {
-      fontSize: layout.heroBadgeFontSize,
-      lineHeight: layout.heroBadgeLineHeight,
-      color: colors.gray,
-      textTransform: 'uppercase',
-      fontWeight: FONT_WEIGHTS.semiBold,
-      letterSpacing: layout.isCompact ? 0.45 : 0.6,
-      textAlign: 'center',
-      includeFontPadding: false,
-    },
-    urgencyBadge: {
-      borderRadius: 9999,
-      borderWidth: 1,
-      paddingHorizontal: SPACING.sm + 2,
-      paddingVertical: layout.isCompact ? SPACING.xs : SPACING.xs + 1,
-      backgroundColor: isDark ? 'rgba(255,69,58,0.2)' : '#FEECEC',
-      alignSelf: 'flex-start',
-    },
-    urgencyBadgeText: {
-      fontSize: layout.heroBadgeFontSize,
-      lineHeight: layout.isCompact ? 13 : 14,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      textTransform: 'uppercase',
-      letterSpacing: layout.isCompact ? 0.35 : 0.5,
-      includeFontPadding: false,
-    },
-    scoreMainRow: {
+    primaryFindingCard: {
       flexDirection: 'row',
       alignItems: 'center',
-    },
-    scoreIconContainer: {
-      width: layout.isCompact ? 58 : 64,
-      height: layout.isCompact ? 58 : 64,
-      borderRadius: layout.isCompact ? 29 : 32,
-      backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#FFFFFF',
+      gap: SPACING.sm,
+      borderRadius: layout.standardRadius,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.md,
       borderWidth: 1,
-      borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#F5ECD5',
+    },
+    primaryFindingCopy: {
+      flex: 1,
+      minWidth: 0,
+      gap: 3,
+    },
+    primaryFindingTitle: {
+      fontSize: layout.bodyTextFontSize,
+      lineHeight: layout.bodyTextLineHeight,
+      color: colors.primaryText,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      includeFontPadding: false,
+    },
+    primaryFindingMeta: {
+      fontSize: SIZES.xs,
+      lineHeight: 16,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      includeFontPadding: false,
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+    },
+    primaryFindingScoreChip: {
       alignItems: 'center',
       justifyContent: 'center',
-      shadowColor: '#0F172A',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: isDark ? 0.15 : 0.07,
-      shadowRadius: 12,
-      elevation: 4,
+      gap: 2,
+      borderRadius: 9999,
+      paddingHorizontal: SPACING.sm + 2,
+      paddingVertical: SPACING.sm,
+      flexShrink: 0,
     },
-    scoreTextContainer: {
-      marginLeft: layout.sectionGap,
-      flex: 1,
-      minWidth: 0,
-    },
-    scoreValueRow: {
-      flexDirection: 'row',
-      alignItems: 'baseline',
-      minWidth: 0,
-    },
-    scoreValue: {
-      fontSize: layout.heroScoreValueFontSize,
-      lineHeight: layout.heroScoreValueLineHeight,
-      fontWeight: FONT_WEIGHTS.bold,
-      letterSpacing: -1.2,
-      includeFontPadding: false,
-    },
-    scoreSuffix: {
-      fontSize: layout.heroScoreSuffixFontSize,
-      lineHeight: layout.heroScoreSuffixLineHeight,
-      color: colors.gray,
-      fontWeight: FONT_WEIGHTS.medium,
-      marginLeft: 4,
-      includeFontPadding: false,
-    },
-    summaryCard: {
-      minHeight: layout.summaryMinHeight,
-      borderRadius: layout.featureRadius,
-      padding: layout.largeBlockPadding,
-      borderWidth: 1,
-    },
-    summaryLabel: {
-      fontSize: SIZES.sm,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.gray,
-      marginBottom: SPACING.sm,
-      textTransform: 'uppercase',
-      letterSpacing: layout.isCompact ? 0.55 : 0.8,
-      includeFontPadding: false,
-    },
-    summaryText: {
+    primaryFindingScore: {
       fontSize: layout.bodyTextFontSize,
-      color: colors.primaryText,
+      lineHeight: layout.bodyTextLineHeight,
+      fontWeight: FONT_WEIGHTS.bold,
+      includeFontPadding: false,
+    },
+    primaryFindingPremiumLabel: {
+      fontSize: SIZES.xs,
+      lineHeight: 12,
+      fontWeight: FONT_WEIGHTS.bold,
+      includeFontPadding: false,
+      letterSpacing: 0.35,
+    },
+    emptyStateIconRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.xs,
+      marginTop: SPACING.sm,
+    },
+    emptyStateTitle: {
+      fontSize: layout.bodyTextFontSize,
+      lineHeight: layout.bodyTextLineHeight,
+      fontWeight: FONT_WEIGHTS.bold,
+      includeFontPadding: false,
+    },
+    emptyStateBody: {
+      fontSize: layout.bodyTextFontSize,
       lineHeight: layout.emphasizedBodyLineHeight,
       includeFontPadding: false,
     },
-    fatSectionCard: {
-      gap: layout.sectionGap,
-      borderRadius: layout.featureRadius,
-      padding: layout.blockPadding,
-      borderWidth: 1,
+    testMarker: {
+      position: 'absolute',
+      width: 0,
+      height: 0,
+      opacity: 0,
     },
-    fatMetricGrid: {
+    metricGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: SPACING.sm,
+      gap: layout.sectionGap,
     },
-    fatMetricCard: {
+    metricGridItem: {
+      flexBasis: layout.useSingleColumnResultCards ? '100%' : '47%',
       flexGrow: 1,
-      flexBasis: layout.isCompact ? '47%' : '48%',
-      minWidth: layout.isCompact ? 132 : 148,
-      borderRadius: layout.standardRadius,
-      paddingHorizontal: SPACING.md,
-      paddingVertical: SPACING.sm + 2,
-      backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#F8F9FD',
-      borderWidth: 1,
-      borderColor: isDark ? 'rgba(255,255,255,0.06)' : '#ECEFF7',
-      gap: 4,
-    },
-    fatMetricLabel: {
-      fontSize: SIZES.xs,
-      lineHeight: 14,
-      color: colors.gray,
-      fontWeight: FONT_WEIGHTS.medium,
-      includeFontPadding: false,
-    },
-    fatMetricValue: {
-      fontSize: layout.sectionTitleFontSize,
-      lineHeight: layout.sectionTitleLineHeight,
-      color: colors.primaryText,
-      fontWeight: FONT_WEIGHTS.bold,
-      includeFontPadding: false,
+      minWidth: 0,
     },
     priorityZonesWrap: {
       flexDirection: 'row',
@@ -1182,165 +1168,47 @@ const createStyles = (
       borderRadius: 9999,
       paddingHorizontal: SPACING.md,
       paddingVertical: SPACING.sm,
-      backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F4F6FA',
       borderWidth: 1,
-      borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#E9ECF5',
     },
     priorityZoneText: {
       fontSize: SIZES.sm,
       lineHeight: layout.bodyTextLineHeight,
       color: colors.primaryText,
       fontWeight: FONT_WEIGHTS.semiBold,
-      includeFontPadding: false,
-    },
-    areaList: {
-      gap: layout.sectionGap,
-    },
-    emptyBlock: {
-      borderRadius: layout.standardRadius,
-      paddingHorizontal: SPACING.md,
-      paddingVertical: SPACING.md,
-      backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#F8F9FD',
-      borderWidth: 1,
-      borderColor: isDark ? 'rgba(255,255,255,0.06)' : '#ECEFF7',
-    },
-    emptySectionText: {
-      fontSize: layout.bodyTextFontSize,
-      lineHeight: layout.bodyTextLineHeight,
-      color: colors.gray,
-      includeFontPadding: false,
-    },
-    conditionsWrapper: {
-      gap: layout.sectionGap,
-      borderRadius: layout.featureRadius,
-      padding: layout.blockPadding,
-      borderWidth: 1,
-    },
-    conditionsHeader: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      justifyContent: 'space-between',
-      gap: SPACING.sm,
-    },
-    sectionTitle: {
-      flex: 1,
+      flexShrink: 1,
       minWidth: 0,
-      fontSize: layout.sectionTitleFontSize,
-      lineHeight: layout.sectionTitleLineHeight,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.primaryText,
       includeFontPadding: false,
     },
-    countBadge: {
-      borderRadius: 9999,
-      minWidth: 34,
-      height: 28,
-      paddingHorizontal: SPACING.sm,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: isDark ? 'rgba(255,255,255,0.09)' : '#F4F6FA',
-    },
-    countBadgeText: {
-      fontSize: SIZES.sm,
-      color: colors.gray,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      includeFontPadding: false,
-    },
-    rasCard: {
-      backgroundColor: isDark ? 'rgba(48,209,88,0.1)' : '#ECFBF0',
-      borderRadius: layout.featureRadius,
+    errorCard: {
+      marginHorizontal: SPACING.page,
+      marginTop: SPACING.xxxl,
+      borderRadius: layout.heroRadius,
       padding: layout.largeBlockPadding,
+      gap: SPACING.md,
       alignItems: 'center',
       borderWidth: 1,
-      borderColor: isDark ? 'rgba(48,209,88,0.32)' : '#CDEFD8',
     },
-    rasIconContainer: {
-      marginBottom: SPACING.sm,
-    },
-    rasTitle: {
-      fontSize: layout.heroTitleFontSize,
-      lineHeight: layout.heroTitleLineHeight,
-      fontWeight: FONT_WEIGHTS.bold,
-      color: colors.success,
-      marginBottom: SPACING.xs,
-      textAlign: 'center',
-      includeFontPadding: false,
-    },
-    rasSubtitle: {
+    errorText: {
       fontSize: layout.bodyTextFontSize,
-      lineHeight: layout.bodyTextLineHeight,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.success,
-      marginBottom: SPACING.sm,
-      textAlign: 'center',
-      includeFontPadding: false,
-    },
-    rasDescription: {
-      fontSize: layout.bodyTextFontSize,
-      color: colors.primaryText,
+      color: colors.gray,
       textAlign: 'center',
       lineHeight: layout.bodyTextLineHeight,
       includeFontPadding: false,
     },
     primaryButton: {
-      paddingHorizontal: SPACING.xxl,
-      paddingVertical: SPACING.md + 1,
-      borderRadius: layout.ctaRadius,
-      minHeight: layout.ctaMinHeight,
-      alignItems: 'center',
-      justifyContent: 'center',
-      shadowColor: '#0F172A',
-      shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: isDark ? 0.28 : 0.12,
-      shadowRadius: 16,
-      elevation: 5,
-    },
-    shareButton: {
       minHeight: layout.ctaMinHeight,
       borderRadius: layout.ctaRadius,
-      borderWidth: 1,
-      paddingHorizontal: SPACING.lg,
-      paddingVertical: SPACING.sm,
-      flexDirection: 'row',
+      paddingHorizontal: SPACING.xl,
+      paddingVertical: SPACING.md,
       alignItems: 'center',
       justifyContent: 'center',
-      gap: SPACING.sm,
-      marginTop: SPACING.md,
-    },
-    shareButtonText: {
-      flexShrink: 1,
-      minWidth: 0,
-      color: colors.primaryText,
-      fontSize: layout.bodyTextFontSize,
-      lineHeight: layout.bodyTextLineHeight,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      textAlign: 'center',
-      includeFontPadding: false,
-    },
-    primaryButtonLarge: {
-      marginTop: SPACING.md,
     },
     primaryButtonText: {
-      color: '#FFFFFF',
+      color: colors.background,
       fontSize: layout.bodyTextFontSize,
       lineHeight: layout.bodyTextLineHeight,
       fontWeight: FONT_WEIGHTS.semiBold,
-      letterSpacing: 0.1,
       includeFontPadding: false,
-    },
-    disclaimerCard: {
-      backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#F7F8FC',
-      borderRadius: layout.standardRadius,
-      borderWidth: 1,
-      borderColor: isDark ? 'rgba(255,255,255,0.07)' : '#ECEEF6',
-      paddingHorizontal: SPACING.md,
-      paddingVertical: SPACING.sm + 2,
-    },
-    disclaimer: {
-      fontSize: SIZES.xs,
-      color: colors.gray,
       textAlign: 'center',
-      lineHeight: layout.isCompact ? 17 : 18,
-      includeFontPadding: false,
     },
   });

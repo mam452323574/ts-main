@@ -97,6 +97,12 @@ jest.mock('@/hooks/queries', () => ({
   usePremiumPotential: (...args: any[]) => mockUsePremiumPotential(...args),
   useFeatureFlags: (...args: any[]) => mockUseFeatureFlags(...args),
 }));
+jest.mock('@/hooks/queries/usePremiumPotential', () => ({
+  usePremiumPotential: (...args: any[]) => mockUsePremiumPotential(...args),
+}));
+jest.mock('@/hooks/queries/useFeatureFlags', () => ({
+  useFeatureFlags: (...args: any[]) => mockUseFeatureFlags(...args),
+}));
 
 jest.mock('@/components/ModalHandle', () => ({
   ModalHandle: () => null,
@@ -213,17 +219,38 @@ const makeSuperResult = (overrides: Partial<any> = {}) => ({
   urgency_flag: false,
   summary_key: 'medical_attention',
   disclaimer_key: 'general',
-  detected_conditions: [
+  detected_conditions: Array.from({ length: 4 }, (_, index) => ({
+    condition_key: 'unknown',
+    category_key: 'general',
+    probability: 82 - index,
+    severity_key: 'moderate',
+    explanation_key: 'unknown',
+    advice_key: 'unknown',
+  })),
+  ...overrides,
+});
+
+const makeFatDistributionResult = () => ({
+  scan_type: 'fat_distribution_scan_v2',
+  global_body_fat_estimate_percent: 24,
+  global_facial_fat_estimate_percent: 18,
+  global_water_retention_estimate_percent: 16,
+  analysis_summary: 'Rétention visible mais contrôlée',
+  dominant_storage_pattern: 'Rétention d’eau modérée',
+  areas_analysis: [
     {
-      condition_key: 'unknown',
-      category_key: 'general',
-      probability: 82,
-      severity_key: 'moderate',
-      explanation_key: 'unknown',
-      advice_key: 'unknown',
+      area_name: 'Joues',
+      subcutaneous_fat_percent: 22,
+      water_retention_percent: 16,
+      definition_percent: 58,
+      dominant_type: 'Rétention d’eau',
+      confidence: 82,
+      explanation: 'Signal hydrique localisé.',
+      actionable_advice: 'Hydratation régulière.',
     },
   ],
-  ...overrides,
+  priority_zones: ['Rétention d’eau'],
+  disclaimer_text: 'Résultat informatif uniquement.',
 });
 
 const flattenText = (value: any): string => {
@@ -437,6 +464,83 @@ describe('Result screen compact locale matrix', () => {
     expect(screen.queryByText('30-day projection')).toBeNull();
   });
 
+  it.each([320, 360, 390] as const)(
+    'keeps key French result labels on wide mobile rows at %spx',
+    (width) => {
+      currentScenario.locale = 'fr';
+      currentScenario.width = width;
+      currentScenario.userProfile = { account_tier: 'premium' };
+      currentScenario.authLoading = false;
+      i18n.locale = 'fr';
+      useWindowDimensionsSpy.mockReturnValue({
+        width,
+        height: 844,
+        scale: 3,
+        fontScale: 1,
+      });
+
+      currentScenario.params = { analysisData: JSON.stringify(makeFaceResult()) };
+      const faceScreen = render(<ScanResultScreen />);
+      const faceHeroBodyStyle = StyleSheet.flatten(
+        faceScreen.getByTestId('result-hero-body').props.style,
+      );
+      const faceQuickStatStyle = StyleSheet.flatten(
+        faceScreen.getAllByTestId('result-quick-stat-card')[0].props.style,
+      );
+      const hydrationGridStyle = StyleSheet.flatten(
+        faceScreen.getByTestId('scan-result-metric-grid-item-hydration').props.style,
+      );
+
+      expect(faceScreen.getAllByText('Score visage').length).toBeGreaterThan(0);
+      expect(faceScreen.getByText('Forme visage')).toBeTruthy();
+      expect(faceScreen.getByText('Hydratation')).toBeTruthy();
+      expect(faceScreen.getByText('Symétrie')).toBeTruthy();
+      expect(faceHeroBodyStyle.flexDirection).toBe('column');
+      expect(faceQuickStatStyle.flexBasis).toBe('100%');
+      expect(hydrationGridStyle.flexBasis).toBe('100%');
+      faceScreen.unmount();
+
+      currentScenario.params = { analysisData: JSON.stringify(makeNutritionResult()) };
+      const nutritionScreen = render(<ScanResultScreen />);
+      const nutritionQuickStatStyle = StyleSheet.flatten(
+        nutritionScreen.getAllByTestId('result-quick-stat-card')[0].props.style,
+      );
+      const satietyGridStyle = StyleSheet.flatten(
+        nutritionScreen.getByTestId('scan-result-metric-grid-item-satiety').props.style,
+      );
+      const vitaminsSectionStyle = StyleSheet.flatten(
+        nutritionScreen.getByTestId('nutrition-long-section-vitamins').props.style,
+      );
+
+      expect(nutritionScreen.getAllByText('Score nutrition').length).toBeGreaterThan(0);
+      expect(nutritionScreen.getByText('Calories')).toBeTruthy();
+      expect(nutritionScreen.getByText('Verdict')).toBeTruthy();
+      expect(nutritionScreen.getByText('Satiété')).toBeTruthy();
+      expect(nutritionScreen.getByText(/^Vitamines/)).toBeTruthy();
+      expect(nutritionQuickStatStyle.flexBasis).toBe('100%');
+      expect(satietyGridStyle.flexBasis).toBe('100%');
+      expect(vitaminsSectionStyle.width).toBe('100%');
+      nutritionScreen.unmount();
+
+      currentScenario.params = {
+        analysisData: JSON.stringify(makeFatDistributionResult()),
+      };
+      const superScreen = render(<SuperScanResultScreen />);
+      const waterRetentionGridStyle = StyleSheet.flatten(
+        superScreen.getByTestId('super-scan-fat-metric-grid-item-water_retention')
+          .props.style,
+      );
+      const waterRetentionTileStyle = StyleSheet.flatten(
+        superScreen.getByTestId('super-scan-area-card-0-water-retention-tile')
+          .props.style,
+      );
+
+      expect(superScreen.getAllByText('Rétention d’eau').length).toBeGreaterThan(0);
+      expect(waterRetentionGridStyle.flexBasis).toBe('100%');
+      expect(waterRetentionTileStyle.flexBasis).toBe('100%');
+    },
+  );
+
   it.each([
     ['de', 'Kohlenhydrate'],
     ['es', 'Carbohidratos'],
@@ -468,8 +572,8 @@ describe('Result screen compact locale matrix', () => {
 
       expect(macroLabel).toHaveTextContent(expectedLabel);
       expect(macroLabel.props.numberOfLines).toBe(2);
-      expect(macroLabel.props.adjustsFontSizeToFit).toBeUndefined();
-      expect(macroLabel.props.minimumFontScale).toBeUndefined();
+      expect(macroLabel.props.adjustsFontSizeToFit).toBe(true);
+      expect(macroLabel.props.minimumFontScale).toBe(0.82);
       expect(macroLabel.props.textBreakStrategy).toBe('simple');
       expect(macroItemStyle.flexBasis).toBe('100%');
       expect(macroItemStyle.minWidth).toBe(0);
@@ -498,52 +602,57 @@ describe('Result screen compact locale matrix', () => {
     const screen = render(<ScanResultScreen />);
     const qualityValue = screen.getByText('Naturelle');
 
-    expect(qualityValue.props.adjustsFontSizeToFit).toBeUndefined();
-    expect(qualityValue.props.minimumFontScale).toBeUndefined();
-    expect(qualityValue.props.numberOfLines).toBe(2);
+    expect(qualityValue.props.adjustsFontSizeToFit).toBe(true);
+    expect(qualityValue.props.minimumFontScale).toBe(0.82);
+    expect(qualityValue.props.numberOfLines).toBe(1);
     expect(qualityValue.props.textBreakStrategy).toBe('simple');
     expectNoMissingTranslationSentinel(screen);
   });
 
-  it('renders controlled unknown copy for unsupported nutrition keys while preserving approved aliases', () => {
-    currentScenario.locale = 'fr';
-    currentScenario.width = 390;
-    currentScenario.userProfile = { account_tier: 'premium' };
-    currentScenario.params = {
-      analysisData: JSON.stringify({
-        ...makeNutritionResult(),
-        verdict_key: 'energisant_mais_gras',
-        ingredient_quality_key: 'mystery_grade',
-        glycemic_index_key: 'slow_release',
-        main_vitamin_keys: ['niacine'],
-      }),
-    };
-    i18n.locale = 'fr';
-    useWindowDimensionsSpy.mockReturnValue({
-      width: 390,
-      height: 844,
-      scale: 3,
-      fontScale: 1,
-    });
+  it.each(['fr', 'en'] as const)(
+    'renders preserved nutrition fallback copy instead of unknown labels in %s',
+    (locale) => {
+      currentScenario.locale = locale;
+      currentScenario.width = 390;
+      currentScenario.userProfile = { account_tier: 'premium' };
+      currentScenario.params = {
+        analysisData: JSON.stringify({
+          ...makeNutritionResult(),
+          verdict_key: 'energisant_mais_gras',
+          verdict_fallback_text: 'Énergisant mais gras',
+          ingredient_quality_key: 'mystery_grade',
+          ingredient_quality_fallback_text: 'Chef special',
+          glycemic_index_key: 'slow_release',
+          glycemic_index_fallback_text: 'Slow release',
+          main_vitamin_keys: ['unknown'],
+          main_vitamins_fallback_text: 'Vitamin P',
+        }),
+      };
+      i18n.locale = locale;
+      useWindowDimensionsSpy.mockReturnValue({
+        width: 390,
+        height: 844,
+        scale: 3,
+        fontScale: 1,
+      });
 
-    const screen = render(<ScanResultScreen />);
+      const screen = render(<ScanResultScreen />);
 
-    expectNoMissingTranslationSentinel(screen);
-    expect(screen.getAllByText(i18n.t('verdicts.unknown')).length).toBeGreaterThan(
-      0
-    );
-    expect(
-      screen.getAllByText(i18n.t('qualitative_levels.glycemic_index.unknown'))
-        .length
-    ).toBeGreaterThan(0);
-    expect(
-      screen.getAllByText(i18n.t('qualitative_levels.ingredient_quality.unknown'))
-        .length
-    ).toBeGreaterThan(0);
-    expect(
-      screen.getAllByText(i18n.t('scan.nutrition.vitamins.vitamin_b3')).length
-    ).toBeGreaterThan(0);
-  });
+      expectNoMissingTranslationSentinel(screen);
+      expect(screen.getByText('Énergisant mais gras')).toBeTruthy();
+      expect(screen.getByText('Chef special')).toBeTruthy();
+      expect(screen.getByText('Slow release')).toBeTruthy();
+      expect(screen.getByText('Vitamin P')).toBeTruthy();
+      expect(screen.queryByText(i18n.t('verdicts.unknown'))).toBeNull();
+      expect(
+        screen.queryByText(i18n.t('qualitative_levels.glycemic_index.unknown'))
+      ).toBeNull();
+      expect(
+        screen.queryByText(i18n.t('qualitative_levels.ingredient_quality.unknown'))
+      ).toBeNull();
+      expect(screen.queryByText(i18n.t('scan.nutrition.vitamins.unknown'))).toBeNull();
+    },
+  );
 
   it('renders controlled unknown copy for unsupported super scan catalog keys', () => {
     currentScenario.locale = 'fr';
@@ -554,16 +663,14 @@ describe('Result screen compact locale matrix', () => {
         makeSuperResult({
           summary_key: 'rare_summary',
           disclaimer_key: 'rare_disclaimer',
-          detected_conditions: [
-            {
+          detected_conditions: Array.from({ length: 4 }, (_, index) => ({
               condition_key: 'rare_condition',
               category_key: 'rare_category',
-              probability: 77,
+              probability: 77 - index,
               severity_key: 'moderate',
               explanation_key: 'rare_explanation',
               advice_key: 'rare_advice',
-            },
-          ],
+          })),
         })
       ),
     };
@@ -583,8 +690,8 @@ describe('Result screen compact locale matrix', () => {
       screen.getByText(i18n.t('scan.super.disclaimers.unknown'))
     ).toBeTruthy();
     expect(
-      screen.getByText(i18n.t('scan.super.conditions.unknown.label'))
-    ).toBeTruthy();
+      screen.getAllByText(i18n.t('scan.super.conditions.unknown.label')).length
+    ).toBeGreaterThan(0);
     expect(screen.getByText(i18n.t('scan.super.categories.unknown'))).toBeTruthy();
     expect(
       screen.getByText(i18n.t('scan.super.explanations.unknown'))

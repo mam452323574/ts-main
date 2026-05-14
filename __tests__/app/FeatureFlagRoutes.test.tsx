@@ -26,6 +26,9 @@ jest.mock('@react-navigation/native', () => ({
 jest.mock('@/hooks/queries', () => ({
   useFeatureFlags: () => mockUseFeatureFlags(),
 }));
+jest.mock('@/hooks/queries/useFeatureFlags', () => ({
+  useFeatureFlags: () => mockUseFeatureFlags(),
+}));
 
 jest.mock('@/contexts/AuthContext', () => ({
   useAuth: () => mockUseAuth(),

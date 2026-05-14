@@ -205,15 +205,26 @@ describe('active Edge Functions parity', () => {
     expect(postViewsBlock).toContain('parseSocialRecordPostViewsRequest');
   });
 
+  it('keeps coach generation bundle verification wired into deploy_functions.ps1', () => {
+    const coachGenerationBlock = readDeployVerificationBlock('coach-generate-response');
+
+    expect(coachGenerationBlock).toContain('handler.ts');
+    expect(coachGenerationBlock).toContain('phase2Contracts.ts');
+    expect(coachGenerationBlock).toContain('parseCoachGenerateRequest');
+  });
+
   it('keeps Supabase function JWT verification config in parity with the active manifest', () => {
     const activeFunctionSlugs = readActiveEdgeFunctionsManifest().sort();
     const functionConfig = readFunctionVerificationConfig();
     const publicWebhookFunctionSlugs = new Set([
       'check-ip-signup',
+      'auth-pre-login',
       // U2-γ Phase 3 — Edge Function appelée avant signup (verify_jwt = false).
       'check-signup-eligibility',
       'fridge-scan-complete',
       'revenuecat-webhook',
+      'secure-login',
+      'secure-signup',
       'social-process-moderation-queue',
     ]);
 

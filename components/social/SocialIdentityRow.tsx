@@ -93,7 +93,8 @@ const createStyles = (colors: any) =>
     text: {
       flex: 1,
       minWidth: 0,
-      gap: 2,
+      gap: 4,
+      paddingVertical: 2,
     },
     username: {
       fontSize: SIZES.text16,
@@ -102,7 +103,8 @@ const createStyles = (colors: any) =>
     },
     meta: {
       fontSize: SIZES.text12,
-      color: colors.gray,
+      lineHeight: 16,
+      color: colors.textMuted ?? colors.gray,
     },
   });
 

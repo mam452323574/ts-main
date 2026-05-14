@@ -95,7 +95,7 @@ describe('ScanLimitIndicator', () => {
     expect(toJSON()).toBeTruthy();
   });
 
-  it('displays a direct recharge countdown for an exhausted free quota', () => {
+  it('displays the next scan countdown instead of a raw 0 quota when exhausted', () => {
     jest.useFakeTimers();
     jest.setSystemTime(NOW);
     const eligibility: ScanEligibilityResponse = {
@@ -110,11 +110,12 @@ describe('ScanLimitIndicator', () => {
 
     render(<ScanLimitIndicator eligibility={eligibility} />);
 
-    expect(screen.getByText('Recharge 21h 14m')).toBeTruthy();
+    expect(screen.getByText('Nouveau scan dans 21h 14m')).toBeTruthy();
+    expect(screen.queryByText('/')).toBeNull();
     expect(screen.queryByText('Limite atteinte')).toBeNull();
   });
 
-  it('displays the next individual recharge for a partially used premium quota', () => {
+  it('keeps showing the remaining stock for a partially used premium quota', () => {
     jest.useFakeTimers();
     jest.setSystemTime(NOW);
     const eligibility: ScanEligibilityResponse = {
@@ -129,8 +130,11 @@ describe('ScanLimitIndicator', () => {
 
     render(<ScanLimitIndicator eligibility={eligibility} />);
 
-    expect(screen.getByText('+1 dans 06h 03m')).toBeTruthy();
-    expect(screen.queryByText('disponible')).toBeNull();
+    expect(screen.getByText('2')).toBeTruthy();
+    expect(screen.getByText('/')).toBeTruthy();
+    expect(screen.getByText('3')).toBeTruthy();
+    expect(screen.getByText('disponible')).toBeTruthy();
+    expect(screen.queryByText(/Nouveau scan dans|\+1 dans/)).toBeNull();
   });
 
   it('keeps full premium quotas as available without a recharge timer', () => {
@@ -150,6 +154,7 @@ describe('ScanLimitIndicator', () => {
 
     expect(screen.getByText('disponible')).toBeTruthy();
     expect(screen.queryByText(/\+1 dans/)).toBeNull();
+    expect(screen.queryByText(/Nouveau scan dans/)).toBeNull();
   });
 
   it('calls onTimerComplete once when the direct recharge countdown reaches zero', async () => {

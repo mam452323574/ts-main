@@ -310,11 +310,11 @@ describe('RootLayout', () => {
     consoleWarnSpy.mockRestore();
   });
 
-  it('uses the shared tabs surface for the home tab in light mode', async () => {
+  it('uses the shared tabs background for the home tab in light mode', async () => {
     const screen = render(<RootLayout />);
 
     await waitFor(() => {
-      expect(mockSetSystemBackgroundColorAsync).toHaveBeenCalledWith(LIGHT_COLORS.cardBackground);
+      expect(mockSetSystemBackgroundColorAsync).toHaveBeenCalledWith(LIGHT_COLORS.background);
       expect(mockSetNavigationBarButtonStyleAsync).toHaveBeenCalledWith('dark');
     });
 
@@ -327,7 +327,7 @@ describe('RootLayout', () => {
     );
   });
 
-  it('uses the shared tabs surface for the coach tab in dark mode', async () => {
+  it('uses the shared tabs background for the coach tab in dark mode', async () => {
     mockUsePathname.mockReturnValue('/coach');
     mockThemeValue = {
       theme: 'dark',
@@ -340,7 +340,7 @@ describe('RootLayout', () => {
     const screen = render(<RootLayout />);
 
     await waitFor(() => {
-      expect(mockSetSystemBackgroundColorAsync).toHaveBeenCalledWith(DARK_COLORS.cardBackground);
+      expect(mockSetSystemBackgroundColorAsync).toHaveBeenCalledWith(DARK_COLORS.background);
       expect(mockSetNavigationBarButtonStyleAsync).toHaveBeenCalledWith('light');
     });
 
@@ -353,13 +353,13 @@ describe('RootLayout', () => {
     );
   });
 
-  it('keeps the scanner tab on the shared tabs surface with a light status bar', async () => {
+  it('keeps the scanner tab on the shared tabs background with a light status bar', async () => {
     mockUsePathname.mockReturnValue('/scanner');
 
     const screen = render(<RootLayout />);
 
     await waitFor(() => {
-      expect(mockSetSystemBackgroundColorAsync).toHaveBeenCalledWith(LIGHT_COLORS.cardBackground);
+      expect(mockSetSystemBackgroundColorAsync).toHaveBeenCalledWith(LIGHT_COLORS.background);
       expect(mockSetNavigationBarButtonStyleAsync).toHaveBeenCalledWith('dark');
     });
 
@@ -372,13 +372,13 @@ describe('RootLayout', () => {
     );
   });
 
-  it('keeps the social tab on the shared tabs surface with the default light status bar', async () => {
+  it('keeps the social tab on the shared tabs background with the default light status bar', async () => {
     mockUsePathname.mockReturnValue('/social');
 
     render(<RootLayout />);
 
     await waitFor(() => {
-      expect(mockSetSystemBackgroundColorAsync).toHaveBeenCalledWith(LIGHT_COLORS.cardBackground);
+      expect(mockSetSystemBackgroundColorAsync).toHaveBeenCalledWith(LIGHT_COLORS.background);
       expect(mockSetNavigationBarButtonStyleAsync).toHaveBeenCalledWith('dark');
     });
 
@@ -390,14 +390,14 @@ describe('RootLayout', () => {
     );
   });
 
-  it('keeps secondary pages on a black Android system background', async () => {
+  it('keeps themed secondary pages on the app Android system background', async () => {
     mockUsePathname.mockReturnValue('/settings');
 
     const screen = render(<RootLayout />);
 
     await waitFor(() => {
-      expect(mockSetSystemBackgroundColorAsync).toHaveBeenCalledWith('#000000');
-      expect(mockSetNavigationBarButtonStyleAsync).toHaveBeenCalledWith('light');
+      expect(mockSetSystemBackgroundColorAsync).toHaveBeenCalledWith(LIGHT_COLORS.background);
+      expect(mockSetNavigationBarButtonStyleAsync).toHaveBeenCalledWith('dark');
     });
 
     expect(screen.queryByTestId('bottom-system-bar-underlay')).toBeNull();

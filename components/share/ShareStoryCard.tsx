@@ -323,7 +323,7 @@ function createStyles(scale: number) {
       fontSize: round(58 * scale),
       lineHeight: round(58 * scale),
       fontWeight: FONT_WEIGHTS.bold,
-      letterSpacing: -2 * scale,
+      letterSpacing: 0,
       includeFontPadding: false,
     },
     scoreSuffix: {
@@ -386,10 +386,10 @@ function createStyles(scale: number) {
       fontWeight: FONT_WEIGHTS.semiBold,
     },
     metricValueNumeric: {
-      letterSpacing: -0.3 * scale,
+      letterSpacing: 0,
     },
     metricValueFraction: {
-      letterSpacing: -0.4 * scale,
+      letterSpacing: 0,
     },
     metricValueText: {
       alignSelf: 'stretch',

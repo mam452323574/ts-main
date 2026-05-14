@@ -15,12 +15,14 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { captureRef } from 'react-native-view-shot';
-import { Camera, ChevronLeft, ImagePlus } from 'lucide-react-native';
+import { AtSign, Camera, Globe2, Hash, ImagePlus } from 'lucide-react-native';
 
+import { AppScreen } from '@/components/AppScreen';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { SocialCategoryPill } from '@/components/social/SocialCategoryPill';
 import { SocialIdentityRow } from '@/components/social/SocialIdentityRow';
 import { ShareStoryCard } from '@/components/share/ShareStoryCard';
@@ -35,7 +37,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useSocialMutations } from '@/hooks/queries';
+import { useSocialMutations } from '@/hooks/queries/useSocialMutations';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { trackEvent } from '@/services/analytics';
 import {
@@ -147,6 +149,7 @@ export default function SocialComposerScreen() {
   const showAlertRef = useRef(showAlert);
   const translateRef = useRef(t);
   const scrollViewRef = useRef<ScrollView | null>(null);
+  const captionInputRef = useRef<TextInput | null>(null);
   const captionScrollFrameRef = useRef<number | null>(null);
   const legacyScanId = getSingleParam(params.scanId) ?? null;
   const routeDraftId = getSingleParam(params.draftId) ?? null;
@@ -313,6 +316,21 @@ export default function SocialComposerScreen() {
     cancelScheduledCaptionScroll();
     setIsCaptionFocused(false);
   }, [cancelScheduledCaptionScroll]);
+
+  const insertCaptionToken = useCallback(
+    (token: '#' | '@') => {
+      setCaption((currentCaption) => {
+        const separator =
+          currentCaption.length === 0 || currentCaption.endsWith(' ') ? '' : ' ';
+        return `${currentCaption}${separator}${token}`;
+      });
+      scheduleCaptionScrollIntoView();
+      requestAnimationFrame(() => {
+        captionInputRef.current?.focus();
+      });
+    },
+    [scheduleCaptionScrollIntoView],
+  );
 
   const handleCaptionSectionLayout = useCallback(
     ({ nativeEvent: { layout } }: LayoutChangeEvent) => {
@@ -503,7 +521,7 @@ export default function SocialComposerScreen() {
         style={compact ? styles.compactPrimaryButton : styles.heroPrimaryButton}
         testID="social-compose-library-button"
       >
-        <ImagePlus color={compact ? colors.primaryText : colors.white} size={18} />
+        <ImagePlus color={compact ? colors.primaryText : colors.background} size={18} />
         <Text
           style={
             compact ? styles.compactPrimaryButtonLabel : styles.heroPrimaryButtonLabel
@@ -529,27 +547,22 @@ export default function SocialComposerScreen() {
   );
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={styles.container}>
+    <AppScreen bottomInset={false} style={styles.container}>
       {alertElement}
       <KeyboardAvoidingView
         behavior={getKeyboardAvoidingViewBehavior()}
         style={styles.container}
         testID="social-compose-keyboard-shell"
       >
-        <View style={styles.header} testID="social-compose-header">
-          <TouchableOpacity
-            accessibilityRole="button"
-            onPress={() => router.back()}
-            style={styles.backButton}
-            testID="social-compose-back-button"
-          >
-            <ChevronLeft color={colors.primaryText} size={20} />
-          </TouchableOpacity>
-          <View style={styles.headerText}>
-            <Text style={styles.title}>{t('social.composer.title')}</Text>
-            <Text style={styles.subtitle}>{t('social.composer.subtitle')}</Text>
-          </View>
-        </View>
+        <ScreenHeader
+          title={t('social.composer.title')}
+          subtitle={t('social.composer.subtitle')}
+          variant="inline"
+          topInset={false}
+          onBack={() => router.back()}
+          backTestID="social-compose-back-button"
+          testID="social-compose-header"
+        />
 
         <ScrollView
           ref={scrollViewRef}
@@ -666,6 +679,7 @@ export default function SocialComposerScreen() {
               </Text>
             </View>
             <TextInput
+              ref={captionInputRef}
               multiline
               maxLength={SOCIAL_POST_MAX_LENGTH}
               placeholder={t('social.composer.caption_placeholder')}
@@ -677,6 +691,32 @@ export default function SocialComposerScreen() {
               onFocus={handleCaptionFocus}
               testID="social-compose-caption-input"
             />
+            <View style={styles.quickToolsRow}>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={t('social.composer.hashtags')}
+                onPress={() => insertCaptionToken('#')}
+                style={styles.quickToolButton}
+                testID="social-compose-hashtag-button"
+              >
+                <Hash color={colors.primaryText} size={17} />
+                <Text style={styles.quickToolLabel}>
+                  {t('social.composer.hashtags')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={t('social.composer.mention')}
+                onPress={() => insertCaptionToken('@')}
+                style={styles.quickToolButton}
+                testID="social-compose-mention-button"
+              >
+                <AtSign color={colors.primaryText} size={17} />
+                <Text style={styles.quickToolLabel}>
+                  {t('social.composer.mention')}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {!isCaptionEditing ? (
@@ -694,6 +734,19 @@ export default function SocialComposerScreen() {
                     onPress={() => setCategory(item)}
                   />
                 ))}
+              </View>
+              <View style={styles.visibilityRow} testID="social-compose-visibility-row">
+                <View style={styles.visibilityIcon}>
+                  <Globe2 color={colors.primaryText} size={18} />
+                </View>
+                <View style={styles.visibilityCopy}>
+                  <Text style={styles.visibilityTitle}>
+                    {t('social.composer.visibility_title')}
+                  </Text>
+                  <Text style={styles.visibilityBody}>
+                    {t('social.composer.visibility_body')}
+                  </Text>
+                </View>
               </View>
             </View>
           ) : null}
@@ -723,14 +776,14 @@ export default function SocialComposerScreen() {
             testID="social-compose-submit"
           >
             {createPostMutation.isPending || isSubmittingPost ? (
-              <ActivityIndicator color={colors.white} size="small" />
+              <ActivityIndicator color={colors.background} size="small" />
             ) : (
               <Text style={styles.submitButtonLabel}>{t('social.composer.submit')}</Text>
             )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 
@@ -818,8 +871,8 @@ const createStyles = (colors: any) =>
       gap: SPACING.sm,
     },
     captionInput: {
-      minHeight: 96,
-      borderRadius: BORDER_RADIUS.xl,
+      minHeight: 128,
+      borderRadius: BORDER_RADIUS.lg,
       backgroundColor: colors.cardBackground,
       borderWidth: 1,
       borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
@@ -830,6 +883,28 @@ const createStyles = (colors: any) =>
       textAlignVertical: 'top',
       lineHeight: 22,
     },
+    quickToolsRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: SPACING.sm,
+    },
+    quickToolButton: {
+      minHeight: 40,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: SPACING.xs,
+      paddingHorizontal: SPACING.md,
+      borderRadius: BORDER_RADIUS.full,
+      backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.06),
+      borderWidth: 1,
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+    },
+    quickToolLabel: {
+      fontSize: SIZES.text14,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      color: colors.primaryText,
+    },
     helperText: {
       fontSize: SIZES.text12,
       color: colors.textMuted ?? colors.gray,
@@ -837,10 +912,44 @@ const createStyles = (colors: any) =>
     heroCard: {
       gap: SPACING.md,
       padding: SPACING.lg,
-      borderRadius: BORDER_RADIUS.xl,
+      borderRadius: BORDER_RADIUS.lg,
       backgroundColor: colors.cardBackground,
       borderWidth: 1,
       borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.06),
+    },
+    visibilityRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.md,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.md,
+      borderRadius: BORDER_RADIUS.lg,
+      backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.05),
+      borderWidth: 1,
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+    },
+    visibilityIcon: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.cardBackground,
+    },
+    visibilityCopy: {
+      flex: 1,
+      minWidth: 0,
+      gap: 2,
+    },
+    visibilityTitle: {
+      fontSize: SIZES.text14,
+      fontWeight: FONT_WEIGHTS.bold,
+      color: colors.primaryText,
+    },
+    visibilityBody: {
+      fontSize: SIZES.text12,
+      lineHeight: 17,
+      color: colors.textMuted ?? colors.gray,
     },
     heroHeaderBlock: {
       gap: SPACING.xs,
@@ -916,13 +1025,20 @@ const createStyles = (colors: any) =>
     },
     heroPrimaryButton: {
       minHeight: 52,
-      borderRadius: BORDER_RADIUS.xl,
-      backgroundColor: colors.primary,
+      borderRadius: BORDER_RADIUS.full,
+      backgroundColor: colors.primaryText,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: SPACING.sm,
       paddingHorizontal: SPACING.md,
+      borderWidth: 1,
+      borderColor: withAlpha(colors.white, 0.2),
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.18,
+      shadowRadius: 18,
+      elevation: 4,
     },
     compactPrimaryButton: {
       flex: 1,
@@ -938,7 +1054,7 @@ const createStyles = (colors: any) =>
     heroPrimaryButtonLabel: {
       fontSize: SIZES.text16,
       fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.white,
+      color: colors.background,
     },
     compactPrimaryButtonLabel: {
       fontSize: SIZES.text14,
@@ -979,7 +1095,7 @@ const createStyles = (colors: any) =>
       paddingHorizontal: SPACING.page,
       borderTopWidth: 1,
       borderTopColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
-      backgroundColor: colors.cardBackground,
+      backgroundColor: colors.background,
     },
     footerHelper: {
       fontSize: SIZES.text12,
@@ -988,10 +1104,17 @@ const createStyles = (colors: any) =>
     },
     submitButton: {
       minHeight: 52,
-      borderRadius: BORDER_RADIUS.xl,
+      borderRadius: BORDER_RADIUS.full,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.primary,
+      backgroundColor: colors.primaryText,
+      borderWidth: 1,
+      borderColor: withAlpha(colors.white, 0.2),
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.18,
+      shadowRadius: 18,
+      elevation: 4,
     },
     submitButtonDisabled: {
       opacity: 0.5,
@@ -999,6 +1122,6 @@ const createStyles = (colors: any) =>
     submitButtonLabel: {
       fontSize: SIZES.text16,
       fontWeight: FONT_WEIGHTS.bold,
-      color: colors.white,
+      color: colors.background,
     },
   });

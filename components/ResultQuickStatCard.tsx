@@ -34,14 +34,25 @@ export function ResultQuickStatCard({
   const { width } = useWindowDimensions();
   const layout = useMemo(() => getResultLayoutState(width), [width]);
   const styles = useMemo(() => createStyles(layout), [layout]);
+  const shouldFitTextValueOnOneLine =
+    valueVariant === 'text' && (valueMaxLines <= 2 || value.trim().length <= 18);
 
   const valueTextProps =
     valueVariant === 'text'
-      ? {
-          numberOfLines: valueMaxLines,
-        }
+      ? shouldFitTextValueOnOneLine
+        ? {
+            adjustsFontSizeToFit: true,
+            ellipsizeMode: 'tail' as const,
+            minimumFontScale: 0.82,
+            numberOfLines: 1 as const,
+          }
+        : {
+            ellipsizeMode: 'tail' as const,
+            numberOfLines: valueMaxLines,
+          }
       : {
           adjustsFontSizeToFit: true,
+          ellipsizeMode: 'tail' as const,
           minimumFontScale: valueVariant === 'fraction' ? 0.82 : 0.84,
           numberOfLines: 1 as const,
         };
@@ -124,9 +135,12 @@ export function ResultQuickStatCard({
       <View testID="result-quick-stat-content" style={styles.content}>
         <Text
           {...RESULT_TEXT_PROPS}
+          adjustsFontSizeToFit
+          ellipsizeMode="tail"
+          minimumFontScale={0.82}
           testID="result-quick-stat-label"
           numberOfLines={labelMaxLines}
-          style={[styles.label, { color: colors.gray }]}
+          style={[styles.label, { color: colors.secondaryText ?? colors.gray }]}
         >
           {label}
         </Text>
@@ -161,7 +175,7 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       justifyContent: 'flex-start',
     },
     halfWidthCard: {
-      flexBasis: '47%',
+      flexBasis: layout.useSingleColumnResultCards ? '100%' : '47%',
       flexGrow: 1,
       minWidth: 0,
     },
@@ -172,7 +186,7 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
     iconWrap: {
       width: layout.quickStatIconSize,
       height: layout.quickStatIconSize,
-      borderRadius: layout.standardRadius,
+      borderRadius: layout.featureRadius - 6,
       alignItems: 'center',
       justifyContent: 'center',
       padding: SPACING.xs,
@@ -198,19 +212,23 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       minWidth: 0,
       justifyContent: 'center',
       gap: layout.quickStatTextGap,
+      alignSelf: 'stretch',
     },
     label: {
       fontSize: layout.quickStatLabelFontSize,
       lineHeight: layout.quickStatLabelLineHeight,
       textTransform: 'uppercase',
-      fontWeight: FONT_WEIGHTS.semiBold,
-      letterSpacing: layout.isCompact ? 0.3 : 0.4,
+      fontWeight: FONT_WEIGHTS.medium,
+      letterSpacing: 0,
       flexShrink: 1,
+      minWidth: 0,
       includeFontPadding: false,
     },
     value: {
       fontWeight: FONT_WEIGHTS.bold,
       flexShrink: 1,
+      minWidth: 0,
+      letterSpacing: 0,
       includeFontPadding: false,
     },
     valueCompact: {

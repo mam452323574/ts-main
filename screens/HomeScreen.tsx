@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
   Platform,
   RefreshControl,
   ScrollView,
@@ -7,72 +8,77 @@ import {
   Text,
   TouchableOpacity,
   View,
-  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Sun, Moon, Crown, ChevronRight } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { useAuth } from '@/contexts/AuthContext';
-import { useNotificationContext } from '@/contexts/NotificationContext';
-import { useTheme } from '@/contexts/ThemeContext';
-import { useLanguage } from '@/contexts/LanguageContext';
-import { useStartupDiagnostics } from '@/contexts/StartupDiagnosticsContext';
-import { useGamification } from '@/contexts/GamificationContext';
+import { useAuth } from '../contexts/AuthContext';
+import { useNotificationContext } from '../contexts/NotificationContext';
+import { useTheme } from '../contexts/ThemeContext';
+import { useLanguage } from '../contexts/LanguageContext';
+import { useStartupDiagnostics } from '../contexts/StartupDiagnosticsContext';
+import { useGamification } from '../contexts/GamificationContext';
 
-import {
-  useDashboard,
-  useAllScanEligibility,
-  useFeatureFlags,
-  useGrowthExperience,
-} from '@/hooks/queries';
+import { useDashboard } from '../hooks/queries/useDashboard';
+import { useAllScanEligibility } from '../hooks/queries/useScanEligibility';
+import { useFeatureFlags } from '../hooks/queries/useFeatureFlags';
+import { useGrowthExperience } from '../hooks/queries/useGrowthExperience';
 
-import { ScanType } from '@/types';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { ErrorMessage } from '@/components/ErrorMessage';
+import { ScanType } from '../types';
+import { AppScreen } from '../components/AppScreen';
+import { LoadingSpinner } from '../components/LoadingSpinner';
+import { ErrorMessage } from '../components/ErrorMessage';
 // DailyStat removed
-import { FoxEvolutionHero } from '@/components/FoxEvolutionHero';
-import { AnalyticsHomeCard } from '@/components/home/AnalyticsHomeCard';
-import { ChefHomeCard } from '@/components/home/ChefHomeCard';
+import { FoxEvolutionHero } from '../components/FoxEvolutionHero';
+import { AnalyticsHomeCard } from '../components/home/AnalyticsHomeCard';
+import { ChefHomeCard } from '../components/home/ChefHomeCard';
 
-import { ScanLimitIndicator } from '@/components/ScanLimitIndicator';
-import { SuperScanIndicator } from '@/components/SuperScanIndicator';
-import { SettingsCog } from '@/components/SettingsCog';
-import { NotificationBell } from '@/components/NotificationBell';
+import { ScanLimitIndicator } from '../components/ScanLimitIndicator';
+import { SuperScanIndicator } from '../components/SuperScanIndicator';
+import { SettingsCog } from '../components/SettingsCog';
+import { NotificationBell } from '../components/NotificationBell';
 import {
   getGamificationStageProgress,
   resolveGamification,
-} from '@/constants/gamification';
-import { SCAN_TYPE_LABELS } from '@/constants/scan';
+} from '../constants/gamification';
+import { SCAN_TYPE_LABELS } from '../constants/scan';
 import {
+  FONT_FAMILIES,
   SIZES,
   SPACING,
   BORDER_RADIUS,
   FONT_WEIGHTS,
-  SHADOWS,
   getAndroidLightSurface,
-  mixColors,
+  getMainPageChrome,
+  getObsidianSurface,
+  getVisualMoodSurface,
   withAlpha,
-} from '@/constants/theme';
-import { shouldPresentEntryOffer } from '@/services/growthExperience';
-import { entryOfferSession } from '@/utils/entryOfferSession';
+} from '../constants/theme';
+import {
+  buildPremiumHealthPalette,
+  type PremiumHealthPalette,
+} from '../constants/premiumHealth';
+import { shouldPresentEntryOffer } from '../services/growthExperience';
+import { entryOfferSession } from '../utils/entryOfferSession';
+import { getMainTabBarMetrics } from '../utils/mainTabBarMetrics';
 import {
   getScanQuotaStatusLabelKey,
   hasScanQuotaPayload,
   resolveScanQuotaState,
-} from '@/utils/scanQuotaState';
-import { hasPremiumAccess } from '@/utils/subscription';
-import { logOperationalError } from '@/utils/observability';
+} from '../utils/scanQuotaState';
+import { hasPremiumAccess } from '../utils/subscription';
+import { logOperationalError } from '../utils/observability';
 
 const STANDARD_SCAN_TYPES: ScanType[] = ['health', 'body', 'nutrition'];
-const HOME_SCROLL_BOTTOM_PADDING = SPACING.xxxl;
 const EMPTY_LOADING_BY_SCAN_TYPE = {
   body: false,
   health: false,
   nutrition: false,
   super: false,
 };
+const HOME_HORIZONTAL_PADDING = 12;
 
 function parseTimestampMs(value: number | string | undefined): number | undefined {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -87,6 +93,21 @@ function parseTimestampMs(value: number | string | undefined): number | undefine
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+function resolveRemainingQuotaCount(quotaState: ReturnType<typeof resolveScanQuotaState>) {
+  if (!hasScanQuotaPayload(quotaState)) {
+    return 0;
+  }
+
+  const eligibility = quotaState.eligibility;
+  const limit = Math.max(eligibility.limit ?? 1, 1);
+  return Math.max(
+    0,
+    eligibility.remaining ??
+      eligibility.available ??
+      (limit - (eligibility.current_count ?? 0)),
+  );
+}
+
 export default function HomeScreen() {
   const router = useRouter();
   const { userProfile } = useAuth();
@@ -94,46 +115,42 @@ export default function HomeScreen() {
   const { t } = useLanguage();
   const { markStartup, settleStartup } = useStartupDiagnostics();
   const insets = useSafeAreaInsets();
-  const { width: windowWidth } = useWindowDimensions();
-  const isAndroidLight = Platform.OS === 'android' && !isDark;
-  const availableGridWidth = Math.max(windowWidth - SPACING.page * 2, 0);
-  const canFitThreeCards = (availableGridWidth - SPACING.sm * 2) / 3 >= 108;
-  const scanGridColumns = canFitThreeCards ? 3 : 2;
-  const scanCardWidth =
-    scanGridColumns > 1
-      ? (availableGridWidth - SPACING.sm * (scanGridColumns - 1)) /
-        scanGridColumns
-      : availableGridWidth;
+  const tabBarMetrics = getMainTabBarMetrics(insets.bottom);
   const { scanCount: localScanCount, setScanCount: setLocalScanCount } =
     useGamification();
   const hasAutoPresentedEntryOffer = useRef(false);
   const completedRechargeRefetchKeysRef = useRef<Set<string>>(new Set());
+  const sectionAnimationValues = useRef([
+    new Animated.Value(0),
+    new Animated.Value(0),
+    new Animated.Value(0),
+  ]).current;
+  const hasAnimatedSectionsRef = useRef(false);
+  const premiumHealth = useMemo(
+    () => buildPremiumHealthPalette(colors, isDark),
+    [colors, isDark],
+  );
+  const mainChrome = useMemo(
+    () => getMainPageChrome(colors, isDark, 'trust'),
+    [colors, isDark],
+  );
 
   const premiumBannerColors = useMemo(
+    () => premiumHealth.premiumGradient,
+    [premiumHealth],
+  );
+  const premiumBannerHighlights = useMemo(
+    () => [t('tabs.coach'), t('scan_types.super'), t('tabs.analytics')],
+    [t],
+  );
+  const scanSectionSupportText = useMemo(
     () =>
-      isDark
-        ? ([
-            mixColors(colors.gold, colors.primaryText, 0.3),
-            mixColors(colors.warning, colors.gold, 0.4),
-          ] as const)
-        : isAndroidLight
-          ? ([
-              mixColors(colors.gold, colors.white, 0.38),
-              mixColors(colors.gold, colors.warning, 0.18),
-              mixColors(colors.warning, colors.gold, 0.68),
-            ] as const)
-          : ([
-              colors.gold,
-              mixColors(colors.warning, colors.gold, 0.55),
-            ] as const),
-    [
-      colors.gold,
-      colors.primaryText,
-      colors.warning,
-      colors.white,
-      isAndroidLight,
-      isDark,
-    ],
+      [
+        t(SCAN_TYPE_LABELS.health),
+        t(SCAN_TYPE_LABELS.body),
+        t(SCAN_TYPE_LABELS.nutrition),
+      ].join(' · '),
+    [t],
   );
 
   const { checkForAchievements, scheduleScanReadyNotification } =
@@ -155,6 +172,9 @@ export default function HomeScreen() {
     canQuery: canQueryEligibility = true,
     refetchAll: refetchEligibility,
     refetchScanType: refetchScanEligibilityType = async () => null,
+    isFetched: isScanEligibilityFetched,
+    isFetching: isScanEligibilityFetching,
+    isStale: isScanEligibilityStale,
   } = useAllScanEligibility();
   const { data: featureFlags } = useFeatureFlags();
   const { data: growthExperience } = useGrowthExperience();
@@ -168,15 +188,10 @@ export default function HomeScreen() {
       createStyles(
         colors,
         isDark,
-        scanCardWidth,
-        scanGridColumns,
+        tabBarMetrics.scrollPaddingBottom,
+        premiumHealth,
       ),
-    [
-      colors,
-      isDark,
-      scanCardWidth,
-      scanGridColumns,
-    ],
+    [colors, isDark, premiumHealth, tabBarMetrics.scrollPaddingBottom],
   );
   const remoteScanCount = data?.gamification.scanCount ?? 0;
   const effectiveScanCount = Math.max(remoteScanCount, localScanCount);
@@ -237,14 +252,51 @@ export default function HomeScreen() {
       scanEligibilityErrors,
     ],
   );
+  const availableStandardScanCount = useMemo(
+    () =>
+      STANDARD_SCAN_TYPES.reduce(
+        (total, scanType) => total + resolveRemainingQuotaCount(scanQuotaStates[scanType]),
+        0,
+      ),
+    [scanQuotaStates],
+  );
+  const availableSuperScanCount = useMemo(
+    () => resolveRemainingQuotaCount(scanQuotaStates.super),
+    [scanQuotaStates.super],
+  );
+  const totalAvailableScans = availableStandardScanCount + availableSuperScanCount;
+  const scanRailAnimatedStyle = useMemo(
+    () => createSectionAnimatedStyle(sectionAnimationValues[2]),
+    [sectionAnimationValues],
+  );
+  const journeyAnimatedStyle = useMemo(
+    () => createSectionAnimatedStyle(sectionAnimationValues[0]),
+    [sectionAnimationValues],
+  );
+  const modulesAnimatedStyle = useMemo(
+    () => createSectionAnimatedStyle(sectionAnimationValues[1]),
+    [sectionAnimationValues],
+  );
 
   // Refetch eligibility when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      if (isAuthReady && canQueryEligibility) {
+      if (
+        isAuthReady &&
+        canQueryEligibility &&
+        !isScanEligibilityFetching &&
+        (!isScanEligibilityFetched || isScanEligibilityStale)
+      ) {
         void refetchEligibility();
       }
-    }, [canQueryEligibility, isAuthReady, refetchEligibility]),
+    }, [
+      canQueryEligibility,
+      isAuthReady,
+      isScanEligibilityFetched,
+      isScanEligibilityFetching,
+      isScanEligibilityStale,
+      refetchEligibility,
+    ]),
   );
 
   const handleQuotaTimerComplete = useCallback((scanType: ScanType, nextRechargeAt: number) => {
@@ -314,6 +366,24 @@ export default function HomeScreen() {
     }
   }, [localScanCount, remoteScanCount, setLocalScanCount]);
 
+  useEffect(() => {
+    if (isLoading || dashboardError || !data || hasAnimatedSectionsRef.current) {
+      return;
+    }
+
+    hasAnimatedSectionsRef.current = true;
+    Animated.stagger(
+      80,
+      sectionAnimationValues.map((value) =>
+        Animated.timing(value, {
+          toValue: 1,
+          duration: 420,
+          useNativeDriver: true,
+        }),
+      ),
+    ).start();
+  }, [data, dashboardError, isLoading, sectionAnimationValues]);
+
   const hasLoggedStartupRef = useRef(false);
 
   useEffect(() => {
@@ -343,6 +413,103 @@ export default function HomeScreen() {
     await Promise.all([refetchDashboard(), refetchEligibility()]);
     setIsManualRefresh(false);
   }, [refetchDashboard, refetchEligibility]);
+
+  const renderSuperScanSlot = () => {
+    if (!isPremium) {
+      return (
+        <TouchableOpacity
+          accessibilityRole="button"
+          activeOpacity={0.84}
+          onPress={() => router.push('/premium-upgrade')}
+          style={styles.superScanPromoShell}
+          testID="home-super-scan-upsell-card"
+        >
+          <View
+            style={styles.superScanPromoSurface}
+            testID="home-super-scan-upsell-surface"
+          >
+            <LinearGradient
+              colors={premiumBannerColors}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.superScanPromoGradient}
+            >
+              <View style={styles.superScanPromoHeader}>
+                <View style={styles.superScanPromoBadge}>
+                  <Crown color={colors.white} size={14} fill={colors.white} />
+                  <Text style={styles.superScanPromoBadgeText}>
+                    {t('components.feature_list.premium')}
+                  </Text>
+                </View>
+                <Text style={styles.superScanPromoTitle}>
+                  {t('components.super_scan.title')}
+                </Text>
+                <Text style={styles.superScanPromoSubtitle}>
+                  {t('components.super_scan.subtitle_locked')}
+                </Text>
+              </View>
+
+              <View style={styles.superScanPromoFooter}>
+                <View style={styles.superScanPromoBenefits}>
+                  {premiumBannerHighlights.map((label) => (
+                    <View key={label} style={styles.superScanPromoBenefitChip}>
+                      <Text style={styles.superScanPromoBenefitChipText}>
+                        {label}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+
+                <View style={styles.superScanPromoCta} testID="home-super-scan-upsell-cta">
+                  <Text style={styles.superScanPromoCtaText}>
+                    {t('scan_limit.upgrade')}
+                  </Text>
+                  <ChevronRight
+                    color={colors.primaryText}
+                    size={18}
+                    strokeWidth={2.7}
+                  />
+                </View>
+              </View>
+            </LinearGradient>
+          </View>
+        </TouchableOpacity>
+      );
+    }
+
+    if (hasScanQuotaPayload(scanQuotaStates.super)) {
+      return (
+        <SuperScanIndicator
+          isPremium={isPremium}
+          eligibility={scanQuotaStates.super.eligibility}
+          onLockedPress={() => router.push('/premium-upgrade')}
+        />
+      );
+    }
+
+    if (scanQuotaStates.super.status === 'locked') {
+      return (
+        <SuperScanIndicator
+          isPremium={false}
+          onLockedPress={() => router.push('/premium-upgrade')}
+        />
+      );
+    }
+
+    return (
+      <View style={styles.superQuotaStateCard} testID="super-scan-state-card">
+        <Text style={styles.superQuotaStateTitle}>
+          {t(SCAN_TYPE_LABELS.super)}
+        </Text>
+        <Text style={styles.superQuotaStateText}>
+          {t(
+            getScanQuotaStatusLabelKey(scanQuotaStates.super) ??
+              'scan_limit.missing_payload',
+          )}
+        </Text>
+      </View>
+    );
+  };
 
   // Header avec logo et branding
   const renderFixedHeader = () => (
@@ -376,137 +543,123 @@ export default function HomeScreen() {
 
     return (
       <>
-        <View style={styles.heroSection}>
-          <View style={styles.heroContent}>
-            <FoxEvolutionHero
-              gamification={effectiveGamification}
-              progress={gamificationProgress}
-            />
+        <Animated.View
+          style={[styles.companionSection, journeyAnimatedStyle]}
+          testID="home-journey-section"
+        >
+          <View style={styles.sectionHeading}>
+            <Text style={styles.sectionEyebrow}>{t('home.companion_title')}</Text>
+            <Text style={styles.sectionSupportText}>
+              {t('home.companion_subtitle')}
+            </Text>
           </View>
-        </View>
-
-        <ChefHomeCard onPress={() => router.push('/scan-frigo' as any)} />
-
-        <AnalyticsHomeCard
-          scanCount={effectiveScanCount}
-          onPress={() => router.push('/analytics')}
-        />
-
-        <View style={styles.scanLimitsSection}>
-          <Text style={styles.sectionTitle}>{t('home.items_available')}</Text>
-
-          {/* Grille des 3 types de scan standards */}
-          <View style={styles.scanLimitsGrid}>
-            {STANDARD_SCAN_TYPES.map((scanType) => {
-              const quotaState = scanQuotaStates[scanType];
-              const quotaStateLabelKey = getScanQuotaStatusLabelKey(quotaState);
-
-              return (
-                <View
-                  key={scanType}
-                  style={styles.scanLimitCardShell}
-                  testID="scan-limit-card-shell"
-                >
-                  <View
-                    style={styles.scanLimitCardSurface}
-                    testID="scan-limit-card-surface"
-                  >
-                    <Text style={styles.scanLimitLabel} numberOfLines={2}>
-                      {t(SCAN_TYPE_LABELS[scanType])}
-                    </Text>
-                    {hasScanQuotaPayload(quotaState) ? (
-                      <ScanLimitIndicator
-                        eligibility={quotaState.eligibility}
-                        isPremium={isPremium}
-                        onLimitReachedPress={
-                          !isPremium
-                            ? () => router.push('/premium-upgrade')
-                            : undefined
-                        }
-                        onTimerComplete={
-                          quotaState.nextRechargeAt
-                            ? () =>
-                                handleQuotaTimerComplete(
-                                  scanType,
-                                  quotaState.nextRechargeAt!,
-                                )
-                            : undefined
-                        }
-                      />
-                    ) : (
-                      <Text style={styles.quotaStateText}>
-                        {t(quotaStateLabelKey ?? 'scan_limit.missing_payload')}
-                      </Text>
-                    )}
-                  </View>
-                </View>
-              );
-            })}
+          <View style={styles.companionCardShell}>
+            <View style={styles.companionCardSurface}>
+              <FoxEvolutionHero
+                gamification={effectiveGamification}
+                progress={gamificationProgress}
+              />
+            </View>
           </View>
+        </Animated.View>
 
-          {/* Super Scan - indicateur séparé avec style premium */}
-          <View style={styles.superScanContainer}>
-            {hasScanQuotaPayload(scanQuotaStates.super) ? (
-              <SuperScanIndicator
-                isPremium={isPremium}
-                eligibility={scanQuotaStates.super.eligibility}
-                onLockedPress={() => router.push('/premium-upgrade')}
-              />
-            ) : scanQuotaStates.super.status === 'locked' ? (
-              <SuperScanIndicator
-                isPremium={false}
-                onLockedPress={() => router.push('/premium-upgrade')}
-              />
-            ) : (
-              <View
-                style={styles.superQuotaStateCard}
-                testID="super-scan-state-card"
-              >
-                <Text style={styles.superQuotaStateTitle}>
-                  {t(SCAN_TYPE_LABELS.super)}
-                </Text>
-                <Text style={styles.superQuotaStateText}>
-                  {t(
-                    getScanQuotaStatusLabelKey(scanQuotaStates.super) ??
-                      'scan_limit.missing_payload',
-                  )}
+        <Animated.View
+          style={[styles.secondaryModulesSection, modulesAnimatedStyle]}
+          testID="home-secondary-modules-section"
+        >
+          <ChefHomeCard onPress={() => router.push('/scan-frigo' as any)} />
+
+          <View style={styles.sectionHeading}>
+            <Text style={styles.sectionEyebrow}>{t('tabs.analytics')}</Text>
+            <Text style={styles.sectionSupportText}>
+              {t('home.analytics_card_scan_count', { count: effectiveScanCount })}
+            </Text>
+          </View>
+          <AnalyticsHomeCard
+            scanCount={effectiveScanCount}
+            onPress={() => router.push('/analytics')}
+          />
+        </Animated.View>
+
+        <Animated.View
+          style={[styles.scanLimitsSection, scanRailAnimatedStyle]}
+          testID="home-scan-rail-section"
+        >
+          <View style={styles.scanRailShell} testID="home-scan-rail">
+            <View style={styles.scanSectionHeaderCard}>
+              <View style={styles.scanSectionHeaderCopy}>
+                <Text style={styles.scanSectionEyebrow}>{t('home.items_available')}</Text>
+                <Text style={styles.scanSectionSupport}>
+                  {scanSectionSupportText}
                 </Text>
               </View>
-            )}
-          </View>
-        </View>
-
-        {!isPremium && (
-          <TouchableOpacity
-            style={styles.premiumBannerShell}
-            onPress={() => router.push('/premium-upgrade')}
-            activeOpacity={0.8}
-            testID="home-premium-banner-shell"
-          >
-            <View
-              style={styles.premiumBannerSurface}
-              testID="home-premium-banner-surface"
-            >
-              <LinearGradient
-                colors={premiumBannerColors}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.premiumBannerGradient}
-              >
-                <Crown color="#FFFFFF" size={24} fill="#FFFFFF" />
-                <View style={styles.premiumBannerText}>
-                  <Text style={styles.premiumBannerTitle}>
-                    {t('home.premium_banner_title')}
-                  </Text>
-                  <Text style={styles.premiumBannerSubtitle}>
-                    {t('home.premium_banner_subtitle')}
-                  </Text>
-                </View>
-                <ChevronRight color="#FFFFFF" size={20} />
-              </LinearGradient>
+              <View style={styles.scanSectionAvailabilityPill}>
+                <Text style={styles.scanSectionAvailabilityValue}>
+                  {totalAvailableScans}
+                </Text>
+                <Text style={styles.scanSectionAvailabilityLabel}>
+                  {t('scan_limit.available')}
+                </Text>
+              </View>
             </View>
-          </TouchableOpacity>
-        )}
+
+            <View style={styles.scanCardsGrid} testID="home-scan-cards-grid">
+              {STANDARD_SCAN_TYPES.map((scanType) => {
+                const quotaState = scanQuotaStates[scanType];
+                const quotaStateLabelKey = getScanQuotaStatusLabelKey(quotaState);
+
+                return (
+                  <View
+                    key={scanType}
+                    style={styles.scanLimitCardShell}
+                    testID="scan-limit-card-shell"
+                  >
+                    <View
+                      style={styles.scanLimitCardSurface}
+                      testID="scan-limit-card-surface"
+                    >
+                      <Text
+                        style={styles.scanLimitLabel}
+                        numberOfLines={2}
+                        testID="scan-limit-label"
+                      >
+                        {t(SCAN_TYPE_LABELS[scanType])}
+                      </Text>
+                      {hasScanQuotaPayload(quotaState) ? (
+                        <ScanLimitIndicator
+                          eligibility={quotaState.eligibility}
+                          isPremium={isPremium}
+                          onLimitReachedPress={
+                            !isPremium
+                              ? () => router.push('/premium-upgrade')
+                              : undefined
+                          }
+                          onTimerComplete={
+                            quotaState.nextRechargeAt
+                              ? () =>
+                                  handleQuotaTimerComplete(
+                                    scanType,
+                                    quotaState.nextRechargeAt!,
+                                  )
+                              : undefined
+                          }
+                        />
+                      ) : (
+                        <Text style={styles.quotaStateText}>
+                          {t(quotaStateLabelKey ?? 'scan_limit.missing_payload')}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+
+            <View style={styles.superScanContainer} testID="home-super-scan-container">
+              {renderSuperScanSlot()}
+            </View>
+          </View>
+        </Animated.View>
       </>
     );
   };
@@ -525,7 +678,7 @@ export default function HomeScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <AppScreen topInset={false} bottomInset={false} style={styles.container}>
       {/* Header fixe */}
       {renderFixedHeader()}
 
@@ -542,17 +695,37 @@ export default function HomeScreen() {
       >
         {renderScrollableHeader()}
       </ScrollView>
-    </View>
+    </AppScreen>
   );
+}
+
+function createSectionAnimatedStyle(animatedValue: Animated.Value) {
+  return {
+    opacity: animatedValue,
+    transform: [
+      {
+        translateY: animatedValue.interpolate({
+          inputRange: [0, 1],
+          outputRange: [18, 0],
+        }),
+      },
+    ],
+  };
 }
 
 const createStyles = (
   colors: any,
   isDark: boolean,
-  scanCardWidth: number,
-  scanGridColumns: number,
+  scrollBottomPadding: number,
+  premiumHealth: PremiumHealthPalette,
 ) => {
   const isAndroidLight = Platform.OS === 'android' && !isDark;
+  const chrome = getMainPageChrome(colors, isDark, 'trust');
+  const companionSurface = getVisualMoodSurface(colors, isDark, {
+    mood: 'obsidian',
+    accentColor: chrome.accentColor,
+    intensity: 'card',
+  });
   const scanCardSurface = isAndroidLight
     ? getAndroidLightSurface(colors, {
         accentColor: colors.primary,
@@ -567,8 +740,8 @@ const createStyles = (
     : null;
   const premiumBannerSurface = isAndroidLight
     ? getAndroidLightSurface(colors, {
-        accentColor: colors.gold,
-        shadowColor: colors.gold,
+        accentColor: premiumHealth.premiumAccent,
+        shadowColor: premiumHealth.premiumAccent,
         backgroundAlpha: 0.12,
         borderAlpha: 0.2,
         overlayAlpha: 0.18,
@@ -578,26 +751,41 @@ const createStyles = (
         elevation: 4,
       })
     : null;
+  const obsidianScanSurface = getObsidianSurface(colors, {
+    accentColor: chrome.accentColor,
+    intensity: 'raised',
+    backgroundAlpha: 0.035,
+    borderAlpha: 0.13,
+    shadowOpacity: 0.12,
+  });
+  const obsidianPremiumSurface = getObsidianSurface(colors, {
+    accentColor: premiumHealth.premiumAccent,
+    intensity: 'premium',
+    backgroundAlpha: 0.06,
+    borderAlpha: 0.28,
+    shadowOpacity: 0.18,
+  });
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: chrome.canvas,
     },
     listContainer: {
       flex: 1,
     },
     listContent: {
-      paddingBottom: HOME_SCROLL_BOTTOM_PADDING,
+      paddingBottom: scrollBottomPadding,
     },
     header: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      paddingHorizontal: SPACING.page,
+      paddingHorizontal: HOME_HORIZONTAL_PADDING,
       paddingTop: SPACING.md,
       paddingBottom: SPACING.md,
-      backgroundColor: colors.cardBackground,
-      ...SHADOWS.header,
+      backgroundColor: chrome.headerBackground,
+      borderBottomWidth: 1,
+      borderBottomColor: chrome.headerBorder,
     },
     headerLeft: {
       flexDirection: 'column',
@@ -607,6 +795,7 @@ const createStyles = (
       fontSize: SIZES.text18,
       fontWeight: FONT_WEIGHTS.bold,
       color: colors.primaryText,
+      fontFamily: FONT_FAMILIES.display,
     },
     headerRight: {
       flexDirection: 'row',
@@ -615,48 +804,105 @@ const createStyles = (
     },
     themeToggle: {
       padding: SPACING.sm,
-    },
-    heroSection: {
-      paddingTop: SPACING.lg,
-      paddingBottom: SPACING.lg,
-      backgroundColor: colors.background,
-    },
-    heroContent: {
-      width: '100%',
-      maxWidth: 560,
-      alignSelf: 'center',
-      paddingHorizontal: SPACING.page,
+      borderRadius: BORDER_RADIUS.full,
+      backgroundColor: chrome.chip.backgroundColor,
+      borderWidth: 1,
+      borderColor: chrome.chip.borderColor,
     },
     scanLimitsSection: {
-      paddingHorizontal: SPACING.page,
-      paddingTop: SPACING.md,
+      paddingHorizontal: HOME_HORIZONTAL_PADDING,
+      paddingTop: SPACING.lg,
     },
-    scanLimitsGrid: {
+    scanRailShell: {
+      paddingHorizontal: SPACING.sm,
+      paddingVertical: SPACING.md,
+      gap: SPACING.md,
+      borderRadius: BORDER_RADIUS.hero,
+      backgroundColor: chrome.elevatedSurface.backgroundColor,
+      borderWidth: 1,
+      borderColor: chrome.elevatedSurface.borderColor,
+      ...obsidianScanSurface.shadowStyle,
+    },
+    scanSectionHeaderCard: {
       flexDirection: 'row',
-      flexWrap: 'wrap',
-      columnGap: SPACING.sm,
-      rowGap: SPACING.sm,
-      justifyContent: scanGridColumns === 3 ? 'space-between' : 'flex-start',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: SPACING.md,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.sm,
+      borderRadius: BORDER_RADIUS.xl,
+      backgroundColor: chrome.mutedSurface.backgroundColor,
+      borderWidth: 1,
+      borderColor: chrome.mutedSurface.borderColor,
+    },
+    scanSectionHeaderCopy: {
+      flex: 1,
+      minWidth: 0,
+      gap: 2,
+    },
+    scanSectionEyebrow: {
+      fontSize: SIZES.text16,
+      fontWeight: FONT_WEIGHTS.bold,
+      color: colors.primaryText,
+      fontFamily: FONT_FAMILIES.display,
+    },
+    scanSectionSupport: {
+      fontSize: SIZES.text12,
+      lineHeight: 18,
+      color: colors.gray,
+    },
+    scanSectionAvailabilityPill: {
+      minWidth: 86,
+      borderRadius: BORDER_RADIUS.xl,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.sm,
+      alignItems: 'center',
+      backgroundColor: chrome.chipActive.backgroundColor,
+      borderWidth: 1,
+      borderColor: chrome.chipActive.borderColor,
+      gap: 2,
+    },
+    scanSectionAvailabilityValue: {
+      fontSize: SIZES.text18,
+      fontWeight: FONT_WEIGHTS.bold,
+      color: colors.primaryText,
+      fontFamily: FONT_FAMILIES.accent,
+    },
+    scanSectionAvailabilityLabel: {
+      fontSize: SIZES.text10,
+      fontWeight: FONT_WEIGHTS.medium,
+      color: colors.gray,
+      textAlign: 'center',
+    },
+    scanCardsGrid: {
+      width: '100%',
+      maxWidth: 420,
+      alignSelf: 'center',
+      flexDirection: 'row',
+      alignItems: 'stretch',
+      justifyContent: 'center',
+      gap: SPACING.sm,
     },
     scanLimitCardShell: {
-      width: scanCardWidth,
+      flex: 1,
       minWidth: 0,
-      borderRadius: BORDER_RADIUS.lg,
-      ...(isAndroidLight ? scanCardSurface?.shadowStyle : SHADOWS.card),
+      borderRadius: BORDER_RADIUS.xl,
+      ...(isAndroidLight ? scanCardSurface?.shadowStyle : obsidianScanSurface.shadowStyle),
     },
     scanLimitCardSurface: {
       minWidth: 0,
       flex: 1,
-      borderRadius: BORDER_RADIUS.lg,
-      padding: SPACING.md,
-      alignItems: 'stretch',
+      borderRadius: BORDER_RADIUS.xl,
+      paddingHorizontal: 6,
+      paddingVertical: SPACING.md,
+      alignItems: 'center',
       backgroundColor: isAndroidLight
         ? scanCardSurface?.backgroundColor
-        : colors.cardBackground,
-      borderWidth: isAndroidLight ? 1 : 0,
+        : obsidianScanSurface.backgroundColor,
+      borderWidth: 1,
       borderColor: isAndroidLight
         ? scanCardSurface?.borderColor
-        : 'transparent',
+        : obsidianScanSurface.borderColor,
       overflow: 'hidden',
     },
     scanLimitLabel: {
@@ -664,19 +910,24 @@ const createStyles = (
       fontWeight: FONT_WEIGHTS.semiBold,
       color: colors.primaryText,
       textAlign: 'center',
+      alignSelf: 'stretch',
       marginBottom: SPACING.sm,
       minWidth: 0,
+      fontFamily: FONT_FAMILIES.display,
     },
     superScanContainer: {
-      marginTop: SPACING.md,
+      width: '100%',
+      maxWidth: 420,
+      alignSelf: 'center',
+      marginTop: SPACING.xs,
     },
     productsSectionHeader: {
-      paddingHorizontal: SPACING.page,
+      paddingHorizontal: HOME_HORIZONTAL_PADDING,
       paddingTop: SPACING.xl,
       paddingBottom: SPACING.sm,
     },
     productItemContainer: {
-      paddingHorizontal: SPACING.page,
+      paddingHorizontal: HOME_HORIZONTAL_PADDING,
     },
     sectionTitle: {
       fontSize: SIZES.text18,
@@ -685,20 +936,21 @@ const createStyles = (
       marginBottom: SPACING.md,
     },
     quotaStateText: {
-      fontSize: SIZES.text16,
+      fontSize: SIZES.text12,
+      lineHeight: 17,
       color: colors.gray,
       textAlign: 'center',
-      paddingVertical: SPACING.md,
+      paddingVertical: SPACING.sm,
     },
     superQuotaStateCard: {
       borderRadius: BORDER_RADIUS.xl,
       padding: SPACING.lg,
-      backgroundColor: colors.cardBackground,
+      backgroundColor: obsidianScanSurface.backgroundColor,
       borderWidth: 1,
-      borderColor: withAlpha(colors.primary, 0.08),
+      borderColor: obsidianScanSurface.borderColor,
       alignItems: 'center',
       gap: SPACING.xs,
-      ...SHADOWS.card,
+      ...obsidianScanSurface.shadowStyle,
     },
     superQuotaStateTitle: {
       fontSize: SIZES.text16,
@@ -712,45 +964,139 @@ const createStyles = (
       color: colors.gray,
       textAlign: 'center',
     },
-    premiumBannerShell: {
-      marginHorizontal: SPACING.page,
-      marginTop: SPACING.xl,
+    superScanPromoShell: {
       borderRadius: BORDER_RADIUS.xl,
       ...(isAndroidLight
         ? premiumBannerSurface?.shadowStyle
-        : SHADOWS.cardHover),
+        : obsidianPremiumSurface.shadowStyle),
     },
-    premiumBannerSurface: {
+    superScanPromoSurface: {
       borderRadius: BORDER_RADIUS.xl,
       overflow: 'hidden',
       backgroundColor: isAndroidLight
         ? premiumBannerSurface?.backgroundColor
-        : 'transparent',
-      borderWidth: isAndroidLight ? 1 : 0,
+        : obsidianPremiumSurface.backgroundColor,
+      borderWidth: 1,
       borderColor: isAndroidLight
         ? premiumBannerSurface?.borderColor
-        : 'transparent',
+        : obsidianPremiumSurface.borderColor,
     },
-    premiumBannerGradient: {
-      flexDirection: 'row' as const,
-      alignItems: 'center' as const,
+    superScanPromoGradient: {
       padding: SPACING.lg,
-      gap: SPACING.md,
-      minWidth: 0,
+      gap: SPACING.lg,
     },
-    premiumBannerText: {
-      flex: 1,
-      minWidth: 0,
+    superScanPromoHeader: {
+      gap: SPACING.sm,
     },
-    premiumBannerTitle: {
-      fontSize: SIZES.text16,
+    superScanPromoBadge: {
+      flexDirection: 'row',
+      alignSelf: 'flex-start',
+      alignItems: 'center',
+      gap: SPACING.xs,
+      paddingHorizontal: SPACING.sm,
+      paddingVertical: 6,
+      borderRadius: BORDER_RADIUS.pill,
+      backgroundColor: withAlpha(colors.white, isDark ? 0.08 : 0.16),
+      borderWidth: 1,
+      borderColor: withAlpha(colors.white, isDark ? 0.12 : 0.2),
+    },
+    superScanPromoBadgeText: {
+      fontSize: SIZES.text10,
       fontWeight: FONT_WEIGHTS.bold,
-      color: '#FFFFFF',
+      color: colors.white,
+      textTransform: 'uppercase',
+      letterSpacing: 0.7,
+      fontFamily: FONT_FAMILIES.accent,
     },
-    premiumBannerSubtitle: {
+    superScanPromoTitle: {
+      fontSize: SIZES.text18,
+      lineHeight: 22,
+      fontWeight: FONT_WEIGHTS.bold,
+      color: colors.white,
+      fontFamily: FONT_FAMILIES.display,
+    },
+    superScanPromoSubtitle: {
       fontSize: SIZES.text12,
+      lineHeight: 18,
       color: withAlpha(colors.white, isAndroidLight ? 0.88 : 0.85),
-      marginTop: 2,
+    },
+    superScanPromoFooter: {
+      gap: SPACING.md,
+    },
+    superScanPromoBenefits: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: SPACING.xs,
+    },
+    superScanPromoBenefitChip: {
+      paddingHorizontal: SPACING.sm,
+      paddingVertical: 5,
+      borderRadius: BORDER_RADIUS.pill,
+      backgroundColor: withAlpha(colors.white, isDark ? 0.08 : 0.16),
+      borderWidth: 1,
+      borderColor: withAlpha(colors.white, isDark ? 0.12 : 0.2),
+    },
+    superScanPromoBenefitChipText: {
+      fontSize: SIZES.text10,
+      fontWeight: FONT_WEIGHTS.bold,
+      color: colors.white,
+      textTransform: 'uppercase',
+      letterSpacing: 0.7,
+      fontFamily: FONT_FAMILIES.accent,
+    },
+    superScanPromoCta: {
+      minHeight: 48,
+      alignSelf: 'flex-start',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.xs,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.sm,
+      borderRadius: BORDER_RADIUS.button,
+      backgroundColor: withAlpha(colors.white, 0.96),
+    },
+    superScanPromoCtaText: {
+      fontSize: SIZES.text14,
+      fontWeight: FONT_WEIGHTS.bold,
+      color: colors.primaryText,
+      fontFamily: FONT_FAMILIES.display,
+    },
+    companionSection: {
+      paddingHorizontal: HOME_HORIZONTAL_PADDING,
+      paddingTop: SPACING.xl,
+      gap: SPACING.md,
+    },
+    secondaryModulesSection: {
+      paddingHorizontal: HOME_HORIZONTAL_PADDING,
+      paddingTop: SPACING.xl,
+      gap: SPACING.md,
+    },
+    sectionHeading: {
+      gap: SPACING.xs,
+    },
+    sectionEyebrow: {
+      fontSize: SIZES.text12,
+      fontWeight: FONT_WEIGHTS.bold,
+      color: chrome.accentColor,
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+      fontFamily: FONT_FAMILIES.display,
+    },
+    sectionSupportText: {
+      fontSize: SIZES.text14,
+      lineHeight: 20,
+      color: withAlpha(colors.primaryText, isDark ? 0.72 : 0.64),
+    },
+    companionCardShell: {
+      borderRadius: BORDER_RADIUS.hero,
+      ...companionSurface,
+    },
+    companionCardSurface: {
+      borderRadius: BORDER_RADIUS.hero,
+      borderWidth: 1,
+      borderColor: companionSurface.borderColor,
+      backgroundColor: companionSurface.backgroundColor,
+      overflow: 'hidden',
     },
   });
 };

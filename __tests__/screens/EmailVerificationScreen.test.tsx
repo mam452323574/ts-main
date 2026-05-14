@@ -27,8 +27,9 @@ jest.mock('@/contexts/LanguageContext', () => ({
     locale: 'fr',
     t: (key: string, options: Record<string, string> = {}) => {
       const translations: Record<string, string> = {
-        'auth.verify_title': 'Verifiez votre email',
-        'auth.verify_subtitle': 'Un code a ete envoye a votre adresse email',
+        'auth.verify_title': 'Encore une etape avant votre premier scan',
+        'auth.verify_subtitle':
+          'Entrez le code envoye a votre email pour activer votre compte.',
         'auth.code_expired': 'Le code expire dans',
         'auth.code_incomplete': 'Code incomplet',
         'auth.code_invalid': 'Code incorrect ou expire',
@@ -38,9 +39,9 @@ jest.mock('@/contexts/LanguageContext', () => ({
         'auth.resend_in': `Renvoyer dans ${options.seconds ?? ''}s`,
         'auth.verify_btn': 'Verifier',
         'auth.verifying': 'Verification...',
-        'auth.verification_sent_title': 'Email verifie !',
+        'auth.verification_sent_title': 'Email verifie',
         'auth.verification_sent_subtitle_signup':
-          'Finalisation de votre compte...',
+          'On prepare votre premier scan...',
         'auth.cancel_verification_title': 'Annuler la vérification ?',
         'auth.cancel_verification_message':
           'Vous serez déconnecté et pourrez reprendre plus tard depuis la connexion.',
@@ -123,7 +124,9 @@ describe('EmailVerificationScreen', () => {
   it('displays email verification title', () => {
     render(<EmailVerificationScreen />);
     
-    expect(screen.getByText('Verifiez votre email')).toBeTruthy();
+    expect(
+      screen.getByText('Encore une etape avant votre premier scan'),
+    ).toBeTruthy();
   });
 
   it('displays email address', () => {

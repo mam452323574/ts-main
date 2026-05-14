@@ -49,6 +49,43 @@ function createQueueResponse() {
   };
 }
 
+function createModerationItem(
+  contentId: string,
+  contentType: 'post' | 'comment' = 'post',
+) {
+  return {
+    content_type: contentType,
+    content_id: contentId,
+    author_id: null,
+    author_username: null,
+    category: null,
+    content_text: null,
+    asset_url: null,
+    moderation_state: 'pending' as const,
+    moderation_reason: null,
+    moderation_provider: null,
+    created_at: '2026-04-18T10:00:00.000Z',
+    open_reports: 0,
+    total_reports_24h: 0,
+    unique_reporters_24h: 0,
+    unique_viewer_count: 0,
+    reason_codes: [],
+    last_reported_at: null,
+    moderation_queued_at: null,
+    moderation_claimed_at: null,
+    moderation_completed_at: null,
+    moderation_attempt_count: 0,
+    moderation_last_error: null,
+    raw_like_count: 0,
+    raw_dislike_count: 0,
+    admin_like_adjustment: 0,
+    admin_dislike_adjustment: 0,
+    effective_like_count: 0,
+    effective_dislike_count: 0,
+    author_active_bans: [],
+  };
+}
+
 describe('useSocialAdminModeration', () => {
   afterEach(() => {
     cleanup();
@@ -259,6 +296,79 @@ describe('useSocialAdminModeration', () => {
       post_id: 'post-1',
       admin_like_adjustment: 3,
       admin_dislike_adjustment: -4,
+    });
+  });
+
+  it('bulk approves visible items with a single invalidation fan-out and returns failed ids', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false, gcTime: Infinity },
+        mutations: { retry: false, gcTime: Infinity },
+      },
+    });
+    const invalidateQueriesSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    mockModerateSocialContent
+      .mockResolvedValueOnce({
+        success: true,
+        target_type: 'post',
+        target_id: 'post-1',
+        action: 'approve',
+        moderation_state: 'approved',
+        affected_reports: 0,
+        event_id: 'event-1',
+      })
+      .mockRejectedValueOnce(new Error('comment approval failed'));
+
+    const { result } = renderHook(
+      () => useSocialAdminModeration('needs_review', true),
+      {
+        wrapper: createWrapper(queryClient),
+      },
+    );
+
+    await waitFor(() => {
+      expect(mockFetchSocialAdminModerationQueue).toHaveBeenCalledWith('needs_review');
+    });
+
+    let summary:
+      | {
+          requestedCount: number;
+          approvedCount: number;
+          failedIds: string[];
+        }
+      | undefined;
+    await act(async () => {
+      summary = await result.current.bulkApproveContentMutation.mutateAsync([
+        createModerationItem('post-1', 'post'),
+        createModerationItem('comment-1', 'comment'),
+      ]);
+    });
+
+    expect(summary).toEqual({
+      requestedCount: 2,
+      approvedCount: 1,
+      failedIds: ['comment-1'],
+    });
+    expect(mockModerateSocialContent).toHaveBeenNthCalledWith(1, {
+      target_type: 'post',
+      target_post_id: 'post-1',
+      action: 'approve',
+    });
+    expect(mockModerateSocialContent).toHaveBeenNthCalledWith(2, {
+      target_type: 'comment',
+      target_comment_id: 'comment-1',
+      action: 'approve',
+    });
+    expect(invalidateQueriesSpy).toHaveBeenCalledTimes(3);
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+      queryKey: ['socialAdminModeration'],
+    });
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+      queryKey: ['socialFeed'],
+    });
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+      queryKey: ['socialComments'],
     });
   });
 });

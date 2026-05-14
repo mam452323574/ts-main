@@ -98,4 +98,43 @@ describe('phase2 utils', () => {
 
     expect(hashFr).not.toBe(hashEn);
   });
+
+  it('ignores volatile generated_at values inside coach payload hashes', async () => {
+    const hashA = await buildNormalizedPayloadHash({
+      payload: {
+        prompt_type: 'latest_scan',
+        generated_at: '2026-04-26T08:00:00.000Z',
+        selected_scan: {
+          scan_id: 'scan-1',
+        },
+      },
+      persona_key: 'gentle_supportive',
+      locale: 'fr',
+    });
+    const hashB = await buildNormalizedPayloadHash({
+      payload: {
+        prompt_type: 'latest_scan',
+        generated_at: '2026-04-26T08:01:00.000Z',
+        selected_scan: {
+          scan_id: 'scan-1',
+        },
+      },
+      persona_key: 'gentle_supportive',
+      locale: 'fr',
+    });
+    const hashC = await buildNormalizedPayloadHash({
+      payload: {
+        prompt_type: 'latest_scan',
+        generated_at: '2026-04-26T08:01:00.000Z',
+        selected_scan: {
+          scan_id: 'scan-2',
+        },
+      },
+      persona_key: 'gentle_supportive',
+      locale: 'fr',
+    });
+
+    expect(hashA).toBe(hashB);
+    expect(hashA).not.toBe(hashC);
+  });
 });

@@ -3,7 +3,7 @@ import { StyleSheet } from 'react-native';
 import { render } from '@testing-library/react-native';
 
 import { SuperScanAreaCard } from '@/components/SuperScanAreaCard';
-import { LIGHT_COLORS } from '@/constants/theme';
+import { LIGHT_COLORS, mixColors, withAlpha } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import { resolveSuperScanAreaTheme } from '@/utils/superScanVisualTheme';
 
@@ -115,6 +115,12 @@ describe('SuperScanAreaCard', () => {
     );
 
     expect(waterRootStyle.borderColor).not.toBe(contourRootStyle.borderColor);
+    expect(waterRootStyle.backgroundColor).toBe(
+      mixColors(LIGHT_COLORS.surfaceElevated, waterTheme.accentColor, 0.012),
+    );
+    expect(waterRootStyle.borderColor).toBe(
+      withAlpha(waterTheme.accentColor, 0.045),
+    );
     expect(waterBadgeStyle.backgroundColor).not.toBe(
       contourBadgeStyle.backgroundColor,
     );
@@ -175,5 +181,81 @@ describe('SuperScanAreaCard', () => {
       confidenceTileStyle.backgroundColor,
     );
     expect(waterValueStyle.color).not.toBe(confidenceValueStyle.color);
+  });
+
+  it('uses full-width readable metric tiles on mobile result widths', () => {
+    useWindowDimensionsSpy.mockReturnValue({
+      width: 390,
+      height: 844,
+      scale: 3,
+      fontScale: 1,
+    });
+
+    const { getAllByText, getByTestId } = render(
+      <SuperScanAreaCard
+        area={{
+          id: 'readable-mobile',
+          areaName: 'Bas du visage',
+          dominantType: 'Rétention d’eau',
+          subcutaneousFatPercent: '18%',
+          waterRetentionPercent: '33%',
+          definitionPercent: '22%',
+          confidencePercent: '79%',
+          explanation: 'Signal hydrique localisé.',
+          actionableAdvice: 'Hydratation régulière.',
+        }}
+        labels={{
+          ...labels,
+          waterRetention: 'Rétention d’eau',
+          definition: 'Définition',
+        }}
+        testID="area-card-readable"
+      />,
+    );
+
+    const waterTileStyle = StyleSheet.flatten(
+      getByTestId('area-card-readable-water-retention-tile').props.style,
+    );
+    const badgeStyle = StyleSheet.flatten(
+      getByTestId('area-card-readable-dominant-badge').props.style,
+    );
+    const waterLabel = getAllByText('Rétention d’eau').find(
+      (node) => node.props.numberOfLines === 1,
+    );
+
+    expect(waterTileStyle.flexBasis).toBe('100%');
+    expect(waterTileStyle.minWidth).toBe(0);
+    expect(badgeStyle.width).toBe('100%');
+    expect(waterLabel?.props.numberOfLines).toBe(1);
+    expect(waterLabel?.props.adjustsFontSizeToFit).toBe(true);
+    expect(waterLabel?.props.minimumFontScale).toBe(0.82);
+  });
+
+  it('renders a premium teaser without leaking area details when locked', () => {
+    const { getByTestId, getByText, queryByText } = render(
+      <SuperScanAreaCard
+        area={{
+          id: 'locked-area',
+          areaName: 'Abdomen',
+          dominantType: 'Subcutaneous',
+          subcutaneousFatPercent: '31%',
+          waterRetentionPercent: '14%',
+          definitionPercent: '46%',
+          confidencePercent: '84%',
+          explanation: 'Storage is more visible through the midsection.',
+          actionableAdvice: 'Keep steps high and recovery steady.',
+        }}
+        labels={labels}
+        lockedTitle="Area analysis"
+        premiumRenderState="locked"
+        testID="area-card-locked"
+      />,
+    );
+
+    expect(getByTestId('area-card-locked')).toBeTruthy();
+    expect(getByText('Area analysis')).toBeTruthy();
+    expect(queryByText('Abdomen')).toBeNull();
+    expect(queryByText('31%')).toBeNull();
+    expect(queryByText('Storage is more visible through the midsection.')).toBeNull();
   });
 });

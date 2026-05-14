@@ -72,15 +72,27 @@ describe('ResultQuickStatCard', () => {
     });
   });
 
-  it('keeps text values multi-line and numeric values fitted on one line', () => {
+  it('fits short text values on one line and preserves longer text values', () => {
     const { getByTestId, rerender } = render(
-      <ResultQuickStatCard label="Verdict" value="Very long text value" valueVariant="text" />
+      <ResultQuickStatCard
+        label="Face shape"
+        value="Oval"
+        valueMaxLines={2}
+        valueVariant="text"
+      />
     );
+
+    expect(getByTestId('result-quick-stat-value').props.numberOfLines).toBe(1);
+    expect(getByTestId('result-quick-stat-value').props.adjustsFontSizeToFit).toBe(true);
+    expect(getByTestId('result-quick-stat-value').props.minimumFontScale).toBe(0.82);
+    expect(getByTestId('result-quick-stat-value').props.textBreakStrategy).toBe('simple');
+    expect(getByTestId('result-quick-stat-label').props.minimumFontScale).toBe(0.82);
+
+    rerender(<ResultQuickStatCard label="Verdict" value="Very long text value" valueVariant="text" />);
 
     expect(getByTestId('result-quick-stat-value').props.numberOfLines).toBe(3);
     expect(getByTestId('result-quick-stat-value').props.adjustsFontSizeToFit).toBeUndefined();
     expect(getByTestId('result-quick-stat-value').props.minimumFontScale).toBeUndefined();
-    expect(getByTestId('result-quick-stat-value').props.textBreakStrategy).toBe('simple');
 
     rerender(<ResultQuickStatCard label="Calories" value="1234" valueVariant="numeric" />);
 
@@ -115,23 +127,24 @@ describe('ResultQuickStatCard', () => {
       getByTestId('result-quick-stat-value').props.style
     );
 
-    expect(rootStyle.minHeight).toBe(104);
-    expect(rootStyle.gap).toBe(9);
+    expect(rootStyle.minHeight).toBe(112);
+    expect(rootStyle.gap).toBe(10);
     expect(rootStyle.flexDirection).toBe('row');
+    expect(rootStyle.flexBasis).toBe('100%');
     expect(rootStyle.alignItems).toBe('center');
-    expect(rootStyle.paddingHorizontal).toBe(12);
-    expect(rootStyle.paddingVertical).toBe(8);
-    expect(iconWrapStyle.width).toBe(54);
-    expect(iconWrapStyle.height).toBe(54);
+    expect(rootStyle.paddingHorizontal).toBe(14);
+    expect(rootStyle.paddingVertical).toBe(10);
+    expect(iconWrapStyle.width).toBe(58);
+    expect(iconWrapStyle.height).toBe(58);
     expect(contentStyle.justifyContent).toBe('center');
-    expect(contentStyle.gap).toBe(2);
-    expect(labelStyle.fontSize).toBe(13);
+    expect(contentStyle.gap).toBe(3);
+    expect(labelStyle.fontSize).toBe(12);
     expect(labelStyle.lineHeight).toBe(15);
-    expect(labelStyle.letterSpacing).toBe(0.4);
-    expect(valueStyle.fontSize).toBe(18);
-    expect(valueStyle.lineHeight).toBe(22);
+    expect(labelStyle.letterSpacing).toBe(0);
+    expect(valueStyle.fontSize).toBe(20);
+    expect(valueStyle.lineHeight).toBe(24);
     expect(getByTestId('result-quick-stat-custom-icon')).toHaveTextContent(
-      'size:30|stroke:2.2'
+      'size:32|stroke:2.2'
     );
   });
 
@@ -154,13 +167,13 @@ describe('ResultQuickStatCard', () => {
     );
 
     expect(rootStyle.width).toBe('100%');
-    expect(rootStyle.minHeight).toBe(104);
-    expect(iconWrapStyle.width).toBe(56);
-    expect(iconWrapStyle.height).toBe(56);
+    expect(rootStyle.minHeight).toBe(112);
+    expect(iconWrapStyle.width).toBe(60);
+    expect(iconWrapStyle.height).toBe(60);
     expect(getByTestId('result-quick-stat-value').props.numberOfLines).toBe(3);
     expect(getByTestId('result-quick-stat-label').props.numberOfLines).toBe(2);
     expect(getByTestId('result-quick-stat-custom-icon')).toHaveTextContent(
-      'size:32|stroke:2.2'
+      'size:34|stroke:2.2'
     );
   });
 
@@ -188,19 +201,19 @@ describe('ResultQuickStatCard', () => {
     const labelStyle = StyleSheet.flatten(getByTestId('result-quick-stat-label').props.style);
     const valueStyle = StyleSheet.flatten(getByTestId('result-quick-stat-value').props.style);
 
-    expect(rootStyle.paddingHorizontal).toBe(12);
-    expect(rootStyle.paddingVertical).toBe(8);
-    expect(rootStyle.minHeight).toBe(100);
-    expect(rootStyle.gap).toBe(8);
-    expect(iconWrapStyle.width).toBe(50);
-    expect(iconWrapStyle.height).toBe(50);
+    expect(rootStyle.paddingHorizontal).toBe(13);
+    expect(rootStyle.paddingVertical).toBe(9);
+    expect(rootStyle.minHeight).toBe(104);
+    expect(rootStyle.gap).toBe(9);
+    expect(iconWrapStyle.width).toBe(52);
+    expect(iconWrapStyle.height).toBe(52);
     expect(labelStyle.fontSize).toBe(12);
-    expect(labelStyle.lineHeight).toBe(15);
-    expect(labelStyle.letterSpacing).toBe(0.3);
-    expect(valueStyle.fontSize).toBe(16);
-    expect(valueStyle.lineHeight).toBe(20);
+    expect(labelStyle.lineHeight).toBe(14);
+    expect(labelStyle.letterSpacing).toBe(0);
+    expect(valueStyle.fontSize).toBe(17);
+    expect(valueStyle.lineHeight).toBe(21);
     expect(getByTestId('result-quick-stat-custom-icon')).toHaveTextContent(
-      'size:27|stroke:2.2'
+      'size:29|stroke:2.2'
     );
   });
 
@@ -223,21 +236,21 @@ describe('ResultQuickStatCard', () => {
     const labelStyle = StyleSheet.flatten(getByTestId('result-quick-stat-label').props.style);
     const valueStyle = StyleSheet.flatten(getByTestId('result-quick-stat-value').props.style);
 
-    expect(rootStyle.paddingHorizontal).toBe(10);
-    expect(rootStyle.paddingVertical).toBe(7);
-    expect(rootStyle.minHeight).toBe(94);
-    expect(rootStyle.borderRadius).toBe(16);
-    expect(rootStyle.gap).toBe(7);
+    expect(rootStyle.paddingHorizontal).toBe(12);
+    expect(rootStyle.paddingVertical).toBe(8);
+    expect(rootStyle.minHeight).toBe(100);
+    expect(rootStyle.borderRadius).toBe(18);
+    expect(rootStyle.gap).toBe(8);
     expect(rootStyle.flexDirection).toBe('row');
     expect(rootStyle.alignItems).toBe('center');
-    expect(rootStyle.flexBasis).toBe('47%');
-    expect(iconWrapStyle.width).toBe(46);
-    expect(iconWrapStyle.height).toBe(46);
+    expect(rootStyle.flexBasis).toBe('100%');
+    expect(iconWrapStyle.width).toBe(48);
+    expect(iconWrapStyle.height).toBe(48);
     expect(labelStyle.fontSize).toBe(12);
-    expect(labelStyle.lineHeight).toBe(15);
-    expect(labelStyle.letterSpacing).toBe(0.3);
-    expect(valueStyle.fontSize).toBe(16);
-    expect(valueStyle.lineHeight).toBe(20);
+    expect(labelStyle.lineHeight).toBe(14);
+    expect(labelStyle.letterSpacing).toBe(0);
+    expect(valueStyle.fontSize).toBe(17);
+    expect(valueStyle.lineHeight).toBe(21);
   });
 
   it('applies semantic theming to the quick stat surface, icon lane, and value', () => {

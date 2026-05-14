@@ -6,6 +6,8 @@ export { useExercises, EXERCISES_QUERY_KEY } from './useExercises';
 export { 
   useScanEligibility, 
   useAllScanEligibility, 
+  useScanEligibilityBatch,
+  SCAN_ELIGIBILITY_BATCH_QUERY_KEY,
   SCAN_ELIGIBILITY_QUERY_KEY 
 } from './useScanEligibility';
 export { useNotificationsQuery, NOTIFICATIONS_QUERY_KEY, fetchNotifications } from './useNotifications';
@@ -58,6 +60,11 @@ export {
   COACH_QUOTA_QUERY_KEY,
   getCoachQuotaQueryKey,
 } from './useCoachQuota';
+export {
+  useCoachScreenSnapshot,
+  COACH_SCREEN_SNAPSHOT_QUERY_KEY,
+  getCoachScreenSnapshotQueryKey,
+} from './useCoachScreenSnapshot';
 export { useGrowthExperience, GROWTH_EXPERIENCE_QUERY_KEY } from './useGrowthExperience';
 export { useCoachGeneration } from './useCoachGeneration';
 export {

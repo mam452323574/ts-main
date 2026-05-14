@@ -74,6 +74,39 @@ jest.mock('@/hooks/queries', () => ({
     userId ?? 'anonymous',
   ],
 }));
+jest.mock('@/hooks/queries/useFeatureFlags', () => ({
+  useFeatureFlags: () => ({
+    data: {
+      social_enabled: false,
+      coach_enabled: false,
+      entry_offer_enabled: true,
+      social_comments_enabled: false,
+      entry_offer_offering_id: 'entry-offer',
+      rollout_percentage: 100,
+    },
+  }),
+}));
+jest.mock('@/hooks/queries/useGrowthExperience', () => ({
+  useGrowthExperience: () => ({
+    data: {
+      user_id: 'user-1',
+      growth_state: 'entry_offer_ready',
+      entry_offer_eligible: true,
+      entry_offer_shown_at: null,
+      entry_offer_dismissed_at: null,
+      entry_offer_claimed_at: null,
+      entry_offer_offering_id: 'entry-offer',
+      coach_seen_at: null,
+      coach_cooldown_until: null,
+      growth_state_updated_at: '2026-04-06T08:00:00.000Z',
+      updated_at: '2026-04-06T08:00:00.000Z',
+    },
+  }),
+  GROWTH_EXPERIENCE_QUERY_KEY: (userId?: string | null) => [
+    'growthExperience',
+    userId ?? 'anonymous',
+  ],
+}));
 
 jest.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({

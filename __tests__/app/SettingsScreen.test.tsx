@@ -126,6 +126,9 @@ jest.mock('@/contexts/NotificationContext', () => ({
 jest.mock('@/hooks/queries', () => ({
   useAllScanEligibility: () => mockUseAllScanEligibility(),
 }));
+jest.mock('@/hooks/queries/useScanEligibility', () => ({
+  useAllScanEligibility: () => mockUseAllScanEligibility(),
+}));
 
 jest.mock('@/hooks/useCustomAlert', () => ({
   useCustomAlert: () => ({

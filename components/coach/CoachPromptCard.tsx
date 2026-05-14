@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image } from 'expo-image';
 import { Check, ChevronRight, Crown, Lock } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -51,8 +52,12 @@ export function CoachPromptCard({
   testID,
 }: CoachPromptCardProps) {
   const { colors, isDark } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const { icon: PromptIcon, accentColor } = getCoachPromptVisual(promptType);
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const {
+    icon: PromptIcon,
+    accentColor,
+    artworkSource,
+  } = getCoachPromptVisual(promptType);
   const promptPalette = useMemo(
     () => getCoachPromptPalette(promptType, colors, isDark),
     [colors, isDark, promptType],
@@ -75,8 +80,14 @@ export function CoachPromptCard({
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,
-        isCompact ? styles.cardCompact : styles.cardFeatured,
-        isSelector ? styles.cardSelector : null,
+        isSelector
+          ? [
+              styles.cardSelector,
+              isCompact ? styles.cardSelectorTile : styles.cardSelectorWide,
+            ]
+          : isCompact
+            ? styles.cardCompact
+            : styles.cardFeatured,
         {
           backgroundColor: isSelector
             ? pressed && !isDisabled
@@ -87,7 +98,7 @@ export function CoachPromptCard({
             : mixColors(
                 neutralSurface,
                 accentColor,
-                pressed && !isDisabled ? 0.16 : selected ? 0.14 : 0.08,
+                pressed && !isDisabled ? 0.1 : selected ? 0.085 : 0.045,
               ),
           borderColor: locked
             ? withAlpha(goldColor, 0.42)
@@ -100,7 +111,7 @@ export function CoachPromptCard({
               : mixColors(
                   neutralBorder,
                   accentColor,
-                  selected ? 0.34 : pressed && !isDisabled ? 0.22 : 0.18,
+                  selected ? 0.22 : pressed && !isDisabled ? 0.16 : 0.12,
                 ),
         },
         selected ? styles.cardSelected : null,
@@ -119,7 +130,7 @@ export function CoachPromptCard({
             {
               backgroundColor: withAlpha(
                 accentColor,
-                busy ? 0.4 : selected ? 0.9 : 0.72,
+                busy ? 0.28 : selected ? 0.62 : 0.46,
               ),
             },
           ]}
@@ -142,7 +153,25 @@ export function CoachPromptCard({
             testID={testID ? `${testID}-backdrop` : undefined}
           />
 
-          {selected ? (
+          {busy ? (
+            <View
+              style={[
+                styles.selectedFloatingBadge,
+                styles.busyFloatingBadge,
+                {
+                  backgroundColor: promptPalette.selectorSelectedIconBackgroundColor,
+                  borderColor: promptPalette.selectorSelectedBorderColor,
+                },
+              ]}
+              testID={testID ? `${testID}-busy-badge` : undefined}
+            >
+              <ActivityIndicator
+                color={promptPalette.selectorIconColor}
+                size="small"
+                testID={testID ? `${testID}-spinner` : undefined}
+              />
+            </View>
+          ) : selected ? (
             <View
               style={[
                 styles.selectedFloatingBadge,
@@ -164,7 +193,35 @@ export function CoachPromptCard({
 
           <View
             style={[
+              styles.selectorArtworkFrame,
+              isCompact
+                ? styles.selectorArtworkFrameTile
+                : styles.selectorArtworkFrameWide,
+            ]}
+            testID={testID ? `${testID}-artwork-frame` : undefined}
+          >
+            <Image
+              source={artworkSource}
+              contentFit="cover"
+              style={styles.selectorArtwork}
+              testID={testID ? `${testID}-artwork` : undefined}
+            />
+            <LinearGradient
+              colors={[
+                withAlpha(colors.background, 0),
+                withAlpha(colors.background, isDark ? 0.84 : 0.46),
+              ]}
+              pointerEvents="none"
+              style={styles.selectorArtworkGradient}
+            />
+          </View>
+
+          <View
+            style={[
               styles.selectorIconShell,
+              isCompact
+                ? styles.selectorIconShellTile
+                : styles.selectorIconShellWide,
               {
                 backgroundColor: selected
                   ? promptPalette.selectorSelectedIconBackgroundColor
@@ -181,17 +238,26 @@ export function CoachPromptCard({
             />
           </View>
 
-          <Text
-            numberOfLines={2}
-            style={[styles.title, styles.titleSelectorTile]}
-          >
-            {title}
-          </Text>
-          {subtitle ? (
-            <Text numberOfLines={3} style={styles.subtitleSelectorTile}>
-              {subtitle}
+          <View style={styles.copySelector}>
+            <Text
+              numberOfLines={2}
+              style={[
+                styles.title,
+                styles.titleSelectorTile,
+                !isCompact ? styles.titleSelectorWide : null,
+              ]}
+            >
+              {title}
             </Text>
-          ) : null}
+            {subtitle ? (
+              <Text
+                numberOfLines={isCompact ? 3 : 2}
+                style={styles.subtitleSelectorTile}
+              >
+                {subtitle}
+              </Text>
+            ) : null}
+          </View>
         </>
       ) : (
         <>
@@ -200,8 +266,8 @@ export function CoachPromptCard({
               styles.iconShell,
               isCompact ? styles.iconShellCompact : null,
               {
-                backgroundColor: mixColors(neutralSurface, accentColor, 0.2),
-                borderColor: withAlpha(accentColor, 0.22),
+                backgroundColor: mixColors(neutralSurface, accentColor, 0.12),
+                borderColor: withAlpha(accentColor, 0.14),
               },
             ]}
             testID={testID ? `${testID}-icon` : undefined}
@@ -211,7 +277,7 @@ export function CoachPromptCard({
                 styles.iconInner,
                 isCompact ? styles.iconInnerCompact : null,
                 {
-                  backgroundColor: withAlpha(accentColor, 0.1),
+                  backgroundColor: withAlpha(accentColor, 0.065),
                 },
               ]}
             >
@@ -246,8 +312,8 @@ export function CoachPromptCard({
               styles.trailing,
               isCompact ? styles.trailingCompact : null,
               {
-                backgroundColor: withAlpha(accentColor, 0.12),
-                borderColor: withAlpha(accentColor, 0.18),
+                backgroundColor: withAlpha(accentColor, 0.07),
+                borderColor: withAlpha(accentColor, 0.12),
               },
             ]}
             testID={testID ? `${testID}-trailing` : undefined}
@@ -314,14 +380,14 @@ export function CoachPromptCard({
   );
 }
 
-const createStyles = (colors: any) =>
+const createStyles = (colors: any, isDark: boolean) =>
   StyleSheet.create({
     card: {
       position: 'relative',
       flexDirection: 'row',
       alignItems: 'center',
       gap: SPACING.md,
-      borderRadius: BORDER_RADIUS.xl,
+      borderRadius: BORDER_RADIUS.xl + 2,
       borderWidth: 1,
       ...SHADOWS.card,
     },
@@ -329,12 +395,21 @@ const createStyles = (colors: any) =>
       flexDirection: 'column',
       alignItems: 'flex-start',
       justifyContent: 'flex-start',
-      gap: SPACING.sm,
-      paddingLeft: SPACING.md,
-      paddingRight: SPACING.md,
-      paddingVertical: SPACING.md,
-      minHeight: 164,
+      gap: SPACING.md,
+      paddingHorizontal: SPACING.md,
+      paddingTop: SPACING.sm + 2,
+      paddingBottom: SPACING.md + 2,
       overflow: 'hidden',
+    },
+    cardSelectorTile: {
+      flexBasis: '100%',
+      flexGrow: 1,
+      minWidth: 0,
+      minHeight: 226,
+    },
+    cardSelectorWide: {
+      width: '100%',
+      minHeight: 226,
     },
     cardFeatured: {
       paddingLeft: SPACING.lg + 2,
@@ -349,7 +424,7 @@ const createStyles = (colors: any) =>
       minHeight: 78,
     },
     cardSelected: {
-      transform: [{ translateY: -1 }],
+      transform: [{ translateY: -2 }],
     },
     cardLocked: {
       // No global opacity here — a lockScrim atop the content does the dimming
@@ -446,7 +521,8 @@ const createStyles = (colors: any) =>
     },
     copySelector: {
       width: '100%',
-      gap: 2,
+      gap: SPACING.xs + 1,
+      paddingHorizontal: SPACING.xs,
     },
     title: {
       fontSize: SIZES.text16,
@@ -501,39 +577,95 @@ const createStyles = (colors: any) =>
     },
     selectedFloatingBadge: {
       position: 'absolute',
-      top: 8,
-      right: 8,
-      width: 22,
-      height: 22,
-      borderRadius: 11,
+      top: 10,
+      right: 10,
+      width: 26,
+      height: 26,
+      borderRadius: 13,
       borderWidth: 2,
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 2,
+      zIndex: 4,
+    },
+    busyFloatingBadge: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
     },
     selectorIconShell: {
-      width: 52,
-      height: 52,
+      width: 44,
+      height: 44,
       borderRadius: BORDER_RADIUS.xl,
       alignItems: 'center',
       justifyContent: 'center',
+      marginTop: -34,
+      marginLeft: SPACING.xs,
+      borderWidth: 1,
+      borderColor: withAlpha(colors.white, 0.12),
+      zIndex: 2,
+    },
+    selectorIconShellTile: {
+      width: 44,
+      height: 44,
+      borderRadius: BORDER_RADIUS.lg,
+    },
+    selectorIconShellWide: {
+      width: 48,
+      height: 48,
+      borderRadius: BORDER_RADIUS.xl,
     },
     selectorBackdrop: {
       position: 'absolute',
       top: 0,
       left: 0,
       right: 0,
-      height: 110,
+      bottom: 0,
+    },
+    selectorArtworkFrame: {
+      alignSelf: 'stretch',
+      overflow: 'hidden',
+      marginTop: -(SPACING.sm + 2),
+      marginHorizontal: -SPACING.md,
+      borderTopLeftRadius: BORDER_RADIUS.xl,
+      borderTopRightRadius: BORDER_RADIUS.xl,
+      borderBottomLeftRadius: BORDER_RADIUS.lg,
+      borderBottomRightRadius: BORDER_RADIUS.lg,
+      borderWidth: 0,
+    },
+    selectorArtworkFrameTile: {
+      height: 142,
+    },
+    selectorArtworkFrameWide: {
+      height: 154,
+    },
+    selectorArtwork: {
+      width: '100%',
+      height: '100%',
+      transform: [{ scale: 1.06 }],
+    },
+    selectorArtworkGradient: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      height: 72,
     },
     titleSelectorTile: {
       fontSize: SIZES.text14,
       lineHeight: 19,
       fontWeight: FONT_WEIGHTS.bold,
-      color: colors.primaryText,
+      color: isDark ? colors.white : colors.primaryText,
+    },
+    titleSelectorWide: {
+      fontSize: SIZES.text16,
+      lineHeight: 20,
     },
     subtitleSelectorTile: {
       fontSize: SIZES.text12,
       lineHeight: 16,
-      color: colors.textMuted ?? withAlpha(colors.gray, 0.95),
+      color: withAlpha(
+        isDark ? colors.white : colors.primaryText,
+        isDark ? 0.72 : 0.58,
+      ),
     },
   });

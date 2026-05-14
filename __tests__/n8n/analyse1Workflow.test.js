@@ -176,6 +176,7 @@ describe('analyse_1 n8n workflow export', () => {
       );
       expect(prompt).toContain('Return exactly one valid JSON object.');
       expect(prompt).toContain('Return no markdown');
+      expect(prompt).toContain('raw minified JSON object');
       expect(prompt).toContain('analysis_meta is internal scan quality metadata');
     }
 
@@ -194,17 +195,27 @@ describe('analyse_1 n8n workflow export', () => {
     expect(bodyPrompt).toContain(
       'body_score is a neutral overall estimate of visible form, silhouette, and posture, not an attractiveness score.',
     );
+    expect(bodyPrompt).toContain('For advanced body fields');
+    expect(bodyPrompt).toContain('never fabricate hidden body areas');
 
     expect(nutritionPrompt).toContain('Never return FACE or BODY');
     expect(nutritionPrompt).toContain(
       'Calories and macros are visual approximations.',
     );
     expect(nutritionPrompt).toContain(
-      'short_verdict: maximum 5 localized words.',
+      'short_verdict: maximum 5 localized words, localized companion text for verdict_key.',
+    );
+    expect(nutritionPrompt).toContain('"verdict_key": null');
+    expect(nutritionPrompt).toContain(
+      'verdict_key: one of "balanced", "smoothie_ideal", "protein_dense", "light", "processed", "sugary", "indulgent"',
     );
 
     expect(fallbackPrompt).toContain(
       'Supported schemas: face, body, nutrition, error.',
+    );
+    expect(fallbackPrompt).toContain('"verdict_key": null');
+    expect(fallbackPrompt).toContain(
+      'verdict_key must be one of "balanced", "smoothie_ideal", "protein_dense", "light", "processed", "sugary", "indulgent"',
     );
     expect(fallbackPrompt).toContain(
       'If the image is ambiguous, return ERROR.',
@@ -218,6 +229,23 @@ describe('analyse_1 n8n workflow export', () => {
     expect(fallbackPrompt).toContain(
       'Never return health, super_health, or super_scan.',
     );
+    expect(fallbackPrompt).toContain('For advanced body fields');
+  });
+
+  it('configures image analysis nodes with enough output tokens', () => {
+    const workflow = readWorkflow();
+
+    for (const nodeName of [
+      'Analyze Face Image',
+      'Analyze Body Image',
+      'Analyze Nutrition Image',
+      'Analyze Image Auto Detect Fallback',
+    ]) {
+      const options = getNode(workflow, nodeName).parameters.options ?? {};
+      const tokenLimit = options.maxOutputTokens ?? options.maxTokens;
+
+      expect(tokenLimit).toBeGreaterThanOrEqual(4096);
+    }
   });
 
   describe('Normalize Analyse Input code node', () => {
@@ -322,6 +350,8 @@ describe('analyse_1 n8n workflow export', () => {
           fatigue_level: 12,
           glow_index: 10,
           face_shape: 'Oval',
+          face_shape_key: 'oval',
+          face_shape_fallback_text: 'Oval',
           collagen_level: 64,
           hydration_level: 73,
           photogenic_score: 10,
@@ -378,15 +408,23 @@ describe('analyse_1 n8n workflow export', () => {
       expect(result.data).toEqual({
         schema_version: 4,
         scan_type: 'nutrition',
+        verdict_key: 'balanced',
+        verdict_fallback_text: 'Balanced',
         plate_health_score: 82,
         calories_estimate: 650,
         protein_grams: 32,
         carbs_grams: 45,
         fat_grams: 22,
+        glycemic_index_key: 'low',
         glycemic_index_label: 'Low',
+        glycemic_index_fallback_text: 'Low',
         satiety_index: 9,
+        ingredient_quality_key: 'natural',
         ingredient_quality: 'Natural',
+        ingredient_quality_fallback_text: 'Natural',
+        main_vitamin_keys: ['vitamin_c'],
         main_vitamins: 'Vitamin C',
+        main_vitamins_fallback_text: 'Vitamin C',
         short_verdict: 'Balanced',
         fiber_grams_estimate: null,
         sugar_grams_estimate: null,
@@ -413,6 +451,69 @@ describe('analyse_1 n8n workflow export', () => {
           metric_coverage_score: null,
           limitation_flags: [],
         },
+      });
+    });
+
+    it('derives a canonical nutrition verdict key when the provider omits it', () => {
+      const workflow = readWorkflow();
+      const result = runCodeNode(workflow, 'Code in JavaScript', {
+        language_code: 'en',
+        scan_route: 'nutrition',
+        text: JSON.stringify({
+          scan_type: 'nutrition',
+          plate_health_score: 76,
+          calories_estimate: 620,
+          protein_grams: 34,
+          carbs_grams: 45,
+          fat_grams: 18,
+          glycemic_index_label: 'Low',
+          satiety_index: 8,
+          ingredient_quality: 'Natural',
+          main_vitamins: 'Vitamin C',
+          short_verdict: 'Filling meal',
+        }),
+      })[0].json;
+
+      expect(result.success).toBe(true);
+      expect(result.data).toMatchObject({
+        scan_type: 'nutrition',
+        verdict_key: 'protein_dense',
+        short_verdict: 'Filling meal',
+      });
+    });
+
+    it('emits nutrition canonical keys together with display fallback text', () => {
+      const workflow = readWorkflow();
+      const result = runCodeNode(workflow, 'Code in JavaScript', {
+        language_code: 'fr',
+        scan_route: 'nutrition',
+        text: JSON.stringify({
+          scan_type: 'nutrition',
+          verdict_key: 'balanced',
+          plate_health_score: 76,
+          calories_estimate: 620,
+          protein_grams: 34,
+          carbs_grams: 45,
+          fat_grams: 18,
+          glycemic_index_label: 'Slow release',
+          satiety_index: 8,
+          ingredient_quality: 'Farm fresh',
+          main_vitamins: 'Vitamin P',
+          short_verdict: 'Chef special',
+        }),
+      })[0].json;
+
+      expect(result.success).toBe(true);
+      expect(result.data).toMatchObject({
+        scan_type: 'nutrition',
+        verdict_key: 'balanced',
+        verdict_fallback_text: 'Chef special',
+        glycemic_index_key: 'unknown',
+        glycemic_index_fallback_text: 'Slow release',
+        ingredient_quality_key: 'natural',
+        ingredient_quality_fallback_text: 'Farm fresh',
+        main_vitamin_keys: ['unknown'],
+        main_vitamins_fallback_text: 'Vitamin P',
       });
     });
 
@@ -450,7 +551,11 @@ describe('analyse_1 n8n workflow export', () => {
           body_score: 81,
           body_fat_percentage: 19,
           muscle_mass_label: 'Balanced',
+          muscle_mass_key: 'balanced',
+          muscle_mass_fallback_text: 'Balanced',
           body_type: 'Athletic',
+          body_type_key: 'athletic',
+          body_type_fallback_text: 'Athletic',
           posture_score: 10,
           waist_estimation_cm: 82,
           strength_index: 74,
@@ -482,6 +587,62 @@ describe('analyse_1 n8n workflow export', () => {
       });
     });
 
+    it('preserves advanced body metrics and persona keys when provider supplies them', () => {
+      const workflow = readWorkflow();
+      const result = runCodeNode(workflow, 'Code in JavaScript', {
+        language_code: 'en',
+        scan_route: 'body',
+        text: JSON.stringify({
+          scan_type: 'body',
+          body_score: 81,
+          body_fat_percentage: 19,
+          muscle_mass_label: 'Balanced',
+          body_type: 'Athletic',
+          posture_score: 8,
+          waist_estimation_cm: 82,
+          strength_index: 74,
+          body_symmetry: 77,
+          bmi_estimate: 23,
+          metabolic_age: 31,
+          muscle_definition_score: 64,
+          midsection_definition_score: 58,
+          shoulder_alignment_score: 71,
+          recovery_readiness_score: 62,
+          upper_body_definition_score: 66,
+          lower_body_definition_score: 69,
+          arm_definition_score: 63,
+          v_taper_score: 57,
+          body_tension_indicator_score: 34,
+          perceived_sex_key: 'neutral_or_unclear',
+          perceived_age_range_key: '25_34',
+          estimated_height_range_key: '170_180cm',
+          estimated_weight_range_key: '70_80kg',
+          body_frame_key: 'medium',
+          perceived_fitness_level_key: 'moderately_active',
+        }),
+      })[0].json;
+
+      expect(result.success).toBe(true);
+      expect(result.data).toMatchObject({
+        scan_type: 'body',
+        muscle_definition_score: 64,
+        midsection_definition_score: 58,
+        shoulder_alignment_score: 71,
+        recovery_readiness_score: 62,
+        upper_body_definition_score: 66,
+        lower_body_definition_score: 69,
+        arm_definition_score: 63,
+        v_taper_score: 57,
+        body_tension_indicator_score: 34,
+        perceived_sex_key: 'neutral_or_unclear',
+        perceived_age_range_key: '25_34',
+        estimated_height_range_key: '170_180cm',
+        estimated_weight_range_key: '70_80kg',
+        body_frame_key: 'medium',
+        perceived_fitness_level_key: 'moderately_active',
+      });
+    });
+
     it('returns a localized error when an explicit route produces another scan type', () => {
       const workflow = readWorkflow();
       const result = runCodeNode(workflow, 'Code in JavaScript', {
@@ -505,10 +666,54 @@ describe('analyse_1 n8n workflow export', () => {
 
       expect(result).toEqual({
         success: false,
+        error: 'Le type de scan retourne ne correspond pas a la demande.',
         data: {
           scan_type: 'error',
           message:
             'Le type de scan retourne ne correspond pas a la demande.',
+        },
+      });
+    });
+
+    it('returns a provider-compatible error envelope for malformed face content', () => {
+      const workflow = readWorkflow();
+      const result = runCodeNode(workflow, 'Code in JavaScript', {
+        language_code: 'en',
+        requested_scan_type: 'face',
+        scan_route: 'face',
+        message: {
+          content: '{"scan_type":"face","face_score":}',
+        },
+      })[0].json;
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Invalid scan response.',
+        data: {
+          scan_type: 'error',
+          message: 'Invalid scan response.',
+        },
+      });
+    });
+
+    it('returns a provider-compatible incomplete envelope for truncated scan JSON', () => {
+      const workflow = readWorkflow();
+      const result = runCodeNode(workflow, 'Code in JavaScript', {
+        language_code: 'en',
+        requested_scan_type: 'face',
+        scan_route: 'face',
+        message: {
+          content:
+            '{"schema_version":4,"scan_type":"face","face_score":65,"perceived_age":25,"analysis_meta":{"confidence_score":85,"image_quality_score":75,"metric_coverage_score":',
+        },
+      })[0].json;
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Scan response was incomplete. Please retry.',
+        data: {
+          scan_type: 'error',
+          message: 'Scan response was incomplete. Please retry.',
         },
       });
     });
@@ -525,10 +730,11 @@ describe('analyse_1 n8n workflow export', () => {
       })[0].json;
 
       for (const result of [missingType, unknownType]) {
-        expect(Object.keys(result).sort()).toEqual(['data', 'success']);
+        expect(Object.keys(result).sort()).toEqual(['data', 'error', 'success']);
         expect(Object.keys(result.data).sort()).toEqual(['message', 'scan_type']);
         expect(result.success).toBe(false);
         expect(result.data.scan_type).toBe('error');
+        expect(result.error).toBe(result.data.message);
       }
 
       expect(missingType.data.message).toBe('Reponse du scan invalide.');

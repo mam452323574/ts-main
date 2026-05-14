@@ -1,7 +1,7 @@
 import { normalizeAnalysisResult } from '@/utils/analysisNormalization';
 
 describe('analysisNormalization', () => {
-  it('upgrades an already normalized v2 payload to schema v4 without webhook fallbacks', () => {
+  it('upgrades an already normalized v2 payload to schema v4 while preserving display fallbacks', () => {
     const normalized = normalizeAnalysisResult({
       schema_version: 2,
       scan_type: 'nutrition',
@@ -29,9 +29,11 @@ describe('analysisNormalization', () => {
       carbs_grams: 36,
       fat_grams: 18,
       verdict_key: 'balanced',
+      verdict_fallback_text: 'Balanced meal',
       glycemic_index_key: 'low',
       satiety_index: 9,
       ingredient_quality_key: 'natural',
+      main_vitamins_fallback_text: 'A, C',
       main_vitamin_keys: ['vitamin_a', 'vitamin_c'],
     });
   });
@@ -86,6 +88,31 @@ describe('analysisNormalization', () => {
     });
   });
 
+  it('preserves provider-supplied canonical nutrition verdict keys', () => {
+    const normalized = normalizeAnalysisResult({
+      scan_type: 'nutrition',
+      plate_health_score: 73,
+      calories_estimate: 540,
+      protein_grams: 31,
+      carbs_grams: 42,
+      fat_grams: 16,
+      verdict_key: 'protein_dense',
+      glycemic_index_key: 'low',
+      satiety_index: 8,
+      ingredient_quality_key: 'natural',
+      main_vitamin_keys: ['vitamin_c'],
+    });
+
+    expect(normalized).toMatchObject({
+      schema_version: 4,
+      scan_type: 'nutrition',
+      verdict_key: 'protein_dense',
+      glycemic_index_key: 'low',
+      ingredient_quality_key: 'natural',
+      main_vitamin_keys: ['vitamin_c'],
+    });
+  });
+
   it('folds unsupported legacy nutrition values into controlled unknown placeholders', () => {
     const normalized = normalizeAnalysisResult({
       scan_type: 'nutrition',
@@ -104,9 +131,13 @@ describe('analysisNormalization', () => {
     expect(normalized).toMatchObject({
       schema_version: 4,
       verdict_key: 'unknown',
+      verdict_fallback_text: 'Chef special',
       glycemic_index_key: 'unknown',
+      glycemic_index_fallback_text: 'Slow release',
       ingredient_quality_key: 'natural',
+      ingredient_quality_fallback_text: 'Farm fresh',
       main_vitamin_keys: ['unknown'],
+      main_vitamins_fallback_text: 'Vitamin P',
     });
   });
 
@@ -156,7 +187,32 @@ describe('analysisNormalization', () => {
       schema_version: 4,
       scan_type: 'body',
       muscle_mass_key: 'balanced',
+      muscle_mass_fallback_text: 'Faible',
       body_type_key: 'athletic',
+      body_type_fallback_text: 'Rectangle',
+    });
+  });
+
+  it('preserves face fallback text alongside normalized qualitative keys', () => {
+    const normalized = normalizeAnalysisResult({
+      scan_type: 'face',
+      face_score: 81,
+      perceived_age: 29,
+      skin_quality_score: 75,
+      symmetry_percentage: 88,
+      fatigue_level: 20,
+      glow_index: 7,
+      face_shape: 'Oval',
+      collagen_level: 68,
+      hydration_level: 72,
+      photogenic_score: 8,
+    });
+
+    expect(normalized).toMatchObject({
+      schema_version: 4,
+      scan_type: 'face',
+      face_shape_key: 'oval',
+      face_shape_fallback_text: 'Oval',
     });
   });
 
@@ -494,10 +550,63 @@ describe('analysisNormalization', () => {
       carbs_grams: 34,
       fat_grams: 11,
       verdict_key: 'balanced',
+      verdict_fallback_text: 'Balanced meal',
       glycemic_index_key: 'low',
+      glycemic_index_fallback_text: 'Faible',
       satiety_index: 7,
       ingredient_quality_key: 'natural',
+      ingredient_quality_fallback_text: 'Natural',
       main_vitamin_keys: ['vitamin_a', 'vitamin_c'],
+      main_vitamins_fallback_text: 'Vitamina A, Vitamina C',
+    });
+  });
+
+  it('preserves optional long nutrition text fields for the result screen', () => {
+    const rawNutritionResult = {
+      scan_type: 'nutrition' as const,
+      plate_health_score: 71,
+      calories_estimate: 390,
+      protein_grams: 19,
+      carbs_grams: 34,
+      fat_grams: 11,
+      short_verdict: 'Balanced meal',
+      glycemic_index_label: 'Low',
+      satiety_index: 7,
+      ingredient_quality: 'Natural',
+      main_vitamin_keys: ['vitamin_c', 'vitamin_a', 'magnesium'],
+      main_vitamins_fallback_text:
+        'Vitamin C, vitamin A and magnesium are visible from citrus, greens and seeds.',
+      micronutrients_i18n: {
+        translations: {
+          en: 'Magnesium, potassium and vitamin C appear visually plausible.',
+        },
+      },
+      nutrition_points:
+        'High color variety, moderate starch load and a visible protein component.',
+      recommendations:
+        'Add extra leafy vegetables if this is intended to be a recovery meal.',
+      food_details: 'Mostly whole foods with a small amount of processed sauce.',
+      meal_analysis: 'The plate looks balanced but portion estimates remain visual.',
+      estimated_composition:
+        'Protein source plus complex carbs, vegetables and a light fat source.',
+    };
+    const normalized = normalizeAnalysisResult(rawNutritionResult);
+
+    expect(normalized).toMatchObject({
+      schema_version: 4,
+      scan_type: 'nutrition',
+      main_vitamin_keys: ['vitamin_c', 'vitamin_a', 'magnesium'],
+      main_vitamins_fallback_text:
+        'Vitamin C, vitamin A and magnesium are visible from citrus, greens and seeds.',
+      micronutrients: 'Magnesium, potassium and vitamin C appear visually plausible.',
+      nutrition_points:
+        'High color variety, moderate starch load and a visible protein component.',
+      recommendations:
+        'Add extra leafy vegetables if this is intended to be a recovery meal.',
+      dietary_details: 'Mostly whole foods with a small amount of processed sauce.',
+      plate_analysis: 'The plate looks balanced but portion estimates remain visual.',
+      estimated_composition:
+        'Protein source plus complex carbs, vegetables and a light fat source.',
     });
   });
 
@@ -551,6 +660,39 @@ describe('analysisNormalization', () => {
         metric_coverage_score: 72,
         limitation_flags: ['blur'],
       },
+    });
+  });
+
+  it('preserves optional extended face metrics from enriched analysis payloads', () => {
+    const normalized = normalizeAnalysisResult({
+      scan_type: 'face',
+      face_score: 81,
+      perceived_age: 28,
+      skin_quality_score: 74,
+      symmetry_percentage: 86,
+      fatigue_level: 21,
+      glow_index: 7,
+      collagen_level: 62,
+      hydration_level: 69,
+      photogenic_score: 8,
+      metrics: {
+        skin_clarity_score: '84',
+        skin_evenness_score: 78,
+      },
+      under_eye_shadow_score: 29,
+      pore_visibility_score: 41,
+      complexion_redness_score: 24,
+      perceived_sleep_quality: 67,
+    } as any);
+
+    expect(normalized).toMatchObject({
+      scan_type: 'face',
+      skin_clarity_score: 84,
+      skin_evenness_score: 78,
+      under_eye_shadow_score: 29,
+      pore_visibility_score: 41,
+      complexion_redness_score: 24,
+      perceived_sleep_quality: 67,
     });
   });
 });

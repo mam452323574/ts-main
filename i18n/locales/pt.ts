@@ -107,6 +107,8 @@ export const PT_TRANSLATIONS = {
     missing_payload: 'Dados indisponíveis',
     upgrade: 'Ser Premium',
     recharge: 'Recarga',
+    next_scan: 'Novo scan',
+    next_scan_in: 'Novo scan em',
   },
   scan_preview: {
     title: 'Escolher Análise',
@@ -115,6 +117,65 @@ export const PT_TRANSLATIONS = {
     confirm_loading: 'Salvando...',
     loading_text:
       'Sua análise chegará em breve, isso pode levar alguns segundos...',
+    loading: {
+      insights_label: 'Indicadores em curso',
+      scan: {
+        health: {
+          eyebrow: 'Leitura facial',
+          insights: {
+            hydration: 'Hidratação',
+            symmetry: 'Simetria',
+            glow: 'Brilho',
+          },
+        },
+        body: {
+          eyebrow: 'Leitura corporal',
+          insights: {
+            posture: 'Postura',
+            composition: 'Composição',
+            balance: 'Equilíbrio',
+          },
+        },
+        nutrition: {
+          eyebrow: 'Leitura nutricional',
+          insights: {
+            calories: 'Calorias',
+            macros: 'Macros',
+            quality: 'Qualidade',
+          },
+        },
+        super: {
+          eyebrow: 'Síntese premium',
+          insights: {
+            synthesis: 'Síntese',
+            zones: 'Zonas-chave',
+            score: 'Pontuação global',
+          },
+        },
+      },
+      phases: {
+        verification: {
+          headline: 'Verificacao da foto',
+          subtext:
+            'Estamos verificando nitidez, luz e enquadramento antes de seguir.',
+        },
+        upload: {
+          headline: 'Upload seguro',
+          subtext:
+            'A foto passa por um upload seguro antes do processamento.',
+        },
+        analysis: {
+          headline: 'Analise Health Scan',
+          subtext:
+            'Estamos transformando sinais visiveis em uma leitura clara e estruturada.',
+        },
+        preparing: {
+          headline: 'Preparando o resultado',
+          subtext:
+            'Estamos reunindo pontuacoes, indicadores e verificacoes finais de consistencia.',
+        },
+      },
+    },
     error_title_type: 'Tipo incorreto',
     error_title_analysis: 'Análise impossível',
     error_title_session: 'Sessão expirada',
@@ -145,7 +206,7 @@ export const PT_TRANSLATIONS = {
     analysis_face: 'Análise Facial',
     analysis_body: 'Análise Corporal',
     analysis_nutrition: 'Análise Nutricional',
-    ai_complete: 'Análise IA concluída',
+    ai_complete: 'Análise concluída',
     details_title: 'Detalhes da análise',
     score_face: 'Pontuação Saúde/Estética',
     score_body: 'Pontuação Forma',
@@ -178,6 +239,16 @@ export const PT_TRANSLATIONS = {
     proteins: 'Proteínas',
     carbs: 'Carboidratos',
     fats: 'Gorduras',
+    coach_action: {
+      title: 'Passar à ação',
+      button: 'Perguntar ao coach',
+      fallback_priority:
+        'O coach pode propor um plano simples para melhorar o ponto prioritário deste scan.',
+      fallback_generic:
+        'O teu coach pode ajudar a transformar este scan em ações concretas para os próximos dias.',
+      fallback_stable:
+        'Os teus resultados estão globalmente estáveis. O coach pode ajudar-te a manter esta progressão.',
+    },
     trajectory_preview: {
       title: 'Projeção de 30 dias',
       locked_headline: 'Desbloqueie sua projeção motivadora de 30 dias.',
@@ -241,7 +312,7 @@ export const PT_TRANSLATIONS = {
     },
     badge: {
       attention: 'Atenção',
-      report: 'Relatório IA',
+      report: 'Relatório',
     },
     metrics: {
       perceived_age: 'Idade percebida',
@@ -268,6 +339,13 @@ export const PT_TRANSLATIONS = {
     actions: {
       compose: 'Criar post',
       share: 'Compartilhar',
+      share_short: 'Enviar',
+      like: 'Gostar',
+      comment: 'Comentar',
+      more: 'Mais',
+      not_interested: 'Nao tenho interesse',
+      not_interested_remove: 'Desfazer nao tenho interesse',
+      not_interested_applied: 'Nao tenho interesse',
       report: 'Denunciar',
       edit: 'Editar',
       delete: 'Remover',
@@ -286,6 +364,13 @@ export const PT_TRANSLATIONS = {
       error_title: 'Falha ao remover',
       error_submit: 'Esta publicacao nao pode ser removida agora.',
     },
+    post_actions: {
+      title: 'Opcoes da publicacao',
+      not_interested_hint:
+        'Use isto como feedback leve para esta publicacao.',
+      report_hint: 'Envie esta publicacao para revisao da moderacao.',
+      delete_hint: 'Remova esta publicacao do feed publico.',
+    },
     errors: {
       reaction_title: 'Reacao nao salva',
       reaction_failed: 'Sua reacao nao pode ser salva.',
@@ -298,6 +383,10 @@ export const PT_TRANSLATIONS = {
       title: 'Comentarios',
       subtitle: 'Apenas respostas planas nesta primeira versao.',
       placeholder: 'Escreva um comentario...',
+      post_button: 'Publicar',
+      guideline:
+        'Trate os outros com respeito. Assedio e linguagem insensivel nao sao bem-vindos aqui.',
+      quick_reaction_label: 'Reacao rapida {{emoji}}',
       edit_placeholder: 'Edite seu comentario...',
       empty_title: 'Ainda nao ha comentarios',
       empty_body: 'Comece a conversa com um comentario respeitoso.',
@@ -366,6 +455,11 @@ export const PT_TRANSLATIONS = {
       placeholder_title: 'Comece com uma foto',
       placeholder_body:
         'Escolha uma foto ou reutilize seu cartao de resultado.',
+      hashtags: 'Hashtags',
+      mention: 'Mencao',
+      visibility_title: 'Todos podem ver esta publicacao',
+      visibility_body:
+        'Ela fica publica depois da aprovacao da moderacao.',
       submit: 'Publicar post',
       submitting: 'Publicando...',
       helper: 'Posts ficam ocultos ate a moderacao liberar.',
@@ -420,6 +514,20 @@ export const PT_TRANSLATIONS = {
         remove: 'Remover',
         restore: 'Restaurar',
         change_category: 'Mudar categoria',
+      },
+      bulk: {
+        selected_count: '{{count}} selecionados',
+        clear_selection: 'Limpar selecao',
+        approve_selection: 'Aprovar selecao',
+        approving_selection: 'Aprovar...',
+        confirm_title: 'Aprovar selecao',
+        confirm_body: 'Aprovar {{count}} conteudos selecionados?',
+        confirm_action: 'Aprovar tudo',
+        partial_title: 'Aprovacao parcial',
+        partial_body: '{{approved}} / {{total}} conteudos aprovados.',
+        failure_title: 'Falha na aprovacao em lote',
+        failure_body:
+          'Nenhum dos {{total}} conteudos selecionados pode ser aprovado.',
       },
       category_change: {
         title: 'Mudar categoria',
@@ -633,46 +741,67 @@ export const PT_TRANSLATIONS = {
     },
     prompts: {
       latest_scan: {
-        title: 'Prioridade do dia',
-        subtitle: 'O que devo ajustar primeiro depois do meu ultimo scan?',
+        title: 'Plano do dia',
+        subtitle:
+          'A partir do meu ultimo scan, diz-me as 3 acoes mais uteis para hoje.',
+      },
+      latest_scan_issue_resolution: {
+        title: 'Acao pos-scan',
+        subtitle:
+          'Ajuda-me a resolver a prioridade deste scan com acoes simples.',
       },
       weekly_plan: {
         title: 'Plano 7 dias',
-        subtitle: 'Quais 3 habitos realistas seguir esta semana?',
+        subtitle:
+          'Prepara um plano realista de refeicoes e movimento para os proximos 7 dias.',
       },
       nutrition_focus: {
-        title: 'Proxima refeicao',
-        subtitle: 'Que pequeno ajuste fazer no proximo prato?',
+        title: 'Refeicao inteligente',
+        subtitle:
+          'Que refeicao simples posso fazer hoje e o que devo comprar para 2-3 dias sem complicar?',
       },
       body_focus: {
-        title: 'Movimento util',
+        title: 'Mover melhor',
         subtitle:
-          'Que gesto simples ajudaria postura, forma ou consistencia?',
+          'Monta um mini plano de treino ou mobilidade para esta semana de acordo com o meu nivel.',
       },
       face_focus: {
-        title: 'Pele & fadiga',
-        subtitle: 'O que dizem os meus sinais visuais hoje?',
+        title: 'Rotina rosto',
+        subtitle:
+          'Que rotina simples de manha e noite devo seguir esta semana para parecer mais descansado?',
       },
       hydration_focus: {
-        title: 'Ritual hidratacao',
-        subtitle: 'Que reflexo simples testar hoje?',
+        title: 'Hidratacao facil',
+        subtitle:
+          'Organiza a minha agua do dia num ritmo facil de manter.',
       },
       sleep_coach: {
-        title: 'Recuperacao da noite',
-        subtitle: 'Que rotina leve pode ajudar hoje a noite?',
+        title: 'Noite de recuperacao',
+        subtitle:
+          'Prepara uma rotina simples para a noite para recuperar melhor esta semana.',
       },
       risk_watch: {
-        title: 'Ponto a acompanhar',
-        subtitle: 'Que sinal merece atencao sem alarme?',
+        title: 'A acompanhar',
+        subtitle:
+          'Que sinais devo acompanhar com calma esta semana e quando procurar um profissional?',
       },
       trend_review: {
-        title: 'O que mudou',
-        subtitle: 'O que realmente melhora, estabiliza ou recua?',
+        title: 'O que funciona',
+        subtitle:
+          'Diz-me o que melhora, o que bloqueia e o que devo continuar esta semana.',
       },
       recovery_plan: {
-        title: 'Reinicio rapido',
-        subtitle: 'Como voltar aos trilhos a partir dos sinais recentes?',
+        title: 'Reset 48h',
+        subtitle:
+          'Faz-me um plano simples de 2 dias para voltar aos trilhos sem excessos.',
       },
+    },
+    prompt_categories: {
+      today: 'Hoje',
+      plan: 'Planos',
+      focus: 'Foco',
+      vigilance: 'Vigiar',
+      trend: 'Tendencias',
     },
     sections: {
       context_notes: 'O que eu observo',
@@ -680,6 +809,35 @@ export const PT_TRANSLATIONS = {
       action_steps: 'Agir agora',
       warnings: 'Atencao',
       data_gaps: 'Areas sem dados suficientes',
+      meal_template: 'Proxima refeicao',
+      meal_swaps: 'Trocas inteligentes',
+      shopping_list: 'Lista de compras',
+      quick_recipe: 'Receita rapida',
+      daily_schedule: 'Plano',
+      micro_routine: 'Rotina curta',
+      habit_tracker: 'Habitos a manter',
+      reminders: 'Lembretes',
+      knowledge_card: 'Bom saber',
+      next_scan_suggestion: 'Proximo scan',
+      signal_watch: 'Sinais a observar',
+      streak_celebration: 'Sequencia atual',
+      today: 'hoje',
+      in_days: 'em {{count}}d',
+      days_per_week: '{{count}}d/7',
+      minutes: '{{count}} min',
+      shopping_fresh: 'Frescos',
+      shopping_dry: 'Mercearia',
+      shopping_drinks: 'Bebidas',
+      shopping_snacks: 'Snacks',
+      shopping_other: 'Outro',
+      scan_face: 'rosto',
+      scan_body: 'corpo',
+      scan_nutrition: 'nutricao',
+      scan_super: 'super scan',
+      scan_health: 'saude',
+      recurrence_today: 'hoje',
+      recurrence_daily: 'diario',
+      recurrence_weekly: 'semanal',
     },
     metric_direction: {
       up: 'em alta',
@@ -737,11 +895,22 @@ export const PT_TRANSLATIONS = {
     },
     action_bar: {
       primary: 'Novo conselho',
+      cta_request: 'Pedir',
+      cta_scan: 'Scan',
+      cta_generating: 'A gerar…',
       primary_with_quota: '{{available}}/{{limit}} · Novo conselho',
       primary_exhausted: '{{available}}/{{limit}} · {{cooldown}}',
       primary_unlimited: 'Ilimitado · Novo conselho',
       primary_checking: 'Verificando cota...',
       primary_unavailable: 'Cota indisponivel',
+      status_available: '{{available}}/{{limit}} disponivel',
+      status_unlimited: 'Ilimitado',
+      status_exhausted: '{{available}}/{{limit}} · {{cooldown}}',
+      status_checking: 'Verificando cota…',
+      status_unavailable: 'Cota indisponivel',
+      status_scan_required: 'Scan necessario',
+      status_result: 'Ultimo conselho visivel',
+      status_question_required: 'Pergunta necessaria',
       scan_required: 'Faca um scan para desbloquear o Coach',
       secondary: 'Ajustes',
       history: 'Conselhos anteriores',
@@ -755,7 +924,15 @@ export const PT_TRANSLATIONS = {
     },
     settings: {
       title: 'Ajustes',
-      subtitle: 'Escolha um coach e uma pergunta, depois peca o conselho.',
+      subtitle: 'Escreva sua pergunta e ajuste coach e foco se precisar.',
+    },
+    questions: {
+      section_label: 'Sugestoes uteis',
+      custom_label: 'Sua pergunta ao coach',
+      custom_placeholder:
+        'Pergunte sobre pele, nutricao, treino ou sono...',
+      empty_summary: 'Pergunta ao coach',
+      counter: '{{count}}/{{max}}',
     },
     options_sheet: {
       persona_label: 'Coach',
@@ -797,17 +974,17 @@ export const PT_TRANSLATIONS = {
     data_account:
       'Informação da conta: e-mail, nome de utilizador, fotografia de perfil',
     data_scans:
-      'Dados de digitalização: imagens analisadas pela nossa IA (rosto, corpo, refeições), resultados de análises e pontuações de saúde',
+      'Dados de digitalização: imagens analisadas (rosto, corpo, refeições), resultados de análises e pontuações de saúde',
     data_device:
       'Informações técnicas: identificador do dispositivo para segurança de início de sessão',
     data_usage:
       'Dados de utilização: histórico de verificação, preferências, estatísticas de utilização',
     camera_title: '3. Usando a câmara',
     camera_content:
-      'O Health Scan utiliza a câmara do seu dispositivo exclusivamente para captar imagens para análise (rosto, corpo, dieta). As fotos são processadas pela nossa inteligência artificial para gerar análises de saúde. As imagens são transmitidas de forma segura por HTTPS e nunca são partilhadas com terceiros. Pode eliminar os seus dados a qualquer momento.',
+      'O Health Scan utiliza a câmara do seu dispositivo exclusivamente para captar imagens para análise (rosto, corpo, dieta). As fotos são processadas pela nossa infraestrutura de análise para gerar análises de saúde. As imagens são transmitidas de forma segura por HTTPS e nunca são partilhadas com terceiros. Pode eliminar os seus dados a qualquer momento.',
     usage_content: 'Os seus dados são utilizados para:',
     usage_analysis:
-      'Forneça análises de saúde personalizadas através da nossa IA',
+      'Fornecer análises de saúde personalizadas',
     usage_improve:
       'Melhorar os nossos algoritmos e a qualidade dos nossos serviços',
     usage_personalize: 'Personalize a sua experiência e recomendações',
@@ -855,7 +1032,7 @@ export const PT_TRANSLATIONS = {
     urgency: {
       title: 'Atenção',
       message:
-        'A IA detectou indicadores visuais que requerem atenção.\n\nIsto não é um diagnóstico médico.',
+        'Indicadores visuais requerem atenção.\n\nIsto não é um diagnóstico médico.',
       dismiss: 'Entendi',
     },
     table: {
@@ -871,7 +1048,7 @@ export const PT_TRANSLATIONS = {
       title: 'Super Scan',
       subtitle_locked: 'Análise completa Corpo & Rosto',
       subtitle_used: 'Volte amanhã para um novo scan',
-      subtitle_available: 'Análise IA profunda disponível',
+      subtitle_available: 'Análise detalhada disponível',
       status_locked: 'Desbloquear com Premium',
       status_used: 'Reset à meia-noite',
       status_available: 'Pronto para escanear',
@@ -1113,10 +1290,11 @@ export const PT_TRANSLATIONS = {
     verify_btn: 'Verificar',
     verifying: 'Verificando...',
     verification_sent_title: 'Email verificado!',
-    verification_sent_subtitle_signup: 'Finalizando a criação da sua conta...',
+    verification_sent_subtitle_signup: 'Estamos preparando seu primeiro scan...',
     verification_sent_subtitle_login: 'Entrando...',
-    verify_title: 'Verifique seu email',
-    verify_subtitle: 'Enviamos um código de 6 dígitos para',
+    verify_title: 'Mais um passo antes do seu primeiro scan',
+    verify_subtitle:
+      'Digite o código enviado para seu email para ativar sua conta.',
     code_expired: 'Código expira em',
     resend_code: 'Reenviar código',
     resend_in: 'Reenviar em {{seconds}}s',
@@ -1161,12 +1339,18 @@ export const PT_TRANSLATIONS = {
       'A verificação de disponibilidade do scan falhou. Tente novamente em instantes.',
     type_required_title: 'Tipo de scan necessário',
     camera_permission_detail:
-      'As fotos de rosto, corpo e comida sao usadas para executar a analise de saude por IA dentro do aplicativo.',
+      'As fotos de rosto, corpo e comida sao usadas para executar a analise de saude dentro do aplicativo.',
     camera_permission_backend:
       'As imagens sao enviadas com seguranca para o nosso backend e processadas pela nossa infraestrutura de analise. Voce pode revisar a politica de privacidade antes de autorizar a camera.',
     type_required_msg: 'Por favor selecione um tipo de scan.',
     super_unavailable_title: 'Super Scan indisponível',
     super_unavailable_msg: 'Por favor selecione outro tipo de scan.',
+    scan_hints: {
+      health: 'Centralize seu rosto dentro do quadro.',
+      body: 'Mantenha todo o corpo visível no enquadramento.',
+      nutrition: 'Mantenha toda a refeição visível de cima.',
+      super: 'Fique estável e mantenha o rosto bem iluminado.',
+    },
   },
   fridge_scan: {
     title: 'Chef',
@@ -1219,6 +1403,14 @@ export const PT_TRANSLATIONS = {
     capture_error: 'Nao foi possivel capturar a foto agora.',
     gallery_error:
       'Nao foi possivel carregar a imagem da galeria agora.',
+    submission_auth_error:
+      'Sua sessao expirou antes de enviar o pedido Chef. Entre novamente e tente de novo.',
+    submission_network_error:
+      'Chef nao conseguiu acessar o servidor. Verifique sua conexao e tente de novo.',
+    submission_image_error:
+      'Chef nao conseguiu preparar esta foto. Tire outra e tente de novo.',
+    submission_service_error:
+      'Chef nao conseguiu aceitar o pedido agora. Tente novamente em instantes.',
     submission_error: 'O pedido Chef nao pode ser enviado agora.',
     back_accessibility: 'Voltar',
     gallery_accessibility: 'Escolher uma foto de alimentos da galeria',
@@ -1400,7 +1592,7 @@ export const PT_TRANSLATIONS = {
       prem_feat_super: 'Super Scan: 1 análise completa a cada 24h',
       prem_feat_unlocked: 'Todos os resultados desbloqueados',
       prem_feat_history: 'Histórico completo + gráficos',
-      prem_feat_ai: 'Dicas de IA personalizadas',
+      prem_feat_ai: 'Dicas personalizadas',
       prem_feat_coach_quota: 'Coach avançado: até 8 dicas a cada 24h',
       prem_feat_coach_modes:
         'Todos os coaches e modos premium: nutrição, corpo, sono, risco, tendências, plano semanal',
@@ -1435,12 +1627,20 @@ export const PT_TRANSLATIONS = {
     welcome_title: 'Bem-vindo!',
     setup_profile: 'Configure seu perfil',
     choose_style: 'Escolha seu estilo',
-    theme_step_title: 'Choose your vibe',
+    theme_step_title: 'Escolha seu estilo',
     theme_step_subtitle:
-      'Start in light or dark mode. Your choice applies right away.',
-    username_step_title: 'What should we call you?',
+      'Escolha claro ou escuro. Você pode trocar depois.',
+    intro_step_title: 'Seu primeiro scan começa aqui',
+    intro_step_subtitle:
+      'Escaneie, entenda e depois acompanhe o que muda. Primeiro vamos preparar só o essencial.',
+    intro_step_note:
+      'Escolha um nome, uma aparência e depois confirme seu email. Falta um passo para seu primeiro scan.',
+    profile_step_title: 'Prepare seu perfil de scan',
+    profile_step_subtitle:
+      'Escolha seu nome, adicione uma foto se quiser e mantenha um visual claro.',
+    username_step_title: 'Como devemos chamar você?',
     username_step_subtitle:
-      'Pick a simple username now. Account creation comes after this.',
+      'Esse nome aparecerá nos seus scans e publicações.',
     avatar_title: 'Adicione uma foto de perfil',
     avatar_subtitle:
       'Isso é opcional agora e você pode alterar depois nas configurações.',
@@ -1448,21 +1648,28 @@ export const PT_TRANSLATIONS = {
     avatar_change_subtitle:
       'Você já tem uma foto. Pode mantê-la ou trocar quando quiser.',
     avatar_skip: 'Pular por agora',
-    avatar_pre_auth_title: 'Add a photo',
+    avatar_pre_auth_title: 'Adicione uma foto',
     avatar_pre_auth_subtitle:
-      'It stays on your device until your account is created.',
-    avatar_selected: 'Photo selected',
-    avatar_take_photo: 'Take a photo',
-    avatar_choose_gallery: 'Choose from gallery',
-    avatar_upload_retry: 'Retry upload',
-    avatar_upload_continue: 'Continue without photo',
-    account_step_title: 'Create your account',
+      'É opcional. Ela fica no seu dispositivo até a verificação da conta.',
+    avatar_selected: 'Foto selecionada',
+    avatar_take_photo: 'Tirar foto',
+    avatar_choose_gallery: 'Escolher da galeria',
+    avatar_upload_retry: 'Tentar envio novamente',
+    avatar_upload_continue: 'Continuar sem foto',
+    account_step_title: 'Crie sua conta',
     account_step_subtitle:
-      'Last step: email, password, then your verification code.',
+      'Email, senha e depois um código antes do seu primeiro scan.',
     username_label: 'Nome de usuário *',
     username_placeholder: 'usuario123',
+    profile_theme_title: 'Aparência',
+    profile_theme_subtitle:
+      'Escolha a versão mais clara para seu fluxo. Você pode trocar depois.',
+    social_avatar_prompt_title:
+      'Adicione uma foto para ser reconhecido mais rápido',
+    social_avatar_prompt_subtitle:
+      'É opcional, mas útil quando você compartilha scans e progresso.',
     username_status: {
-      ready: 'Username ready',
+      ready: 'Nome pronto',
       checking: 'Verificando...',
       available: 'Disponível',
       taken: 'Já em uso',
@@ -1470,48 +1677,48 @@ export const PT_TRANSLATIONS = {
     },
     theme: {
       dark: 'Escuro',
-      dark_desc: 'Padrão',
+      dark_desc: 'Contraste premium',
       light: 'Claro',
-      light_desc: 'Secundário',
+      light_desc: 'Clareza clínica',
     },
     next_btn: 'Próximo',
     start_btn: 'Começar a aventura',
     enter_app: 'Abrir o app',
     slide_1_eyebrow: 'Scanner',
-    slide_1_title: 'Escaneie o que importa',
+    slide_1_title: 'Escaneie primeiro. Suponha menos.',
     slide_1_subtitle:
-      'Tire uma foto e deixe o app analisar suas refeições, seu rosto ou seu corpo.',
-    slide_1_bullet_1: 'Scans rápidos',
-    slide_1_bullet_2: 'Análise inteligente',
-    slide_1_bullet_3: 'Base dos seus conselhos',
-    slide_2_eyebrow: 'Coach IA',
-    slide_2_title: 'Coaches que realmente acompanham',
+      'Uma foto para refeições, rosto ou corpo. O Health Scan transforma isso em um ponto de partida claro.',
+    slide_1_bullet_1: 'Rosto, corpo, refeições',
+    slide_1_bullet_2: 'Captura rápida',
+    slide_1_bullet_3: 'Base clara',
+    slide_2_eyebrow: 'Coach',
+    slide_2_title: 'Entenda o que o scan mostra',
     slide_2_subtitle:
-      'Seus coaches usam seus dados de scan para dar conselhos úteis e personalizados.',
-    slide_2_bullet_1: 'Conselhos sob medida',
-    slide_2_bullet_2: 'Acompanhamento inteligente',
-    slide_2_bullet_3: 'Recomendações concretas',
+      'Seu coach transforma cada scan em próximos passos simples de seguir.',
+    slide_2_bullet_1: 'Conselhos pessoais',
+    slide_2_bullet_2: 'Contexto após cada scan',
+    slide_2_bullet_3: 'Próxima melhor ação',
     slide_3_eyebrow: 'Comunidade',
-    slide_3_title: 'Cresça com a comunidade',
+    slide_3_title: 'Compartilhe avanços quando quiser',
     slide_3_subtitle:
-      'Compartilhe avanços, descubra outras jornadas e encontre motivação.',
-    slide_3_bullet_1: 'Inspiração',
-    slide_3_bullet_2: 'Motivação',
-    slide_3_bullet_3: 'Comunidade',
+      'Publique atualizações, compare jornadas e mantenha seu ritmo.',
+    slide_3_bullet_1: 'Compartilhar scans',
+    slide_3_bullet_2: 'Seguir outras pessoas',
+    slide_3_bullet_3: 'Motivação',
     slide_4_eyebrow: 'Progresso',
-    slide_4_title: 'Acompanhe seu progresso no tempo',
+    slide_4_title: 'Veja progresso, não ruído',
     slide_4_subtitle:
-      'Veja tendências, estatísticas e evolução num piscar de olhos, em vários períodos.',
-    slide_4_bullet_1: 'Visão clara',
-    slide_4_bullet_2: 'Vários períodos',
-    slide_4_bullet_3: 'Progresso mensurável',
+      'Compare seus scans ao longo do tempo e veja o que melhora, trava ou desvia.',
+    slide_4_bullet_1: 'Antes e depois',
+    slide_4_bullet_2: 'Visão de tendência',
+    slide_4_bullet_3: 'Mudança mensurável',
     slide_5_eyebrow: 'Geladeira',
-    slide_5_title: 'Transforme sua geladeira em ideias de refeições',
+    slide_5_title: 'Leve isso para suas refeições',
     slide_5_subtitle:
-      'Fotografe seus ingredientes e descubra ideias que combinam com sua vontade.',
-    slide_5_bullet_1: 'Ideias de receitas',
-    slide_5_bullet_2: 'Indulgente ou leve',
-    slide_5_bullet_3: 'Simples e rápido',
+      'Escaneie sua geladeira e transforme seu plano em ideias de refeições simples.',
+    slide_5_bullet_1: 'Scan de ingredientes',
+    slide_5_bullet_2: 'Ideias de receitas',
+    slide_5_bullet_3: 'Leve ou indulgente',
     error_session: 'Sessão inválida. Por favor, faça login novamente.',
     error_email: 'Por favor, verifique seu email antes de continuar.',
     error_username_empty: 'Por favor, escolha um nome de usuário',

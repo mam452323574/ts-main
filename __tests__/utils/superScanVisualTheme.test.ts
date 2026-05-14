@@ -1,4 +1,5 @@
-import { DARK_COLORS, LIGHT_COLORS, mixColors } from '@/constants/theme';
+import { DARK_COLORS, LIGHT_COLORS, mixColors, withAlpha } from '@/constants/theme';
+import { getResultScreenGradient } from '@/utils/resultLayout';
 import {
   resolveFatDistributionDominantMetricId,
   resolveFatDistributionSuperScanPalette,
@@ -92,6 +93,13 @@ describe('super scan visual theme', () => {
     });
 
     expect(palette.sectionSurfaceVariant).toBe('neutral');
+    expect(palette.backgroundGradient).toEqual(
+      getResultScreenGradient({
+        colors,
+        isDark: false,
+        accentColor: palette.accentColor,
+      }),
+    );
     expect(palette.backgroundGradient[0]).not.toBe(
       mixColors(colors.background, colors.gold, 0.28),
     );
@@ -123,6 +131,46 @@ describe('super scan visual theme', () => {
     );
     expect(palette.secondarySurfaceBackgroundColor).not.toBe(
       mixColors(DARK_COLORS.cardBackground, DARK_COLORS.gold, 0.1),
+    );
+  });
+
+  it('keeps aqua and recovery palettes as accents instead of green background washes', () => {
+    const aquaPalette = resolveFatDistributionSuperScanPalette({
+      colors,
+      isDark: false,
+      bodyFat: 12,
+      facialFat: 9,
+      waterRetention: 19,
+    });
+    const recoveryPalette = resolveLegacySuperScanPalette({
+      colors,
+      isDark: false,
+      globalRiskScore: 24,
+      urgencyFlag: false,
+    });
+
+    expect(aquaPalette.accentColor).not.toBe(colors.accentGreen);
+    expect(recoveryPalette.accentColor).not.toBe(colors.accentGreen);
+    expect(aquaPalette.sectionSurfaceVariant).toBe('neutral');
+    expect(recoveryPalette.sectionSurfaceVariant).toBe('neutral');
+    expect(aquaPalette.backgroundGradient).toEqual(
+      getResultScreenGradient({
+        colors,
+        isDark: false,
+        accentColor: aquaPalette.accentColor,
+      }),
+    );
+    expect(aquaPalette.heroBorderColor).toBe(
+      withAlpha(
+        mixColors(aquaPalette.accentColor, aquaPalette.premiumWarmAccentColor, 0.12),
+        0.1,
+      ),
+    );
+    expect(aquaPalette.sectionBackgroundColor).not.toBe(
+      mixColors(colors.cardBackground, colors.accentGreen, 0.1),
+    );
+    expect(recoveryPalette.shareBackgroundColor).not.toBe(
+      mixColors(colors.cardBackground, colors.accentGreen, 0.08),
     );
   });
 

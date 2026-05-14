@@ -72,6 +72,14 @@ jest.mock('@/hooks/queries', () => ({
     },
   }),
 }));
+jest.mock('@/hooks/queries/useSocialMutations', () => ({
+  useSocialMutations: () => ({
+    createPostMutation: {
+      isPending: false,
+      mutateAsync: (...args: unknown[]) => mockMutateAsync(...args),
+    },
+  }),
+}));
 
 jest.mock('@/hooks/useCustomAlert', () => ({
   useCustomAlert: () => ({
@@ -374,6 +382,29 @@ describe('SocialComposerScreen', () => {
 
     expect(screen.getByDisplayValue('Quick update')).toBeTruthy();
     expect(screen.getByTestId('social-compose-asset-card')).toBeTruthy();
+  });
+
+  it('inserts hashtag and mention tokens into the caption composer', async () => {
+    mockGetSocialComposerDraft.mockResolvedValueOnce(null);
+    mockParams.mockReturnValue({
+      defaultCategory: 'food',
+    });
+
+    const screen = await renderScreen();
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('social-compose-hashtag-button'));
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId('social-compose-caption-input').props.value).toBe('#');
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('social-compose-mention-button'));
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId('social-compose-caption-input').props.value).toBe('# @');
   });
 
   it('registers keyboard listeners and restores the category when the keyboard closes', async () => {

@@ -1,4 +1,13 @@
 import { isCoachPersonaKey } from '../../../shared/coachPersonas.ts';
+import {
+  COACH_QUESTION_MAX_LENGTH,
+  isCoachQuestionForPromptType,
+  normalizeCoachQuestionKey,
+  resolveCoachQuestionHints,
+  resolveCoachQuestionSelection,
+  sanitizeCoachQuestionHints,
+} from '../../../shared/coachQuestions.ts';
+import { normalizeCoachGenerationPromptType } from '../../../shared/coachPromptTypes.ts';
 import { Phase2HttpError } from './phase2Errors.ts';
 import type {
   CoachGenerateRequest,
@@ -183,8 +192,13 @@ const COACH_GENERATE_ALLOWED_KEYS = [
 const COACH_INNER_PAYLOAD_ALLOWED_KEYS = [
   'payload_version',
   'prompt_type',
+  'question_key',
+  'question_text',
+  'question_hints',
   'generated_at',
   'scan_count_7d',
+  'selected_scan_id',
+  'scan_intent',
   'selected_scan',
   'recent_scans',
   'latest_scan',
@@ -192,20 +206,9 @@ const COACH_INNER_PAYLOAD_ALLOWED_KEYS = [
   'latest_by_type',
   'comparison_to_previous',
   'trend_summary',
+  'inferred_persona',
+  'coach_profile_memory',
   'by_type',
-] as const;
-
-const COACH_INNER_PAYLOAD_PROMPT_TYPES = [
-  'latest_scan',
-  'weekly_plan',
-  'recovery_plan',
-  'nutrition_focus',
-  'body_focus',
-  'face_focus',
-  'hydration_focus',
-  'sleep_coach',
-  'risk_watch',
-  'trend_review',
 ] as const;
 
 const COACH_INNER_PAYLOAD_MAX_DEPTH = 6;
@@ -214,6 +217,178 @@ const COACH_INNER_PAYLOAD_MAX_RECENT_SCANS = 32;
 const COACH_INNER_PAYLOAD_MAX_PRIOR_SCANS = 16;
 const COACH_INNER_PAYLOAD_MAX_ARRAY_LENGTH = 64;
 const COACH_INNER_PAYLOAD_MAX_KEYS_PER_OBJECT = 80;
+const COACH_SELECTED_SCAN_ID_MAX_LENGTH = 120;
+
+const COACH_SCAN_INTENT_ALLOWED_KEYS = [
+  'scan_id',
+  'scan_type',
+  'has_actionable_issue',
+  'priority_metric',
+  'priority_label',
+  'severity',
+  'reason',
+  'user_facing_summary',
+  'prompt_type',
+  'question_key',
+  'question_text',
+  'fallback_prompt_type',
+  'premium_required',
+] as const;
+
+const COACH_SCAN_INTENT_REQUIRED_KEYS = [
+  'has_actionable_issue',
+  'priority_metric',
+  'priority_label',
+  'severity',
+  'question_text',
+  'user_facing_summary',
+] as const;
+
+function throwInvalidCoachScanIntent(message: string): never {
+  throw new Phase2HttpError(400, 'invalid_coach_payload', message);
+}
+
+function normalizeCoachScanIntentNullableTextField(
+  payload: Record<string, unknown>,
+  key: string,
+  maxLength: number,
+) {
+  const value = payload[key];
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (typeof value !== 'string') {
+    throwInvalidCoachScanIntent(`payload.scan_intent.${key} is not supported`);
+  }
+
+  return (
+    normalizeOptionalFreeText(value, {
+      fieldName: `payload.scan_intent.${key}`,
+      maxLength,
+    }) ?? null
+  );
+}
+
+function normalizeCoachScanIntentRequiredTextField(
+  payload: Record<string, unknown>,
+  key: string,
+  maxLength: number,
+) {
+  const value = payload[key];
+  if (typeof value !== 'string') {
+    throwInvalidCoachScanIntent(`payload.scan_intent.${key} is required`);
+  }
+
+  const normalized = normalizeOptionalFreeText(value, {
+    fieldName: `payload.scan_intent.${key}`,
+    maxLength,
+    required: true,
+  });
+  if (!normalized) {
+    throwInvalidCoachScanIntent(`payload.scan_intent.${key} is required`);
+  }
+
+  return normalized;
+}
+
+function normalizeCoachScanIntent(value: unknown) {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === null) {
+    return null;
+  }
+
+  if (!isRecord(value)) {
+    throwInvalidCoachScanIntent('payload.scan_intent must be an object');
+  }
+
+  const unknownKeys = Object.keys(value).filter(
+    (key) =>
+      !(COACH_SCAN_INTENT_ALLOWED_KEYS as readonly string[]).includes(key),
+  );
+  if (unknownKeys.length > 0) {
+    throw new Phase2HttpError(
+      400,
+      'invalid_coach_payload',
+      'payload.scan_intent contains unsupported fields',
+      { unknown_keys: unknownKeys },
+    );
+  }
+
+  const intent = value as Record<string, unknown>;
+  const missingKey = (COACH_SCAN_INTENT_REQUIRED_KEYS as readonly string[]).find(
+    (key) => !(key in intent),
+  );
+  if (missingKey) {
+    throwInvalidCoachScanIntent(`payload.scan_intent.${missingKey} is required`);
+  }
+
+  if (typeof intent.has_actionable_issue !== 'boolean') {
+    throwInvalidCoachScanIntent(
+      'payload.scan_intent.has_actionable_issue is not supported',
+    );
+  }
+
+  const severity = intent.severity;
+  if (
+    severity !== null &&
+    severity !== undefined &&
+    severity !== 'low' &&
+    severity !== 'medium' &&
+    severity !== 'high'
+  ) {
+    throwInvalidCoachScanIntent('payload.scan_intent.severity is not supported');
+  }
+
+  return {
+    has_actionable_issue: intent.has_actionable_issue,
+    priority_metric: normalizeCoachScanIntentNullableTextField(
+      intent,
+      'priority_metric',
+      80,
+    ),
+    priority_label: normalizeCoachScanIntentNullableTextField(
+      intent,
+      'priority_label',
+      120,
+    ),
+    severity: severity ?? null,
+    user_facing_summary: normalizeCoachScanIntentRequiredTextField(
+      intent,
+      'user_facing_summary',
+      320,
+    ),
+    question_text: normalizeCoachScanIntentRequiredTextField(
+      intent,
+      'question_text',
+      COACH_QUESTION_MAX_LENGTH,
+    ),
+  };
+}
+
+function normalizeCoachSelectedScanId(value: unknown) {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === null) {
+    return null;
+  }
+
+  const selectedScanId = readOptionalString(value);
+  if (!selectedScanId || selectedScanId.length > COACH_SELECTED_SCAN_ID_MAX_LENGTH) {
+    throw new Phase2HttpError(
+      400,
+      'invalid_coach_payload',
+      'payload.selected_scan_id is not supported',
+    );
+  }
+
+  return selectedScanId;
+}
 
 function assertCoachInnerPayloadDepth(
   value: unknown,
@@ -292,14 +467,50 @@ export function assertCoachInnerPayload(payload: Record<string, unknown>) {
   if (
     payload.prompt_type !== undefined &&
     (typeof payload.prompt_type !== 'string' ||
-      !(COACH_INNER_PAYLOAD_PROMPT_TYPES as readonly string[]).includes(
-        payload.prompt_type,
-      ))
+      normalizeCoachGenerationPromptType(payload.prompt_type) === null)
   ) {
     throw new Phase2HttpError(
       400,
       'invalid_coach_payload',
       'payload.prompt_type is not supported',
+    );
+  }
+  const promptType = normalizeCoachGenerationPromptType(payload.prompt_type);
+
+  normalizeCoachSelectedScanId(payload.selected_scan_id);
+  normalizeCoachScanIntent(payload.scan_intent);
+
+  if (payload.question_key !== undefined && payload.question_key !== null) {
+    const normalizedQuestionKey = normalizeCoachQuestionKey(payload.question_key);
+    if (
+      typeof payload.question_key !== 'string' ||
+      normalizedQuestionKey === null ||
+      (promptType !== null &&
+        !isCoachQuestionForPromptType(normalizedQuestionKey, promptType))
+    ) {
+      throw new Phase2HttpError(
+        400,
+        'invalid_coach_payload',
+        'payload.question_key is not supported',
+      );
+    }
+  }
+
+  if (payload.question_text !== undefined) {
+    normalizeOptionalFreeText(payload.question_text, {
+      fieldName: 'payload.question_text',
+      maxLength: COACH_QUESTION_MAX_LENGTH,
+    });
+  }
+
+  if (
+    payload.question_hints !== undefined &&
+    sanitizeCoachQuestionHints(payload.question_hints) === null
+  ) {
+    throw new Phase2HttpError(
+      400,
+      'invalid_coach_payload',
+      'payload.question_hints is not supported',
     );
   }
 
@@ -1203,11 +1414,59 @@ export function parseCoachGenerateRequest(payload: unknown): CoachGenerateReques
       'persona_key is not supported',
     );
   }
+  const locale = readOptionalString(payload.locale) ?? undefined;
+  const promptType = normalizeCoachGenerationPromptType(
+    payload.payload.prompt_type,
+  );
+  const normalizedPayload = {
+    ...payload.payload,
+  };
+  const normalizedSelectedScanId = normalizeCoachSelectedScanId(
+    payload.payload.selected_scan_id,
+  );
+  const normalizedScanIntent = normalizeCoachScanIntent(
+    payload.payload.scan_intent,
+  );
+  const sanitizedQuestionHints = sanitizeCoachQuestionHints(
+    payload.payload.question_hints,
+  );
+
+  if (promptType) {
+    normalizedPayload.prompt_type = promptType;
+    const resolvedQuestionSelection = resolveCoachQuestionSelection({
+      promptType,
+      questionKey: normalizeCoachQuestionKey(payload.payload.question_key),
+      questionText:
+        normalizeOptionalFreeText(payload.payload.question_text, {
+          fieldName: 'payload.question_text',
+          maxLength: COACH_QUESTION_MAX_LENGTH,
+        }) ?? null,
+      locale,
+    });
+    normalizedPayload.question_key = resolvedQuestionSelection.questionKey ?? null;
+    normalizedPayload.question_text = resolvedQuestionSelection.questionText ?? null;
+    normalizedPayload.question_hints = resolveCoachQuestionHints({
+      promptType,
+      questionKey: resolvedQuestionSelection.questionKey,
+      questionText: resolvedQuestionSelection.questionText,
+      locale,
+    });
+  } else if (sanitizedQuestionHints) {
+    normalizedPayload.question_hints = sanitizedQuestionHints;
+  }
+
+  if (normalizedSelectedScanId !== undefined) {
+    normalizedPayload.selected_scan_id = normalizedSelectedScanId;
+  }
+
+  if (normalizedScanIntent !== undefined) {
+    normalizedPayload.scan_intent = normalizedScanIntent;
+  }
 
   return {
-    payload: payload.payload,
+    payload: normalizedPayload,
     persona_key: payload.persona_key,
-    locale: readOptionalString(payload.locale) ?? undefined,
+    locale,
     force_refresh: readOptionalBoolean(payload.force_refresh) ?? undefined,
   };
 }

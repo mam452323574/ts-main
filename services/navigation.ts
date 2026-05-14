@@ -4,6 +4,17 @@ class NavigationService {
   private isNavigating = false;
   private navigationQueue: Array<() => void> = [];
 
+  private dismissAllIfPossible(): void {
+    if (!router.canDismiss()) {
+      return;
+    }
+
+    try {
+      router.dismissAll();
+    } catch {
+    }
+  }
+
   async dismissAllModalsAndNavigate(path: string, delay: number = 300): Promise<void> {
     if (this.isNavigating) {
       return new Promise((resolve) => {
@@ -15,11 +26,7 @@ class NavigationService {
 
     try {
       this.isNavigating = true;
-
-      try {
-        router.dismissAll();
-      } catch {
-      }
+      this.dismissAllIfPossible();
 
       await new Promise((resolve) => setTimeout(resolve, delay));
       router.replace(path as any);
@@ -42,10 +49,9 @@ class NavigationService {
     }
   }
 
-
   navigateToNotifications(): void {
     try {
-      try { router.dismissAll(); } catch {}
+      this.dismissAllIfPossible();
       setTimeout(() => {
         try {
           router.push('/notifications');

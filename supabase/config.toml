@@ -1,6 +1,9 @@
 [functions.check-and-record-scan]
 verify_jwt = true
 
+[functions.check-scan-eligibility-batch]
+verify_jwt = true
+
 [functions.cancel-scan-reservation]
 verify_jwt = true
 
@@ -20,6 +23,12 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.coach-quota-status]
+verify_jwt = true
+
+[functions.coach-screen-snapshot]
+verify_jwt = true
+
+[functions.coach-sync-profile-memory]
 verify_jwt = true
 
 [functions.social-reserve-upload]

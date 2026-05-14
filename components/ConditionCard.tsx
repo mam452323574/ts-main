@@ -32,7 +32,6 @@ interface ConditionCardProps {
 
 type SeverityTone = {
   accent: string;
-  surface: string;
   border: string;
   scoreSurface: string;
 };
@@ -44,26 +43,23 @@ const getSeverityTone = (
   if (severity === 'high') {
     return {
       accent: '#FF5A52',
-      surface: isDark ? 'rgba(255,90,82,0.12)' : '#FFF2F1',
-      border: isDark ? 'rgba(255,90,82,0.45)' : '#FFD6D2',
-      scoreSurface: isDark ? 'rgba(255,90,82,0.2)' : '#FDE8E6',
+      border: withAlpha('#FF5A52', isDark ? 0.24 : 0.14),
+      scoreSurface: withAlpha('#FF5A52', isDark ? 0.12 : 0.07),
     };
   }
 
   if (severity === 'moderate') {
     return {
       accent: '#FF9F2E',
-      surface: isDark ? 'rgba(255,159,46,0.12)' : '#FFF8EE',
-      border: isDark ? 'rgba(255,159,46,0.45)' : '#FFE4BF',
-      scoreSurface: isDark ? 'rgba(255,159,46,0.2)' : '#FFF0DA',
+      border: withAlpha('#FF9F2E', isDark ? 0.22 : 0.13),
+      scoreSurface: withAlpha('#FF9F2E', isDark ? 0.11 : 0.065),
     };
   }
 
   return {
     accent: '#34C97A',
-    surface: isDark ? 'rgba(52,201,122,0.12)' : '#EFFAF3',
-    border: isDark ? 'rgba(52,201,122,0.45)' : '#CAEDD8',
-    scoreSurface: isDark ? 'rgba(52,201,122,0.2)' : '#DFF5E8',
+    border: withAlpha('#34C97A', isDark ? 0.2 : 0.12),
+    scoreSurface: withAlpha('#34C97A', isDark ? 0.1 : 0.06),
   };
 };
 
@@ -113,6 +109,11 @@ export function ConditionCard({
     : isLoading
       ? t('condition_card.loading.advice')
       : t('condition_card.locked.advice_teaser');
+  const probabilityValue = isUnlocked
+    ? formatConditionProbability(condition.probability, locale)
+    : isLoading
+      ? t('metric_card.loading_value')
+      : t('metric_card.blurred_text');
 
   const handleUnlock = () => {
     router.push('/premium-upgrade');
@@ -180,10 +181,6 @@ export function ConditionCard({
           kind: 'feature',
           accentColor: tone.accent,
         }),
-        {
-          backgroundColor: tone.surface,
-          borderColor: tone.border,
-        },
       ]}
     >
       <View style={styles.headerRow}>
@@ -258,14 +255,33 @@ export function ConditionCard({
             },
           ]}
         >
+          {isLocked ? (
+            <Lock
+              color={tone.accent}
+              size={layout.isCompact ? 12 : 14}
+              testID="condition-card-probability-lock"
+            />
+          ) : null}
           <Text
             {...RESULT_TEXT_PROPS}
             testID="condition-card-probability-value"
             numberOfLines={1}
             style={[styles.probabilityValue, { color: tone.accent }]}
           >
-            {formatConditionProbability(condition.probability, locale)}
+            {probabilityValue}
           </Text>
+          {isLocked || isLoading ? (
+            <Text
+              {...RESULT_TEXT_PROPS}
+              numberOfLines={1}
+              style={[styles.probabilityPremiumLabel, { color: tone.accent }]}
+              testID="condition-card-probability-premium-label"
+            >
+              {isLoading
+                ? t('metric_card.loading_label')
+                : t('metric_card.premium_label')}
+            </Text>
+          ) : null}
           <Text
             {...RESULT_TEXT_PROPS}
             testID="condition-card-probability-label"
@@ -348,7 +364,7 @@ const createStyles = (
       lineHeight: layout.isCompact ? 24 : 25,
       fontWeight: FONT_WEIGHTS.bold,
       color: themeColors.primaryText,
-      letterSpacing: -0.25,
+      letterSpacing: 0,
       flex: 1,
       flexShrink: 1,
       includeFontPadding: false,
@@ -405,6 +421,7 @@ const createStyles = (
       minWidth: layout.isCompact ? undefined : 92,
       alignItems: 'center',
       justifyContent: 'center',
+      gap: 2,
       borderRadius: layout.standardRadius,
       borderWidth: 1,
       paddingHorizontal: SPACING.md,
@@ -416,11 +433,18 @@ const createStyles = (
       fontSize: layout.isCompact ? SIZES.xl : SIZES.xl + 1,
       lineHeight: layout.isCompact ? 27 : 28,
       fontWeight: FONT_WEIGHTS.bold,
-      letterSpacing: -0.4,
+      letterSpacing: 0,
+      includeFontPadding: false,
+    },
+    probabilityPremiumLabel: {
+      fontSize: SIZES.xs,
+      lineHeight: 12,
+      fontWeight: FONT_WEIGHTS.bold,
+      letterSpacing: layout.isCompact ? 0.25 : 0.35,
       includeFontPadding: false,
     },
     probabilityLabel: {
-      marginTop: 4,
+      marginTop: 2,
       fontSize: SIZES.xs,
       lineHeight: 14,
       color: themeColors.gray,

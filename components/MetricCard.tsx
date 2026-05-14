@@ -31,6 +31,7 @@ interface MetricCardProps {
   isLocked?: boolean;
   premiumRenderState?: PremiumRenderState;
   onPremiumPress?: () => void;
+  testID?: string;
   valueVariant?: 'numeric' | 'fraction' | 'text';
   titleMaxLines?: number;
   valueMaxLines?: number;
@@ -44,6 +45,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   isLocked = false,
   premiumRenderState,
   onPremiumPress,
+  testID = 'metric-card-root',
   valueVariant = 'text',
   titleMaxLines = 2,
   valueMaxLines = valueVariant === 'text' ? 3 : 1,
@@ -64,14 +66,25 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   const activeTheme = isUnlocked ? theme : undefined;
   const overrideIconColor =
     activeTheme?.iconColor ?? (!isUnlocked ? colors.primaryText : undefined);
+  const shouldFitTextValueOnOneLine =
+    valueVariant === 'text' && (valueMaxLines <= 2 || value.trim().length <= 18);
 
   const valueTextProps =
     valueVariant === 'text'
-      ? {
-          numberOfLines: valueMaxLines,
-        }
+      ? shouldFitTextValueOnOneLine
+        ? {
+            adjustsFontSizeToFit: true,
+            ellipsizeMode: 'tail' as const,
+            minimumFontScale: 0.82,
+            numberOfLines: 1 as const,
+          }
+        : {
+            ellipsizeMode: 'tail' as const,
+            numberOfLines: valueMaxLines,
+          }
       : {
           adjustsFontSizeToFit: true,
+          ellipsizeMode: 'tail' as const,
           minimumFontScale: valueVariant === 'fraction' ? 0.82 : 0.84,
           numberOfLines: 1 as const,
         };
@@ -114,7 +127,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
 
   const cardContent = (
     <View
-      testID="metric-card-root"
+      testID={testID}
       style={[
         styles.container,
         getResultSurfaceChrome({
@@ -148,9 +161,12 @@ export const MetricCard: React.FC<MetricCardProps> = ({
         <View style={styles.content}>
           <Text
             {...RESULT_TEXT_PROPS}
+            adjustsFontSizeToFit
+            ellipsizeMode="tail"
+            minimumFontScale={0.82}
             testID="metric-card-title"
             numberOfLines={titleMaxLines}
-            style={[styles.title, { color: colors.gray }]}
+            style={[styles.title, { color: colors.secondaryText ?? colors.gray }]}
           >
             {title}
           </Text>
@@ -209,9 +225,9 @@ export const MetricCard: React.FC<MetricCardProps> = ({
 
               {isLockedState ? (
                 <View
-                  style={[styles.lockBadge, { backgroundColor: colors.primary }]}
+                  style={[styles.lockBadge, { backgroundColor: colors.gold }]}
                 >
-                  <Lock color={colors.white} size={12} />
+                  <Lock color={colors.background} size={12} />
                 </View>
               ) : null}
             </View>
@@ -225,13 +241,16 @@ export const MetricCard: React.FC<MetricCardProps> = ({
           style={[
             styles.statusTag,
             layout.isCompact && styles.statusTagCompactRow,
-            { backgroundColor: colors.primaryLight },
+            {
+              backgroundColor: withAlpha(colors.gold, isDark ? 0.14 : 0.18),
+              borderColor: withAlpha(colors.gold, isDark ? 0.24 : 0.2),
+            },
           ]}
         >
           <Text
             {...RESULT_TEXT_PROPS}
             numberOfLines={1}
-            style={[styles.statusText, { color: colors.primary }]}
+            style={[styles.statusText, { color: colors.gold }]}
           >
             {premiumLabel}
           </Text>
@@ -245,7 +264,10 @@ export const MetricCard: React.FC<MetricCardProps> = ({
             {
               backgroundColor: isDark
                 ? withAlpha(colors.white, 0.08)
-                : withAlpha(colors.primaryText, 0.06),
+                : withAlpha(colors.primaryText, 0.04),
+              borderColor: isDark
+                ? withAlpha(colors.white, 0.12)
+                : withAlpha(colors.primaryText, 0.08),
             },
           ]}
         >
@@ -302,7 +324,7 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
     iconWrap: {
       width: layout.metricCardIconSize,
       height: layout.metricCardIconSize,
-      borderRadius: layout.standardRadius,
+      borderRadius: layout.featureRadius - 6,
       alignItems: 'center',
       justifyContent: 'center',
       padding: SPACING.xs,
@@ -320,11 +342,13 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       minWidth: 0,
       gap: layout.metricCardTextGap,
       justifyContent: 'center',
+      alignSelf: 'stretch',
     },
     title: {
       fontSize: layout.metricCardLabelFontSize,
       lineHeight: layout.metricCardLabelLineHeight,
       fontWeight: FONT_WEIGHTS.medium,
+      letterSpacing: 0,
       flexShrink: 1,
       minWidth: 0,
       includeFontPadding: false,
@@ -332,6 +356,7 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
     value: {
       flexShrink: 1,
       minWidth: 0,
+      letterSpacing: 0,
       includeFontPadding: false,
     },
     valueCompact: {
@@ -382,9 +407,10 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       borderRadius: 9999,
       paddingHorizontal: SPACING.sm,
       paddingVertical: layout.isCompact ? 2 : 3,
+      borderWidth: 1,
       justifyContent: 'center',
       alignItems: 'center',
-      alignSelf: layout.isCompact ? 'flex-start' : 'center',
+      alignSelf: 'flex-start',
       flexShrink: 0,
     },
     statusTagCompactRow: {

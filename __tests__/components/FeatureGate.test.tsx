@@ -121,6 +121,6 @@ describe('FeatureGate', () => {
       </FeatureGate>
     );
     
-    expect(screen.getByText('Débloquez cette fonctionnalité et bien plus encore')).toBeTruthy();
+    expect(screen.getByText('Debloquez cette fonctionnalite et bien plus encore avec Premium.')).toBeTruthy();
   });
 });

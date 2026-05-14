@@ -66,14 +66,14 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Health Scan a besoin d'acceder a votre camera pour capturer des photos destinees a l'analyse sante par IA."
+          "cameraPermission": "Health Scan a besoin d'acceder a votre camera pour capturer des photos destinees a l'analyse sante."
         }
       ],
       [
         "expo-image-picker",
         {
           "photosPermission": "Health Scan a besoin d'acceder a vos photos pour choisir une photo de profil.",
-          "cameraPermission": "Health Scan a besoin d'acceder a votre camera pour capturer des photos destinees a l'analyse sante par IA.",
+          "cameraPermission": "Health Scan a besoin d'acceder a votre camera pour capturer des photos destinees a l'analyse sante.",
           "microphonePermission": false
         }
       ],

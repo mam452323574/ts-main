@@ -69,7 +69,8 @@ describe('RadialScoreGauge', () => {
     );
 
     expect(getByText('Score de santé assiette vraiment plus long en espagnol').props.numberOfLines).toBe(2);
-    expect(getByText('Score de santé assiette vraiment plus long en espagnol').props.minimumFontScale).toBe(0.84);
+    expect(getByText('Score de santé assiette vraiment plus long en espagnol').props.minimumFontScale).toBe(0.86);
+    expect(getByText('Score de santé assiette vraiment plus long en espagnol').props.ellipsizeMode).toBe('tail');
   });
 
   it('shrinks gauge typography and padding on compact widths', () => {
@@ -89,7 +90,7 @@ describe('RadialScoreGauge', () => {
     const maxStyle = StyleSheet.flatten(getByTestId('radial-score-max').props.style);
 
     expect(rootStyle.paddingHorizontal).toBe(12);
-    expect(rootStyle.borderRadius).toBe(16);
+    expect(rootStyle.borderRadius).toBe(18);
     expect(valueStyle.fontSize).toBe(40);
     expect(valueStyle.lineHeight).toBe(44);
     expect(maxStyle.fontSize).toBe(16);

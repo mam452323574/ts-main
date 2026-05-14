@@ -4,13 +4,12 @@ import {
   type OnboardingPromoSlideKey,
   type OnboardingPromoThemeVariant,
 } from '@/constants/onboardingPromoAssets';
-import { SUPPORTED_LOCALES } from '@/i18n/config';
 
 const SLIDES: OnboardingPromoSlideKey[] = [
   'scanner',
+  'analytics',
   'coach',
   'social',
-  'analytics',
   'fridge',
 ];
 
@@ -18,22 +17,10 @@ const THEMES: OnboardingPromoThemeVariant[] = ['light', 'dark'];
 
 describe('onboarding promo asset manifest', () => {
   it.each(THEMES)(
-    'returns one shared %s hero asset per slide for every locale',
+    'returns one %s hero asset per slide',
     (theme) => {
       SLIDES.forEach((slide) => {
-        const referenceAsset = getOnboardingPromoAsset(
-          theme,
-          SUPPORTED_LOCALES[0],
-          slide,
-        );
-
-        expect(referenceAsset).toBeTruthy();
-
-        SUPPORTED_LOCALES.forEach((locale) => {
-          expect(getOnboardingPromoAsset(theme, locale, slide)).toBe(
-            referenceAsset,
-          );
-        });
+        expect(getOnboardingPromoAsset(theme, slide)).toBeTruthy();
       });
     },
   );

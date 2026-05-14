@@ -144,6 +144,64 @@ describe('shareStory payload builder', () => {
     });
   });
 
+  it.each(['fr', 'en'] as const)(
+    'uses preserved nutrition fallback copy in share stories for %s',
+    (locale) => {
+      i18n.locale = locale;
+
+      const payload = buildShareStoryPayload({
+        analysisData: {
+          schema_version: 4,
+          scan_type: 'nutrition',
+          plate_health_score: 77,
+          calories_estimate: 25,
+          protein_grams: 3,
+          carbs_grams: 4,
+          fat_grams: 1,
+          verdict_key: 'balanced',
+          glycemic_index_key: 'low',
+          satiety_index: 8,
+          ingredient_quality_key: 'mystery_grade',
+          ingredient_quality_fallback_text: 'Chef special',
+          main_vitamin_keys: ['vitamin_a'],
+        } as any,
+        imageUri: 'file:///meal.jpg',
+        t: (scope, options) => i18n.t(scope, options) as string,
+        locale,
+      })!;
+
+      expect(payload.variant).toBe('nutrition');
+      expect(payload.metrics[2].value).toBe('Chef special');
+    },
+  );
+
+  it('uses a dash in share stories when nutrition fallback copy is unavailable', () => {
+    i18n.locale = 'fr';
+
+    const payload = buildShareStoryPayload({
+      analysisData: {
+        schema_version: 4,
+        scan_type: 'nutrition',
+        plate_health_score: 77,
+        calories_estimate: 25,
+        protein_grams: 3,
+        carbs_grams: 4,
+        fat_grams: 1,
+        verdict_key: 'balanced',
+        glycemic_index_key: 'low',
+        satiety_index: 8,
+        ingredient_quality_key: 'mystery_grade',
+        main_vitamin_keys: ['vitamin_a'],
+      } as any,
+      imageUri: 'file:///meal.jpg',
+      t: (scope, options) => i18n.t(scope, options) as string,
+      locale: 'fr',
+    })!;
+
+    expect(payload.variant).toBe('nutrition');
+    expect(payload.metrics[2].value).toBe('-');
+  });
+
   it('formats super scan metrics with /100 risk, urgency and condition count', () => {
     const translator = (scope: string, options?: Record<string, unknown>) => {
       const translations: Record<string, string> = {
@@ -152,7 +210,7 @@ describe('shareStory payload builder', () => {
         'share_story.metrics.urgency': 'Urgence',
         'share_story.metrics.conditions': 'Conditions',
         'share_story.urgency.normal': 'Stable',
-        'share_story.badge.report': 'Rapport IA',
+        'share_story.badge.report': 'Rapport',
       };
 
       return translations[scope] ?? String(options?.defaultValue ?? scope);
@@ -277,7 +335,7 @@ describe('shareStory payload builder', () => {
         })
       )
     ).toMatchObject({
-      schema_version: 3,
+      schema_version: 4,
       scan_type: 'face',
       face_score: 83,
       face_shape_key: 'oval',

@@ -1,5 +1,6 @@
 import { ComponentType, memo, ReactNode, useMemo } from 'react';
 import {
+  ActivityIndicator,
   KeyboardTypeOptions,
   StyleProp,
   StyleSheet,
@@ -9,10 +10,10 @@ import {
   TouchableOpacity,
   View,
   ViewStyle,
- ActivityIndicator } from 'react-native';
+} from 'react-native';
 import { AlertCircle, Check, X } from 'lucide-react-native';
 
-import { SHADOWS, SIZES, SPACING, withAlpha } from '@/constants/theme';
+import { BORDER_RADIUS, FONT_FAMILIES, SHADOWS, SIZES, SPACING, withAlpha } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuthPalette } from '@/components/auth/tokens';
 
@@ -189,29 +190,32 @@ const createStyles = (colors: any, palette: ReturnType<typeof useAuthPalette>) =
       gap: SPACING.xs,
     },
     label: {
-      fontSize: SIZES.text14,
-      fontWeight: '500',
-      color: colors.gray,
+      fontSize: SIZES.text12,
+      fontWeight: '700',
+      letterSpacing: 1.1,
+      textTransform: 'uppercase',
+      color: withAlpha(colors.gray, 0.92),
       marginLeft: SPACING.xs,
     },
     container: {
       flexDirection: 'row',
       alignItems: 'center',
-      minHeight: 56,
-      backgroundColor: palette.accentSofter,
-      borderRadius: 22,
+      minHeight: 60,
+      backgroundColor: palette.surfaceGlass,
+      borderRadius: BORDER_RADIUS.xl,
       borderWidth: 1,
-      borderColor: 'transparent',
+      borderColor: palette.secondaryActionBorder,
       paddingHorizontal: SPACING.md,
-    },
-    containerFocused: {
-      borderColor: palette.accentRing,
-      backgroundColor: palette.accentSoft,
       ...SHADOWS.soft,
+      shadowColor: palette.shadowColor,
+      shadowOpacity: 0.08,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 2,
     },
     containerError: {
       borderColor: withAlpha(colors.error, 0.5),
-      backgroundColor: withAlpha(colors.error, 0.06),
+      backgroundColor: withAlpha(colors.error, 0.08),
     },
     containerDisabled: {
       opacity: 0.6,
@@ -224,6 +228,7 @@ const createStyles = (colors: any, palette: ReturnType<typeof useAuthPalette>) =
     input: {
       flex: 1,
       fontSize: SIZES.md,
+      fontFamily: FONT_FAMILIES.body,
       color: colors.primaryText,
       paddingVertical: SPACING.md,
     },
@@ -245,5 +250,6 @@ const createStyles = (colors: any, palette: ReturnType<typeof useAuthPalette>) =
       fontWeight: '500',
       marginLeft: SPACING.xs,
       marginTop: SPACING.xs,
+      lineHeight: 18,
     },
   });

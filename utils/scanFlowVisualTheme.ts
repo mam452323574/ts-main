@@ -1,8 +1,10 @@
 import {
   type ThemeColors,
   mixColors,
+  softenAccentColor,
   withAlpha,
 } from '@/constants/theme';
+import { buildPremiumHealthPalette } from '@/constants/premiumHealth';
 import type { ScanType } from '@/types';
 
 const CHEF_SOFT_GOLD = '#C9A46A';
@@ -43,6 +45,24 @@ export interface ScanPreviewVisualTheme {
   progressTrackBackground: string;
   progressTrackBorder: string;
   dotBackground: string;
+  loadingOverlayGradient: [string, string, string];
+  loadingVignetteBackground: string;
+  loadingVignetteBorder: string;
+  loadingVignetteShadowColor: string;
+  loadingVignetteMetaBackground: string;
+  loadingVignetteMetaBorder: string;
+  loadingVignetteMetaText: string;
+  loadingPhaseEyebrow: string;
+  loadingProgressValue: string;
+  loadingInsightsLabel: string;
+  loadingHeroShadowColor: string;
+  loadingHeroScrimGradient: [string, string, string];
+  loadingStepBackground: string;
+  loadingStepBorder: string;
+  loadingStepLabel: string;
+  loadingTrustLineBackground: string;
+  loadingTrustLineBorder: string;
+  loadingTrustLineText: string;
 }
 
 export interface ScanFlowAccentTheme {
@@ -53,6 +73,52 @@ export interface ScanFlowAccentTheme {
   progressGradient: [string, string];
   dotActiveColor: string;
   dotCompletedColor: string;
+  chipBackground: string;
+  chipBorder: string;
+  chipText: string;
+  vignetteFrameBorder: string;
+  completionGlow: string;
+  completionGlowSoft: string;
+  guideStroke: string;
+  guideWarning: string;
+  guideSuccess: string;
+  instructionBackground: string;
+  instructionBorder: string;
+  instructionText: string;
+  countdownText: string;
+  countdownRing: string;
+  heroPreviewGradient: [string, string, string];
+  heroPreviewMetaBackground: string;
+  heroPreviewMetaBorder: string;
+  heroPreviewMetaText: string;
+  trustLineAccent: string;
+}
+
+export interface ScanCaptureVisualTheme {
+  screenBackground: string;
+  topScrimGradient: [string, string];
+  bottomScrimGradient: [string, string, string];
+  chromeBackground: string;
+  chromeBorder: string;
+  chromeText: string;
+  chromeMutedText: string;
+  instructionCardBackground: string;
+  instructionCardBorder: string;
+  instructionTitle: string;
+  instructionBody: string;
+  secondaryButtonBackground: string;
+  secondaryButtonBorder: string;
+  secondaryButtonText: string;
+  primaryButtonBackground: string;
+  primaryButtonBorder: string;
+  primaryButtonText: string;
+  countdownBackground: string;
+  countdownText: string;
+  countdownRing: string;
+  shutterOuter: string;
+  shutterInner: string;
+  shadowColor: string;
+  overlayTint: string;
 }
 
 export interface ChefFlowVisualTheme {
@@ -88,55 +154,100 @@ export interface ChefFlowVisualTheme {
 
 export function resolveScanPreviewVisualTheme(
   colors: ThemeColors,
-  isDark: boolean,
+  _isDark: boolean,
 ): ScanPreviewVisualTheme {
+  const premium = buildPremiumHealthPalette(colors, true);
+  const textPrimary = '#F6FBFF';
+  const textSecondary = '#B7C6D4';
+  const textMuted = '#7F92A3';
+
   return {
-    screenBackground: isDark ? '#050505' : colors.background,
-    closeButtonBackground: isDark
-      ? withAlpha('#000000', 0.4)
-      : withAlpha(colors.white, 0.82),
-    closeButtonBorder: isDark
-      ? withAlpha(colors.white, 0.1)
-      : withAlpha(colors.primaryText, 0.08),
-    closeButtonIcon: isDark ? colors.white : colors.primaryText,
-    actionPanelTint: isDark ? 'dark' : 'light',
-    actionPanelBackground: isDark
-      ? 'rgba(20, 20, 22, 0.4)'
-      : withAlpha(colors.cardBackground, 0.84),
-    actionPanelShadowColor: isDark
-      ? '#000000'
-      : mixColors(colors.gray, colors.primary, 0.18),
-    infoLabelColor: isDark
-      ? withAlpha(colors.white, 0.7)
-      : colors.secondaryText,
-    infoValueColor: isDark ? colors.white : colors.primaryText,
-    secondaryButtonBackground: isDark
-      ? withAlpha(colors.white, 0.12)
-      : colors.surfaceMuted,
-    secondaryButtonText: isDark ? colors.white : colors.primaryText,
-    loadingOverlayBackground: isDark
-      ? 'rgba(0, 0, 0, 0.85)'
-      : withAlpha(colors.background, 0.9),
-    progressCardBackground: isDark ? 'rgba(28, 28, 30, 0.98)' : colors.cardBackground,
-    progressCardBorder: isDark
-      ? withAlpha(colors.white, 0.08)
-      : withAlpha(colors.primaryText, 0.06),
-    progressCardShadowColor: isDark
-      ? '#000000'
-      : mixColors(colors.gray, colors.primary, 0.18),
-    loadingStepText: isDark ? colors.white : colors.primaryText,
-    loadingSubtext: isDark
-      ? withAlpha(colors.white, 0.5)
-      : colors.secondaryText,
-    progressTrackBackground: isDark
-      ? withAlpha(colors.white, 0.1)
-      : colors.surfaceMuted,
-    progressTrackBorder: isDark
-      ? withAlpha(colors.white, 0.04)
-      : withAlpha(colors.primaryText, 0.06),
-    dotBackground: isDark
-      ? withAlpha(colors.white, 0.2)
-      : withAlpha(colors.primaryText, 0.14),
+    screenBackground: premium.canvas,
+    closeButtonBackground: withAlpha('#02070C', 0.62),
+    closeButtonBorder: withAlpha(colors.white, 0.1),
+    closeButtonIcon: textPrimary,
+    actionPanelTint: 'dark',
+    actionPanelBackground: withAlpha('#0B131B', 0.94),
+    actionPanelShadowColor: premium.shadowColor,
+    infoLabelColor: textSecondary,
+    infoValueColor: textPrimary,
+    secondaryButtonBackground: withAlpha(colors.white, 0.04),
+    secondaryButtonText: textPrimary,
+    loadingOverlayBackground: withAlpha('#02070C', 0.94),
+    progressCardBackground: withAlpha('#0C141C', 0.96),
+    progressCardBorder: premium.borderSubtle,
+    progressCardShadowColor: premium.shadowColor,
+    loadingStepText: textPrimary,
+    loadingSubtext: textSecondary,
+    progressTrackBackground: withAlpha(colors.white, 0.08),
+    progressTrackBorder: premium.borderSubtle,
+    dotBackground: withAlpha(colors.white, 0.16),
+    loadingOverlayGradient: [
+      withAlpha('#02070C', 0.96),
+      withAlpha(premium.canvasElevated, 0.98),
+      premium.canvas,
+    ],
+    loadingVignetteBackground: withAlpha('#0C141B', 0.42),
+    loadingVignetteBorder: premium.borderStrong,
+    loadingVignetteShadowColor: premium.shadowColor,
+    loadingVignetteMetaBackground: withAlpha('#050B11', 0.78),
+    loadingVignetteMetaBorder: premium.borderStrong,
+    loadingVignetteMetaText: textPrimary,
+    loadingPhaseEyebrow: textMuted,
+    loadingProgressValue: textPrimary,
+    loadingInsightsLabel: textMuted,
+    loadingHeroShadowColor: premium.shadowColor,
+    loadingHeroScrimGradient: [
+      withAlpha('#030A10', 0),
+      withAlpha('#030A10', 0.18),
+      withAlpha('#030A10', 0.78),
+    ],
+    loadingStepBackground: withAlpha(colors.white, 0.04),
+    loadingStepBorder: premium.borderSubtle,
+    loadingStepLabel: textSecondary,
+    loadingTrustLineBackground: withAlpha(colors.white, 0.04),
+    loadingTrustLineBorder: premium.borderSubtle,
+    loadingTrustLineText: textSecondary,
+  };
+}
+
+export function resolveScanCaptureVisualTheme(
+  colors: ThemeColors,
+  _isDark: boolean,
+): ScanCaptureVisualTheme {
+  const premium = buildPremiumHealthPalette(colors, true);
+  const textPrimary = '#F6FBFF';
+  const textSecondary = '#B7C6D4';
+
+  return {
+    screenBackground: premium.canvas,
+    topScrimGradient: [withAlpha(premium.canvas, 0.42), withAlpha(premium.canvas, 0)],
+    bottomScrimGradient: [
+      withAlpha(premium.canvas, 0),
+      withAlpha(premium.canvasElevated, 0.12),
+      withAlpha(premium.canvas, 0.46),
+    ],
+    chromeBackground: withAlpha('#0A1219', 0.76),
+    chromeBorder: withAlpha(colors.white, 0.08),
+    chromeText: textPrimary,
+    chromeMutedText: textSecondary,
+    instructionCardBackground: withAlpha('#0A1219', 0.88),
+    instructionCardBorder: withAlpha(colors.white, 0.1),
+    instructionTitle: textPrimary,
+    instructionBody: textSecondary,
+    secondaryButtonBackground: withAlpha(colors.white, 0.04),
+    secondaryButtonBorder: withAlpha(colors.white, 0.08),
+    secondaryButtonText: textPrimary,
+    primaryButtonBackground: premium.primaryActionBackground,
+    primaryButtonBorder: premium.primaryActionBorder,
+    primaryButtonText: premium.primaryActionText,
+    countdownBackground: withAlpha(premium.canvasElevated, 0.84),
+    countdownText: textPrimary,
+    countdownRing: withAlpha(colors.white, 0.12),
+    shutterOuter: withAlpha(colors.white, 0.68),
+    shutterInner: textPrimary,
+    shadowColor: premium.shadowColor,
+    overlayTint: 'transparent',
   };
 }
 
@@ -145,82 +256,128 @@ export function resolveScanFlowAccentTheme(
   isDark: boolean,
   scanType: ScanType,
 ): ScanFlowAccentTheme {
+  const premium = buildPremiumHealthPalette(colors, true);
+  const buildAccentTheme = (
+    accentColor: string,
+    accentStrongColor: string,
+  ): ScanFlowAccentTheme => {
+    const softenedAccent = softenAccentColor(colors, isDark, accentColor, 'standard');
+    const softenedStrong = softenAccentColor(colors, isDark, accentStrongColor, 'selected');
+
+    return {
+      accentColor: softenedAccent,
+      accentStrongColor: softenedStrong,
+      accentSoftBackground: withAlpha(softenedAccent, isDark ? 0.075 : 0.045),
+      accentBadgeBackground: withAlpha(softenedAccent, isDark ? 0.1 : 0.06),
+      progressGradient: [softenedStrong, softenedAccent],
+      dotActiveColor: softenedStrong,
+      dotCompletedColor: withAlpha(softenedAccent, 0.38),
+      chipBackground: withAlpha(softenedAccent, isDark ? 0.09 : 0.055),
+      chipBorder: withAlpha(softenedStrong, isDark ? 0.16 : 0.11),
+      chipText: '#F6FBFF',
+      vignetteFrameBorder: withAlpha(softenedStrong, isDark ? 0.24 : 0.16),
+      completionGlow: softenedStrong,
+      completionGlowSoft: withAlpha(softenedAccent, isDark ? 0.12 : 0.07),
+      guideStroke: withAlpha(softenedStrong, 0.88),
+      guideWarning: premium.coralAccent,
+      guideSuccess: premium.trustAccent,
+      instructionBackground: withAlpha(softenedAccent, isDark ? 0.07 : 0.045),
+      instructionBorder: withAlpha(softenedStrong, isDark ? 0.14 : 0.1),
+      instructionText: '#F6FBFF',
+      countdownText: '#F6FBFF',
+      countdownRing: withAlpha(softenedStrong, 0.2),
+      heroPreviewGradient: [
+        withAlpha(softenedStrong, isDark ? 0.18 : 0.11),
+        withAlpha(softenedAccent, isDark ? 0.07 : 0.045),
+        withAlpha('#050B11', 0),
+      ],
+      heroPreviewMetaBackground: withAlpha('#050B11', 0.82),
+      heroPreviewMetaBorder: withAlpha(softenedStrong, 0.18),
+      heroPreviewMetaText: '#F6FBFF',
+      trustLineAccent: softenedStrong,
+    };
+  };
+
+  if (scanType === 'body') {
+    const accentColor = mixColors(colors.success ?? colors.accentGreen, colors.gray, isDark ? 0.18 : 0.26);
+    const accentStrongColor = isDark
+      ? mixColors(accentColor, colors.primary, 0.12)
+      : mixColors(accentColor, colors.primaryText, 0.04);
+
+    return buildAccentTheme(accentColor, accentStrongColor);
+  }
+
+  if (scanType === 'nutrition') {
+    const accentColor = mixColors(colors.warning, colors.gray, isDark ? 0.12 : 0.18);
+    const accentStrongColor = isDark
+      ? mixColors(colors.gold, accentColor, 0.14)
+      : mixColors(accentColor, colors.gold, 0.08);
+
+    return buildAccentTheme(accentColor, accentStrongColor);
+  }
+
   if (scanType === 'super') {
     const accentColor = isDark
       ? colors.gold
-      : mixColors(CHEF_SOFT_GOLD, colors.warning, 0.16);
+      : mixColors(CHEF_SOFT_GOLD, colors.warning, 0.1);
     const accentStrongColor = isDark
       ? colors.goldLight
-      : mixColors('#FFF5DF', accentColor, 0.52);
+      : mixColors('#FFF5DF', accentColor, 0.34);
 
-    return {
-      accentColor,
-      accentStrongColor,
-      accentSoftBackground: withAlpha(accentColor, isDark ? 0.12 : 0.14),
-      accentBadgeBackground: withAlpha(accentColor, isDark ? 0.15 : 0.16),
-      progressGradient: [accentStrongColor, accentColor],
-      dotActiveColor: accentColor,
-      dotCompletedColor: withAlpha(accentColor, isDark ? 0.62 : 0.5),
-    };
+    return buildAccentTheme(accentColor, accentStrongColor);
   }
 
-  const accentColor = colors.primary;
+  const accentColor = mixColors(colors.primary, colors.secondary, isDark ? 0.1 : 0.055);
   const accentStrongColor = isDark
     ? colors.primaryDark
-    : mixColors(colors.primary, colors.primaryDark, 0.2);
+    : mixColors(colors.primary, colors.primaryDark, 0.14);
 
-  return {
-    accentColor,
-    accentStrongColor,
-    accentSoftBackground: withAlpha(accentColor, isDark ? 0.1 : 0.12),
-    accentBadgeBackground: withAlpha(accentColor, isDark ? 0.15 : 0.14),
-    progressGradient: [accentColor, accentStrongColor],
-    dotActiveColor: accentStrongColor,
-    dotCompletedColor: withAlpha(accentColor, isDark ? 0.6 : 0.46),
-  };
+  return buildAccentTheme(accentColor, accentStrongColor);
 }
 
 export function resolveChefFlowVisualTheme(
   colors: ThemeColors,
   isDark: boolean,
 ): ChefFlowVisualTheme {
+  const premium = buildPremiumHealthPalette(colors, isDark);
+
   if (isDark) {
     return {
-      screenBackground: CHEF_DARK_BASE,
-      overlayBackground: '#050508',
-      surfaceBackground: CHEF_DARK_SURFACE,
-      surfaceElevated: CHEF_DARK_SURFACE_ELEVATED,
-      surfaceStrong: CHEF_DARK_SURFACE_STRONG,
-      borderColor: CHEF_DARK_BORDER,
-      borderStrong: CHEF_DARK_BORDER_STRONG,
+      screenBackground: premium.canvas,
+      overlayBackground: premium.canvas,
+      surfaceBackground: mixColors(premium.surfaceRaised, colors.gold, 0.06),
+      surfaceElevated: mixColors(premium.surfaceRaised, colors.gold, 0.1),
+      surfaceStrong: premium.canvasElevated,
+      borderColor: withAlpha(colors.gold, 0.18),
+      borderStrong: withAlpha(colors.gold, 0.28),
       textPrimary: colors.white,
-      textSecondary: '#D1D1D6',
-      textMuted: '#A6A6AF',
+      textSecondary: '#D7DCE2',
+      textMuted: '#A4AFBA',
       textInverse: colors.white,
       warmAccent: colors.gold,
-      warmAccentSoft: withAlpha(colors.gold, 0.16),
-      chromeButtonBackground: 'rgba(13, 15, 14, 0.78)',
-      chromeButtonBorder: withAlpha(colors.gold, 0.18),
-      footerBackground: 'rgba(12, 15, 20, 0.98)',
-      footerBorder: withAlpha(colors.gold, 0.12),
+      warmAccentSoft: withAlpha(colors.gold, 0.12),
+      chromeButtonBackground: withAlpha(premium.surfaceGlass, 0.9),
+      chromeButtonBorder: withAlpha(colors.gold, 0.16),
+      footerBackground: withAlpha(premium.surfaceGlass, 0.98),
+      footerBorder: withAlpha(colors.gold, 0.1),
       imageBackground: withAlpha(colors.white, 0.08),
       imageBorder: withAlpha(colors.white, 0.12),
       imageBadgeBackground: 'rgba(10, 13, 12, 0.82)',
       imageBadgeBorder: withAlpha(colors.gold, 0.24),
       reviewOverlayGradient: [
-        'rgba(8, 10, 8, 0.96)',
-        'rgba(12, 15, 19, 0.94)',
-        'rgba(5, 5, 8, 0.98)',
+        withAlpha(premium.canvas, 0.96),
+        withAlpha(premium.canvasElevated, 0.94),
+        withAlpha(premium.canvas, 0.98),
       ],
       reviewCardGradient: [
-        'rgba(245, 214, 127, 0.14)',
-        'rgba(24, 30, 25, 0.98)',
-        'rgba(12, 15, 20, 0.99)',
+        withAlpha(colors.gold, 0.1),
+        withAlpha(premium.surfaceRaised, 0.98),
+        premium.canvasElevated,
       ],
       imageBorderGradient: [
-        'rgba(245, 214, 127, 0.44)',
-        'rgba(47, 130, 236, 0.18)',
-        'rgba(255, 255, 255, 0.1)',
+        withAlpha(colors.goldLight, 0.3),
+        withAlpha(premium.trustAccent, 0.12),
+        withAlpha(colors.white, 0.08),
       ],
       imageVignetteGradient: [
         'rgba(3, 7, 12, 0)',
@@ -229,8 +386,8 @@ export function resolveChefFlowVisualTheme(
       ],
       footerGradient: [
         'rgba(255, 255, 255, 0)',
-        'rgba(255, 215, 10, 0.05)',
-        'rgba(255, 215, 10, 0.08)',
+        'rgba(255, 215, 10, 0.04)',
+        'rgba(255, 215, 10, 0.06)',
       ],
       progressTrackBackground: withAlpha(colors.white, 0.12),
       progressTrackBorder: withAlpha(colors.white, 0.16),
@@ -238,40 +395,40 @@ export function resolveChefFlowVisualTheme(
   }
 
   return {
-    screenBackground: mixColors(colors.background, CHEF_LIGHT_BASE, 0.58),
+    screenBackground: premium.canvas,
     overlayBackground: CHEF_LIGHT_BASE,
-    surfaceBackground: CHEF_LIGHT_SURFACE,
-    surfaceElevated: CHEF_LIGHT_SURFACE_ELEVATED,
-    surfaceStrong: CHEF_LIGHT_SURFACE_STRONG,
-    borderColor: CHEF_LIGHT_BORDER,
-    borderStrong: CHEF_LIGHT_BORDER_STRONG,
+    surfaceBackground: '#FFFCF7',
+    surfaceElevated: '#FBF6EE',
+    surfaceStrong: '#F7EEDF',
+    borderColor: withAlpha(CHEF_SOFT_GOLD, 0.22),
+    borderStrong: withAlpha(CHEF_SOFT_GOLD, 0.3),
     textPrimary: CHEF_LIGHT_TEXT,
     textSecondary: CHEF_LIGHT_TEXT_SECONDARY,
     textMuted: CHEF_LIGHT_TEXT_MUTED,
     textInverse: colors.white,
     warmAccent: CHEF_SOFT_GOLD,
-    warmAccentSoft: withAlpha(CHEF_SOFT_GOLD, 0.14),
-    chromeButtonBackground: withAlpha(colors.white, 0.84),
-    chromeButtonBorder: withAlpha(CHEF_SOFT_GOLD, 0.28),
-    footerBackground: withAlpha(CHEF_LIGHT_SURFACE, 0.96),
-    footerBorder: withAlpha(CHEF_SOFT_GOLD, 0.14),
+    warmAccentSoft: withAlpha(CHEF_SOFT_GOLD, 0.12),
+    chromeButtonBackground: withAlpha(colors.white, 0.9),
+    chromeButtonBorder: withAlpha(CHEF_SOFT_GOLD, 0.22),
+    footerBackground: withAlpha('#FFFCF7', 0.98),
+    footerBorder: withAlpha(CHEF_SOFT_GOLD, 0.12),
     imageBackground: '#F2E8D8',
     imageBorder: withAlpha(CHEF_SOFT_GOLD, 0.22),
     imageBadgeBackground: 'rgba(59, 49, 38, 0.78)',
     imageBadgeBorder: withAlpha(colors.white, 0.22),
     reviewOverlayGradient: [
       withAlpha('#FFF8EF', 0.98),
-      withAlpha('#F8F1E4', 0.96),
-      withAlpha('#F3E7D7', 0.94),
+      withAlpha('#F9F1E4', 0.96),
+      withAlpha('#F2E6D6', 0.94),
     ],
     reviewCardGradient: [
-      withAlpha(CHEF_SOFT_GOLD, 0.14),
-      CHEF_LIGHT_SURFACE,
+      withAlpha(CHEF_SOFT_GOLD, 0.12),
+      '#FFFCF7',
       '#F8F0E4',
     ],
     imageBorderGradient: [
-      withAlpha(CHEF_SOFT_GOLD, 0.34),
-      withAlpha(colors.primary, 0.12),
+      withAlpha(CHEF_SOFT_GOLD, 0.28),
+      withAlpha(premium.trustAccent, 0.1),
       withAlpha(colors.white, 0.92),
     ],
     imageVignetteGradient: [

@@ -13,6 +13,26 @@ export const COACH_PROMPT_TYPES = [
 
 export type CoachPromptType = (typeof COACH_PROMPT_TYPES)[number];
 
+export const LATEST_SCAN_ISSUE_RESOLUTION_PROMPT_TYPE =
+  'latest_scan_issue_resolution' as const;
+
+export const COACH_HIDDEN_GENERATION_PROMPT_TYPES = [
+  LATEST_SCAN_ISSUE_RESOLUTION_PROMPT_TYPE,
+] as const;
+
+export const COACH_GENERATION_PROMPT_TYPES = [
+  ...COACH_PROMPT_TYPES,
+  ...COACH_HIDDEN_GENERATION_PROMPT_TYPES,
+] as const;
+
+export type CoachGenerationPromptType =
+  (typeof COACH_GENERATION_PROMPT_TYPES)[number];
+
+export const COACH_PROMPT_TYPE_ALIASES = {
+  trend_comparison: 'trend_review',
+  latest_scan_issue_resolution: 'latest_scan',
+} as const;
+
 export const DEFAULT_COACH_PROMPT_TYPE: CoachPromptType = 'latest_scan';
 
 export const COACH_PROMPT_CATEGORIES = [
@@ -60,10 +80,61 @@ export function isCoachPromptType(value: unknown): value is CoachPromptType {
   );
 }
 
+export function isCoachGenerationPromptType(
+  value: unknown,
+): value is CoachGenerationPromptType {
+  return (
+    typeof value === 'string' &&
+    (COACH_GENERATION_PROMPT_TYPES as readonly string[]).includes(value)
+  );
+}
+
 export function normalizeCoachPromptType(
   value: unknown,
 ): CoachPromptType | null {
-  return isCoachPromptType(value) ? value : null;
+  if (isCoachPromptType(value)) {
+    return value;
+  }
+
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return (COACH_PROMPT_TYPE_ALIASES as Record<string, CoachPromptType>)[
+    normalized
+  ] ?? null;
+}
+
+export function normalizeCoachGenerationPromptType(
+  value: unknown,
+): CoachGenerationPromptType | null {
+  if (isCoachGenerationPromptType(value)) {
+    return value;
+  }
+
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (isCoachGenerationPromptType(normalized)) {
+    return normalized;
+  }
+
+  return (COACH_PROMPT_TYPE_ALIASES as Record<string, CoachPromptType>)[
+    normalized
+  ] ?? null;
+}
+
+export function resolveVisibleCoachPromptType(
+  promptType: CoachGenerationPromptType,
+): CoachPromptType {
+  if (promptType === LATEST_SCAN_ISSUE_RESOLUTION_PROMPT_TYPE) {
+    return 'latest_scan';
+  }
+
+  return promptType;
 }
 
 export function getCoachPromptDefinition(
@@ -94,12 +165,13 @@ export function resolveEffectiveCoachPromptType(
   promptType: unknown,
   accountTier?: string | null,
 ): CoachPromptType {
-  if (!isCoachPromptType(promptType)) {
+  const normalizedPromptType = normalizeCoachPromptType(promptType);
+  if (!normalizedPromptType) {
     return DEFAULT_COACH_PROMPT_TYPE;
   }
 
-  return hasCoachPromptTypeAccess(promptType, accountTier)
-    ? promptType
+  return hasCoachPromptTypeAccess(normalizedPromptType, accountTier)
+    ? normalizedPromptType
     : DEFAULT_COACH_PROMPT_TYPE;
 }
 
@@ -152,8 +224,15 @@ const DEFAULT_QUOTA: CoachPromptScanQuota = {
   priorLimit: 6,
 };
 
-const COACH_PROMPT_SCAN_QUOTAS: Record<CoachPromptType, CoachPromptScanQuota> = {
+const COACH_PROMPT_SCAN_QUOTAS: Record<
+  CoachGenerationPromptType,
+  CoachPromptScanQuota
+> = {
   latest_scan: {
+    recentLimit: 5,
+    priorLimit: 4,
+  },
+  latest_scan_issue_resolution: {
     recentLimit: 5,
     priorLimit: 4,
   },
@@ -203,7 +282,7 @@ const COACH_PROMPT_SCAN_QUOTAS: Record<CoachPromptType, CoachPromptScanQuota> = 
 };
 
 export function getCoachPromptScanQuota(
-  promptType: CoachPromptType,
+  promptType: CoachGenerationPromptType,
 ): CoachPromptScanQuota {
   return COACH_PROMPT_SCAN_QUOTAS[promptType] ?? DEFAULT_QUOTA;
 }

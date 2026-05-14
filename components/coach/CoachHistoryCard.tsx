@@ -8,6 +8,11 @@ import {
 import { ChevronDown, ChevronUp } from 'lucide-react-native';
 
 import { Button } from '@/components/Button';
+import {
+  CoachStructuredContentSections,
+  hasRenderableCoachStructuredContent,
+  type CoachStructuredContentLabels,
+} from '@/components/coach/CoachStructuredContentSections';
 import { CoachPersonaAvatar } from '@/components/coach/CoachPersonaAvatar';
 import { useTheme } from '@/contexts/ThemeContext';
 import {
@@ -21,12 +26,7 @@ import {
 import type { CoachPersonaVisual } from '@/shared/coachPersonaVisuals';
 import type { CoachStructuredContent } from '@/shared/coachContent';
 
-export interface CoachHistorySectionLabels {
-  context_notes?: string;
-  priorities?: string;
-  action_steps?: string;
-  warnings?: string;
-}
+export type CoachHistorySectionLabels = CoachStructuredContentLabels;
 
 interface CoachHistoryCardProps {
   title: string;
@@ -96,13 +96,9 @@ export function CoachHistoryCard({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const hasStructuredSections = useMemo(
     () =>
-      !!content &&
-      (content.summary.length > 0 ||
-        content.context_notes.length > 0 ||
-        content.priorities.length > 0 ||
-        content.action_steps.length > 0 ||
-        content.warnings.length > 0 ||
-        !!content.encouragement),
+      hasRenderableCoachStructuredContent(content, {
+        showSummary: true,
+      }),
     [content],
   );
   const paragraphs = useMemo(
@@ -115,15 +111,6 @@ export function CoachHistoryCard({
     }
     return body;
   }, [body, content?.summary, hasStructuredSections]);
-  const resolvedSectionLabels = useMemo(
-    () => ({
-      context_notes: sectionLabels?.context_notes ?? 'Ce que je remarque',
-      priorities: sectionLabels?.priorities ?? 'À surveiller',
-      action_steps: sectionLabels?.action_steps ?? 'À faire maintenant',
-      warnings: sectionLabels?.warnings ?? 'Vigilance',
-    }),
-    [sectionLabels],
-  );
   const showFooter = !!disclaimer || (!!ctaLabel && !!onCtaPress);
 
   return (
@@ -215,65 +202,10 @@ export function CoachHistoryCard({
               style={styles.sectionsWrap}
               testID={`${testID}-structured-content`}
             >
-              {content.summary ? (
-                <Text style={styles.structuredSummary}>{content.summary}</Text>
-              ) : null}
-              {content.context_notes.length > 0 ? (
-                <View style={styles.section}>
-                  <Text style={styles.sectionLabel}>
-                    {resolvedSectionLabels.context_notes}
-                  </Text>
-                  {content.context_notes.map((note, index) => (
-                    <Text key={`context-${index}`} style={styles.sectionItem}>
-                      {`• ${note}`}
-                    </Text>
-                  ))}
-                </View>
-              ) : null}
-              {content.priorities.length > 0 ? (
-                <View style={styles.section}>
-                  <Text style={styles.sectionLabel}>
-                    {resolvedSectionLabels.priorities}
-                  </Text>
-                  {content.priorities.map((priority, index) => (
-                    <Text key={`priority-${index}`} style={styles.sectionItem}>
-                      {`→ ${priority}`}
-                    </Text>
-                  ))}
-                </View>
-              ) : null}
-              {content.action_steps.length > 0 ? (
-                <View style={styles.section}>
-                  <Text style={styles.sectionLabel}>
-                    {resolvedSectionLabels.action_steps}
-                  </Text>
-                  {content.action_steps.map((step, index) => (
-                    <Text
-                      key={`action-${index}`}
-                      style={styles.sectionItemAction}
-                    >
-                      {`✓ ${step}`}
-                    </Text>
-                  ))}
-                </View>
-              ) : null}
-              {content.warnings.length > 0 ? (
-                <View style={[styles.section, styles.warningSection]}>
-                  <Text style={[styles.sectionLabel, styles.warningLabel]}>
-                    {resolvedSectionLabels.warnings}
-                  </Text>
-                  {content.warnings.map((warning, index) => (
-                    <Text key={`warning-${index}`} style={styles.sectionItem}>
-                      {`⚠ ${warning}`}
-                    </Text>
-                  ))}
-                </View>
-              ) : null}
-              {content.encouragement ? (
-                <Text style={styles.encouragement}>
-                  {content.encouragement}
-                </Text>
-              ) : null}
+              <CoachStructuredContentSections
+                content={content}
+                labels={sectionLabels}
+              />
             </View>
           ) : (
             <View style={styles.bodyWrap}>
@@ -328,7 +260,7 @@ const createStyles = (colors: any) =>
       left: 0,
       right: 0,
       height: 3,
-      backgroundColor: withAlpha(colors.primary, 0.42),
+      backgroundColor: withAlpha(colors.primary, 0.24),
     },
     toggle: {
       paddingHorizontal: SPACING.md + 2,
@@ -376,9 +308,9 @@ const createStyles = (colors: any) =>
       paddingHorizontal: SPACING.sm,
       paddingVertical: 4,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: withAlpha(colors.primary, 0.12),
+      backgroundColor: withAlpha(colors.primary, 0.07),
       borderWidth: 1,
-      borderColor: withAlpha(colors.primary, 0.2),
+      borderColor: withAlpha(colors.primary, 0.12),
     },
     recentPillText: {
       fontSize: 10,
@@ -448,11 +380,11 @@ const createStyles = (colors: any) =>
       fontWeight: FONT_WEIGHTS.semiBold,
     },
     warningSection: {
-      backgroundColor: withAlpha(colors.warning, 0.08),
+      backgroundColor: withAlpha(colors.warning, 0.055),
       borderRadius: BORDER_RADIUS.md,
       padding: SPACING.sm + 2,
       borderWidth: 1,
-      borderColor: withAlpha(colors.warning, 0.22),
+      borderColor: withAlpha(colors.warning, 0.14),
     },
     warningLabel: {
       color: colors.warning,

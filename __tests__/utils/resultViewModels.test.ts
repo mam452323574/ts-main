@@ -32,6 +32,12 @@ describe('result view models', () => {
     'common.metrics.hydration': 'Hidratacion',
     'common.metrics.photogenic': 'Fotogenia',
     'common.metrics.skin_quality': 'Piel',
+    'common.metrics.skin_clarity': 'Claridad',
+    'common.metrics.skin_evenness': 'Tono uniforme',
+    'common.metrics.under_eye_shadow': 'Ojeras',
+    'common.metrics.pore_visibility': 'Poros',
+    'common.metrics.complexion_redness': 'Rojeces',
+    'common.metrics.sleep_quality': 'Sueno',
     'common.metrics.glow': 'Energia',
     'common.metrics.collagen': 'Colageno',
     'common.metrics.body_type': 'Tipo corporal',
@@ -52,10 +58,30 @@ describe('result view models', () => {
     'common.metrics.proteins': 'Proteinas',
     'common.metrics.carbs': 'Carbohidratos',
     'common.metrics.fats': 'Grasas',
+    'common.metrics.fiber': 'Fibra',
+    'common.metrics.sugar': 'Azucar',
+    'common.metrics.processing_level': 'Procesamiento',
+    'common.metrics.sodium_level': 'Sodio',
+    'common.metrics.meal_balance': 'Equilibrio',
+    'common.metrics.inflammation_index': 'Inflamacion',
+    'common.metrics.color_diversity': 'Colores',
+    'common.metrics.vegetable_ratio': 'Vegetales',
+    'common.metrics.protein_visibility': 'Proteina visible',
+    'common.metrics.whole_grain': 'Integral',
+    'common.metrics.meal_freshness': 'Frescura',
     'common.metrics.satiety': 'Saciedad',
     'common.metrics.ingredient_quality': 'Ingredientes',
     'common.metrics.glycemic_index': 'Indice glucemico',
     'common.metrics.vitamins': 'Vitaminas',
+    'scan.nutrition.long_sections.vitamins': 'Vitaminas y micronutrientes',
+    'scan.nutrition.long_sections.micronutrients': 'Micronutrientes',
+    'scan.nutrition.long_sections.nutrition_points': 'Puntos nutricionales',
+    'scan.nutrition.long_sections.recommendations': 'Recomendaciones',
+    'scan.nutrition.long_sections.dietary_details': 'Detalles alimentarios',
+    'scan.nutrition.long_sections.plate_analysis': 'Analisis del plato',
+    'scan.nutrition.long_sections.estimated_composition': 'Composicion estimada',
+    'scan.nutrition.long_sections.expand': 'Ver mas',
+    'scan.nutrition.long_sections.collapse': 'Ver menos',
     'qualitative_levels.body_type.athletic': 'Atletico',
     'qualitative_levels.muscle_mass.balanced': 'Equilibrada',
     'qualitative_levels.ingredient_quality.processed': 'Procesado',
@@ -133,6 +159,16 @@ describe('result view models', () => {
       'amber',
       'rose',
     ]);
+    expect(viewModel.macros?.items.every((item) => item.value === '••••••')).toBe(
+      true,
+    );
+    expect(
+      viewModel.macros?.items.every((item) => item.premiumRenderState === 'locked'),
+    ).toBe(true);
+    expect(viewModel.metrics[0]).toMatchObject({
+      premiumRenderState: 'locked',
+      value: '••••••',
+    });
     expect(viewModel.metrics[1].value).toBe('Procesado');
     expect(viewModel.metrics[1].theme.tone).toBe('coral');
     expect(viewModel.premiumMetrics[0]).toMatchObject({
@@ -140,11 +176,198 @@ describe('result view models', () => {
       value: '••••••',
     });
     expect(viewModel.premiumMetrics[0].theme.tone).toBe('coral');
-    expect(viewModel.premiumMetrics[1]).toMatchObject({
+    expect(viewModel.premiumMetrics).toHaveLength(1);
+    expect(viewModel.nutritionLongSections?.[0]).toMatchObject({
+      id: 'vitamins',
       premiumRenderState: 'locked',
-      value: '••••••',
+      body: '••••••',
     });
-    expect(viewModel.premiumMetrics[1].theme.tone).toBe('blue');
+    expect(viewModel.nutritionLongSections?.[0].theme.tone).toBe('blue');
+  });
+
+  it('moves unlocked nutrition vitamins and long details into full-width sections', () => {
+    const viewModel = buildScanResultViewModel({
+      analysisData: {
+        schema_version: 4,
+        scan_type: 'nutrition',
+        plate_health_score: 82,
+        calories_estimate: 410,
+        protein_grams: 28,
+        carbs_grams: 33,
+        fat_grams: 14,
+        verdict_key: 'balanced',
+        glycemic_index_key: 'high',
+        satiety_index: 8,
+        ingredient_quality_key: 'processed',
+        main_vitamin_keys: ['vitamin_a', 'vitamin_c'],
+        main_vitamins_fallback_text:
+          'Vitaminas A y C visibles, con apoyo de antioxidantes y minerales de los vegetales.',
+        recommendations:
+          'Aumenta la fibra con una porcion extra de verduras y mantén una fuente de proteina clara.',
+      },
+      t,
+      locale: 'es',
+      premiumRenderState: 'unlocked',
+      resolveFaceGlowScore: () => 0,
+    });
+
+    expect(viewModel.premiumMetrics.map((metric) => metric.icon)).toEqual([
+      'glycemic',
+    ]);
+    expect(viewModel.nutritionLongSections?.map((section) => section.id)).toEqual([
+      'vitamins',
+      'recommendations',
+    ]);
+    expect(viewModel.nutritionLongSections?.[0]).toMatchObject({
+      title: 'Vitaminas y micronutrientes',
+      body:
+        'Vitaminas A y C visibles, con apoyo de antioxidantes y minerales de los vegetales.',
+      tags: ['Vitamina A', 'Vitamina C'],
+      premiumRenderState: 'unlocked',
+    });
+    expect(viewModel.nutritionLongSections?.[1]).toMatchObject({
+      title: 'Recomendaciones',
+      body:
+        'Aumenta la fibra con una porcion extra de verduras y mantén una fuente de proteina clara.',
+    });
+  });
+
+  it('prefers preserved raw fallback text over unknown nutrition labels', () => {
+    const viewModel = buildScanResultViewModel({
+      analysisData: {
+        schema_version: 4,
+        scan_type: 'nutrition',
+        plate_health_score: 82,
+        calories_estimate: 410,
+        protein_grams: 28,
+        carbs_grams: 33,
+        fat_grams: 14,
+        verdict_key: 'mystery_verdict',
+        verdict_fallback_text: 'Energisant mais gras',
+        glycemic_index_key: 'slow_release',
+        glycemic_index_fallback_text: 'Slow release',
+        satiety_index: 8,
+        ingredient_quality_key: 'farm_fresh',
+        ingredient_quality_fallback_text: 'Farm fresh',
+        main_vitamin_keys: ['unknown'],
+        main_vitamins_fallback_text: 'Vitamin P',
+      } as any,
+      t,
+      locale: 'es',
+      premiumRenderState: 'unlocked',
+      resolveFaceGlowScore: () => 0,
+    });
+
+    expect(viewModel.quickStats[1].value).toBe('Energisant mais gras');
+    expect(viewModel.metrics[1].value).toBe('Farm fresh');
+    expect(viewModel.premiumMetrics[0].value).toBe('Slow release');
+    expect(viewModel.nutritionLongSections?.[0]?.body).toBe('Vitamin P');
+  });
+
+  it('renders a dash when qualitative fallback text is unavailable', () => {
+    const faceViewModel = buildScanResultViewModel({
+      analysisData: {
+        schema_version: 4,
+        scan_type: 'face',
+        face_score: 75,
+        perceived_age: 29,
+        face_shape_key: 'mystery_shape',
+        symmetry_percentage: 82,
+        fatigue_level: 24,
+        hydration_level: 68,
+        photogenic_score: 8,
+        skin_quality_score: 71,
+        energy_score: 7,
+        collagen_level: 64,
+      } as any,
+      t,
+      locale: 'es',
+      premiumRenderState: 'unlocked',
+      resolveFaceGlowScore: () => 0,
+    });
+    const bodyViewModel = buildScanResultViewModel({
+      analysisData: {
+        schema_version: 4,
+        scan_type: 'body',
+        body_score: 75,
+        body_type_key: 'mystery_type',
+        muscle_mass_key: 'mystery_mass',
+        waist_estimation_cm: 79,
+        strength_index: 73,
+        bmi_estimate: 22.1,
+        metabolic_age: 28,
+        body_fat_percentage: 18,
+        posture_score: 8,
+        body_symmetry: 77,
+      } as any,
+      t,
+      locale: 'es',
+      premiumRenderState: 'unlocked',
+      resolveFaceGlowScore: () => 0,
+    });
+    const nutritionViewModel = buildScanResultViewModel({
+      analysisData: {
+        schema_version: 4,
+        scan_type: 'nutrition',
+        plate_health_score: 82,
+        calories_estimate: 410,
+        protein_grams: 28,
+        carbs_grams: 33,
+        fat_grams: 14,
+        verdict_key: 'mystery_verdict',
+        glycemic_index_key: 'slow_release',
+        satiety_index: 8,
+        ingredient_quality_key: 'farm_fresh',
+        main_vitamin_keys: ['unknown'],
+      } as any,
+      t,
+      locale: 'es',
+      premiumRenderState: 'unlocked',
+      resolveFaceGlowScore: () => 0,
+    });
+
+    expect(faceViewModel.quickStats[1].value).toBe('-');
+    expect(bodyViewModel.quickStats[0].value).toBe('-');
+    expect(bodyViewModel.quickStats[1].value).toBe('-');
+    expect(nutritionViewModel.quickStats[1].value).toBe('-');
+    expect(nutritionViewModel.metrics[1].value).toBe('-');
+    expect(nutritionViewModel.premiumMetrics[0].value).toBe('-');
+    expect(nutritionViewModel.nutritionLongSections).toEqual([]);
+  });
+
+  it('keeps premium nutrition long sections neutral while auth is loading', () => {
+    const viewModel = buildScanResultViewModel({
+      analysisData: {
+        schema_version: 3,
+        scan_type: 'nutrition',
+        plate_health_score: 82,
+        calories_estimate: 410,
+        protein_grams: 28,
+        carbs_grams: 33,
+        fat_grams: 14,
+        verdict_key: 'balanced',
+        glycemic_index_key: 'high',
+        satiety_index: 8,
+        ingredient_quality_key: 'processed',
+        main_vitamin_keys: ['vitamin_a', 'vitamin_c'],
+      },
+      t,
+      locale: 'es',
+      premiumRenderState: 'loading',
+      resolveFaceGlowScore: () => 0,
+    });
+
+    expect(viewModel.premiumMetrics.every((metric) => metric.value === '...')).toBe(
+      true,
+    );
+    expect(
+      viewModel.premiumMetrics.every((metric) => metric.premiumRenderState === 'loading'),
+    ).toBe(true);
+    expect(viewModel.nutritionLongSections?.[0]).toMatchObject({
+      id: 'vitamins',
+      premiumRenderState: 'loading',
+      body: '...',
+    });
   });
 
   it('keeps premium nutrition metrics neutral while auth is loading', () => {
@@ -202,7 +425,7 @@ describe('result view models', () => {
     expect(viewModel.quickStats[0].value).toBe('Atletico');
     expect(viewModel.quickStats[1].value).toBe('Equilibrada');
     expect(viewModel.metrics[1].theme.tone).toBe('emerald');
-    expect(viewModel.premiumMetrics[0].theme.tone).toBe('coral');
+    expect(viewModel.premiumMetrics[0].theme.tone).toBe('amber');
     expect(viewModel.premiumMetrics[0].premiumRenderState).toBe('unlocked');
   });
 
@@ -274,11 +497,13 @@ describe('result view models', () => {
       'perceived_age',
       'face_shape',
     ]);
+    expect(faceViewModel).not.toHaveProperty('heroInsight');
+    expect(faceViewModel).not.toHaveProperty('keyInsight');
     expect(faceViewModel.metrics.map((item) => item.theme.tone)).toEqual([
-      'teal',
-      'indigo',
       'blue',
-      'violet',
+      'slate',
+      'blue',
+      'gold',
     ]);
     expect(faceViewModel.premiumMetrics.map((item) => item.icon)).toEqual([
       'skin_quality',
@@ -286,14 +511,16 @@ describe('result view models', () => {
       'collagen',
     ]);
     expect(faceViewModel.premiumMetrics.map((item) => item.theme.tone)).toEqual([
-      'teal',
+      'blue',
       'gold',
-      'rose',
+      'blue',
     ]);
     expect(bodyViewModel.quickStats.map((item) => item.icon)).toEqual([
       'body_type',
       'muscle_mass',
     ]);
+    expect(bodyViewModel).not.toHaveProperty('heroInsight');
+    expect(bodyViewModel).not.toHaveProperty('keyInsight');
     expect(bodyViewModel.premiumMetrics.map((item) => item.icon)).toEqual([
       'body_fat',
       'posture',
@@ -303,6 +530,8 @@ describe('result view models', () => {
       'calories',
       'verdict',
     ]);
+    expect(nutritionViewModel).not.toHaveProperty('heroInsight');
+    expect(nutritionViewModel).not.toHaveProperty('keyInsight');
     expect(nutritionViewModel.macros?.items.map((item) => item.icon)).toEqual([
       'proteins',
       'carbs',
@@ -314,6 +543,8 @@ describe('result view models', () => {
     ]);
     expect(nutritionViewModel.premiumMetrics.map((item) => item.icon)).toEqual([
       'glycemic',
+    ]);
+    expect(nutritionViewModel.nutritionLongSections?.map((item) => item.icon)).toEqual([
       'vitamins',
     ]);
     expect(nutritionViewModel.quickStats.map((item) => item.theme.tone)).toEqual([
@@ -326,8 +557,61 @@ describe('result view models', () => {
     ]);
     expect(nutritionViewModel.premiumMetrics.map((item) => item.theme.tone)).toEqual([
       'coral',
-      'blue',
     ]);
+    expect(nutritionViewModel.nutritionLongSections?.[0].theme.tone).toBe('blue');
+  });
+
+  it('adds up to five available extended face metrics to the visible analysis grid', () => {
+    const viewModel = buildScanResultViewModel({
+      analysisData: {
+        schema_version: 4,
+        scan_type: 'face',
+        face_score: 78,
+        perceived_age: 28,
+        face_shape_key: 'oval',
+        symmetry_percentage: 82,
+        fatigue_level: 24,
+        hydration_level: 68,
+        photogenic_score: 8,
+        skin_quality_score: 74,
+        energy_score: 7,
+        collagen_level: 66,
+        skin_clarity_score: 79,
+        skin_evenness_score: 72,
+        under_eye_shadow_score: 31,
+        pore_visibility_score: 44,
+        complexion_redness_score: 27,
+        perceived_sleep_quality: 63,
+      },
+      t,
+      locale: 'es',
+      premiumRenderState: 'unlocked',
+      resolveFaceGlowScore: () => 7,
+    });
+
+    expect(viewModel.metrics.map((item) => item.icon)).toEqual([
+      'symmetry',
+      'fatigue',
+      'hydration',
+      'photogenic',
+      'skin_clarity',
+      'skin_evenness',
+      'under_eye_shadow',
+      'pore_visibility',
+      'complexion_redness',
+      'sleep_quality',
+    ]);
+    expect(viewModel.metrics.slice(4).map((item) => item.value)).toEqual([
+      '79/100',
+      '72/100',
+      '31/100',
+      '44/100',
+      '27/100',
+      '63/100',
+    ]);
+    expect(viewModel.metrics.slice(4).every((item) => item.titleMaxLines === 1)).toBe(
+      true,
+    );
   });
 
   it('localizes super scan summary and disclaimer while keeping normalized conditions sorted', () => {

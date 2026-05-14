@@ -376,6 +376,16 @@ describe('phase2 contracts', () => {
         prompt_type: 'latest_scan',
         payload_version: 1,
         scan_count_7d: 5,
+        question_key: 'latest_scan__top_priority_today',
+        question_text:
+          "A partir de mon dernier scan, quelle est la priorite n\u00b01 aujourd'hui ?",
+        question_hints: {
+          intent_key: 'latest_scan_priority_today',
+          time_scope: 'today',
+          preferred_artifacts: ['priorities', 'action_steps', 'knowledge_card'],
+          discouraged_artifacts: ['daily_schedule', 'shopping_list'],
+          ui_tags: ['starter', 'priority', 'morning'],
+        },
       },
       persona_key: 'gentle_supportive',
       locale: 'fr',

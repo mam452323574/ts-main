@@ -1,10 +1,11 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
-import { Alert, Platform, StyleSheet } from 'react-native';
+import { Alert, InteractionManager, Platform, StyleSheet } from 'react-native';
 import ScannerScreen from '@/screens/ScannerScreen';
 import { paywallSession } from '@/utils/paywallSession';
 import { ApiError } from '@/services/api';
-import { SPACING } from '@/constants/theme';
+import { DARK_COLORS, LIGHT_COLORS, SPACING } from '@/constants/theme';
+import { getMainTabBarMetrics } from '@/utils/mainTabBarMetrics';
 
 // Mock expo-camera
 const mockUseCameraPermissions = jest.fn();
@@ -16,6 +17,13 @@ const mockShowAlert = jest.fn();
 const mockScheduleSuperScanReset = jest.fn();
 const mockNextScanTimerProps: any[] = [];
 const mockUseSafeAreaInsets = jest.fn(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
+const mockUseTheme = jest.fn();
+
+jest.mock('@/contexts/ThemeContext', () => ({
+  useTheme: () => mockUseTheme(),
+  ThemeProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
 jest.mock('expo-camera', () => ({
   CameraView: (() => {
     const React = require('react');
@@ -59,7 +67,16 @@ jest.mock('expo-image-manipulator', () => ({
 // Mock expo-router
 const mockPush = jest.fn();
 let latestFocusEffectCallback: (() => void) | undefined;
+let focusEffectRegistrationCount = 0;
 const mockUseFocusEffect = jest.fn((callback: () => void) => {
+  focusEffectRegistrationCount += 1;
+
+  if (focusEffectRegistrationCount % 2 === 1) {
+    const ReactLocal = require('react');
+    ReactLocal.useEffect(callback, [callback]);
+    return;
+  }
+
   latestFocusEffectCallback = callback;
 });
 jest.mock('expo-router', () => ({
@@ -76,9 +93,12 @@ jest.mock('react-native-safe-area-context', () => ({
 
 // Mock lucide-react-native icons
 jest.mock('lucide-react-native', () => ({
+  AlertCircle: 'AlertCircle',
   Camera: 'Camera',
+  CheckCircle2: 'CheckCircle2',
   FlipHorizontal: 'FlipHorizontal',
   Image: 'Image',
+  Info: 'Info',
   Crown: 'Crown',
   Gift: 'Gift',
   WifiOff: 'WifiOff',
@@ -126,10 +146,12 @@ const mockHasConnectivityError = jest.fn();
 const mockHasBlockingEligibilityError = jest.fn();
 const mockIsAuthReady = jest.fn();
 const mockCanQueryEligibility = jest.fn();
+const mockEligibilityIsFetched = jest.fn();
+const mockEligibilityIsFetching = jest.fn();
+const mockEligibilityIsStale = jest.fn();
 const mockRefetchAll = jest.fn();
 const mockRefetchScanType = jest.fn();
-jest.mock('@/hooks/queries', () => ({
-  useAllScanEligibility: () => ({
+const mockBuildScanEligibilityResult = () => ({
     data: mockScanEligibilityData(),
     errors: mockScanEligibilityErrors(),
     loadingByScanType: mockScanEligibilityLoadingByType(),
@@ -137,11 +159,19 @@ jest.mock('@/hooks/queries', () => ({
     isError: Object.keys(mockScanEligibilityErrors() || {}).length > 0,
     isAuthReady: mockIsAuthReady(),
     canQuery: mockCanQueryEligibility(),
+    isFetched: mockEligibilityIsFetched(),
+    isFetching: mockEligibilityIsFetching(),
+    isStale: mockEligibilityIsStale(),
     hasConnectivityError: mockHasConnectivityError(),
     hasBlockingEligibilityError: mockHasBlockingEligibilityError(),
     refetchAll: mockRefetchAll,
     refetchScanType: mockRefetchScanType,
-  }),
+});
+jest.mock('@/hooks/queries', () => ({
+  useAllScanEligibility: () => mockBuildScanEligibilityResult(),
+}));
+jest.mock('@/hooks/queries/useScanEligibility', () => ({
+  useAllScanEligibility: () => mockBuildScanEligibilityResult(),
 }));
 
 // Mock components
@@ -247,6 +277,27 @@ describe('ScannerScreen', () => {
     mockCameraGuideProps.current = null;
     mockNextScanTimerProps.length = 0;
     latestFocusEffectCallback = undefined;
+    focusEffectRegistrationCount = 0;
+    jest.spyOn(InteractionManager, 'runAfterInteractions').mockImplementation(((task?: any) => {
+      if (typeof task === 'function') {
+        task();
+      } else {
+        task?.gen?.();
+      }
+
+      return {
+        then: jest.fn(),
+        done: jest.fn(),
+        cancel: jest.fn(),
+      };
+    }) as any);
+    mockUseTheme.mockReturnValue({
+      theme: 'light',
+      colors: LIGHT_COLORS,
+      isDark: false,
+      toggleTheme: jest.fn(),
+      setTheme: jest.fn(),
+    });
     mockUserProfile.mockReturnValue({ account_tier: 'free' });
     mockScheduleSuperScanReset.mockResolvedValue(undefined);
     // Mock all scan types with default eligibility
@@ -268,6 +319,9 @@ describe('ScannerScreen', () => {
     mockHasBlockingEligibilityError.mockReturnValue(false);
     mockIsAuthReady.mockReturnValue(true);
     mockCanQueryEligibility.mockReturnValue(true);
+    mockEligibilityIsFetched.mockReturnValue(false);
+    mockEligibilityIsFetching.mockReturnValue(false);
+    mockEligibilityIsStale.mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -295,7 +349,7 @@ describe('ScannerScreen', () => {
       await waitFor(() => {
         expect(screen.getByText(/Nous avons besoin d'acc/)).toBeTruthy();
       });
-      expect(screen.getByText('Autoriser')).toBeTruthy();
+      expect(screen.getByText('Autoriser la caméra')).toBeTruthy();
     });
 
     it('calls requestPermission when Autoriser button is pressed', async () => {
@@ -308,10 +362,10 @@ describe('ScannerScreen', () => {
       render(<ScannerScreen />);
 
       await waitFor(() => {
-        expect(screen.getByText('Autoriser')).toBeTruthy();
+        expect(screen.getByText('Autoriser la caméra')).toBeTruthy();
       });
 
-      fireEvent.press(screen.getByText('Autoriser'));
+      fireEvent.press(screen.getByText('Autoriser la caméra'));
 
       expect(mockRequestPermission).toHaveBeenCalled();
     });
@@ -389,11 +443,10 @@ describe('ScannerScreen', () => {
 
       expect(screen.getByText('23h59')).toBeTruthy();
       expect(screen.queryByText(/Recharge dans/)).toBeNull();
-      expect(screen.getByText('0/1')).toBeTruthy();
       expect(screen.queryByText('scan_limits.week_1')).toBeNull();
     });
 
-    it('shows the recharge timer on a premium 2/3 quota while keeping the card selectable', async () => {
+    it('shows the remaining stock on a premium 2/3 quota while keeping the card selectable', async () => {
       mockUserProfile.mockReturnValue({ account_tier: 'premium' });
       const partialPremiumEligibility = {
         allowed: true,
@@ -413,17 +466,17 @@ describe('ScannerScreen', () => {
 
       render(<ScannerScreen />);
 
-      await waitFor(() => {
-        expect(screen.getByText('2/3')).toBeTruthy();
-      });
-
-      expect(screen.getByText('23h59')).toBeTruthy();
+      expect(screen.getByText('2/3')).toBeTruthy();
+      expect(screen.queryByText('23h59')).toBeNull();
       expect(screen.queryByText(/Recharge dans|\+1 dans/)).toBeNull();
       fireEvent.press(screen.getByText(/Visage/));
       expect(mockShowAlert).not.toHaveBeenCalled();
+      expect(screen.getByTestId('scanner-scan-type-selector')).toBeTruthy();
+      expect(screen.queryByTestId('scanner-instruction-card')).toBeNull();
+      expect(screen.getByText('2/3')).toBeTruthy();
     });
 
-    it('shows the recharge timer on a premium 1/3 quota', async () => {
+    it('shows the remaining stock on a premium 1/3 quota', async () => {
       mockUserProfile.mockReturnValue({ account_tier: 'premium' });
       const partialPremiumEligibility = {
         allowed: true,
@@ -443,12 +496,13 @@ describe('ScannerScreen', () => {
 
       render(<ScannerScreen />);
 
-      await waitFor(() => {
-        expect(screen.getByText('1/3')).toBeTruthy();
-      });
-
-      expect(screen.getByText('23h59')).toBeTruthy();
+      expect(screen.getByText('1/3')).toBeTruthy();
+      expect(screen.queryByText('23h59')).toBeNull();
       expect(screen.queryByText(/Recharge dans|\+1 dans/)).toBeNull();
+      fireEvent.press(screen.getByText('Nutrition'));
+      expect(screen.getByTestId('scanner-scan-type-selector')).toBeTruthy();
+      expect(screen.queryByTestId('scanner-instruction-card')).toBeNull();
+      expect(screen.getByText('1/3')).toBeTruthy();
     });
 
     it('shows the recharge timer on a premium exhausted 0/3 quota', async () => {
@@ -471,10 +525,6 @@ describe('ScannerScreen', () => {
       });
 
       render(<ScannerScreen />);
-
-      await waitFor(() => {
-        expect(screen.getByText('0/3')).toBeTruthy();
-      });
 
       expect(screen.getByText('23h59')).toBeTruthy();
       expect(screen.queryByText(/Recharge dans|\+1 dans/)).toBeNull();
@@ -500,10 +550,6 @@ describe('ScannerScreen', () => {
       });
 
       render(<ScannerScreen />);
-
-      await waitFor(() => {
-        expect(screen.getByText('0/1')).toBeTruthy();
-      });
 
       expect(screen.getByText('23h59')).toBeTruthy();
       expect(screen.queryByText(/Recharge dans/)).toBeNull();
@@ -654,7 +700,7 @@ describe('ScannerScreen', () => {
       const alertBody = mockShowAlert.mock.calls.at(-1)?.[1];
 
       expect(alertBody).toContain('Limite quotidienne atteinte (1 scan). Prochain scan disponible dans 23 heures');
-      expect(alertBody).toContain('Passez en Premium pour scanner sans limite');
+      expect(alertBody).toContain('Passez Premium pour augmenter vos quotas et débloquer Super Scan');
       expect(alertBody).not.toContain('[missing');
     });
 
@@ -688,7 +734,7 @@ describe('ScannerScreen', () => {
       });
 
       expect(screen.getByText('Votre prochain scan est disponible dans 23 heures')).toBeTruthy();
-      expect(screen.getByText('Passez en Premium pour scanner sans limite')).toBeTruthy();
+      expect(screen.getByText('Passez Premium pour augmenter vos quotas et débloquer Super Scan')).toBeTruthy();
     });
   });
 
@@ -749,6 +795,79 @@ describe('ScannerScreen', () => {
   });
 
 
+  describe('visual styling', () => {
+    beforeEach(() => {
+      mockUseCameraPermissions.mockReturnValue([
+        { granted: true },
+        jest.fn(),
+      ]);
+    });
+
+    it('renders the dark-first premium inner shutter in light theme', async () => {
+      render(<ScannerScreen />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('scanner-capture-button-inner')).toBeTruthy();
+      });
+
+      const innerStyle = StyleSheet.flatten(
+        screen.getByTestId('scanner-capture-button-inner').props.style,
+      );
+
+      expect(innerStyle.backgroundColor).toBe('#F6FBFF');
+      expect(innerStyle.borderColor).toBe('rgba(246, 251, 255, 0.16)');
+    });
+
+    it('uses a stronger yellow treatment for selected Super Scan in light theme', async () => {
+      mockUserProfile.mockReturnValue({ account_tier: 'premium' });
+
+      render(<ScannerScreen />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Super')).toBeTruthy();
+      });
+
+      fireEvent.press(screen.getByText('Super'));
+
+      const superButtonStyle = StyleSheet.flatten(
+        screen.getByTestId('scanner-super-scan-button').props.style,
+      );
+      const superLabelStyle = StyleSheet.flatten(
+        screen.getByTestId('scanner-super-scan-label').props.style,
+      );
+      expect(superButtonStyle.backgroundColor).toBe('#FFD33D');
+      expect(superButtonStyle.borderColor).toBe('#FFE45C');
+      expect(superLabelStyle.color).toBe('#2B2115');
+    });
+
+    it('uses the stronger selected Super Scan yellow treatment in dark theme too', async () => {
+      mockUseTheme.mockReturnValue({
+        theme: 'dark',
+        colors: DARK_COLORS,
+        isDark: true,
+        toggleTheme: jest.fn(),
+        setTheme: jest.fn(),
+      });
+      mockUserProfile.mockReturnValue({ account_tier: 'premium' });
+
+      render(<ScannerScreen />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Super')).toBeTruthy();
+      });
+
+      fireEvent.press(screen.getByText('Super'));
+
+      const superButtonStyle = StyleSheet.flatten(
+        screen.getByTestId('scanner-super-scan-button').props.style,
+      );
+
+      expect(superButtonStyle.backgroundColor).toBe('#FFD33D');
+      expect(superButtonStyle.borderColor).toBe('#FFE45C');
+    });
+  });
+
+
 
   describe('capture actions', () => {
     beforeEach(() => {
@@ -782,9 +901,49 @@ describe('ScannerScreen', () => {
         expect.objectContaining({
           scanType: 'health',
           visible: true,
+          viewportInsets: {
+            top: SPACING.xl,
+            bottom:
+              getMainTabBarMetrics(0).topOffsetFromBottom +
+              SPACING.md +
+              76 +
+              SPACING.md +
+              80 +
+              SPACING.lg,
+          },
         })
       );
       expect(screen.getByTestId('scanner-focus-overlay').props.pointerEvents).toBe('none');
+    });
+
+    it('keeps every selected scan mode immersive without a redundant close/reset button', async () => {
+      render(<ScannerScreen />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Visage/)).toBeTruthy();
+      });
+
+      const scanSelections = [
+        { label: /Visage/, scanType: 'health' },
+        { label: 'Corps', scanType: 'body' },
+        { label: 'Nutrition', scanType: 'nutrition' },
+        { label: 'Super', scanType: 'super' },
+      ] as const;
+
+      for (const { label, scanType } of scanSelections) {
+        fireEvent.press(screen.getByText(label));
+
+        expect(screen.queryByTestId('scanner-reset-button')).toBeNull();
+        expect(mockCameraGuideProps.current).toEqual(
+          expect.objectContaining({
+            scanType,
+            visible: true,
+          })
+        );
+      }
+
+      expect(screen.queryByText('Scanner')).toBeNull();
+      expect(screen.getAllByText(/Visage/)).toHaveLength(1);
     });
 
     it('shows alert when trying to capture without selecting scan type', async () => {
@@ -867,8 +1026,9 @@ describe('ScannerScreen', () => {
       );
     });
 
-    it('captures immediately and opens the preview on the back camera', async () => {
+    it('runs the guided capture flow and opens the preview directly on the back camera', async () => {
       const Haptics = require('expo-haptics');
+      jest.useFakeTimers();
 
       render(<ScannerScreen />);
 
@@ -880,9 +1040,8 @@ describe('ScannerScreen', () => {
       await act(async () => {
         fireEvent.press(screen.getByTestId('scanner-capture-button'));
         await Promise.resolve();
+        await jest.advanceTimersByTimeAsync(2000);
       });
-
-      expect(screen.queryByText('Analyse biometrique en cours...')).toBeNull();
 
       await waitFor(() => {
         expect(Haptics.impactAsync).toHaveBeenCalledTimes(1);
@@ -893,6 +1052,8 @@ describe('ScannerScreen', () => {
       expect(captureOptions).toEqual({ quality: 1 });
       expect(captureOptions.skipProcessing).toBeUndefined();
       expect(mockManipulateAsync).not.toHaveBeenCalled();
+      expect(screen.queryByTestId('scanner-confirm-card')).toBeNull();
+
       expect(mockPush).toHaveBeenCalledWith({
         pathname: '/scan-preview',
         params: {
@@ -902,9 +1063,57 @@ describe('ScannerScreen', () => {
       });
     });
 
+    it('keeps the selector and controls mounted while camera capture is pending', async () => {
+      let resolveCapture:
+        | ((value: { uri: string }) => void)
+        | null = null;
+      mockTakePictureAsync.mockReturnValue(
+        new Promise((resolve) => {
+          resolveCapture = resolve;
+        })
+      );
+
+      render(<ScannerScreen />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Visage/)).toBeTruthy();
+      });
+
+      fireEvent.press(screen.getByText(/Visage/));
+
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('scanner-capture-button'));
+        await Promise.resolve();
+      });
+
+      expect(mockTakePictureAsync).toHaveBeenCalledTimes(1);
+      expect(mockPush).not.toHaveBeenCalled();
+      expect(screen.getByTestId('scanner-scan-type-selector')).toBeTruthy();
+      expect(screen.getByTestId('scanner-gallery-button')).toBeTruthy();
+      expect(screen.getByTestId('scanner-capture-button')).toBeTruthy();
+      expect(screen.getByTestId('scanner-flip-camera-button')).toBeTruthy();
+
+      await act(async () => {
+        resolveCapture?.({ uri: 'file:///slow-captured-photo.jpg' });
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith({
+          pathname: '/scan-preview',
+          params: {
+            imageUri: 'file:///slow-captured-photo.jpg',
+            scanType: 'health',
+          },
+        });
+      });
+    });
+
     it('flips the captured image on the front camera before opening the preview', async () => {
       mockTakePictureAsync.mockResolvedValue({ uri: 'file:///front-camera-photo.jpg' });
       mockManipulateAsync.mockResolvedValue({ uri: 'file:///front-camera-photo-fixed.jpg', width: 100, height: 200 });
+      jest.useFakeTimers();
 
       render(<ScannerScreen />);
 
@@ -924,6 +1133,7 @@ describe('ScannerScreen', () => {
       await act(async () => {
         fireEvent.press(screen.getByTestId('scanner-capture-button'));
         await Promise.resolve();
+        await jest.advanceTimersByTimeAsync(2000);
       });
 
       await waitFor(() => {
@@ -935,19 +1145,21 @@ describe('ScannerScreen', () => {
             format: 'jpeg',
           }
         );
-        expect(mockPush).toHaveBeenCalledWith({
-          pathname: '/scan-preview',
-          params: {
-            imageUri: 'file:///front-camera-photo-fixed.jpg',
-            scanType: 'health',
-          },
-        });
+      });
+
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/scan-preview',
+        params: {
+          imageUri: 'file:///front-camera-photo-fixed.jpg',
+          scanType: 'health',
+        },
       });
     });
 
     it('stays on the scanner and shows the existing photo error when front camera normalization fails', async () => {
       mockTakePictureAsync.mockResolvedValue({ uri: 'file:///front-camera-photo.jpg' });
       mockManipulateAsync.mockRejectedValue(new Error('flip failed'));
+      jest.useFakeTimers();
 
       render(<ScannerScreen />);
 
@@ -960,6 +1172,7 @@ describe('ScannerScreen', () => {
       await act(async () => {
         fireEvent.press(screen.getByTestId('scanner-capture-button'));
         await Promise.resolve();
+        await jest.advanceTimersByTimeAsync(2000);
       });
 
       await waitFor(() => {
@@ -1332,15 +1545,29 @@ describe('ScannerScreen', () => {
       const selectorStyle = StyleSheet.flatten(
         screen.getByTestId('scanner-scan-type-selector').props.style,
       );
-      const bannerStyle = StyleSheet.flatten(
-        screen.getByTestId('scanner-network-banner').props.style,
+      const topBandStyle = StyleSheet.flatten(
+        screen.getByTestId('scanner-top-band').props.style,
       );
 
-      expect(controlsStyle.bottom).toBe(SPACING.sm + SPACING.md);
-      expect(selectorStyle.bottom).toBe(
-        SPACING.sm + SPACING.md + 76 + SPACING.md,
+      const tabBarMetrics = getMainTabBarMetrics(0);
+      const expectedControlsBottom = tabBarMetrics.topOffsetFromBottom + SPACING.sm;
+
+      expect(controlsStyle.bottom).toBe(expectedControlsBottom);
+      expect(selectorStyle.flexDirection).toBe('row');
+      expect(topBandStyle.top).toBe(24 + SPACING.sm);
+      expect(mockCameraGuideProps.current).toEqual(
+        expect.objectContaining({
+          viewportInsets: {
+            top: 24 + SPACING.lg,
+            bottom:
+              expectedControlsBottom +
+              72 +
+              SPACING.sm +
+              76 +
+              SPACING.lg,
+          },
+        }),
       );
-      expect(bannerStyle.top).toBe(24 + SPACING.md);
     });
 
     it('shows a precise alert when the tapped scan type has a non-network eligibility error', async () => {
@@ -1371,6 +1598,7 @@ describe('ScannerScreen', () => {
     });
 
     it('keeps successful scan types usable when another eligibility query fails', async () => {
+      jest.useFakeTimers();
       mockScanEligibilityData.mockReturnValue({
         body: defaultEligibility,
         nutrition: defaultEligibility,
@@ -1391,6 +1619,7 @@ describe('ScannerScreen', () => {
       await act(async () => {
         fireEvent.press(screen.getByTestId('scanner-capture-button'));
         await Promise.resolve();
+        await jest.advanceTimersByTimeAsync(2000);
       });
 
       await waitFor(() => {

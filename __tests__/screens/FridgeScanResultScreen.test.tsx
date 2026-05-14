@@ -130,6 +130,9 @@ jest.mock('@/contexts/LanguageContext', () => ({
 jest.mock('@/hooks/queries', () => ({
   useFridgeScanRecord: (...args: unknown[]) => mockUseFridgeScanRecord(...args),
 }));
+jest.mock('@/hooks/queries/useFridgeScanRecord', () => ({
+  useFridgeScanRecord: (...args: unknown[]) => mockUseFridgeScanRecord(...args),
+}));
 
 jest.mock('@/components/ModalHandle', () => ({
   ModalHandle: () => null,
@@ -159,6 +162,7 @@ jest.mock('lucide-react-native', () => {
     CheckCircle2: makeIcon('CheckCircle2'),
     Dumbbell: makeIcon('Dumbbell'),
     Leaf: makeIcon('Leaf'),
+    Lock: makeIcon('Lock'),
     ShieldCheck: makeIcon('ShieldCheck'),
     Utensils: makeIcon('Utensils'),
   };

@@ -1,7 +1,7 @@
 import { Redirect } from 'expo-router';
 
 import SocialCommentsScreen from '@/screens/SocialCommentsScreen';
-import { useFeatureFlags } from '@/hooks/queries';
+import { useFeatureFlags } from '@/hooks/queries/useFeatureFlags';
 import {
   resolveSocialCommentsGate,
   shouldEnableSocialComments,

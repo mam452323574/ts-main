@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
+import { PremiumTeaserCard } from '@/components/results/PremiumTeaserCard';
 import { FONT_WEIGHTS, SIZES, SPACING, withAlpha } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import {
@@ -10,6 +11,7 @@ import {
 } from '@/utils/resultLayout';
 import type { FatDistributionAreaViewModel } from '@/utils/resultViewModels';
 import type { ResolvedSuperScanAreaTheme } from '@/utils/superScanVisualTheme';
+import type { PremiumRenderState } from '@/utils/subscription';
 
 interface SuperScanAreaCardLabels {
   dominantType: string;
@@ -24,6 +26,9 @@ interface SuperScanAreaCardLabels {
 interface SuperScanAreaCardProps {
   area: FatDistributionAreaViewModel;
   labels: SuperScanAreaCardLabels;
+  lockedTitle?: string;
+  onPremiumPress?: () => void;
+  premiumRenderState?: PremiumRenderState;
   testID?: string;
   theme?: ResolvedSuperScanAreaTheme;
 }
@@ -31,6 +36,9 @@ interface SuperScanAreaCardProps {
 export function SuperScanAreaCard({
   area,
   labels,
+  lockedTitle,
+  onPremiumPress,
+  premiumRenderState = 'unlocked',
   testID = 'super-scan-area-card',
   theme,
 }: SuperScanAreaCardProps) {
@@ -41,6 +49,19 @@ export function SuperScanAreaCard({
     () => createStyles(colors, isDark, layout),
     [colors, isDark, layout],
   );
+
+  if (premiumRenderState !== 'unlocked') {
+    return (
+      <PremiumTeaserCard
+        accentColor={theme?.accentColor ?? colors.primary}
+        lineCount={4}
+        onPress={premiumRenderState === 'locked' ? onPremiumPress : undefined}
+        premiumRenderState={premiumRenderState}
+        testID={testID}
+        title={lockedTitle ?? labels.explanation}
+      />
+    );
+  }
 
   return (
     <View
@@ -64,6 +85,9 @@ export function SuperScanAreaCard({
       <View style={styles.headerRow}>
         <Text
           {...RESULT_TEXT_PROPS}
+          adjustsFontSizeToFit
+          ellipsizeMode="tail"
+          minimumFontScale={0.86}
           numberOfLines={2}
           style={styles.areaName}
           testID={`${testID}-name`}
@@ -85,6 +109,9 @@ export function SuperScanAreaCard({
         >
           <Text
             {...RESULT_TEXT_PROPS}
+            adjustsFontSizeToFit
+            ellipsizeMode="tail"
+            minimumFontScale={0.82}
             numberOfLines={1}
             style={styles.badgeLabel}
           >
@@ -92,6 +119,9 @@ export function SuperScanAreaCard({
           </Text>
           <Text
             {...RESULT_TEXT_PROPS}
+            adjustsFontSizeToFit
+            ellipsizeMode="tail"
+            minimumFontScale={0.82}
             numberOfLines={2}
             style={[
               styles.badgeValue,
@@ -150,13 +180,19 @@ export function SuperScanAreaCard({
           >
             <Text
               {...RESULT_TEXT_PROPS}
-              numberOfLines={2}
+              adjustsFontSizeToFit
+              ellipsizeMode="tail"
+              minimumFontScale={0.82}
+              numberOfLines={1}
               style={styles.metricLabel}
             >
               {metric.label}
             </Text>
             <Text
               {...RESULT_TEXT_PROPS}
+              adjustsFontSizeToFit
+              ellipsizeMode="tail"
+              minimumFontScale={0.82}
               numberOfLines={1}
               style={[
                 styles.metricValue,
@@ -187,6 +223,9 @@ export function SuperScanAreaCard({
       >
         <Text
           {...RESULT_TEXT_PROPS}
+          adjustsFontSizeToFit
+          ellipsizeMode="tail"
+          minimumFontScale={0.82}
           numberOfLines={1}
           style={[
             styles.sectionLabel,
@@ -221,6 +260,9 @@ export function SuperScanAreaCard({
       >
         <Text
           {...RESULT_TEXT_PROPS}
+          adjustsFontSizeToFit
+          ellipsizeMode="tail"
+          minimumFontScale={0.82}
           numberOfLines={1}
           style={[
             styles.sectionLabel,
@@ -258,8 +300,8 @@ const createStyles = (
       borderWidth: 1,
     },
     headerRow: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
+      flexDirection: layout.useSingleColumnResultCards ? 'column' : 'row',
+      alignItems: layout.useSingleColumnResultCards ? 'stretch' : 'flex-start',
       justifyContent: 'space-between',
       gap: SPACING.sm,
     },
@@ -270,11 +312,17 @@ const createStyles = (
       lineHeight: layout.sectionTitleLineHeight,
       fontWeight: FONT_WEIGHTS.bold,
       color: colors.primaryText,
+      flexShrink: 1,
       includeFontPadding: false,
     },
     dominantBadge: {
       minWidth: layout.isCompact ? 112 : 132,
-      maxWidth: layout.isCompact ? 140 : 164,
+      maxWidth: layout.useSingleColumnResultCards
+        ? undefined
+        : layout.isCompact
+          ? 140
+          : 164,
+      width: layout.useSingleColumnResultCards ? '100%' : undefined,
       borderRadius: layout.standardRadius,
       paddingHorizontal: SPACING.sm + 2,
       paddingVertical: SPACING.sm,
@@ -294,6 +342,8 @@ const createStyles = (
       textTransform: 'uppercase',
       letterSpacing: 0.55,
       fontWeight: FONT_WEIGHTS.semiBold,
+      flexShrink: 1,
+      minWidth: 0,
       includeFontPadding: false,
     },
     badgeValue: {
@@ -301,6 +351,8 @@ const createStyles = (
       lineHeight: layout.bodyTextLineHeight,
       color: colors.primaryText,
       fontWeight: FONT_WEIGHTS.semiBold,
+      flexShrink: 1,
+      minWidth: 0,
       includeFontPadding: false,
     },
     metricsGrid: {
@@ -310,8 +362,12 @@ const createStyles = (
     },
     metricTile: {
       flexGrow: 1,
-      flexBasis: layout.isCompact ? '47%' : '48%',
-      minWidth: layout.isCompact ? 120 : 140,
+      flexBasis: layout.useSingleColumnResultCards ? '100%' : '48%',
+      minWidth: layout.useSingleColumnResultCards
+        ? 0
+        : layout.isCompact
+          ? 120
+          : 140,
       borderRadius: layout.standardRadius,
       paddingHorizontal: SPACING.sm + 2,
       paddingVertical: SPACING.sm,
@@ -329,6 +385,8 @@ const createStyles = (
       lineHeight: 14,
       color: colors.gray,
       fontWeight: FONT_WEIGHTS.medium,
+      flexShrink: 1,
+      minWidth: 0,
       includeFontPadding: false,
     },
     metricValue: {
@@ -336,6 +394,8 @@ const createStyles = (
       lineHeight: layout.bodyTextLineHeight,
       color: colors.primaryText,
       fontWeight: FONT_WEIGHTS.bold,
+      flexShrink: 1,
+      minWidth: 0,
       includeFontPadding: false,
     },
     sectionCard: {
@@ -358,6 +418,8 @@ const createStyles = (
       textTransform: 'uppercase',
       letterSpacing: 0.55,
       fontWeight: FONT_WEIGHTS.semiBold,
+      flexShrink: 1,
+      minWidth: 0,
       includeFontPadding: false,
     },
     sectionBody: {

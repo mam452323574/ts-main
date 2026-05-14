@@ -10,7 +10,15 @@ import {
 } from 'react-native';
 import { Check, ChevronDown, Globe, X } from 'lucide-react-native';
 
-import { SHADOWS, SIZES, SPACING } from '@/constants/theme';
+import {
+  BORDER_RADIUS,
+  SHADOWS,
+  SIZES,
+  SPACING,
+  getThemeTokens,
+  getThemedSurface,
+  withAlpha,
+} from '@/constants/theme';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { LOCALE_OPTIONS, type LocaleCode } from '@/i18n/config';
@@ -108,17 +116,26 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({ style }) => 
   );
 };
 
-const createStyles = (colors: any, isDark: boolean) =>
-  StyleSheet.create({
+const createStyles = (colors: any, isDark: boolean) => {
+  const tokens = getThemeTokens(isDark);
+  const modalSurface = getThemedSurface({
+    colors,
+    isDark,
+    variant: 'glass',
+    border: true,
+    shadow: true,
+  });
+
+  return StyleSheet.create({
     button: {
       flexDirection: 'row',
       alignItems: 'center',
       paddingHorizontal: 12,
       paddingVertical: 8,
-      borderRadius: 20,
+      borderRadius: BORDER_RADIUS.full,
       borderWidth: 1,
-      borderColor: colors.lightGray,
-      backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.9)',
+      borderColor: tokens.border.subtle,
+      backgroundColor: tokens.surfaceGlass.base,
       ...SHADOWS.header,
     },
     flag: {
@@ -135,7 +152,7 @@ const createStyles = (colors: any, isDark: boolean) =>
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
-      backgroundColor: isDark ? 'rgba(3,8,16,0.72)' : 'rgba(10,16,32,0.42)',
+      backgroundColor: tokens.scrim,
       paddingHorizontal: SPACING.lg,
     },
     modalBackdrop: {
@@ -148,16 +165,16 @@ const createStyles = (colors: any, isDark: boolean) =>
     modalContent: {
       width: '88%',
       maxWidth: 360,
-      borderRadius: 30,
+      borderRadius: BORDER_RADIUS.hero,
       paddingVertical: SPACING.lg,
-      backgroundColor: colors.cardBackground,
+      backgroundColor: modalSurface.backgroundColor,
       borderWidth: 1,
-      borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#EBEEF6',
-      shadowColor: '#0D1428',
-      shadowOffset: { width: 0, height: 14 },
-      shadowOpacity: isDark ? 0.38 : 0.14,
-      shadowRadius: 24,
-      elevation: 11,
+      borderColor: modalSurface.borderColor,
+      shadowColor: modalSurface.shadowColor,
+      shadowOffset: modalSurface.shadowOffset,
+      shadowOpacity: modalSurface.shadowOpacity,
+      shadowRadius: modalSurface.shadowRadius,
+      elevation: modalSurface.elevation,
       maxHeight: '72%',
     },
     modalHeaderIconRow: {
@@ -170,9 +187,9 @@ const createStyles = (colors: any, isDark: boolean) =>
       borderRadius: 27,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: isDark ? 'rgba(10,132,255,0.18)' : '#EAF3FF',
+      backgroundColor: withAlpha(colors.primary, isDark ? 0.16 : 0.1),
       borderWidth: 1,
-      borderColor: isDark ? 'rgba(10,132,255,0.4)' : '#CDE2FF',
+      borderColor: withAlpha(colors.primary, isDark ? 0.34 : 0.2),
     },
     modalEmoji: {
       marginTop: SPACING.xs,
@@ -194,7 +211,7 @@ const createStyles = (colors: any, isDark: boolean) =>
     closeButton: {
       padding: 6,
       borderRadius: 16,
-      backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F4F6FB',
+      backgroundColor: tokens.surfaceMuted.base,
     },
     listContent: {
       paddingHorizontal: SPACING.lg,
@@ -207,12 +224,12 @@ const createStyles = (colors: any, isDark: boolean) =>
       padding: SPACING.md,
       borderRadius: 16,
       borderWidth: 1,
-      borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#E8ECF5',
-      backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#FFFFFF',
+      borderColor: tokens.border.subtle,
+      backgroundColor: tokens.surface.base,
     },
     languageOptionSelected: {
-      borderColor: 'rgba(0,122,255,0.34)',
-      backgroundColor: 'rgba(0,122,255,0.12)',
+      borderColor: withAlpha(colors.primary, 0.34),
+      backgroundColor: withAlpha(colors.primary, isDark ? 0.14 : 0.1),
     },
     flagLarge: {
       fontSize: 24,
@@ -229,3 +246,4 @@ const createStyles = (colors: any, isDark: boolean) =>
       fontWeight: '700',
     },
   });
+};

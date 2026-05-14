@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   ChartNoAxesCombined,
   ChefHat,
@@ -24,7 +25,9 @@ import {
   type LucideProps,
 } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
+import { AppScreen } from '@/components/AppScreen';
 import { ModalHandle } from '@/components/ModalHandle';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { CoachFeatureIcon, SuperScanFeatureIcon } from '@/components/FeatureIcons';
 import {
   SIZES,
@@ -33,14 +36,17 @@ import {
   FONT_WEIGHTS,
   SHADOWS,
   getAndroidLightSurface,
+  getObsidianSurface,
+  getVisualMoodSurface,
   mixColors,
   withAlpha,
 } from '@/constants/theme';
+import { buildPremiumHealthPalette, type PremiumHealthPalette } from '@/constants/premiumHealth';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import type { PurchasesOffering, PurchasesPackage } from 'react-native-purchases';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
-import { GROWTH_EXPERIENCE_QUERY_KEY } from '@/hooks/queries';
+import { GROWTH_EXPERIENCE_QUERY_KEY } from '@/hooks/queries/useGrowthExperience';
 import { trackEvent, trackFailureEvent } from '@/services/analytics';
 import { markEntryOfferClaimed } from '@/services/growthExperience';
 import { loadPurchasesModule } from '@/services/purchasesRuntime';
@@ -55,8 +61,6 @@ import { logOperationalError } from '@/utils/observability';
 import { getRuntimeCapabilities } from '@/utils/runtimeCapabilities';
 import { hasPremiumAccessFromProfile } from '@/utils/subscription';
 import { resolveSafeReturnRoute, safeOpenExternalUrl } from '@/utils/urlSecurity';
-
-const CARD_MIN_WIDTH = 280;
 
 // ─── Feature list types ───
 interface FeatureItem {
@@ -218,10 +222,21 @@ export default function PremiumUpgradeScreen() {
   const { colors, isDark } = useTheme();
   const { t, locale } = useLanguage();
   const insets = useSafeAreaInsets();
-  const styles = useMemo(() => createStyles(colors, insets, isDark), [colors, insets, isDark]);
+  const premiumHealth = useMemo(
+    () => buildPremiumHealthPalette(colors, isDark),
+    [colors, isDark],
+  );
+  const styles = useMemo(
+    () => createStyles(colors, insets, isDark, premiumHealth),
+    [colors, insets, isDark, premiumHealth],
+  );
   const runtime = getRuntimeCapabilities();
   const { showAlert, alertElement } = useCustomAlert();
   const isNativePurchasesAvailable = runtime.canUseNativePurchases;
+  const heroGradientColors = useMemo(
+    () => premiumHealth.premiumGradient,
+    [premiumHealth],
+  );
 
   const source = readRouteParam(params.source);
   const requestedOfferingId = readRouteParam(params.offeringId);
@@ -666,9 +681,9 @@ export default function PremiumUpgradeScreen() {
     return (
       <View style={styles.container}>
         {alertElement}
-        <View style={styles.alreadyPremiumContainer}>
+          <View style={styles.alreadyPremiumContainer}>
           <View style={styles.premiumBadge}>
-            <Crown color={colors.white} size={64} fill={colors.white} />
+            <Crown color={colors.gold} size={64} fill={withAlpha(colors.gold, 0.2)} />
           </View>
           <Text style={styles.alreadyPremiumTitle}>{t('premium.already_premium_title')}</Text>
           <Text style={[styles.alreadyPremiumText, { color: colors.primaryText, fontWeight: 'bold' }]}>
@@ -684,8 +699,8 @@ export default function PremiumUpgradeScreen() {
             </Text>
           )}
 
-          <TouchableOpacity 
-            style={[styles.ctaButton, { backgroundColor: colors.primary, width: '100%', maxWidth: 300, marginBottom: SPACING.md }]} 
+          <TouchableOpacity
+            style={[styles.ctaButton, { backgroundColor: colors.primaryText, width: '100%', maxWidth: 300, marginBottom: SPACING.md }]}
             onPress={handleManageSubscription}
           >
             <Text style={styles.ctaButtonText}>{t('premium.manage_subscription')}</Text>
@@ -703,7 +718,7 @@ export default function PremiumUpgradeScreen() {
   const renderFeatureRow = (item: FeatureItem, index: number, isHighlighted: boolean) => {
     const Icon = item.icon;
     const iconColor = item.included
-      ? (isHighlighted ? colors.primary : colors.success)
+      ? (isHighlighted ? colors.gold : colors.success)
       : colors.error;
 
     return (
@@ -713,8 +728,8 @@ export default function PremiumUpgradeScreen() {
             styles.featureIcon,
             {
               backgroundColor: item.included
-                ? (isHighlighted ? colors.primary + '20' : colors.success + '20')
-                : colors.error + '15',
+                ? (isHighlighted ? withAlpha(colors.gold, 0.14) : withAlpha(colors.success, 0.14))
+                : withAlpha(colors.error, 0.12),
             },
           ]}
         >
@@ -779,8 +794,8 @@ export default function PremiumUpgradeScreen() {
         testID={`premium-card-${packageTestIdSuffix}-shell`}
       >
         {badge ? (
-          <View style={[styles.badge, { backgroundColor: colors.primary }]}>
-            <Star color={colors.white} size={12} fill={colors.white} />
+          <View style={[styles.badge, { backgroundColor: colors.gold }]}>
+            <Star color={colors.background} size={12} fill={colors.background} />
             <Text style={styles.badgeText}>{badge}</Text>
           </View>
         ) : null}
@@ -796,7 +811,7 @@ export default function PremiumUpgradeScreen() {
             <Text style={[styles.cardTitle, { color: colors.primaryText }]}>
               {resolvePackageTitle(pack, t)}
             </Text>
-            <Text style={[styles.cardPrice, { color: colors.primary }]}>
+            <Text style={[styles.cardPrice, { color: shouldUseHighlightStyles ? colors.gold : colors.primary }]}>
               {pack.product.priceString}
             </Text>
             {packageSubtitle ? (
@@ -827,7 +842,7 @@ export default function PremiumUpgradeScreen() {
               styles.ctaButton,
               shouldUseHighlightStyles ? styles.ctaButtonAnnual : null,
               {
-                backgroundColor: colors.primary,
+                backgroundColor: colors.primaryText,
                 opacity: purchaseDisabled ? 0.7 : 1,
               },
               SHADOWS.button,
@@ -839,7 +854,7 @@ export default function PremiumUpgradeScreen() {
             testID={`premium-card-${packageTestIdSuffix}-cta`}
           >
             {purchasingPackageId === pack.identifier ? (
-              <ActivityIndicator color={colors.white} />
+              <ActivityIndicator color={colors.background} />
             ) : (
               <Text style={styles.ctaButtonText}>{ctaLabel}</Text>
             )}
@@ -851,18 +866,16 @@ export default function PremiumUpgradeScreen() {
 
   // ─── Main render ───
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <AppScreen topInset={false} bottomInset={false} style={[styles.container, { backgroundColor: colors.background }]}>
       {alertElement}
       <ModalHandle />
 
-      {/* Header bar */}
-      <View style={styles.header}>
-        <View style={{ width: 28 }} />
-        <Text style={[styles.headerTitle, { color: colors.primaryText }]}>{t('premium.title')}</Text>
-        <TouchableOpacity onPress={dismissToOrigin} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-          <X color={colors.primaryText} size={28} />
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        title={t('premium.title')}
+        onClose={dismissToOrigin}
+        centered
+        testID="premium-screen-header"
+      />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -878,53 +891,57 @@ export default function PremiumUpgradeScreen() {
           ]}
         >
           {/* ─── Hero section ─── */}
-          <View style={styles.heroSection}>
-            <View style={styles.heroCrownContainer}>
-              <Crown color={colors.primary} size={44} fill={colors.primary} />
-              <View style={styles.heroSparkle}>
-                <Sparkles color={colors.warning} size={20} fill={colors.warning} />
+          <View style={styles.heroShell}>
+            <LinearGradient
+              colors={heroGradientColors}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.heroSection}
+            >
+              <View style={styles.heroCrownContainer}>
+                <Crown color={colors.gold} size={44} fill={withAlpha(colors.gold, 0.22)} />
+                <View style={styles.heroSparkle}>
+                  <Sparkles color={colors.gold} size={20} fill={colors.gold} />
+                </View>
               </View>
+              <Text style={[styles.heroTitle, { color: colors.primaryText }]}>
+                {t('premium.subscription_page.hero_title')}
+              </Text>
+              <Text style={[styles.heroSubtitle, { color: colors.gray }]}>
+                {activeEntryOfferPackage?.introLabel ??
+                  activeEntryOfferPackage?.subheadline ??
+                  t('premium.subscription_page.hero_subtitle')}
+              </Text>
+
+              <View style={styles.heroBenefits}>
+                {premiumFeatures.slice(0, 3).map((feature, index) => (
+                  <View key={`${feature.label}-${index}`} style={styles.heroBenefitChip}>
+                    <Check color={colors.gold} size={14} />
+                    <Text style={styles.heroBenefitText} numberOfLines={2}>
+                      {feature.label}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </LinearGradient>
+          </View>
+
+          <View style={styles.contextCard}>
+            <View style={styles.contextIconWrap}>
+              <ChartNoAxesCombined color={colors.primary} size={18} />
             </View>
-            <Text style={[styles.heroTitle, { color: colors.primaryText }]}>
-              {t('premium.subscription_page.hero_title')}
-            </Text>
-            <Text style={[styles.heroSubtitle, { color: colors.gray }]}>
-              {activeEntryOfferPackage?.introLabel ??
-                activeEntryOfferPackage?.subheadline ??
-                t('premium.subscription_page.hero_subtitle')}
-            </Text>
+            <View style={styles.contextCopy}>
+              <Text style={styles.contextTitle}>
+                {t('premium.subscription_page.contextual_analytics_title')}
+              </Text>
+              <Text style={styles.contextBody}>
+                {t('premium.subscription_page.contextual_analytics_body')}
+              </Text>
+            </View>
           </View>
 
           {/* ─── Cards horizontal scroll ─── */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.cardsContainer}
-            style={{ overflow: 'visible' }}
-            testID="premium-cards-scroll"
-            snapToInterval={CARD_MIN_WIDTH + SPACING.md}
-            decelerationRate="fast"
-          >
-            {/* ── Card 1: Gratuit ── */}
-            <View style={[styles.cardShell, styles.cardShellFree]} testID="premium-card-free-shell">
-              <View style={[styles.cardSurface, styles.cardSurfaceFree]} testID="premium-card-free-surface">
-                <View style={styles.cardHeader}>
-                <Text style={[styles.cardTitle, { color: colors.gray }]}>
-                  {t('premium.subscription_page.free_title')}
-                </Text>
-                <Text style={[styles.cardPrice, { color: colors.gray }]}>
-                  {t('premium.subscription_page.free_price')}
-                </Text>
-                </View>
-
-                <View style={styles.cardDivider} />
-
-                <View style={styles.featuresList} testID="premium-card-features-list">
-                  {freeFeatures.map((f, i) => renderFeatureRow(f, i, false))}
-                </View>
-              </View>
-            </View>
-
+          <View style={styles.cardsContainer} testID="premium-cards-scroll">
             {loadingPackages ? (
               <View style={[styles.cardShell, styles.cardShellMonthly]}>
                 <View style={[styles.cardSurface, styles.cardSurfaceMonthly, styles.loadingCard]}>
@@ -949,7 +966,26 @@ export default function PremiumUpgradeScreen() {
                 </View>
               </View>
             )}
-          </ScrollView>
+
+            <View style={[styles.cardShell, styles.cardShellFree]} testID="premium-card-free-shell">
+              <View style={[styles.cardSurface, styles.cardSurfaceFree]} testID="premium-card-free-surface">
+                <View style={styles.cardHeader}>
+                  <Text style={[styles.cardTitle, { color: colors.gray }]}>
+                    {t('premium.subscription_page.free_title')}
+                  </Text>
+                  <Text style={[styles.cardPrice, { color: colors.gray }]}>
+                    {t('premium.subscription_page.free_price')}
+                  </Text>
+                </View>
+
+                <View style={styles.cardDivider} />
+
+                <View style={styles.featuresList} testID="premium-card-features-list">
+                  {freeFeatures.map((f, i) => renderFeatureRow(f, i, false))}
+                </View>
+              </View>
+            </View>
+          </View>
 
           {/* ─── Bottom section ─── */}
           <View style={styles.bottomSection}>
@@ -1003,7 +1039,7 @@ export default function PremiumUpgradeScreen() {
 
         </Animated.View>
       </ScrollView>
-    </View>
+    </AppScreen>
   );
 }
 
@@ -1011,8 +1047,23 @@ export default function PremiumUpgradeScreen() {
 // STYLES
 // ═══════════════════════════════════════════
 
-const createStyles = (colors: any, insets: any, isDark: boolean) => {
+const createStyles = (
+  colors: any,
+  insets: any,
+  isDark: boolean,
+  premiumHealth: PremiumHealthPalette,
+) => {
   const isAndroidLight = Platform.OS === 'android' && !isDark;
+  const heroSurface = getVisualMoodSurface(colors, isDark, {
+    mood: 'softClinical',
+    accentColor: premiumHealth.premiumAccent,
+    intensity: 'hero',
+  });
+  const contextSurface = getVisualMoodSurface(colors, isDark, {
+    mood: 'softClinical',
+    accentColor: premiumHealth.trustAccent,
+    intensity: 'card',
+  });
   const freeSurface = isAndroidLight
     ? getAndroidLightSurface(colors, {
         accentColor: colors.gray,
@@ -1025,6 +1076,14 @@ const createStyles = (colors: any, insets: any, isDark: boolean) => {
         shadowOffsetY: 6,
         elevation: 2,
       })
+    : isDark
+      ? getObsidianSurface(colors, {
+          accentColor: colors.gray,
+          intensity: 'flat',
+          backgroundAlpha: 0.03,
+          borderAlpha: 0.1,
+          shadowOpacity: 0.08,
+        })
     : null;
   const monthlySurface = isAndroidLight
     ? getAndroidLightSurface(colors, {
@@ -1038,11 +1097,19 @@ const createStyles = (colors: any, insets: any, isDark: boolean) => {
         shadowOffsetY: 6,
         elevation: 3,
       })
+    : isDark
+      ? getObsidianSurface(colors, {
+          accentColor: premiumHealth.trustAccent,
+          intensity: 'raised',
+          backgroundAlpha: 0.05,
+          borderAlpha: 0.16,
+          shadowOpacity: 0.14,
+        })
     : null;
   const annualSurface = isAndroidLight
     ? getAndroidLightSurface(colors, {
-        accentColor: colors.primary,
-        shadowColor: colors.primary,
+        accentColor: colors.gold,
+        shadowColor: colors.gold,
         backgroundAlpha: 0.07,
         borderAlpha: 0.22,
         overlayAlpha: 0.1,
@@ -1051,11 +1118,22 @@ const createStyles = (colors: any, insets: any, isDark: boolean) => {
         shadowOffsetY: 8,
         elevation: 4,
       })
+    : isDark
+      ? getObsidianSurface(colors, {
+          accentColor: premiumHealth.premiumAccent,
+          intensity: 'premium',
+          backgroundAlpha: 0.1,
+          borderAlpha: 0.34,
+          shadowOpacity: 0.22,
+          shadowRadius: 30,
+          shadowOffsetY: 14,
+        })
     : null;
 
   return StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: premiumHealth.canvas,
   },
 
   // ─── Header ───
@@ -1066,6 +1144,9 @@ const createStyles = (colors: any, insets: any, isDark: boolean) => {
     paddingHorizontal: SPACING.page || 20,
     paddingVertical: SPACING.md,
     paddingTop: insets.top + SPACING.sm,
+    backgroundColor: isDark ? withAlpha(colors.background, 0.94) : colors.cardBackground,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
   },
   headerTitle: {
     fontSize: SIZES.lg,
@@ -1084,11 +1165,33 @@ const createStyles = (colors: any, insets: any, isDark: boolean) => {
   heroSection: {
     alignItems: 'center',
     paddingHorizontal: SPACING.page,
-    paddingTop: SPACING.md,
+    paddingTop: SPACING.lg,
+    paddingBottom: SPACING.lg,
+    borderRadius: BORDER_RADIUS.hero,
+    borderWidth: 1,
+    borderColor: heroSurface.borderColor,
+    backgroundColor: heroSurface.backgroundColor,
+    gap: SPACING.md,
+  },
+  heroShell: {
+    marginHorizontal: SPACING.page,
+    borderRadius: BORDER_RADIUS.hero,
+    ...(heroSurface.shadowColor ? heroSurface : SHADOWS.card),
   },
   heroCrownContainer: {
     position: 'relative',
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: isDark
+      ? mixColors(colors.cardBackground, colors.gold, 0.1)
+      : mixColors(colors.cardBackground, colors.gold, 0.18),
+    borderWidth: 1,
+    borderColor: withAlpha(colors.gold, isDark ? 0.28 : 0.22),
     marginBottom: SPACING.md,
+    ...(isDark ? annualSurface?.shadowStyle : SHADOWS.card),
   },
   heroSparkle: {
     position: 'absolute',
@@ -1104,58 +1207,119 @@ const createStyles = (colors: any, insets: any, isDark: boolean) => {
   heroSubtitle: {
     fontSize: SIZES.md,
     textAlign: 'center',
+    lineHeight: 22,
+  },
+  heroBenefits: {
+    width: '100%',
+    gap: SPACING.sm,
+  },
+  heroBenefitChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.xl,
+    backgroundColor: premiumHealth.chipBackground,
+    borderWidth: 1,
+    borderColor: premiumHealth.chipBorder,
+  },
+  heroBenefitText: {
+    flex: 1,
+    fontSize: SIZES.sm,
+    lineHeight: 18,
+    color: colors.primaryText,
+    fontWeight: FONT_WEIGHTS.medium,
+  },
+  contextCard: {
+    marginHorizontal: SPACING.page,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    borderColor: contextSurface.borderColor,
+    backgroundColor: premiumHealth.surfaceRaised,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    ...(contextSurface.shadowColor ? contextSurface : SHADOWS.none),
+  },
+  contextIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: withAlpha(colors.primary, isDark ? 0.16 : 0.1),
+  },
+  contextCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  contextTitle: {
+    fontSize: SIZES.text14,
+    lineHeight: 18,
+    color: colors.primaryText,
+    fontWeight: FONT_WEIGHTS.bold,
+  },
+  contextBody: {
+    fontSize: SIZES.text12,
+    lineHeight: 18,
+    color: colors.gray,
   },
 
   // ─── Cards container ───
   cardsContainer: {
     paddingHorizontal: SPACING.page,
-    gap: SPACING.md,
+    gap: SPACING.lg,
     paddingTop: SPACING.lg,
     paddingBottom: SPACING.sm,
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
 
   // ─── Card base ───
   cardShell: {
-    width: CARD_MIN_WIDTH,
-    borderRadius: BORDER_RADIUS.xl,
+    width: '100%',
+    maxWidth: 460,
+    borderRadius: BORDER_RADIUS.hero,
     overflow: 'visible',
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
   },
   cardShellFree: {
     opacity: 0.85,
-    ...(isAndroidLight ? freeSurface?.shadowStyle : SHADOWS.card),
+    ...(freeSurface?.shadowStyle ?? SHADOWS.card),
   },
   cardShellMonthly: {
-    ...(isAndroidLight ? monthlySurface?.shadowStyle : SHADOWS.card),
+    ...(monthlySurface?.shadowStyle ?? SHADOWS.card),
   },
   cardShellAnnual: {
     position: 'relative',
-    transform: [{ scale: 1.02 }],
-    ...(isAndroidLight ? annualSurface?.shadowStyle : SHADOWS.card),
+    transform: [{ scale: 1.01 }],
+    ...(annualSurface?.shadowStyle ?? SHADOWS.card),
   },
   cardSurface: {
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: BORDER_RADIUS.hero,
     padding: SPACING.lg,
     overflow: 'hidden',
-    borderWidth: 1.5,
+    borderWidth: 1,
   },
   cardSurfaceFree: {
-    backgroundColor: isAndroidLight
+    backgroundColor: freeSurface
       ? freeSurface?.backgroundColor
       : isDark
-        ? colors.cardBackground
-        : mixColors(colors.cardBackground, colors.lightGray, 0.45),
-    borderColor: isAndroidLight ? freeSurface?.borderColor : colors.lightGray,
+        ? premiumHealth.surfaceBase
+        : premiumHealth.surfaceRaised,
+    borderColor: freeSurface?.borderColor ?? colors.lightGray,
   },
   cardSurfaceMonthly: {
-    backgroundColor: isAndroidLight ? monthlySurface?.backgroundColor : colors.cardBackground,
-    borderColor: isAndroidLight ? monthlySurface?.borderColor : withAlpha(colors.primary, 0.25),
+    backgroundColor: monthlySurface?.backgroundColor ?? colors.cardBackground,
+    borderColor: monthlySurface?.borderColor ?? withAlpha(colors.primary, 0.25),
   },
   cardSurfaceAnnual: {
-    backgroundColor: isAndroidLight ? annualSurface?.backgroundColor : colors.cardBackground,
-    borderColor: isAndroidLight ? annualSurface?.borderColor : colors.primary,
-    borderWidth: 2.5,
+    backgroundColor: annualSurface?.backgroundColor ?? colors.cardBackground,
+    borderColor: annualSurface?.borderColor ?? colors.gold,
+    borderWidth: 1.5,
   },
 
   // ─── Badge ───
@@ -1172,9 +1336,11 @@ const createStyles = (colors: any, insets: any, isDark: boolean) => {
     borderRadius: BORDER_RADIUS.full,
     gap: SPACING.xs,
     zIndex: 10,
+    borderWidth: 1,
+    borderColor: withAlpha(colors.white, 0.22),
   },
   badgeText: {
-    color: '#FFFFFF',
+    color: colors.background,
     fontSize: SIZES.xs,
     fontWeight: FONT_WEIGHTS.bold,
     textTransform: 'uppercase',
@@ -1209,7 +1375,7 @@ const createStyles = (colors: any, insets: any, isDark: boolean) => {
   // ─── Card divider ───
   cardDivider: {
     height: 1,
-    backgroundColor: colors.lightGray,
+    backgroundColor: premiumHealth.borderSubtle,
     marginVertical: SPACING.md,
   },
 
@@ -1242,12 +1408,15 @@ const createStyles = (colors: any, insets: any, isDark: boolean) => {
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: SPACING.lg,
+    borderWidth: 1,
+    borderColor: premiumHealth.primaryActionBorder,
+    backgroundColor: premiumHealth.primaryActionBackground,
   },
   ctaButtonAnnual: {
     paddingVertical: SPACING.md + 2,
   },
   ctaButtonText: {
-    color: '#FFFFFF',
+    color: premiumHealth.primaryActionText,
     fontSize: SIZES.sm,
     fontWeight: FONT_WEIGHTS.bold,
   },
@@ -1276,8 +1445,15 @@ const createStyles = (colors: any, insets: any, isDark: boolean) => {
   // ─── Bottom section ───
   bottomSection: {
     paddingHorizontal: SPACING.page,
+    paddingVertical: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    borderColor: contextSurface.borderColor,
+    backgroundColor: premiumHealth.surfaceRaised,
+    marginHorizontal: SPACING.page,
     alignItems: 'center',
     gap: SPACING.md,
+    ...(contextSurface.shadowColor ? contextSurface : SHADOWS.none),
   },
   restoreButton: {
     flexDirection: 'row',
@@ -1293,7 +1469,7 @@ const createStyles = (colors: any, insets: any, isDark: boolean) => {
   legalText: {
     fontSize: SIZES.xs,
     textAlign: 'center',
-    fontStyle: 'italic',
+    lineHeight: 18,
   },
   linksRow: {
     flexDirection: 'row',
@@ -1310,7 +1486,7 @@ const createStyles = (colors: any, insets: any, isDark: boolean) => {
   storeNote: {
     fontSize: SIZES.xs,
     textAlign: 'center',
-    fontStyle: 'italic',
+    lineHeight: 18,
     marginTop: SPACING.xs,
   },
 
@@ -1328,10 +1504,15 @@ const createStyles = (colors: any, insets: any, isDark: boolean) => {
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: colors.primary,
+    backgroundColor: isDark
+      ? mixColors(colors.cardBackground, colors.gold, 0.12)
+      : mixColors(colors.cardBackground, colors.gold, 0.18),
+    borderWidth: 1,
+    borderColor: withAlpha(colors.gold, 0.34),
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: SPACING.xl,
+    ...(annualSurface?.shadowStyle ?? SHADOWS.card),
   },
   alreadyPremiumTitle: {
     fontSize: SIZES.xxxl,
@@ -1344,6 +1525,7 @@ const createStyles = (colors: any, insets: any, isDark: boolean) => {
     textAlign: 'center',
     marginBottom: SPACING.xl,
     color: colors.gray,
+    lineHeight: 24,
   },
   });
 };

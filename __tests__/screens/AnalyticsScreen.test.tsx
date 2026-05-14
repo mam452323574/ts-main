@@ -1,6 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
+import { InteractionManager, StyleSheet } from 'react-native';
 import AnalyticsScreen from '@/screens/AnalyticsScreen';
 import { paywallSession } from '@/utils/paywallSession';
 
@@ -42,11 +42,15 @@ jest.mock('react-native-chart-kit', () => {
 });
 
 jest.mock('lucide-react-native', () => ({
+  AlertCircle: 'AlertCircle',
   Crown: 'Crown',
+  CheckCircle2: 'CheckCircle2',
   Check: 'Check',
   ChevronLeft: 'ChevronLeft',
   X: 'X',
+  Info: 'Info',
   Activity: 'Activity',
+  RefreshCw: 'RefreshCw',
   Smile: 'Smile',
   Utensils: 'Utensils',
   Sparkles: 'Sparkles',
@@ -81,6 +85,9 @@ jest.mock('expo-localization', () => ({
 }));
 
 jest.mock('@/hooks/queries', () => ({
+  useAnalytics: (period: string) => mockUseAnalytics(period),
+}));
+jest.mock('@/hooks/queries/useAnalytics', () => ({
   useAnalytics: (period: string) => mockUseAnalytics(period),
 }));
 
@@ -179,6 +186,19 @@ describe('AnalyticsScreen', () => {
     mockPush.mockClear();
     mockLineChartProps.length = 0;
     mockUseWindowDimensions.mockReturnValue(defaultDimensions);
+    jest.spyOn(InteractionManager, 'runAfterInteractions').mockImplementation(((task?: any) => {
+      if (typeof task === 'function') {
+        task();
+      } else {
+        task?.gen?.();
+      }
+
+      return {
+        then: jest.fn(),
+        done: jest.fn(),
+        cancel: jest.fn(),
+      };
+    }) as any);
     paywallSession.reset();
 
     mockUseAuth.mockReturnValue({
@@ -257,8 +277,26 @@ describe('AnalyticsScreen', () => {
     expect(screen.getByTestId('analytics-health-metric-score')).toBeTruthy();
     expect(screen.getByTestId('analytics-body-metric-score')).toBeTruthy();
     expect(screen.getByTestId('analytics-nutrition-metric-score')).toBeTruthy();
+    expect(screen.queryByTestId('analytics-summary-rail')).toBeNull();
     expect(screen.queryByText('Super Scan')).toBeNull();
     expect(screen.getAllByTestId('mock-line-chart')).toHaveLength(3);
+  });
+
+  it('uses one neutral analytics line color instead of the old nutrition green', () => {
+    mockUseAnalytics.mockImplementation((period: string) => makeQueryState(period));
+
+    render(<AnalyticsScreen />);
+
+    const latestCharts = getLatestLineCharts();
+    const lineColors = latestCharts.map((chartProps) =>
+      chartProps.data.datasets[0].color(1),
+    );
+
+    expect(new Set(lineColors).size).toBe(1);
+    expect(lineColors).not.toContain('rgba(52, 199, 89, 1)');
+    lineColors.forEach((lineColor) => {
+      expect(lineColor).not.toContain('52, 199, 89');
+    });
   });
 
   it('changes period when free period button is pressed', () => {

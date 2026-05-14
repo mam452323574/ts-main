@@ -15,7 +15,7 @@ import {
   formatAge,
   formatCalories as formatCaloriesValue,
 } from '@/utils/scanFormatters';
-import { localizeQualitativeLevel } from '@/utils/resultLocalization';
+import { localizeDisplayQualitativeLevel } from '@/utils/resultLocalization';
 import {
   normalizeAppGeneratedImageUri,
   normalizeTrustedImageUri,
@@ -389,9 +389,10 @@ function buildNutritionPayload(
       ),
       createMetric(
         tx(t, 'share_story.metrics.quality'),
-        localizeQualitativeLevel(
+        localizeDisplayQualitativeLevel(
           'ingredient_quality',
           nutritionData.ingredient_quality_key,
+          nutritionData.ingredient_quality_fallback_text,
           t,
           '-',
         ),

@@ -1,13 +1,21 @@
 import { useCallback, useMemo, useRef } from 'react';
-import { useQuery, useQueries } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { ApiError, ApiService, isConnectivityApiError } from '@/services/api';
+import type { ScanEligibilityBatchResult } from '@/services/api';
 import { ScanType, ScanEligibilityResponse } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
-import { SCAN_ELIGIBILITY_QUERY_KEY } from '@/utils/scanEligibilityQuery';
+import {
+  SCAN_ELIGIBILITY_QUERY_KEY,
+  SCAN_ELIGIBILITY_QUERY_SCOPE,
+} from '@/utils/scanEligibilityQuery';
 
 export { SCAN_ELIGIBILITY_QUERY_KEY };
 
 const SCAN_TYPES: ScanType[] = ['body', 'health', 'nutrition', 'super'];
+
+export const SCAN_ELIGIBILITY_BATCH_QUERY_KEY = (
+  userId: string | null | undefined,
+) => [...SCAN_ELIGIBILITY_QUERY_SCOPE(userId), 'batch'] as const;
 
 export type ScanEligibilityDataMap = Partial<
   Record<ScanType, ScanEligibilityResponse>
@@ -43,39 +51,34 @@ export const useAllScanEligibility = () => {
   const userId = session?.user?.id ?? null;
   const canQuery = !loading && !!session;
 
-  const queries = useQueries({
-    queries: SCAN_TYPES.map((scanType) => ({
-      queryKey: SCAN_ELIGIBILITY_QUERY_KEY(userId, scanType),
-      queryFn: () => ApiService.checkScanEligibilityOnly(scanType),
-      staleTime: 1000 * 60 * 2,
-      enabled: canQuery,
-      retry: false,
-    })),
+  const query = useQuery<ScanEligibilityBatchResult, ApiError>({
+    queryKey: SCAN_ELIGIBILITY_BATCH_QUERY_KEY(userId),
+    queryFn: () => ApiService.checkScanEligibilityBatch(SCAN_TYPES),
+    staleTime: 1000 * 60 * 2,
+    enabled: canQuery,
+    retry: false,
   });
-  const queriesRef = useRef(queries);
-  queriesRef.current = queries;
+  const queryRef = useRef(query);
+  queryRef.current = query;
 
   const data = useMemo(
-    () =>
-      SCAN_TYPES.reduce((acc, scanType, index) => {
-        const queryData = queries[index].data;
-        if (queryData) {
-          acc[scanType] = queryData as ScanEligibilityResponse;
-        }
-        return acc;
-      }, {} as ScanEligibilityDataMap),
-    [
-      queries[0].data,
-      queries[1].data,
-      queries[2].data,
-      queries[3].data,
-    ],
+    () => query.data?.data ?? {},
+    [query.data],
   );
 
   const errors = useMemo(
-    () =>
-      SCAN_TYPES.reduce((acc, scanType, index) => {
-        const queryError = queries[index].error;
+    () => {
+      if (query.data?.errors && Object.keys(query.data.errors).length > 0) {
+        return query.data.errors;
+      }
+
+      if (!query.error) {
+        return {};
+      }
+
+      const queryError: unknown = query.error;
+
+      return SCAN_TYPES.reduce((acc, scanType) => {
         if (queryError instanceof ApiError) {
           acc[scanType] = queryError;
         } else if (queryError instanceof Error) {
@@ -90,30 +93,23 @@ export const useAllScanEligibility = () => {
           );
         }
         return acc;
-      }, {} as ScanEligibilityErrorMap),
-    [
-      queries[0].error,
-      queries[1].error,
-      queries[2].error,
-      queries[3].error,
-    ],
+      }, {} as ScanEligibilityErrorMap);
+    },
+    [query.data?.errors, query.error],
   );
 
   const loadingByScanType = useMemo(
     () =>
       loading
         ? buildEmptyLoadingMap(true)
-        : SCAN_TYPES.reduce((acc, scanType, index) => {
-            acc[scanType] = canQuery && Boolean(queries[index].isLoading);
+        : SCAN_TYPES.reduce((acc, scanType) => {
+            acc[scanType] = canQuery && Boolean(query.isLoading);
             return acc;
           }, buildEmptyLoadingMap(false)),
     [
       canQuery,
       loading,
-      queries[0].isLoading,
-      queries[1].isLoading,
-      queries[2].isLoading,
-      queries[3].isLoading,
+      query.isLoading,
     ],
   );
 
@@ -128,14 +124,11 @@ export const useAllScanEligibility = () => {
   );
 
   const isLoading = useMemo(
-    () => loading || (canQuery && queries.some((query) => query.isLoading)),
+    () => loading || (canQuery && query.isLoading),
     [
       canQuery,
       loading,
-      queries[0].isLoading,
-      queries[1].isLoading,
-      queries[2].isLoading,
-      queries[3].isLoading,
+      query.isLoading,
     ],
   );
 
@@ -144,7 +137,7 @@ export const useAllScanEligibility = () => {
       return [];
     }
 
-    return Promise.all(queriesRef.current.map((query) => query.refetch()));
+    return [await queryRef.current.refetch()];
   }, [canQuery]);
 
   const refetchScanType = useCallback(async (scanType: ScanType) => {
@@ -152,12 +145,11 @@ export const useAllScanEligibility = () => {
       return null;
     }
 
-    const queryIndex = SCAN_TYPES.indexOf(scanType);
-    if (queryIndex < 0) {
+    if (!SCAN_TYPES.includes(scanType)) {
       return null;
     }
 
-    return queriesRef.current[queryIndex].refetch();
+    return queryRef.current.refetch();
   }, [canQuery]);
 
   return {
@@ -170,7 +162,12 @@ export const useAllScanEligibility = () => {
     isError: errorList.length > 0,
     hasConnectivityError,
     hasBlockingEligibilityError,
+    isFetched: query.isFetched,
+    isFetching: query.isFetching,
+    isStale: query.isStale,
     refetchAll,
     refetchScanType,
   };
 };
+
+export const useScanEligibilityBatch = useAllScanEligibility;

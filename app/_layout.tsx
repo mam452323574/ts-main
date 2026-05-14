@@ -19,6 +19,7 @@ import * as NavigationBar from 'expo-navigation-bar';
 import * as SystemUI from 'expo-system-ui';
 
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
+import { useBootPrefetch } from '@/hooks/useBootPrefetch';
 import { useProtectedRoute } from '@/hooks/useProtectedRoute';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { NotificationProvider } from '@/contexts/NotificationContext';
@@ -52,7 +53,7 @@ import type { AndroidRouteChrome } from '@/utils/androidRouteChrome';
 // `import { queryClient } from '@/app/_layout'`.
 export { queryClient };
 
-const DEFAULT_ANDROID_SYSTEM_BACKGROUND = DARK_COLORS.cardBackground;
+const DEFAULT_ANDROID_SYSTEM_BACKGROUND = DARK_COLORS.background;
 
 if (Platform.OS === 'android') {
   void SystemUI.setBackgroundColorAsync(DEFAULT_ANDROID_SYSTEM_BACKGROUND).catch((error) => {
@@ -72,6 +73,11 @@ async function syncAndroidSystemBars(routeChrome: AndroidRouteChrome) {
   } catch (error) {
     console.error('[NavigationBar] Failed to sync button style:', error);
   }
+}
+
+function BootPrefetchController() {
+  useBootPrefetch();
+  return null;
 }
 
 function RootLayoutNav() {
@@ -323,6 +329,7 @@ export default function RootLayout() {
             <ErrorBoundary>
               <LanguageProvider>
                 <AuthProvider>
+                  <BootPrefetchController />
                   <GamificationProvider>
                     <AppThemeProvider>
                       <NotificationProvider>

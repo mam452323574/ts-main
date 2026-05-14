@@ -1,17 +1,21 @@
 import { useState, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, FlatList, RefreshControl, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, CheckCheck } from 'lucide-react-native';
+import { CheckCheck } from 'lucide-react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useNotificationContext } from '@/contexts/NotificationContext';
-import { useNotificationsQuery, NOTIFICATIONS_QUERY_KEY } from '@/hooks/queries';
+import { NOTIFICATIONS_QUERY_KEY, useNotificationsQuery } from '@/hooks/queries/useNotifications';
+import { AppScreen } from '@/components/AppScreen';
+import { HeaderIconButton, ScreenHeader } from '@/components/ScreenHeader';
+import { ScreenState } from '@/components/ScreenState';
+import { SegmentedControl } from '@/components/SegmentedControl';
 import { NotificationCard } from '@/components/NotificationCard';
 import { supabase } from '@/services/supabase';
-import { SIZES, SPACING, BORDER_RADIUS, FONT_WEIGHTS } from '@/constants/theme';
+import { SPACING } from '@/constants/theme';
 
 type FilterType = 'all' | 'unread' | 'read';
 
@@ -69,7 +73,7 @@ export default function NotificationsScreen() {
   };
 
   const handleMarkAllAsRead = async () => {
-    if (!user) return;
+    if (!user || markingAllAsRead) return;
 
     try {
       setMarkingAllAsRead(true);
@@ -91,77 +95,83 @@ export default function NotificationsScreen() {
     }
   };
 
-  const renderFilterButton = (filterType: FilterType, label: string) => (
-    <TouchableOpacity
-      style={[styles.filterButton, filter === filterType && styles.filterButtonActive]}
-      onPress={() => setFilter(filterType)}
-      activeOpacity={0.7}
-    >
-      <Text
-        style={[
-          styles.filterButtonText,
-          filter === filterType && styles.filterButtonTextActive,
-        ]}
-      >
-        {label}
-      </Text>
-    </TouchableOpacity>
+  const filterOptions = useMemo(
+    () => [
+      {
+        value: 'all' as const,
+        label: t('notifications.filter_all'),
+        testID: 'notifications-filter-all',
+      },
+      {
+        value: 'unread' as const,
+        label: `${t('notifications.filter_unread')} (${unreadCount})`,
+        testID: 'notifications-filter-unread',
+      },
+      {
+        value: 'read' as const,
+        label: t('notifications.filter_read'),
+        testID: 'notifications-filter-read',
+      },
+    ],
+    [t, unreadCount],
   );
 
   const renderEmptyState = () => (
-    <View style={styles.emptyContainer}>
-      <View style={styles.emptyIconContainer}>
-        <CheckCheck color={colors.primary} size={64} />
-      </View>
-      <Text style={styles.emptyTitle}>{t('notifications.empty_title')}</Text>
-      <Text style={styles.emptyText}>
-        {filter === 'unread'
+    <ScreenState
+      tone="empty"
+      title={t('notifications.empty_title')}
+      message={
+        filter === 'unread'
           ? t('notifications.empty_unread')
-          : t('notifications.empty_all')}
-      </Text>
-    </View>
+          : t('notifications.empty_all')
+      }
+      icon={<CheckCheck />}
+      testID="notifications-empty-state"
+    />
   );
 
   return (
-    <View style={styles.container}>
+    <AppScreen topInset={false} bottomInset={false} style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-          activeOpacity={0.7}
-        >
-          <ChevronLeft color={colors.primaryText} size={24} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('notifications.title')}</Text>
-        <View style={styles.headerRight}>
-          {unreadCount > 0 && (
-            <TouchableOpacity
-              style={styles.markAllButton}
-              onPress={handleMarkAllAsRead}
-              disabled={markingAllAsRead}
-              activeOpacity={0.7}
-            >
-              {markingAllAsRead ? (
-                <ActivityIndicator size="small" color={colors.primary} />
-              ) : (
-                <CheckCheck color={colors.primary} size={20} />
-              )}
-            </TouchableOpacity>
-          )}
-        </View>
+        <ScreenHeader
+          title={t('notifications.title')}
+          onBack={() => router.back()}
+          centered
+          topInset
+          right={
+            unreadCount > 0 ? (
+              <HeaderIconButton
+                accessibilityLabel={t('notifications.filter_read')}
+                onPress={handleMarkAllAsRead}
+                icon={
+                  markingAllAsRead ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <CheckCheck color={colors.primaryText} size={20} />
+                  )
+                }
+              />
+            ) : undefined
+          }
+        />
       </View>
 
       <View style={styles.filterContainer}>
-        {renderFilterButton('all', t('notifications.filter_all'))}
-        {renderFilterButton('unread', `${t('notifications.filter_unread')} (${unreadCount})`)}
-        {renderFilterButton('read', t('notifications.filter_read'))}
+        <SegmentedControl<FilterType>
+          value={filter}
+          onChange={setFilter}
+          options={filterOptions}
+          testID="notifications-filter-control"
+        />
       </View>
 
       {isLoading && !notifications.length ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>{t('notifications.loading')}</Text>
-        </View>
+        <ScreenState
+          tone="loading"
+          layout="full"
+          title={t('notifications.loading')}
+          testID="notifications-loading-state"
+        />
       ) : (
         <FlatList
           data={notifications}
@@ -189,7 +199,7 @@ export default function NotificationsScreen() {
           }
         />
       )}
-    </View>
+    </AppScreen>
   );
 }
 
@@ -199,101 +209,17 @@ const createStyles = (colors: any, insets: any) => StyleSheet.create({
     backgroundColor: colors.background,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: insets.top + SPACING.sm,
-    paddingBottom: SPACING.md,
-    paddingHorizontal: SPACING.page,
-    backgroundColor: colors.cardBackground,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.lightGray,
-  },
-  backButton: {
-    padding: SPACING.xs,
-    width: 40,
-  },
-  headerTitle: {
-    fontSize: SIZES.text18,
-    fontWeight: FONT_WEIGHTS.bold,
-    color: colors.primaryText,
-  },
-  headerRight: {
-    width: 40,
-    alignItems: 'flex-end',
-  },
-  markAllButton: {
-    padding: SPACING.xs,
+    backgroundColor: colors.background,
   },
   filterContainer: {
-    flexDirection: 'row',
     paddingHorizontal: SPACING.page,
     paddingVertical: SPACING.md,
-    gap: SPACING.sm,
-    backgroundColor: colors.cardBackground,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.lightGray,
-  },
-  filterButton: {
-    paddingVertical: SPACING.xs,
-    paddingHorizontal: SPACING.md,
-    borderRadius: BORDER_RADIUS.full,
     backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.lightGray,
-  },
-  filterButtonActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  filterButtonText: {
-    fontSize: SIZES.text14,
-    fontWeight: FONT_WEIGHTS.medium,
-    color: colors.gray,
-  },
-  filterButtonTextActive: {
-    color: colors.white,
-    fontWeight: FONT_WEIGHTS.semiBold,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSubtle ?? colors.lightGray,
   },
   listContent: {
     padding: SPACING.page,
     paddingBottom: insets.bottom + SPACING.xl,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: SPACING.md,
-  },
-  loadingText: {
-    fontSize: SIZES.text14,
-    color: colors.gray,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: SPACING.xxxl,
-  },
-  emptyIconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: colors.grayLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: SPACING.xl,
-  },
-  emptyTitle: {
-    fontSize: SIZES.text20,
-    fontWeight: FONT_WEIGHTS.bold,
-    color: colors.primaryText,
-    marginBottom: SPACING.sm,
-  },
-  emptyText: {
-    fontSize: SIZES.text14,
-    color: colors.gray,
-    textAlign: 'center',
-    paddingHorizontal: SPACING.xl,
   },
 });

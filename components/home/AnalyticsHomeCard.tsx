@@ -18,131 +18,37 @@ import Svg, {
 } from 'react-native-svg';
 
 import {
+  buildPremiumHealthModulePalette,
+  getPremiumHealthResponsiveCardMetrics,
+} from '@/constants/premiumHealth';
+import {
   BORDER_RADIUS,
+  FONT_FAMILIES,
   FONT_WEIGHTS,
   SHADOWS,
   SIZES,
   SPACING,
-  ThemeColors,
-  mixColors,
   withAlpha,
 } from '@/constants/theme';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 
-const ANALYST_COACH_IMAGE = require('../../assets/images/coach/analytical_precise.png');
+const ANALYST_COACH_IMAGE = require('../../assets/images/coach/analytical_precise.webp');
 
 type AnalyticsHomeCardProps = {
   scanCount: number;
   onPress: () => void;
 };
 
-type AnalyticsCardPalette = {
-  accentBlue: string;
-  surfaceBackground: string;
-  surfaceBorder: string;
-  backgroundGradient: readonly [string, string, string];
-  blueWashGradient: readonly [string, string, string];
-  coachGlowGradient: readonly [string, string, string];
-  eyebrowBackground: string;
-  eyebrowBorder: string;
-  eyebrowText: string;
-  title: string;
-  subtitle: string;
-  scanCountLabel: string;
-  curveBase: string;
-  curveStrokeStart: string;
-  curveStrokeMid: string;
-  curveStrokeEnd: string;
-  ctaBackground: string;
-  ctaBorder: string;
-  ctaText: string;
-  ctaIcon: string;
-  ctaShadowColor: string;
-  shellShadowColor: string;
-  coachImageOpacity: number;
-};
-
-function getAnalyticsPalette(
-  colors: ThemeColors,
-  isDark: boolean,
-): AnalyticsCardPalette {
-  if (isDark) {
-    return {
-      accentBlue: '#3F84FF',
-      surfaceBackground: '#07152B',
-      surfaceBorder: 'rgba(82, 132, 216, 0.28)',
-      backgroundGradient: ['#102A55', '#071A35', '#061326'] as const,
-      blueWashGradient: [
-        'rgba(63, 132, 255, 0.18)',
-        'rgba(63, 132, 255, 0.04)',
-        'rgba(63, 132, 255, 0)',
-      ] as const,
-      coachGlowGradient: [
-        'rgba(63, 132, 255, 0.2)',
-        'rgba(63, 132, 255, 0.06)',
-        'rgba(63, 132, 255, 0)',
-      ] as const,
-      eyebrowBackground: 'rgba(8, 28, 58, 0.72)',
-      eyebrowBorder: 'rgba(116, 154, 219, 0.24)',
-      eyebrowText: 'rgba(255, 255, 255, 0.9)',
-      title: colors.white,
-      subtitle: 'rgba(224, 232, 246, 0.72)',
-      scanCountLabel: 'rgba(224, 232, 246, 0.72)',
-      curveBase: 'rgba(57, 124, 255, 0.16)',
-      curveStrokeStart: 'rgba(31, 99, 232, 0.05)',
-      curveStrokeMid: 'rgba(47, 120, 255, 0.62)',
-      curveStrokeEnd: 'rgba(77, 147, 255, 0.96)',
-      ctaBackground: '#1766EE',
-      ctaBorder: withAlpha(colors.white, 0.2),
-      ctaText: colors.white,
-      ctaIcon: '#FFFFFF',
-      ctaShadowColor: '#1766EE',
-      shellShadowColor: mixColors(colors.primary, colors.secondary, 0.18),
-      coachImageOpacity: 1,
-    };
-  }
-
-  const accentBlue = mixColors(colors.primaryDark, colors.white, 0.2);
-  const textInk = mixColors(colors.primaryText, colors.primaryDark, 0.12);
-  const secondaryInk = mixColors(colors.secondaryText, accentBlue, 0.16);
+function getAnalyticsPalette(colors: any, isDark: boolean) {
+  const base = buildPremiumHealthModulePalette(colors, isDark, 'trust');
 
   return {
-    accentBlue,
-    surfaceBackground: mixColors(colors.cardBackground, colors.primary, 0.05),
-    surfaceBorder: withAlpha(accentBlue, 0.18),
-    backgroundGradient: [
-      mixColors(colors.white, colors.primary, 0.1),
-      mixColors(colors.cardBackground, colors.primary, 0.06),
-      mixColors(colors.surfaceMuted, colors.primary, 0.03),
-    ] as const,
-    blueWashGradient: [
-      withAlpha(accentBlue, 0.12),
-      withAlpha(accentBlue, 0.04),
-      withAlpha(accentBlue, 0),
-    ] as const,
-    coachGlowGradient: [
-      withAlpha(accentBlue, 0.16),
-      withAlpha(accentBlue, 0.05),
-      withAlpha(accentBlue, 0),
-    ] as const,
-    eyebrowBackground: mixColors(colors.white, colors.primary, 0.12),
-    eyebrowBorder: withAlpha(accentBlue, 0.14),
-    eyebrowText: textInk,
-    title: textInk,
-    subtitle: secondaryInk,
-    scanCountLabel: mixColors(colors.secondaryText, accentBlue, 0.22),
-    curveBase: withAlpha(accentBlue, 0.12),
-    curveStrokeStart: withAlpha(accentBlue, 0.08),
-    curveStrokeMid: withAlpha(accentBlue, 0.44),
-    curveStrokeEnd: withAlpha(accentBlue, 0.82),
-    ctaBackground: mixColors(colors.white, colors.primary, 0.22),
-    ctaBorder: withAlpha(accentBlue, 0.18),
-    ctaText: textInk,
-    ctaIcon: textInk,
-    ctaShadowColor: accentBlue,
-    shellShadowColor: mixColors(colors.gray, colors.primary, 0.16),
-    coachImageOpacity: 0.96,
+    ...base,
+    curveBase: withAlpha(base.accent, isDark ? 0.1 : 0.07),
+    curveStrokeStart: withAlpha(base.accent, 0.04),
+    curveStrokeMid: withAlpha(base.accent, isDark ? 0.34 : 0.26),
+    curveStrokeEnd: withAlpha(base.accent, isDark ? 0.72 : 0.56),
   };
 }
 
@@ -153,15 +59,17 @@ export function AnalyticsHomeCard({
   const { colors, isDark } = useTheme();
   const { t } = useLanguage();
   const { width: windowWidth } = useWindowDimensions();
-  const isCompact = windowWidth < 360;
-  const isTablet = windowWidth >= 768;
+  const metrics = useMemo(
+    () => getPremiumHealthResponsiveCardMetrics(windowWidth),
+    [windowWidth],
+  );
   const palette = useMemo(
     () => getAnalyticsPalette(colors, isDark),
     [colors, isDark],
   );
   const styles = useMemo(
-    () => createStyles(colors, isDark, isCompact, isTablet, palette),
-    [colors, isCompact, isDark, isTablet, palette],
+    () => createStyles(colors, isDark, metrics, palette),
+    [colors, isDark, metrics, palette],
   );
 
   return (
@@ -180,32 +88,40 @@ export function AnalyticsHomeCard({
           style={styles.backgroundGradient}
         />
         <LinearGradient
-          colors={palette.blueWashGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0.8, y: 1 }}
-          style={styles.blueWash}
+          colors={palette.bottomScrimGradient}
+          start={{ x: 0.5, y: 0.42 }}
+          end={{ x: 0.5, y: 1 }}
+          style={styles.bottomScrim}
         />
         <LinearGradient
-          colors={palette.coachGlowGradient}
-          start={{ x: 0.15, y: 0 }}
-          end={{ x: 0.9, y: 1 }}
-          style={styles.coachGlow}
+          colors={palette.copyScrimGradient}
+          start={{ x: 0, y: 0.35 }}
+          end={{ x: 1, y: 0.35 }}
+          style={styles.copyScrim}
         />
 
-        <Image
-          source={ANALYST_COACH_IMAGE}
-          style={styles.coachImage}
-          resizeMode="contain"
-          testID="home-analytics-coach-image"
-        />
+        <View pointerEvents="none" style={styles.visualStage}>
+          <LinearGradient
+            colors={palette.spotlightGradient}
+            start={{ x: 0.12, y: 0.1 }}
+            end={{ x: 0.92, y: 0.92 }}
+            style={styles.visualGlow}
+          />
+          <Image
+            source={ANALYST_COACH_IMAGE}
+            style={styles.coachImage}
+            resizeMode="contain"
+            testID="home-analytics-coach-image"
+          />
+        </View>
 
         <View style={styles.content}>
           <View style={styles.copyColumn}>
             <View style={styles.eyebrowPill}>
               <TrendingUp
-                color={palette.accentBlue}
+                color={palette.eyebrowText}
                 size={16}
-                strokeWidth={2.5}
+                strokeWidth={2.4}
               />
               <Text style={styles.eyebrow}>
                 {t('home.analytics_card_eyebrow')}
@@ -217,19 +133,28 @@ export function AnalyticsHomeCard({
               {t('home.analytics_card_subtitle')}
             </Text>
 
-            <View style={styles.scanCountBlock}>
-              <Text
-                style={styles.scanCountNumber}
-                testID="home-analytics-scan-count"
-              >
-                {scanCount}
-              </Text>
-              <Text
-                style={styles.scanCountLabel}
-                testID="home-analytics-scan-label"
-              >
-                {t('home.analytics_card_scan_label')}
-              </Text>
+            <View style={styles.metaPanel}>
+              <View style={styles.metaIconTile}>
+                <TrendingUp
+                  color={palette.accent}
+                  size={18}
+                  strokeWidth={2.4}
+                />
+              </View>
+              <View style={styles.metaTextColumn}>
+                <Text
+                  style={styles.metaPrimary}
+                  testID="home-analytics-scan-count"
+                >
+                  {scanCount}
+                </Text>
+                <Text
+                  style={styles.metaSecondary}
+                  testID="home-analytics-scan-label"
+                >
+                  {t('home.analytics_card_scan_label')}
+                </Text>
+              </View>
             </View>
 
             <View
@@ -312,23 +237,20 @@ export function AnalyticsHomeCard({
 }
 
 const createStyles = (
-  colors: any,
+  _colors: any,
   isDark: boolean,
-  isCompact: boolean,
-  isTablet: boolean,
-  palette: AnalyticsCardPalette,
+  metrics: ReturnType<typeof getPremiumHealthResponsiveCardMetrics>,
+  palette: ReturnType<typeof getAnalyticsPalette>,
 ) => {
-  const cardRadius = isTablet ? BORDER_RADIUS.hero + 4 : BORDER_RADIUS.hero;
-  const coachWidth = isTablet ? 392 : isCompact ? 232 : 266;
-  const coachHeight = isTablet ? 392 : isCompact ? 232 : 266;
-  const copyMaxWidth = isTablet ? 380 : isCompact ? 188 : 232;
-  const cardMinHeight = isTablet ? 520 : isCompact ? 430 : 462;
+  const coachWidth = metrics.isTablet ? 312 : metrics.isCompact ? 212 : 248;
+  const coachHeight = metrics.isTablet ? 312 : metrics.isCompact ? 212 : 248;
+  const visualStageHeight = metrics.isTablet ? 280 : metrics.isCompact ? 210 : 238;
+  const visualStageWidth = metrics.isTablet ? 268 : metrics.isCompact ? 188 : 222;
+  const footerHeight = metrics.ctaHeight + SPACING.md;
 
   return StyleSheet.create({
     shell: {
-      marginHorizontal: SPACING.page,
-      marginBottom: SPACING.md,
-      borderRadius: cardRadius,
+      borderRadius: metrics.cardRadius,
       ...(Platform.OS === 'android'
         ? {
             elevation: 6,
@@ -336,143 +258,199 @@ const createStyles = (
         : {
             ...SHADOWS.cardHover,
             shadowColor: palette.shellShadowColor,
-            shadowOpacity: isDark ? 0.22 : 0.1,
-            shadowRadius: isDark ? 22 : 18,
-            shadowOffset: { width: 0, height: isDark ? 12 : 10 },
+            shadowOpacity: isDark ? 0.16 : 0.08,
+            shadowRadius: isDark ? 18 : 14,
+            shadowOffset: { width: 0, height: isDark ? 11 : 9 },
           }),
     },
     surface: {
-      minHeight: cardMinHeight,
-      borderRadius: cardRadius,
-      padding: isTablet ? SPACING.xl : isCompact ? SPACING.md + 2 : SPACING.lg + 2,
+      minHeight: metrics.cardMinHeight,
+      borderRadius: metrics.cardRadius,
+      padding: metrics.horizontalPadding,
       backgroundColor: palette.surfaceBackground,
       borderWidth: 1,
       borderColor: palette.surfaceBorder,
       overflow: 'hidden',
+      position: 'relative',
     },
     backgroundGradient: {
       ...StyleSheet.absoluteFillObject,
     },
-    blueWash: {
+    bottomScrim: {
       position: 'absolute',
-      top: -24,
-      left: -18,
+      left: 0,
       right: 0,
-      height: '72%',
-    },
-    coachGlow: {
-      position: 'absolute',
-      right: isTablet ? 20 : isCompact ? -12 : -4,
-      bottom: isTablet ? 116 : isCompact ? 112 : 116,
-      width: isTablet ? 240 : isCompact ? 176 : 208,
-      height: isTablet ? 240 : isCompact ? 176 : 208,
-      borderRadius: 999,
-      opacity: isDark ? 0.9 : 1,
-    },
-    coachImage: {
-      position: 'absolute',
-      right: isTablet ? -36 : isCompact ? -62 : -58,
-      bottom: isTablet ? 76 : isCompact ? 76 : 74,
-      width: coachWidth,
-      height: coachHeight,
-      zIndex: 1,
-      opacity: palette.coachImageOpacity,
-    },
-    content: {
-      flex: 1,
-      justifyContent: 'space-between',
+      bottom: 0,
+      height: '44%',
       zIndex: 2,
     },
-    copyColumn: {
-      maxWidth: copyMaxWidth,
+    copyScrim: {
+      position: 'absolute',
+      top: 0,
+      bottom: 0,
+      left: 0,
+      width: Math.min(
+        metrics.copyWidth + metrics.horizontalPadding * 2 + 12,
+        360,
+      ),
+      zIndex: 1,
+    },
+    visualStage: {
+      position: 'absolute',
+      right: metrics.isTablet ? 16 : metrics.isCompact ? -18 : -8,
+      top: metrics.isTablet ? 58 : metrics.isCompact ? 94 : 92,
+      width: visualStageWidth,
+      height: visualStageHeight,
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 2,
+    },
+    visualGlow: {
+      position: 'absolute',
+      inset: 18,
+      borderRadius: 999,
+      opacity: isDark ? 0.36 : 0.42,
+    },
+    coachImage: {
+      width: coachWidth,
+      height: coachHeight,
+      opacity: palette.imageOpacity,
+      shadowColor: palette.imageShadowColor,
+      shadowOpacity: palette.imageShadowOpacity,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 10 },
+    },
+    content: {
+      minHeight: metrics.cardMinHeight - metrics.horizontalPadding * 2,
+      position: 'relative',
       zIndex: 3,
     },
+    copyColumn: {
+      width: metrics.copyWidth,
+      alignItems: 'flex-start',
+      zIndex: 4,
+    },
     eyebrowPill: {
-      alignSelf: 'flex-start',
       flexDirection: 'row',
       alignItems: 'center',
       gap: SPACING.sm,
-      paddingHorizontal: isCompact ? SPACING.md : SPACING.lg,
-      paddingVertical: SPACING.sm + 2,
-      borderRadius: BORDER_RADIUS.md + 6,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.sm,
+      borderRadius: BORDER_RADIUS.full,
       backgroundColor: palette.eyebrowBackground,
       borderWidth: 1,
       borderColor: palette.eyebrowBorder,
-      marginBottom: isCompact ? SPACING.xl : SPACING.xl + 2,
     },
     eyebrow: {
       fontSize: SIZES.text12,
       lineHeight: 16,
       fontWeight: FONT_WEIGHTS.bold,
-      color: palette.eyebrowText,
+      letterSpacing: 0.45,
       textTransform: 'uppercase',
-      letterSpacing: 0,
+      color: palette.eyebrowText,
+      fontFamily: FONT_FAMILIES.display,
     },
     title: {
-      fontSize: isTablet ? 42 : isCompact ? 30 : 34,
-      lineHeight: isTablet ? 48 : isCompact ? 36 : 40,
+      marginTop: SPACING.lg,
+      fontSize: metrics.titleSize,
+      lineHeight: metrics.titleLineHeight,
       fontWeight: FONT_WEIGHTS.bold,
       color: palette.title,
       letterSpacing: 0,
+      fontFamily: FONT_FAMILIES.display,
     },
     subtitle: {
-      marginTop: SPACING.md,
-      fontSize: isTablet ? SIZES.text18 : SIZES.text16,
-      lineHeight: isTablet ? 27 : 24,
-      color: palette.subtitle,
-    },
-    scanCountBlock: {
-      marginTop: isCompact ? SPACING.lg : SPACING.lg + 6,
-    },
-    scanCountNumber: {
-      fontSize: isTablet ? 54 : isCompact ? 44 : 48,
-      lineHeight: isTablet ? 60 : isCompact ? 50 : 54,
-      fontWeight: FONT_WEIGHTS.bold,
-      color: palette.accentBlue,
-      letterSpacing: 0,
-    },
-    scanCountLabel: {
-      marginTop: 2,
-      fontSize: isTablet ? SIZES.text18 : SIZES.text16,
-      lineHeight: isTablet ? 24 : 21,
+      marginTop: SPACING.sm,
+      fontSize: metrics.bodySize,
+      lineHeight: metrics.bodyLineHeight,
       fontWeight: FONT_WEIGHTS.medium,
-      color: palette.scanCountLabel,
+      color: palette.body,
+    },
+    metaPanel: {
+      marginTop: SPACING.lg,
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      gap: SPACING.md,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.md,
+      borderRadius: BORDER_RADIUS.lg,
+      backgroundColor: palette.metaPanelBackground,
+      borderWidth: 1,
+      borderColor: palette.metaPanelBorder,
+      maxWidth: metrics.copyWidth,
+    },
+    metaIconTile: {
+      width: 36,
+      height: 36,
+      borderRadius: BORDER_RADIUS.md,
+      backgroundColor: palette.metaIconTileBackground,
+      borderWidth: 1,
+      borderColor: palette.metaIconTileBorder,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    metaTextColumn: {
+      flexShrink: 1,
+    },
+    metaPrimary: {
+      fontSize: metrics.isTablet ? 40 : metrics.isCompact ? 32 : 36,
+      lineHeight: metrics.isTablet ? 44 : metrics.isCompact ? 36 : 40,
+      fontWeight: FONT_WEIGHTS.bold,
+      color: palette.accent,
+      letterSpacing: 0,
+      fontFamily: FONT_FAMILIES.accent,
+    },
+    metaSecondary: {
+      marginTop: 2,
+      fontSize: metrics.metaSecondarySize,
+      lineHeight: metrics.metaSecondarySize + 4,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      color: palette.metaSecondaryText,
+      letterSpacing: 0.2,
     },
     curveWrap: {
-      width: isTablet ? 264 : isCompact ? 166 : 204,
-      height: isTablet ? 86 : isCompact ? 58 : 68,
-      marginTop: isCompact ? SPACING.xs + 2 : SPACING.sm,
+      width: metrics.isTablet ? 248 : metrics.isCompact ? 178 : 204,
+      height: metrics.isTablet ? 76 : metrics.isCompact ? 58 : 68,
+      marginTop: SPACING.sm,
       marginLeft: -4,
       opacity: 0.94,
       zIndex: 2,
     },
     footer: {
-      marginTop: isTablet ? SPACING.xl : isCompact ? SPACING.lg : SPACING.xl,
-      zIndex: 4,
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      width: '100%',
+      paddingTop: SPACING.md,
+      minHeight: footerHeight,
+      zIndex: 5,
     },
     cta: {
-      minHeight: isTablet ? 58 : 54,
-      borderRadius: BORDER_RADIUS.xl,
-      paddingHorizontal: SPACING.lg,
+      minHeight: metrics.ctaHeight,
+      borderRadius: BORDER_RADIUS.full,
+      backgroundColor: palette.ctaBackground,
       borderWidth: 1,
       borderColor: palette.ctaBorder,
-      backgroundColor: palette.ctaBackground,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
+      paddingHorizontal: SPACING.xl,
       gap: SPACING.md,
       ...SHADOWS.button,
       shadowColor: palette.ctaShadowColor,
-      shadowOpacity: isDark ? 0.26 : 0.14,
+      shadowOpacity: isDark ? 0.12 : 0.06,
       shadowRadius: isDark ? 10 : 8,
       shadowOffset: { width: 0, height: isDark ? 6 : 4 },
     },
     ctaLabel: {
-      fontSize: isTablet ? SIZES.text18 : SIZES.text16,
-      lineHeight: isTablet ? 24 : 22,
+      fontSize: metrics.isCompact ? SIZES.text16 : SIZES.text18,
+      lineHeight: metrics.isCompact ? 22 : 24,
       fontWeight: FONT_WEIGHTS.bold,
       color: palette.ctaText,
       letterSpacing: 0,
+      fontFamily: FONT_FAMILIES.display,
     },
   });
 };

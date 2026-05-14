@@ -63,37 +63,47 @@ describe('androidRouteChrome', () => {
     );
   });
 
-  it('keeps social-compose on the themed background to avoid a black bottom system gap', () => {
-    expect(getAndroidRouteChrome('/social-compose', LIGHT_COLORS, false)).toEqual(
-      expect.objectContaining({
-        systemBackgroundColor: LIGHT_COLORS.background,
-        navigationButtonStyle: 'dark',
-        statusBarStyle: 'dark',
-        isMainTabsRoute: false,
-      })
-    );
+  it('keeps core UI routes on the themed background to avoid Android system gaps', () => {
+    [
+      '/analytics',
+      '/settings',
+      '/premium-upgrade',
+      '/notification-settings',
+      '/social-compose',
+      '/social-comments',
+      '/scan-result',
+    ].forEach((route) => {
+      expect(getAndroidRouteChrome(route, LIGHT_COLORS, false)).toEqual(
+        expect.objectContaining({
+          systemBackgroundColor: LIGHT_COLORS.background,
+          navigationButtonStyle: 'dark',
+          statusBarStyle: 'dark',
+          isMainTabsRoute: false,
+        })
+      );
 
-    expect(getAndroidRouteChrome('/social-compose', DARK_COLORS, true)).toEqual(
+      expect(getAndroidRouteChrome(route, DARK_COLORS, true)).toEqual(
+        expect.objectContaining({
+          systemBackgroundColor: DARK_COLORS.background,
+          navigationButtonStyle: 'light',
+          statusBarStyle: 'light',
+          isMainTabsRoute: false,
+        })
+      );
+    });
+  });
+
+  it('keeps immersive scan routes on the black Android system background', () => {
+    expect(getAndroidRouteChrome('/scan-preview', DARK_COLORS, true)).toEqual(
       expect.objectContaining({
-        systemBackgroundColor: DARK_COLORS.background,
+        systemBackgroundColor: ANDROID_SECONDARY_BACKGROUND,
         navigationButtonStyle: 'light',
         statusBarStyle: 'light',
         isMainTabsRoute: false,
       })
     );
-  });
 
-  it('keeps non-tab routes on the black Android system background', () => {
-    expect(getAndroidRouteChrome('/settings', LIGHT_COLORS, false)).toEqual(
-      expect.objectContaining({
-        systemBackgroundColor: ANDROID_SECONDARY_BACKGROUND,
-        navigationButtonStyle: 'light',
-        statusBarStyle: 'dark',
-        isMainTabsRoute: false,
-      })
-    );
-
-    expect(getAndroidRouteChrome('/scan-preview', DARK_COLORS, true)).toEqual(
+    expect(getAndroidRouteChrome('/scan-frigo', LIGHT_COLORS, false)).toEqual(
       expect.objectContaining({
         systemBackgroundColor: ANDROID_SECONDARY_BACKGROUND,
         navigationButtonStyle: 'light',

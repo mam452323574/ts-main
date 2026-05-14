@@ -44,6 +44,8 @@ const translations: Record<string, string> = {
   'fridge_scan_result.protein_band.low': 'Low',
   'fridge_scan_result.protein_band.medium': 'Medium',
   'fridge_scan_result.protein_band.high': 'High',
+  'metric_card.premium_label': 'PREMIUM',
+  'metric_card.loading_label': 'LOADING',
 };
 
 const t = (key: string) => translations[key] ?? key;
@@ -101,6 +103,7 @@ const baseMealResult: FridgeMealResult = {
 function renderCard(
   mode: FridgeMealMode,
   overrides: Partial<FridgeMealResult> = {},
+  premiumRenderState: 'loading' | 'locked' | 'unlocked' = 'unlocked',
 ) {
   const mealResult: FridgeMealResult = {
     ...baseMealResult,
@@ -112,6 +115,7 @@ function renderCard(
     <ChefResultCard
       imageUri="file:///meal.jpg"
       mealResult={mealResult}
+      premiumRenderState={premiumRenderState}
       selectedMode={mode}
       t={t}
     />,
@@ -239,5 +243,30 @@ describe('ChefResultCard', () => {
     expect(screen.getByTestId('chef-result-caution')).toBeTruthy();
     expect(screen.getByText('Energy')).toBeTruthy();
     expect(screen.getByText('High')).toBeTruthy();
+  });
+
+  it('keeps the free recipe preview visible while locking rich chef sections', () => {
+    renderCard(
+      'diet',
+      {
+        nutrition_estimate: {
+          calories_band: 'moderate',
+          protein_band: 'high',
+          note: 'Estimated only from visible foods.',
+        },
+        tips: ['Add lemon at the end.'],
+        caution_note: 'The photo is partial.',
+      },
+      'locked',
+    );
+
+    expect(screen.getByText('Crunch bowl')).toBeTruthy();
+    expect(screen.getByText('A quick bowl from visible ingredients.')).toBeTruthy();
+    expect(screen.queryByText('Simple and light')).toBeNull();
+    expect(screen.queryByText('Energy')).toBeNull();
+    expect(screen.queryByText('Estimated only from visible foods.')).toBeNull();
+    expect(screen.queryByText('Slice tomato')).toBeNull();
+    expect(screen.getAllByText('PREMIUM').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('chef-result-section-nutrition')).toBeTruthy();
   });
 });

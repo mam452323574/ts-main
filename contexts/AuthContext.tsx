@@ -25,6 +25,7 @@ import {
   hasCoachPersonaAccess,
   isCoachPersonaKey,
 } from '@/shared/coachPersonas';
+import { normalizePersistedInferredPersona } from '@/shared/coachProfileMemory';
 import {
   logOperationalError,
   type SafeObservabilityProperties,
@@ -173,6 +174,9 @@ const normalizeLoadedUserProfile = (
     coach_persona_key: isCoachPersonaKey(profile.coach_persona_key)
       ? profile.coach_persona_key
       : DEFAULT_COACH_PERSONA_KEY,
+    inferred_persona: normalizePersistedInferredPersona(
+      profile.inferred_persona ?? null,
+    ),
   };
 };
 

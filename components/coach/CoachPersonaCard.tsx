@@ -1,12 +1,16 @@
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Check, Crown, Lock } from 'lucide-react-native';
 
 import { useTheme } from '@/contexts/ThemeContext';
 import {
   BORDER_RADIUS,
   FONT_WEIGHTS,
-  SHADOWS,
+  getVisualMoodSurface,
+  mixColors,
   SIZES,
   SPACING,
   withAlpha,
@@ -20,7 +24,7 @@ interface CoachPersonaCardProps {
   avatarImageSource?: CoachPersonaVisual['imageSource'];
   avatarFallbackLabel: string;
   avatarHaloTint: string;
-  variant?: 'default' | 'compact';
+  variant?: 'default' | 'compact' | 'portrait';
   active?: boolean;
   locked?: boolean;
   disabled?: boolean;
@@ -47,7 +51,22 @@ export function CoachPersonaCard({
 }: CoachPersonaCardProps) {
   const { colors, isDark = false } = useTheme();
   const isCompact = variant === 'compact';
-  const styles = createStyles(colors, isCompact);
+  const isPortrait = variant === 'portrait';
+  const [imageFailed, setImageFailed] = useState(false);
+  const styles = createStyles(colors, isDark, isCompact, isPortrait);
+  const cardSurface = getVisualMoodSurface(colors, isDark, {
+    mood: 'obsidian',
+    accentColor: avatarHaloTint,
+    intensity: isPortrait ? (active ? 'card' : 'subtle') : active ? 'card' : 'subtle',
+    shadow: !isPortrait || active,
+  });
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [avatarImageSource]);
+
+  const shouldRenderPortraitImage =
+    isPortrait && !!avatarImageSource && !imageFailed;
 
   return (
     <Pressable
@@ -58,7 +77,9 @@ export function CoachPersonaCard({
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,
+        cardSurface,
         isCompact && styles.cardCompact,
+        isPortrait && styles.cardPortrait,
         active && styles.cardActive,
         locked && styles.cardLocked,
         disabled && styles.cardDisabled,
@@ -66,31 +87,117 @@ export function CoachPersonaCard({
       ]}
       testID={testID}
     >
-      <View style={styles.headerRow}>
-        <CoachPersonaAvatar
-          imageSource={avatarImageSource}
-          fallbackLabel={avatarFallbackLabel}
-          haloTint={avatarHaloTint}
-          size={isCompact ? 60 : 68}
-          dimmed={locked}
-          emphasis={isCompact ? 'subtle' : active ? 'featured' : 'default'}
-          testID={testID ? `${testID}-avatar` : undefined}
-        />
-        {active ? (
-          <View style={styles.activeBadge}>
-            <Check color={colors.white} size={14} strokeWidth={3} />
+      {isPortrait ? (
+        <>
+          <View
+            style={[
+              styles.portraitImageFrame,
+              {
+                backgroundColor: mixColors(
+                  colors.cardBackground,
+                  avatarHaloTint,
+                  active ? 0.1 : 0.07,
+                ),
+                borderColor: withAlpha(avatarHaloTint, active ? 0.24 : 0.12),
+              },
+            ]}
+            testID={testID ? `${testID}-portrait-frame` : undefined}
+          >
+            {shouldRenderPortraitImage ? (
+              <Image
+                source={avatarImageSource}
+                contentFit="cover"
+                style={[styles.portraitImage, locked && styles.portraitImageDimmed]}
+                onError={() => setImageFailed(true)}
+                testID={testID ? `${testID}-portrait-image` : undefined}
+              />
+            ) : (
+              <View
+                style={[
+                  styles.portraitFallback,
+                  {
+                    backgroundColor: mixColors(
+                      colors.cardBackground,
+                      avatarHaloTint,
+                      active ? 0.24 : 0.18,
+                    ),
+                  },
+                ]}
+                testID={testID ? `${testID}-portrait-fallback` : undefined}
+              >
+                <Text style={styles.portraitFallbackLabel}>
+                  {avatarFallbackLabel}
+                </Text>
+              </View>
+            )}
+            <LinearGradient
+              colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.72)']}
+              pointerEvents="none"
+              style={styles.portraitImageGradient}
+              testID={testID ? `${testID}-portrait-gradient` : undefined}
+            />
           </View>
-        ) : null}
-      </View>
 
-      <View style={styles.copy}>
-        <Text numberOfLines={isCompact ? 1 : 2} style={[styles.title, active && styles.titleActive]}>
-          {title}
-        </Text>
-        <Text numberOfLines={isCompact ? 1 : 2} style={styles.subtitle}>
-          {subtitle}
-        </Text>
-      </View>
+          {active ? (
+            <View
+              style={[
+                styles.activeBadge,
+                styles.activeBadgePortrait,
+                { backgroundColor: avatarHaloTint },
+              ]}
+            >
+              <Check color={colors.white} size={15} strokeWidth={3} />
+            </View>
+          ) : null}
+
+          <View style={styles.copy}>
+            <Text
+              numberOfLines={2}
+              style={[
+                styles.title,
+                styles.titlePortrait,
+                active && styles.titleActive,
+                active ? { color: mixColors(colors.white, avatarHaloTint, 0.12) } : null,
+              ]}
+            >
+              {title}
+            </Text>
+            <Text numberOfLines={2} style={[styles.subtitle, styles.subtitlePortrait]}>
+              {subtitle}
+            </Text>
+          </View>
+        </>
+      ) : (
+        <>
+          <View style={styles.headerRow}>
+            <CoachPersonaAvatar
+              imageSource={avatarImageSource}
+              fallbackLabel={avatarFallbackLabel}
+              haloTint={avatarHaloTint}
+              size={isCompact ? 52 : 68}
+              dimmed={locked}
+              emphasis={isCompact ? 'subtle' : active ? 'featured' : 'default'}
+              testID={testID ? `${testID}-avatar` : undefined}
+            />
+            {active ? (
+              <View
+                style={[styles.activeBadge, { backgroundColor: avatarHaloTint }]}
+              >
+                <Check color={colors.white} size={14} strokeWidth={3} />
+              </View>
+            ) : null}
+          </View>
+
+          <View style={styles.copy}>
+            <Text numberOfLines={isCompact ? 1 : 2} style={[styles.title, active && styles.titleActive]}>
+              {title}
+            </Text>
+            <Text numberOfLines={isCompact ? 1 : 2} style={styles.subtitle}>
+              {subtitle}
+            </Text>
+          </View>
+        </>
+      )}
 
       {locked ? (
         <View
@@ -106,7 +213,7 @@ export function CoachPersonaCard({
           />
           <View style={styles.lockScrim} />
           <View
-            style={styles.lockBadge}
+            style={[styles.lockBadge, isPortrait && styles.lockBadgePortrait]}
             testID={testID ? `${testID}-lock-badge` : undefined}
           >
             <Crown
@@ -130,7 +237,12 @@ export function CoachPersonaCard({
   );
 }
 
-const createStyles = (colors: any, isCompact: boolean) =>
+const createStyles = (
+  colors: any,
+  isDark: boolean,
+  isCompact: boolean,
+  isPortrait: boolean,
+) =>
   StyleSheet.create({
     card: {
       position: 'relative',
@@ -139,29 +251,29 @@ const createStyles = (colors: any, isCompact: boolean) =>
       paddingHorizontal: SPACING.md,
       paddingVertical: SPACING.md,
       borderRadius: BORDER_RADIUS.xl,
-      backgroundColor: withAlpha(colors.cardBackground, 0.94),
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.04),
       overflow: 'hidden',
       gap: SPACING.sm,
-      ...SHADOWS.card,
     },
     cardCompact: {
-      width: 172,
+      width: 146,
       flexBasis: 'auto',
-      minHeight: 138,
-      paddingHorizontal: SPACING.md,
-      paddingVertical: SPACING.md,
-      gap: SPACING.sm,
+      minHeight: 116,
+      paddingHorizontal: SPACING.sm + 2,
+      paddingVertical: SPACING.sm + 2,
+      gap: SPACING.xs + 2,
+    },
+    cardPortrait: {
+      width: 168,
+      flexBasis: 'auto',
+      minHeight: 258,
+      paddingHorizontal: 0,
+      paddingVertical: 0,
+      gap: 0,
+      borderRadius: BORDER_RADIUS.xl,
     },
     cardActive: {
-      borderColor: withAlpha(colors.primary, 0.28),
-      backgroundColor: colors.surfaceAccent ?? withAlpha(colors.primary, 0.08),
-      shadowColor: colors.primary,
-      shadowOpacity: 0.18,
-      shadowRadius: 18,
-      shadowOffset: { width: 0, height: 10 },
-      elevation: 6,
+      transform: [{ translateY: -1 }],
     },
     cardLocked: {
       borderColor: withAlpha(colors.gold ?? '#FFD700', 0.34),
@@ -177,24 +289,33 @@ const createStyles = (colors: any, isCompact: boolean) =>
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: SPACING.xs,
-      minHeight: isCompact ? 68 : 84,
+      minHeight: isCompact ? 56 : 84,
     },
     copy: {
-      gap: isCompact ? 4 : 6,
+      gap: isPortrait ? 5 : isCompact ? 4 : 6,
+      paddingHorizontal: isPortrait ? SPACING.md : 0,
+      paddingTop: isPortrait ? SPACING.sm + 2 : 0,
+      paddingBottom: isPortrait ? SPACING.md : 0,
     },
     title: {
-      fontSize: isCompact ? SIZES.text16 : SIZES.text14,
-      lineHeight: isCompact ? 20 : 18,
+      fontSize: isPortrait ? SIZES.text16 : SIZES.text14,
+      lineHeight: isPortrait ? 20 : isCompact ? 19 : 18,
       fontWeight: FONT_WEIGHTS.semiBold,
       color: colors.primaryText,
+    },
+    titlePortrait: {
+      color: colors.white,
     },
     titleActive: {
       color: colors.primary,
     },
     subtitle: {
       fontSize: SIZES.text12,
-      lineHeight: isCompact ? 17 : 16,
+      lineHeight: isPortrait ? 17 : isCompact ? 16 : 16,
       color: colors.textMuted ?? withAlpha(colors.gray, 0.98),
+    },
+    subtitlePortrait: {
+      color: withAlpha(colors.white, 0.72),
     },
     activeBadge: {
       width: isCompact ? 20 : 22,
@@ -204,18 +325,62 @@ const createStyles = (colors: any, isCompact: boolean) =>
       justifyContent: 'center',
       backgroundColor: colors.primary,
     },
+    activeBadgePortrait: {
+      position: 'absolute',
+      top: SPACING.sm + 2,
+      right: SPACING.sm + 2,
+      width: 28,
+      height: 28,
+      borderWidth: 2,
+      borderColor: withAlpha(colors.background, 0.78),
+      zIndex: 2,
+    },
+    portraitImageFrame: {
+      position: 'relative',
+      height: 192,
+      borderRadius: BORDER_RADIUS.lg,
+      overflow: 'hidden',
+    },
+    portraitImage: {
+      width: '100%',
+      height: '100%',
+      transform: [{ scale: 1.08 }],
+    },
+    portraitImageDimmed: {
+      opacity: 0.76,
+    },
+    portraitFallback: {
+      width: '100%',
+      height: '100%',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    portraitFallbackLabel: {
+      fontSize: 28,
+      lineHeight: 32,
+      fontWeight: FONT_WEIGHTS.bold,
+      color: colors.primaryText,
+      letterSpacing: 1,
+    },
+    portraitImageGradient: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      height: 88,
+    },
     lockOverlay: {
       ...StyleSheet.absoluteFillObject,
       justifyContent: 'flex-start',
-      paddingHorizontal: isCompact ? SPACING.sm + 2 : SPACING.md,
-      paddingVertical: isCompact ? SPACING.sm + 2 : SPACING.md,
+      paddingHorizontal: isPortrait ? SPACING.sm + 2 : isCompact ? SPACING.sm + 2 : SPACING.md,
+      paddingVertical: isPortrait ? SPACING.sm + 2 : isCompact ? SPACING.sm + 2 : SPACING.md,
     },
     lockBlur: {
       ...StyleSheet.absoluteFillObject,
     },
     lockScrim: {
       ...StyleSheet.absoluteFillObject,
-      backgroundColor: withAlpha(colors.cardBackground, 0.34),
+      backgroundColor: withAlpha(colors.background, isDark ? 0.5 : 0.22),
     },
     lockBadge: {
       alignSelf: 'flex-start',
@@ -225,9 +390,16 @@ const createStyles = (colors: any, isCompact: boolean) =>
       paddingHorizontal: SPACING.sm + 2,
       paddingVertical: 5,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: withAlpha(colors.goldLight ?? '#FFF8E1', 0.92),
+      backgroundColor: mixColors(
+        colors.goldLight ?? '#FFF8E1',
+        colors.background,
+        isDark ? 0.68 : 0.12,
+      ),
       borderWidth: 1,
       borderColor: withAlpha(colors.gold ?? '#FFD700', 0.32),
+    },
+    lockBadgePortrait: {
+      alignSelf: 'flex-end',
     },
     lockBadgeText: {
       fontSize: 10,

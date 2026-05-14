@@ -192,6 +192,21 @@ function Get-FunctionBundleVerificationRule {
   )
 
   switch ($FunctionName) {
+    'coach-generate-response' {
+      return [PSCustomObject]@{
+        AdditionalFunctionFileChecks = @(
+          'handler.ts'
+        )
+        SharedFileChecks = @(
+          [PSCustomObject]@{
+            SharedFileRelativePath = 'supabase\functions\_shared\phase2Contracts.ts'
+            RequiredSharedExports = @(
+              'parseCoachGenerateRequest'
+            )
+          }
+        )
+      }
+    }
     'social-update-comment' {
       return [PSCustomObject]@{
         SharedFileChecks = @(
@@ -320,6 +335,16 @@ function Invoke-FunctionBundleVerification {
       -LocalPath $localFunctionPath `
       -DownloadedPath $downloadedFunctionPath `
       -Label "$FunctionName index.ts"
+
+    foreach ($additionalFunctionFilePath in @($rule.AdditionalFunctionFileChecks)) {
+      $localAdditionalFunctionPath = Join-Path $ScriptRoot "supabase\functions\$FunctionName\$additionalFunctionFilePath"
+      $downloadedAdditionalFunctionPath = Join-Path $verificationRoot "supabase\functions\$FunctionName\$additionalFunctionFilePath"
+
+      Assert-DownloadedFileMatchesLocal `
+        -LocalPath $localAdditionalFunctionPath `
+        -DownloadedPath $downloadedAdditionalFunctionPath `
+        -Label "$FunctionName $additionalFunctionFilePath"
+    }
 
     foreach ($sharedFileCheck in @($rule.SharedFileChecks)) {
       $localSharedPath = Join-Path $ScriptRoot $sharedFileCheck.SharedFileRelativePath

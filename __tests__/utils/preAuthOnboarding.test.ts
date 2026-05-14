@@ -21,7 +21,7 @@ describe('preAuthOnboarding draft helpers', () => {
       avatarSkipped: false,
       email: '',
       createdUserId: null,
-      lastStep: 'theme',
+      lastStep: 'intro',
     });
   });
 
@@ -74,7 +74,24 @@ describe('preAuthOnboarding draft helpers', () => {
       avatarSkipped: false,
       email: '',
       createdUserId: null,
-      lastStep: 'theme',
+      lastStep: 'intro',
+    });
+  });
+
+  it('maps legacy stored steps to the new flow', () => {
+    expect(
+      sanitizePreAuthOnboardingDraft({
+        username: 'friendly',
+        lastStep: 'avatar',
+      }),
+    ).toEqual({
+      selectedTheme: null,
+      username: 'friendly',
+      avatarLocalUri: null,
+      avatarSkipped: false,
+      email: '',
+      createdUserId: null,
+      lastStep: 'profile',
     });
   });
 
@@ -82,7 +99,7 @@ describe('preAuthOnboarding draft helpers', () => {
     const draft = await updatePreAuthOnboardingDraft({
       selectedTheme: 'dark',
       username: 'friendly',
-      lastStep: 'avatar',
+      lastStep: 'profile',
     });
 
     expect(hasPreAuthProfileDraft(draft)).toBe(true);

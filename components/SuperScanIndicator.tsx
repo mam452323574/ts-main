@@ -43,16 +43,18 @@ export function SuperScanIndicator({ isPremium, eligibility, onLockedPress }: Su
   const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
-  const isAvailable = isPremium && eligibility?.allowed === true;
   const resolvedLimit = Math.max(eligibility?.limit ?? 1, 1);
   const resolvedRemaining = Math.max(
     0,
     eligibility?.remaining ?? (resolvedLimit - (eligibility?.current_count ?? 0))
   );
+  const hasRemainingScans = resolvedRemaining > 0;
+  const isAvailable = isPremium && eligibility?.allowed === true && hasRemainingScans;
   const nextRechargeAt =
     parseTimestampMs(eligibility?.next_recharge_at) ??
     parseTimestampMs(eligibility?.nextRechargeAt) ??
     parseTimestampMs(eligibility?.next_available_date);
+  const showRechargeTimer = isPremium && !hasRemainingScans && !!nextRechargeAt;
   const progressRatio = isPremium ? Math.min(100, (resolvedRemaining / resolvedLimit) * 100) : 0;
   const gradientColors = isPremium
     ? [
@@ -138,14 +140,14 @@ export function SuperScanIndicator({ isPremium, eligibility, onLockedPress }: Su
               <View style={styles.lockedBadge}>
                 <Lock color={colors.gray} size={14} />
               </View>
-            ) : isAvailable ? (
+            ) : hasRemainingScans ? (
               <View style={styles.availableBadge}>
                 <Zap color={colors.gold} size={14} fill={colors.gold} />
                 <Text style={styles.availableText}>{`${resolvedRemaining}/${resolvedLimit}`}</Text>
               </View>
-            ) : (
+            ) : showRechargeTimer ? null : (
               <View style={styles.usedBadge}>
-                <Text style={styles.usedText}>{`${resolvedRemaining}/${resolvedLimit}`}</Text>
+                <Text style={styles.usedText}>{t('scan_limit.limit_reached')}</Text>
               </View>
             )}
           </View>
@@ -171,11 +173,11 @@ export function SuperScanIndicator({ isPremium, eligibility, onLockedPress }: Su
                 : t('components.super_scan.status_available')}
           </Text>
 
-          {isPremium && nextRechargeAt && (
+          {showRechargeTimer && (
             <View style={styles.timerContainer}>
               <NextScanTimer
                 nextAvailableDate={nextRechargeAt}
-                scanLabel={t('scan_limit.recharge')}
+                scanLabel={t('scan_limit.next_scan')}
                 textColor={colors.gray}
                 iconColor={colors.gray}
               />

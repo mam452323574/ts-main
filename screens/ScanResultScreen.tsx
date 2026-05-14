@@ -10,27 +10,35 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { AlertCircle, Share2, X } from 'lucide-react-native';
+import { AlertCircle, Lock } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+
 import { ModalHandle } from '@/components/ModalHandle';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { RadialScoreGauge } from '@/components/RadialScoreGauge';
 import { MetricCard } from '@/components/MetricCard';
 import { ResultQuickStatCard } from '@/components/ResultQuickStatCard';
 import { ResultIcon } from '@/components/ResultIcon';
 import { TrajectoryPreviewCard } from '@/components/TrajectoryPreviewCard';
+import { ResultActionRail } from '@/components/results/ResultActionRail';
+import { ScanCoachCtaCard } from '@/components/results/ScanCoachCtaCard';
+import { ResultHeroSurface } from '@/components/results/ResultHeroSurface';
+import { ResultNarrativeCard } from '@/components/results/ResultNarrativeCard';
+import { NutritionLongTextCard } from '@/components/results/NutritionLongTextCard';
+import { ResultPillBadge } from '@/components/results/ResultPillBadge';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import {
-  BORDER_RADIUS,
   FONT_WEIGHTS,
-  SHADOWS,
   SIZES,
   SPACING,
   withAlpha,
 } from '@/constants/theme';
 import { AnalysisResult } from '@/types';
-import { useFeatureFlags, usePremiumPotential } from '@/hooks/queries';
+import { useFeatureFlags } from '@/hooks/queries/useFeatureFlags';
+import { usePremiumPotential } from '@/hooks/queries/usePremiumPotential';
 import { resolveFaceGlowScore } from '@/utils/faceGlow';
 import {
   isSuperAnalysisType,
@@ -46,8 +54,13 @@ import {
 import {
   RESULT_TEXT_PROPS,
   getResultLayoutState,
-  getResultSurfaceChrome,
+  getResultScreenGradient,
 } from '@/utils/resultLayout';
+import {
+  buildCoachGenerationInputFromScanCoachIntent,
+  encodeScanCoachIntentParam,
+  scanCoachIntent,
+} from '@/utils/scanCoachIntent';
 import {
   resolveResultItemTheme,
   resolveScanTypeTheme,
@@ -89,8 +102,8 @@ export default function ScanResultScreen() {
   );
   const insets = useSafeAreaInsets();
   const styles = useMemo(
-    () => createStyles(colors, insets, isDark, layout),
-    [colors, insets, isDark, layout],
+    () => createStyles(colors, insets, layout),
+    [colors, insets, layout],
   );
 
   const params = useLocalSearchParams();
@@ -121,11 +134,17 @@ export default function ScanResultScreen() {
     scanId ?? null,
     !!analysisData,
   );
-
   const slideAnim = useRef(new Animated.Value(50)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const sectionAnimations = useRef(
+    Array.from({ length: 6 }, () => new Animated.Value(0)),
+  ).current;
 
   useEffect(() => {
+    fadeAnim.setValue(0);
+    slideAnim.setValue(50);
+    sectionAnimations.forEach((value) => value.setValue(0));
+
     Animated.parallel([
       Animated.spring(slideAnim, {
         toValue: 0,
@@ -138,8 +157,30 @@ export default function ScanResultScreen() {
         duration: 400,
         useNativeDriver: true,
       }),
+      Animated.stagger(
+        55,
+        sectionAnimations.map((value) =>
+          Animated.timing(value, {
+            toValue: 1,
+            duration: 320,
+            useNativeDriver: true,
+          }),
+        ),
+      ),
     ]).start();
-  }, [fadeAnim, slideAnim]);
+  }, [fadeAnim, sectionAnimations, slideAnim]);
+
+  const getSectionAnimationStyle = (index: number) => ({
+    opacity: Animated.multiply(fadeAnim, sectionAnimations[index]),
+    transform: [
+      {
+        translateY: sectionAnimations[index].interpolate({
+          inputRange: [0, 1],
+          outputRange: [18, 0],
+        }),
+      },
+    ],
+  });
 
   const viewModel = useMemo(() => {
     if (!analysisData) {
@@ -174,13 +215,33 @@ export default function ScanResultScreen() {
   }, [
     analysisData,
     locale,
-    premiumRenderState,
     premiumPotential?.currentScan?.analyzed_at,
     premiumPotential?.currentScan?.created_at,
     premiumPotential?.historicalAverage30d,
     premiumPotential?.recentScoreHistory,
+    premiumRenderState,
     t,
   ]);
+  const coachIntent = useMemo(
+    () =>
+      analysisData
+        ? scanCoachIntent(analysisData, {
+            locale,
+            scanId,
+            scanType: analysisData.scan_type,
+          })
+        : null,
+    [analysisData, locale, scanId],
+  );
+  const coachScanType = useMemo(() => {
+    if (!analysisData) {
+      return null;
+    }
+
+    return analysisData.scan_type === 'face'
+      ? 'health'
+      : analysisData.scan_type;
+  }, [analysisData]);
 
   const handleClose = () => {
     if (router.canDismiss()) {
@@ -218,19 +279,56 @@ export default function ScanResultScreen() {
     });
   };
 
+  const handleCoachPress = () => {
+    if (!coachIntent) {
+      return;
+    }
+    const coachGenerationInput =
+      buildCoachGenerationInputFromScanCoachIntent(coachIntent, {
+        accountTier: userProfile?.account_tier,
+      });
+
+    router.push({
+      pathname: '/coach',
+      params: {
+        source: 'scan_result',
+        autoSubmit: '1',
+        ...(scanId ? { scanId } : {}),
+        ...(coachScanType ? { scanType: coachScanType } : {}),
+        promptType: coachGenerationInput.promptType,
+        fallbackPromptType: coachIntent.fallback_prompt_type,
+        questionKey: coachGenerationInput.questionKey ?? '',
+        questionText: coachGenerationInput.questionText,
+        priorityMetric: coachIntent.priority_metric ?? '',
+        scanIntent: encodeScanCoachIntentParam(coachIntent),
+      },
+    } as any);
+  };
+
+  const fallbackBackgroundGradient = getResultScreenGradient({
+    colors,
+    isDark,
+  });
+
   if (!analysisData || !viewModel) {
     return (
       <View style={styles.container}>
+        <LinearGradient
+          colors={fallbackBackgroundGradient}
+          end={{ x: 1, y: 1 }}
+          start={{ x: 0, y: 0 }}
+          style={styles.backgroundLayer}
+          testID="scan-result-background-layer"
+        />
         <ModalHandle />
-          <View style={styles.header}>
-            <View style={styles.headerSidePlaceholder} />
-          <Text {...RESULT_TEXT_PROPS} numberOfLines={1} style={styles.headerTitle}>
-            {t('common.results.title')}
-          </Text>
-          <TouchableOpacity onPress={handleClose} style={styles.iconButton}>
-            <X color={colors.primaryText} size={20} />
-          </TouchableOpacity>
-        </View>
+        <ScreenHeader
+          title={t('common.results.title')}
+          onClose={handleClose}
+          centered
+          variant="inline"
+          style={styles.resultHeader}
+          testID="scan-result-screen-header"
+        />
         <View style={styles.errorContainer}>
           <AlertCircle color={colors.error} size={48} />
           <Text
@@ -240,12 +338,12 @@ export default function ScanResultScreen() {
             {t('common.results.no_data')}
           </Text>
           <TouchableOpacity
-            style={[styles.errorButton, { backgroundColor: colors.primary }]}
+            style={[styles.errorButton, { backgroundColor: colors.primaryText }]}
             onPress={handleClose}
           >
             <Text
               {...RESULT_TEXT_PROPS}
-              style={[styles.errorButtonText, { color: colors.white }]}
+              style={[styles.errorButtonText, { color: colors.background }]}
             >
               {t('common.home_back')}
             </Text>
@@ -257,25 +355,32 @@ export default function ScanResultScreen() {
 
   const scanTypeTheme = resolveScanTypeTheme(viewModel.scanType, colors, isDark);
   const accentColor = scanTypeTheme.accentColor;
+  const backgroundGradient = getResultScreenGradient({
+    colors,
+    isDark,
+    accentColor,
+  });
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={styles.container}>
+      <LinearGradient
+        colors={backgroundGradient}
+        end={{ x: 1, y: 1 }}
+        start={{ x: 0, y: 0 }}
+        style={styles.backgroundLayer}
+        testID="scan-result-background-layer"
+      />
       {alertElement}
       <ModalHandle />
 
-      <View style={styles.header}>
-        <View style={styles.headerSidePlaceholder} />
-        <Text
-          {...RESULT_TEXT_PROPS}
-          numberOfLines={1}
-          style={[styles.headerTitle, { color: colors.primaryText }]}
-        >
-          {t('common.results.title')}
-        </Text>
-        <TouchableOpacity onPress={handleClose} style={styles.iconButton}>
-          <X color={colors.primaryText} size={20} />
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        title={t('common.results.title')}
+        onClose={handleClose}
+        centered
+        variant="inline"
+        style={styles.resultHeader}
+        testID="scan-result-screen-header"
+      />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -290,202 +395,227 @@ export default function ScanResultScreen() {
             },
           ]}
         >
-          <View
-            style={[
-              styles.typeCard,
-              getResultSurfaceChrome({
-                colors,
-                isDark,
-                kind: 'feature',
-                accentColor,
-              }),
-            ]}
-          >
-            <View
-              style={[
-                styles.typeIconContainer,
-                { backgroundColor: accentColor },
-              ]}
-            >
-              <ResultIcon
-                color={scanTypeTheme.iconColor}
-                size={layout.typeIconGlyphSize}
-                token={viewModel.scanType}
-              />
-            </View>
-
-            <View style={styles.typeTextContainer}>
-              <Text
-                {...RESULT_TEXT_PROPS}
-                style={[styles.typeTitle, { color: colors.primaryText }]}
-              >
-                {viewModel.typeLabel}
-              </Text>
-              {viewModel.analysisQualityLabel ? (
-                <View
-                  style={[
-                    styles.analysisQualityBadge,
-                    { backgroundColor: withAlpha(accentColor, 0.12) },
-                  ]}
-                >
-                  <Text
-                    {...RESULT_TEXT_PROPS}
-                    style={[
-                      styles.analysisQualityBadgeText,
-                      { color: accentColor },
-                    ]}
-                  >
-                    {viewModel.analysisQualityLabel}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-          </View>
-
-          <View style={styles.detailsSection}>
-            <Text
-              {...RESULT_TEXT_PROPS}
-              style={[styles.sectionTitle, { color: colors.primaryText }]}
-            >
-              {t('common.results.details_title')}
-            </Text>
-
-            <RadialScoreGauge
-              score={viewModel.score}
-              label={viewModel.scoreLabel}
-              color={accentColor}
-            />
-
-            <View style={styles.gridContainer}>
-              {viewModel.quickStats.map((item) => {
-                const itemTheme = resolveResultItemTheme({
-                  colors,
-                  isDark,
-                  theme: item.theme,
-                });
-
-                return (
-                  <ResultQuickStatCard
-                    key={item.id}
-                    fullWidth={item.span === 'full'}
-                    icon={<ResultIcon color={itemTheme.iconColor} token={item.icon} />}
-                    label={item.label}
-                    theme={itemTheme}
-                    value={item.value}
-                    valueMaxLines={item.valueMaxLines}
-                    valueVariant={item.valueVariant}
+          <Animated.View style={getSectionAnimationStyle(0)}>
+            <ResultHeroSurface
+              accentColor={accentColor}
+              title={viewModel.scoreLabel}
+              backgroundMediaUri={imageUri ?? null}
+              headerContent={(
+                <View style={styles.heroBadgeRow}>
+                  <ResultPillBadge
+                    accentColor={accentColor}
+                    backgroundColor={scanTypeTheme.chipBackground}
+                    borderColor={scanTypeTheme.chipBorder}
+                    icon={(
+                      <ResultIcon
+                        color={scanTypeTheme.iconColor}
+                        size={layout.isCompact ? 14 : 15}
+                        token={viewModel.scanType}
+                      />
+                    )}
+                    label={viewModel.typeLabel}
+                    textColor={scanTypeTheme.chipText}
+                    variant="accent"
                   />
-                );
-              })}
-            </View>
+                  <ResultPillBadge
+                    backgroundColor={scanTypeTheme.neutralChipBackground}
+                    borderColor={scanTypeTheme.neutralChipBorder}
+                    label={t('common.results.ai_report')}
+                    textColor={scanTypeTheme.neutralChipText}
+                    variant="neutral"
+                  />
+                  {viewModel.analysisQualityLabel ? (
+                    <ResultPillBadge
+                      accentColor={accentColor}
+                      backgroundColor={scanTypeTheme.chipBackground}
+                      borderColor={scanTypeTheme.chipBorder}
+                      label={viewModel.analysisQualityLabel}
+                      textColor={scanTypeTheme.chipText}
+                    />
+                  ) : null}
+                </View>
+              )}
+              footerContent={(
+                <View style={styles.heroQuickStatsGrid}>
+                  {viewModel.quickStats.map((item) => {
+                    const itemTheme = resolveResultItemTheme({
+                      colors,
+                      isDark,
+                      theme: item.theme,
+                    });
 
-            {viewModel.macros ? (
-              <ProportionsCard
-                colors={colors}
-                isDark={isDark}
-                macros={viewModel.macros}
-                layout={layout}
-              />
-            ) : null}
-
-            {viewModel.metrics.map((item) => {
-              const itemTheme = resolveResultItemTheme({
-                colors,
-                isDark,
-                theme: item.theme,
-              });
-
-              return (
-                <MetricCard
-                  key={item.id}
-                  icon={<ResultIcon color={itemTheme.iconColor} token={item.icon} />}
-                  theme={itemTheme}
-                  title={item.title}
-                  value={item.value}
-                  valueMaxLines={item.valueMaxLines}
-                  valueVariant={item.valueVariant}
+                    return (
+                      <ResultQuickStatCard
+                        key={item.id}
+                        fullWidth={item.span === 'full'}
+                        icon={<ResultIcon color={itemTheme.iconColor} token={item.icon} />}
+                        label={item.label}
+                        labelMaxLines={item.labelMaxLines}
+                        theme={itemTheme}
+                        value={item.value}
+                        valueMaxLines={item.valueMaxLines}
+                        valueVariant={item.valueVariant}
+                      />
+                    );
+                  })}
+                </View>
+              )}
+              visual={(
+                <RadialScoreGauge
+                  score={viewModel.score}
+                  label={viewModel.scoreLabel}
+                  color={accentColor}
                 />
-              );
-            })}
+              )}
+            />
+          </Animated.View>
 
-            {trajectoryViewModel?.shouldRender ? (
+          {coachIntent ? (
+            <Animated.View style={getSectionAnimationStyle(1)}>
+              <ScanCoachCtaCard
+                accentColor={accentColor}
+                intent={coachIntent}
+                onPress={handleCoachPress}
+                testID="scan-result-coach-cta"
+                variant="hero"
+              />
+            </Animated.View>
+          ) : null}
+
+          {trajectoryViewModel?.shouldRender ? (
+            <Animated.View style={getSectionAnimationStyle(2)}>
               <TrajectoryPreviewCard
-              model={trajectoryViewModel}
-              onPress={
+                model={trajectoryViewModel}
+                onPress={
                   trajectoryViewModel.premiumRenderState === 'locked'
                     ? handleTrajectoryPress
                     : undefined
                 }
               />
-            ) : null}
+            </Animated.View>
+          ) : null}
 
-            {viewModel.premiumMetrics.map((item) => {
-              const itemTheme = resolveResultItemTheme({
-                colors,
-                isDark,
-                theme: item.theme,
-              });
+          <Animated.View style={getSectionAnimationStyle(3)}>
+            <View style={styles.sectionStack}>
+              <Text
+                {...RESULT_TEXT_PROPS}
+                style={[styles.sectionTitle, { color: colors.primaryText }]}
+              >
+                {t('common.results.details_title')}
+              </Text>
 
-              return (
-                <MetricCard
-                  key={item.id}
-                  icon={<ResultIcon color={itemTheme.iconColor} token={item.icon} />}
-                  theme={itemTheme}
-                  title={item.title}
-                  value={item.value}
-                  valueMaxLines={item.valueMaxLines}
-                  valueVariant={item.valueVariant}
-                  premiumRenderState={item.premiumRenderState}
+              {viewModel.macros ? (
+                <ProportionsCard
+                  colors={colors}
+                  isDark={isDark}
+                  layout={layout}
+                  macros={viewModel.macros}
                   onPremiumPress={handlePremiumPress}
                 />
-              );
-            })}
-          </View>
+              ) : null}
 
-          <TouchableOpacity
-            style={[
-              styles.shareButton,
-              {
-                borderColor: accentColor,
-                backgroundColor: isDark
-                  ? 'rgba(255,255,255,0.04)'
-                  : colors.cardBackground,
-              },
-            ]}
-            disabled={isPreparingCommunityShare}
-            onPress={handleSharePress}
-            testID="scan-result-share-button"
-          >
-            <Share2 color={accentColor} size={18} />
-            <Text
-              {...RESULT_TEXT_PROPS}
-              adjustsFontSizeToFit
-              minimumFontScale={0.84}
-              numberOfLines={2}
-              style={[styles.shareButtonText, { color: colors.primaryText }]}
-            >
-              {t('share_story.actions.share_score')}
-            </Text>
-          </TouchableOpacity>
+              <View style={styles.metricGrid}>
+                {viewModel.metrics.map((item) => {
+                  const itemTheme = resolveResultItemTheme({
+                    colors,
+                    isDark,
+                    theme: item.theme,
+                  });
 
-          <TouchableOpacity
-            style={[
-              styles.backButton,
-              { backgroundColor: colors.primary },
-              SHADOWS.button,
-            ]}
-            onPress={handleClose}
-          >
-            <Text
-              {...RESULT_TEXT_PROPS}
-              adjustsFontSizeToFit
-              minimumFontScale={0.86}
-              numberOfLines={2}
-              style={[styles.backButtonText, { color: colors.white }]}
+                  return (
+                    <View
+                      key={item.id}
+                      style={styles.metricGridItem}
+                      testID={`scan-result-metric-grid-item-${item.id}`}
+                    >
+                      <MetricCard
+                        icon={<ResultIcon color={itemTheme.iconColor} token={item.icon} />}
+                        theme={itemTheme}
+                        title={item.title}
+                        titleMaxLines={item.titleMaxLines}
+                        value={item.value}
+                        valueMaxLines={item.valueMaxLines}
+                        valueVariant={item.valueVariant}
+                        premiumRenderState={item.premiumRenderState}
+                        onPremiumPress={handlePremiumPress}
+                      />
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          </Animated.View>
+
+          <Animated.View style={getSectionAnimationStyle(4)}>
+            <ResultNarrativeCard
+              accentColor={accentColor}
+              eyebrow={t('common.results.deep_analysis_label')}
             >
-              {t('common.home_back')}
-            </Text>
-          </TouchableOpacity>
+              <View style={styles.deepAnalysisStack}>
+                {viewModel.premiumMetrics.length > 0 ? (
+                  <View style={styles.metricGrid}>
+                    {viewModel.premiumMetrics.map((item) => {
+                      const itemTheme = resolveResultItemTheme({
+                        colors,
+                        isDark,
+                        theme: item.theme,
+                      });
+
+                      return (
+                        <View
+                          key={item.id}
+                          style={styles.metricGridItem}
+                          testID={`scan-result-premium-metric-grid-item-${item.id}`}
+                        >
+                          <MetricCard
+                            icon={<ResultIcon color={itemTheme.iconColor} token={item.icon} />}
+                            theme={itemTheme}
+                            title={item.title}
+                            titleMaxLines={item.titleMaxLines}
+                            value={item.value}
+                            valueMaxLines={item.valueMaxLines}
+                            valueVariant={item.valueVariant}
+                            premiumRenderState={item.premiumRenderState}
+                            onPremiumPress={handlePremiumPress}
+                          />
+                        </View>
+                      );
+                    })}
+                  </View>
+                ) : null}
+
+                {viewModel.nutritionLongSections?.map((section) => {
+                  const sectionTheme = resolveResultItemTheme({
+                    colors,
+                    isDark,
+                    theme: section.theme,
+                  });
+
+                  return (
+                    <NutritionLongTextCard
+                      key={section.id}
+                      onPremiumPress={handlePremiumPress}
+                      section={section}
+                      theme={sectionTheme}
+                    />
+                  );
+                })}
+              </View>
+            </ResultNarrativeCard>
+          </Animated.View>
+
+          <Animated.View style={getSectionAnimationStyle(5)}>
+            <View style={styles.actionStack}>
+              <ResultActionRail
+                accentColor={accentColor}
+                onPrimaryPress={handleClose}
+                onSecondaryPress={handleSharePress}
+                primaryLabel={t('common.home_back')}
+                secondaryDisabled={isPreparingCommunityShare}
+                secondaryLabel={t('share_story.actions.share_score')}
+              />
+            </View>
+          </Animated.View>
         </Animated.View>
       </ScrollView>
     </View>
@@ -497,32 +627,27 @@ function ProportionsCard({
   colors,
   isDark,
   layout,
+  onPremiumPress,
 }: {
   macros: ReturnType<typeof buildScanResultViewModel>['macros'];
   colors: any;
   isDark: boolean;
   layout: ReturnType<typeof getResultLayoutState>;
+  onPremiumPress?: () => void;
 }) {
+  const { t } = useLanguage();
+  const styles = useMemo(() => createProportionsStyles(layout), [layout]);
+
   if (!macros) {
     return null;
   }
 
-  const styles = useMemo(() => createProportionsStyles(layout), [layout]);
-
   return (
-    <View
-      style={[
-        styles.card,
-        getResultSurfaceChrome({
-          colors,
-          isDark,
-          kind: 'standard',
-        }),
-      ]}
+    <ResultNarrativeCard
+      accentColor={colors.warning}
+      eyebrow={macros.title}
+      surfaceVariant="wellnessPremium"
     >
-      <Text {...RESULT_TEXT_PROPS} style={[styles.title, { color: colors.gray }]}>
-        {macros.title}
-      </Text>
       <View style={styles.row}>
         {macros.items.map((item) => {
           const itemTheme = resolveResultItemTheme({
@@ -530,21 +655,10 @@ function ProportionsCard({
             isDark,
             theme: item.theme,
           });
-
-          return (
-            <View
-              key={item.id}
-              testID={`scan-result-macro-item-${item.id}`}
-              style={[
-                styles.item,
-                layout.isCompact ? styles.itemStacked : styles.itemThreeUp,
-                layout.isCompact ? styles.itemFull : null,
-                {
-                  backgroundColor: itemTheme.cardBackgroundColor,
-                  borderColor: itemTheme.cardBorderColor,
-                },
-              ]}
-            >
+          const isLocked = item.premiumRenderState === 'locked';
+          const isLoading = item.premiumRenderState === 'loading';
+          const itemContent = (
+            <>
               <View
                 style={[
                   styles.iconWrap,
@@ -563,6 +677,9 @@ function ProportionsCard({
               </View>
               <Text
                 {...RESULT_TEXT_PROPS}
+                adjustsFontSizeToFit
+                ellipsizeMode="tail"
+                minimumFontScale={0.82}
                 numberOfLines={2}
                 testID={`scan-result-macro-label-${item.id}`}
                 style={[styles.label, { color: colors.gray }]}
@@ -578,11 +695,69 @@ function ProportionsCard({
               >
                 {item.value}
               </Text>
+              {isLocked || isLoading ? (
+                <View
+                  style={[
+                    styles.statusTag,
+                    {
+                      backgroundColor: isLoading
+                        ? withAlpha(colors.primaryText, isDark ? 0.08 : 0.05)
+                        : withAlpha(colors.gold, isDark ? 0.15 : 0.18),
+                      borderColor: isLoading
+                        ? withAlpha(colors.primaryText, isDark ? 0.12 : 0.08)
+                        : withAlpha(colors.gold, isDark ? 0.25 : 0.2),
+                    },
+                  ]}
+                >
+                  {isLocked ? <Lock color={colors.gold} size={11} /> : null}
+                  <Text
+                    {...RESULT_TEXT_PROPS}
+                    numberOfLines={1}
+                    style={[
+                      styles.statusText,
+                      { color: isLocked ? colors.gold : colors.gray },
+                    ]}
+                  >
+                    {isLoading
+                      ? t('metric_card.loading_label')
+                      : t('metric_card.premium_label')}
+                  </Text>
+                </View>
+              ) : null}
+            </>
+          );
+          const itemStyle = [
+            styles.item,
+            layout.useSingleColumnResultCards ? styles.itemStacked : styles.itemThreeUp,
+            layout.useSingleColumnResultCards ? styles.itemFull : null,
+            {
+              backgroundColor: itemTheme.cardBackgroundColor,
+              borderColor: itemTheme.cardBorderColor,
+            },
+          ];
+
+          return isLocked && onPremiumPress ? (
+            <TouchableOpacity
+              key={item.id}
+              activeOpacity={0.86}
+              onPress={onPremiumPress}
+              testID={`scan-result-macro-item-${item.id}`}
+              style={itemStyle}
+            >
+              {itemContent}
+            </TouchableOpacity>
+          ) : (
+            <View
+              key={item.id}
+              testID={`scan-result-macro-item-${item.id}`}
+              style={itemStyle}
+            >
+              {itemContent}
             </View>
           );
         })}
       </View>
-    </View>
+    </ResultNarrativeCard>
   );
 }
 
@@ -590,18 +765,6 @@ const createProportionsStyles = (
   layout: ReturnType<typeof getResultLayoutState>,
 ) =>
   StyleSheet.create({
-    card: {
-      borderRadius: layout.standardRadius,
-      borderWidth: 1,
-      padding: layout.cardPadding,
-      marginBottom: SPACING.sm,
-    },
-    title: {
-      fontSize: SIZES.sm,
-      lineHeight: layout.isCompact ? 17 : 18,
-      marginBottom: layout.sectionGap,
-      includeFontPadding: false,
-    },
     row: {
       flexDirection: 'row',
       flexWrap: 'wrap',
@@ -625,16 +788,10 @@ const createProportionsStyles = (
       flexShrink: 0,
     },
     itemThreeUp: {
-      minWidth: layout.isCompact ? 0 : 104,
-    },
-    itemTwoUp: {
-      minWidth: 136,
+      minWidth: 104,
     },
     itemStacked: {
       minWidth: 0,
-    },
-    itemHalf: {
-      flexBasis: '48%',
     },
     itemFull: {
       flexBasis: '100%',
@@ -645,6 +802,7 @@ const createProportionsStyles = (
       textAlign: 'center',
       alignSelf: 'stretch',
       flexShrink: 1,
+      minWidth: 0,
       includeFontPadding: false,
     },
     value: {
@@ -653,12 +811,32 @@ const createProportionsStyles = (
       fontWeight: FONT_WEIGHTS.bold,
       includeFontPadding: false,
     },
+    statusTag: {
+      minHeight: 22,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: SPACING.xs,
+      borderRadius: 9999,
+      borderWidth: 1,
+      paddingHorizontal: SPACING.sm,
+      paddingVertical: 2,
+      marginTop: SPACING.xs - 2,
+      alignSelf: 'center',
+      maxWidth: '100%',
+    },
+    statusText: {
+      fontSize: SIZES.xs,
+      lineHeight: layout.isCompact ? 12 : 13,
+      fontWeight: FONT_WEIGHTS.bold,
+      includeFontPadding: false,
+      letterSpacing: layout.isCompact ? 0.25 : 0.35,
+    },
   });
 
 const createStyles = (
   colors: any,
   insets: any,
-  isDark: boolean,
   layout: ReturnType<typeof getResultLayoutState>,
 ) =>
   StyleSheet.create({
@@ -666,42 +844,13 @@ const createStyles = (
       flex: 1,
       backgroundColor: colors.background,
     },
-    header: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingHorizontal: SPACING.page,
-      paddingTop: insets.top + SPACING.sm,
-      paddingBottom: SPACING.md,
-      minHeight: layout.headerMinHeight,
+    backgroundLayer: {
+      ...StyleSheet.absoluteFillObject,
     },
-    headerSidePlaceholder: {
-      width: layout.headerSlotSize,
-      height: layout.headerSlotSize,
-    },
-    iconButton: {
-      width: layout.headerSlotSize,
-      height: layout.headerSlotSize,
-      borderRadius: layout.headerSlotSize / 2,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: isDark
-        ? withAlpha(colors.white, 0.06)
-        : withAlpha(colors.primaryText, 0.04),
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: isDark
-        ? withAlpha(colors.white, 0.08)
-        : withAlpha(colors.primaryText, 0.08),
-    },
-    headerTitle: {
-      fontSize: layout.headerTitleFontSize,
-      lineHeight: layout.headerTitleLineHeight,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.primaryText,
-      flex: 1,
-      textAlign: 'center',
-      paddingHorizontal: SPACING.md,
-      includeFontPadding: false,
+    resultHeader: {
+      backgroundColor: 'transparent',
+      borderBottomColor: 'transparent',
+      borderBottomWidth: 0,
     },
     scrollContent: {
       padding: SPACING.page,
@@ -709,6 +858,46 @@ const createStyles = (
     },
     content: {
       gap: layout.contentGap,
+    },
+    heroBadgeRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: SPACING.xs - 1,
+    },
+    heroQuickStatsGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: layout.sectionGap,
+    },
+    sectionStack: {
+      gap: layout.sectionGap,
+    },
+    sectionTitle: {
+      fontSize: layout.sectionTitleFontSize,
+      lineHeight: layout.sectionTitleLineHeight,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      includeFontPadding: false,
+    },
+    gridContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: layout.sectionGap,
+    },
+    metricGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: layout.sectionGap,
+    },
+    deepAnalysisStack: {
+      gap: layout.sectionGap,
+    },
+    actionStack: {
+      gap: layout.sectionGap,
+    },
+    metricGridItem: {
+      flexBasis: layout.useSingleColumnResultCards ? '100%' : '47%',
+      flexGrow: 1,
+      minWidth: 0,
     },
     errorContainer: {
       flex: 1,
@@ -719,13 +908,12 @@ const createStyles = (
     },
     errorText: {
       fontSize: layout.bodyTextFontSize,
-      color: colors.gray,
       textAlign: 'center',
       lineHeight: layout.emphasizedBodyLineHeight,
       includeFontPadding: false,
     },
     errorButton: {
-      backgroundColor: colors.primary,
+      backgroundColor: colors.primaryText,
       paddingHorizontal: SPACING.xl,
       paddingVertical: SPACING.md,
       borderRadius: layout.ctaRadius,
@@ -735,100 +923,10 @@ const createStyles = (
       justifyContent: 'center',
     },
     errorButtonText: {
-      color: colors.white,
+      color: colors.background,
       fontSize: layout.bodyTextFontSize,
       lineHeight: layout.bodyTextLineHeight,
       fontWeight: FONT_WEIGHTS.semiBold,
-      includeFontPadding: false,
-    },
-    typeCard: {
-      borderRadius: layout.featureRadius,
-      padding: layout.blockPadding,
-      flexDirection: 'row',
-      alignItems: layout.isCompact ? 'flex-start' : 'center',
-      gap: layout.sectionGap,
-      borderWidth: 1,
-      borderColor: isDark
-        ? withAlpha(colors.white, 0.08)
-        : withAlpha(colors.primaryText, 0.06),
-    },
-    typeIconContainer: {
-      width: layout.typeIconSize,
-      height: layout.typeIconSize,
-      borderRadius: layout.standardRadius,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    typeTextContainer: {
-      flex: 1,
-      minWidth: 0,
-      gap: SPACING.xs,
-    },
-    analysisQualityBadge: {
-      alignSelf: 'flex-start',
-      paddingHorizontal: SPACING.sm,
-      paddingVertical: 6,
-      borderRadius: BORDER_RADIUS.sm,
-    },
-    analysisQualityBadgeText: {
-      fontSize: SIZES.text12,
-      fontWeight: FONT_WEIGHTS.semiBold,
-    },
-    typeTitle: {
-      fontSize: layout.heroTitleFontSize,
-      lineHeight: layout.heroTitleLineHeight,
-      fontWeight: FONT_WEIGHTS.bold,
-      flexShrink: 1,
-      includeFontPadding: false,
-    },
-    detailsSection: {
-      gap: layout.sectionGap,
-    },
-    sectionTitle: {
-      fontSize: layout.sectionTitleFontSize,
-      lineHeight: layout.sectionTitleLineHeight,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      marginBottom: SPACING.xs,
-      includeFontPadding: false,
-    },
-    gridContainer: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: layout.sectionGap,
-    },
-    shareButton: {
-      minHeight: layout.ctaMinHeight,
-      borderRadius: layout.ctaRadius,
-      borderWidth: 1,
-      paddingHorizontal: SPACING.lg,
-      paddingVertical: SPACING.sm,
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
-      gap: SPACING.sm,
-    },
-    shareButtonText: {
-      flexShrink: 1,
-      minWidth: 0,
-      textAlign: 'center',
-      fontSize: layout.bodyTextFontSize,
-      lineHeight: layout.bodyTextLineHeight,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      includeFontPadding: false,
-    },
-    backButton: {
-      minHeight: layout.ctaMinHeight,
-      borderRadius: layout.ctaRadius,
-      paddingVertical: SPACING.md,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginTop: SPACING.md,
-    },
-    backButtonText: {
-      fontSize: layout.bodyTextFontSize,
-      lineHeight: layout.bodyTextLineHeight,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      textAlign: 'center',
       includeFontPadding: false,
     },
   });

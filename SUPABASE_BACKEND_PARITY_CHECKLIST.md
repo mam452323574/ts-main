@@ -136,6 +136,8 @@ Coach-specific runtime requirements:
 - Feature flag: `app_feature_flags.scope='mobile'` with `coach_enabled=true`
 - Secret: `N8N_COACH_GENERATE_WEBHOOK_URL`
 - Set or update `N8N_COACH_GENERATE_WEBHOOK_URL` as a Supabase Edge Function secret before smoke-testing Coach. Secret-only changes are available immediately; redeploy `coach-generate-response` only when the function code itself changes.
+- `WEBHOOK_ALLOWED_HOSTS` must include the n8n host used by `N8N_COACH_GENERATE_WEBHOOK_URL`, or the Edge Function will reject the webhook URL.
+- `n8n/workflows/coach.json` is an import template: after import, manually rebind the 6 `DeepSeek *` nodes to a real DeepSeek credential before enabling the workflow.
 
 ### Subscription and entitlement flow
 

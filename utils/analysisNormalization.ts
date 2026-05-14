@@ -160,6 +160,58 @@ const FAT_DISTRIBUTION_DISCLAIMER_FIELDS = [
   'disclaimer_text_i18n',
   'disclaimer_text',
 ] as const;
+const NUTRITION_MICRONUTRIENT_TEXT_FIELDS = [
+  'micronutrients_i18n',
+  'micronutrients',
+  'main_micronutrients_i18n',
+  'main_micronutrients',
+  'micronutrient_details_i18n',
+  'micronutrient_details',
+] as const;
+const NUTRITION_POINTS_TEXT_FIELDS = [
+  'nutrition_points_i18n',
+  'nutrition_points',
+  'nutritional_points_i18n',
+  'nutritional_points',
+  'nutrition_highlights_i18n',
+  'nutrition_highlights',
+] as const;
+const NUTRITION_RECOMMENDATION_TEXT_FIELDS = [
+  'recommendations_i18n',
+  'recommendations',
+  'nutrition_recommendations_i18n',
+  'nutrition_recommendations',
+  'dietary_recommendations_i18n',
+  'dietary_recommendations',
+  'actionable_advice_i18n',
+  'actionable_advice',
+] as const;
+const NUTRITION_DIETARY_DETAILS_TEXT_FIELDS = [
+  'dietary_details_i18n',
+  'dietary_details',
+  'food_details_i18n',
+  'food_details',
+  'meal_details_i18n',
+  'meal_details',
+] as const;
+const NUTRITION_PLATE_ANALYSIS_TEXT_FIELDS = [
+  'plate_analysis_i18n',
+  'plate_analysis',
+  'meal_analysis_i18n',
+  'meal_analysis',
+  'dish_analysis_i18n',
+  'dish_analysis',
+  'analysis_text_i18n',
+  'analysis_text',
+] as const;
+const NUTRITION_ESTIMATED_COMPOSITION_TEXT_FIELDS = [
+  'estimated_composition_i18n',
+  'estimated_composition',
+  'composition_estimated_i18n',
+  'composition_estimated',
+  'composition_details_i18n',
+  'composition_details',
+] as const;
 const ANALYSIS_META_LIMITATION_FLAGS: readonly ScanAnalysisLimitationFlag[] = [
   'blur',
   'low_light',
@@ -362,6 +414,36 @@ function findFirstResolvedText(
   }
 
   return null;
+}
+
+function buildOptionalTextField<
+  Key extends keyof Pick<
+    ScanNutritionResult,
+    | 'verdict_fallback_text'
+    | 'glycemic_index_fallback_text'
+    | 'ingredient_quality_fallback_text'
+    | 'main_vitamins_fallback_text'
+    | 'micronutrients'
+    | 'nutrition_points'
+    | 'recommendations'
+    | 'dietary_details'
+    | 'plate_analysis'
+    | 'estimated_composition'
+  >,
+>(key: Key, value: string | null) {
+  return value ? ({ [key]: value } as Pick<ScanNutritionResult, Key>) : {};
+}
+
+function readLongVitaminFallbackText(
+  value: unknown,
+  hasRecognizedCanonicalKeys = false,
+) {
+  const text = resolveText(value);
+  if (!text) {
+    return null;
+  }
+
+  return text;
 }
 
 function findFirstExplicitKey(
@@ -618,6 +700,7 @@ function normalizeFaceResult(raw: Record<string, unknown>): ScanFaceResult {
     raw.face_shape_fallback_text ?? raw.face_shape_i18n ?? raw.face_shape
   );
   const metrics = isPlainObject(raw.metrics) ? raw.metrics : null;
+  const faceShapeKey = normalizeAlias('face_shape', explicitKey ?? faceShapeText);
 
   return {
     schema_version: 4,
@@ -637,10 +720,76 @@ function normalizeFaceResult(raw: Record<string, unknown>): ScanFaceResult {
         metrics?.glowScore
     ),
     energy_score: readOptionalNumber(raw.energy_score),
-    face_shape_key: normalizeAlias('face_shape', explicitKey ?? faceShapeText),
+    face_shape_key: faceShapeKey,
+    ...(faceShapeText ? { face_shape_fallback_text: faceShapeText } : {}),
     collagen_level: readNumber(raw.collagen_level),
     hydration_level: readNumber(raw.hydration_level),
     photogenic_score: readNumber(raw.photogenic_score),
+    skin_clarity_score: readOptionalBoundedNumber(
+      raw.skin_clarity_score ?? metrics?.skin_clarity_score,
+      0,
+      100,
+    ),
+    under_eye_shadow_score: readOptionalBoundedNumber(
+      raw.under_eye_shadow_score ?? metrics?.under_eye_shadow_score,
+      0,
+      100,
+    ),
+    under_eye_volume_score: readOptionalBoundedNumber(
+      raw.under_eye_volume_score ?? metrics?.under_eye_volume_score,
+      0,
+      100,
+    ),
+    eye_openness_score: readOptionalBoundedNumber(
+      raw.eye_openness_score ?? metrics?.eye_openness_score,
+      0,
+      100,
+    ),
+    complexion_redness_score: readOptionalBoundedNumber(
+      raw.complexion_redness_score ?? metrics?.complexion_redness_score,
+      0,
+      100,
+    ),
+    pore_visibility_score: readOptionalBoundedNumber(
+      raw.pore_visibility_score ?? metrics?.pore_visibility_score,
+      0,
+      100,
+    ),
+    skin_evenness_score: readOptionalBoundedNumber(
+      raw.skin_evenness_score ?? metrics?.skin_evenness_score,
+      0,
+      100,
+    ),
+    skin_radiance_score: readOptionalBoundedNumber(
+      raw.skin_radiance_score ?? metrics?.skin_radiance_score,
+      0,
+      100,
+    ),
+    lip_dryness_score: readOptionalBoundedNumber(
+      raw.lip_dryness_score ?? metrics?.lip_dryness_score,
+      0,
+      100,
+    ),
+    forehead_smoothness_score: readOptionalBoundedNumber(
+      raw.forehead_smoothness_score ?? metrics?.forehead_smoothness_score,
+      0,
+      100,
+    ),
+    t_zone_oiliness_score: readOptionalBoundedNumber(
+      raw.t_zone_oiliness_score ?? metrics?.t_zone_oiliness_score,
+      0,
+      100,
+    ),
+    perceived_stress_level: readOptionalBoundedNumber(
+      raw.perceived_stress_level ?? metrics?.perceived_stress_level,
+      0,
+      100,
+    ),
+    perceived_sleep_quality: readOptionalBoundedNumber(
+      raw.perceived_sleep_quality ?? metrics?.perceived_sleep_quality,
+      0,
+      100,
+    ),
   };
 }
 
@@ -655,6 +804,8 @@ function normalizeBodyResult(raw: Record<string, unknown>): ScanBodyResult {
   const muscleMassText = resolveText(
     raw.muscle_mass_fallback_text ?? raw.muscle_mass_label_i18n ?? raw.muscle_mass_label
   );
+  const muscleMassKey = normalizeAlias('muscle_mass', explicitMuscleMassKey ?? muscleMassText);
+  const bodyTypeKey = normalizeAlias('body_type', explicitBodyTypeKey ?? bodyTypeText);
 
   return {
     schema_version: 4,
@@ -662,8 +813,10 @@ function normalizeBodyResult(raw: Record<string, unknown>): ScanBodyResult {
     analysis_meta: normalizeAnalysisMeta(raw.analysis_meta ?? raw.analysisMeta),
     body_score: readNumber(raw.body_score),
     body_fat_percentage: readNumber(raw.body_fat_percentage),
-    muscle_mass_key: normalizeAlias('muscle_mass', explicitMuscleMassKey ?? muscleMassText),
-    body_type_key: normalizeAlias('body_type', explicitBodyTypeKey ?? bodyTypeText),
+    muscle_mass_key: muscleMassKey,
+    ...(muscleMassText ? { muscle_mass_fallback_text: muscleMassText } : {}),
+    body_type_key: bodyTypeKey,
+    ...(bodyTypeText ? { body_type_fallback_text: bodyTypeText } : {}),
     posture_score: readNumber(raw.posture_score),
     waist_estimation_cm: readNumber(raw.waist_estimation_cm),
     strength_index: readNumber(raw.strength_index),
@@ -682,8 +835,29 @@ function normalizeNutritionResult(raw: Record<string, unknown>): ScanNutritionRe
   const verdictText = resolveText(
     raw.verdict_fallback_text ?? raw.short_verdict_i18n ?? raw.short_verdict
   );
-  const glycemicText = resolveText(raw.glycemic_index_label_i18n ?? raw.glycemic_index_label);
-  const ingredientQualityText = resolveText(raw.ingredient_quality_i18n ?? raw.ingredient_quality);
+  const glycemicText = resolveText(
+    raw.glycemic_index_fallback_text ??
+      raw.glycemic_index_label_i18n ??
+      raw.glycemic_index_label
+  );
+  const ingredientQualityText = resolveText(
+    raw.ingredient_quality_fallback_text ??
+      raw.ingredient_quality_i18n ??
+      raw.ingredient_quality
+  );
+  const mainVitaminsValue =
+    raw.main_vitamin_keys ??
+    raw.main_vitamins_fallback_text ??
+    raw.main_vitamins_i18n ??
+    raw.main_vitamins;
+  const mainVitaminKeys = normalizeVitaminKeys(mainVitaminsValue);
+  const recognizedVitaminKeys = mainVitaminKeys.some((item) => item !== 'unknown');
+  const candidates = [raw];
+  const verdictKey = normalizeVerdictKey(explicitVerdictKey ?? verdictText);
+  const glycemicIndexKey = normalizeGlycemicIndexKey(explicitGlycemicKey ?? glycemicText);
+  const ingredientQualityKey = normalizeIngredientQualityKey(
+    explicitIngredientQualityKey ?? ingredientQualityText
+  );
 
   return {
     schema_version: 4,
@@ -694,17 +868,49 @@ function normalizeNutritionResult(raw: Record<string, unknown>): ScanNutritionRe
     protein_grams: readNumber(raw.protein_grams),
     carbs_grams: readNumber(raw.carbs_grams),
     fat_grams: readNumber(raw.fat_grams),
-    verdict_key: normalizeVerdictKey(explicitVerdictKey ?? verdictText),
-    glycemic_index_key: normalizeGlycemicIndexKey(explicitGlycemicKey ?? glycemicText),
+    verdict_key: verdictKey,
+    ...buildOptionalTextField('verdict_fallback_text', verdictText),
+    glycemic_index_key: glycemicIndexKey,
+    ...buildOptionalTextField('glycemic_index_fallback_text', glycemicText),
     satiety_index: readNumber(raw.satiety_index),
-    ingredient_quality_key: normalizeIngredientQualityKey(
-      explicitIngredientQualityKey ?? ingredientQualityText
+    ingredient_quality_key: ingredientQualityKey,
+    ...buildOptionalTextField(
+      'ingredient_quality_fallback_text',
+      ingredientQualityText
     ),
-    main_vitamin_keys: normalizeVitaminKeys(
-      raw.main_vitamin_keys ??
+    main_vitamin_keys: mainVitaminKeys,
+    ...buildOptionalTextField(
+      'main_vitamins_fallback_text',
+      readLongVitaminFallbackText(
         raw.main_vitamins_fallback_text ??
-        raw.main_vitamins_i18n ??
-        raw.main_vitamins
+          raw.main_vitamins_i18n ??
+          raw.main_vitamins,
+        recognizedVitaminKeys
+      )
+    ),
+    ...buildOptionalTextField(
+      'micronutrients',
+      findFirstResolvedText(candidates, NUTRITION_MICRONUTRIENT_TEXT_FIELDS)
+    ),
+    ...buildOptionalTextField(
+      'nutrition_points',
+      findFirstResolvedText(candidates, NUTRITION_POINTS_TEXT_FIELDS)
+    ),
+    ...buildOptionalTextField(
+      'recommendations',
+      findFirstResolvedText(candidates, NUTRITION_RECOMMENDATION_TEXT_FIELDS)
+    ),
+    ...buildOptionalTextField(
+      'dietary_details',
+      findFirstResolvedText(candidates, NUTRITION_DIETARY_DETAILS_TEXT_FIELDS)
+    ),
+    ...buildOptionalTextField(
+      'plate_analysis',
+      findFirstResolvedText(candidates, NUTRITION_PLATE_ANALYSIS_TEXT_FIELDS)
+    ),
+    ...buildOptionalTextField(
+      'estimated_composition',
+      findFirstResolvedText(candidates, NUTRITION_ESTIMATED_COMPOSITION_TEXT_FIELDS)
     ),
   };
 }

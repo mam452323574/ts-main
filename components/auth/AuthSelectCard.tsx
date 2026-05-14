@@ -2,7 +2,14 @@ import { ReactNode, useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Check } from 'lucide-react-native';
 
-import { BORDER_RADIUS, SHADOWS, SIZES, SPACING } from '@/constants/theme';
+import {
+  BORDER_RADIUS,
+  FONT_FAMILIES,
+  SHADOWS,
+  SIZES,
+  SPACING,
+  withAlpha,
+} from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuthPalette } from '@/components/auth/tokens';
 
@@ -46,7 +53,7 @@ export function AuthSelectCard({
         <Text style={styles.title}>{title}</Text>
         {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       </View>
-      <View style={styles.checkSlot}>
+      <View style={[styles.checkSlot, selected && styles.checkSlotSelected]}>
         {selected ? <Check color={colors.primaryText} size={22} /> : null}
       </View>
     </TouchableOpacity>
@@ -56,48 +63,65 @@ export function AuthSelectCard({
 const createStyles = (colors: any, palette: ReturnType<typeof useAuthPalette>) =>
   StyleSheet.create({
     card: {
-      minHeight: 84,
+      minHeight: 108,
       flexDirection: 'row',
       alignItems: 'center',
       gap: SPACING.lg,
       paddingHorizontal: SPACING.lg,
       paddingVertical: SPACING.lg,
       borderRadius: BORDER_RADIUS.hero,
-      backgroundColor: palette.accentSofter,
+      backgroundColor: palette.surfaceGlass,
       borderWidth: 1,
-      borderColor: 'transparent',
+      borderColor: palette.secondaryActionBorder,
+      ...SHADOWS.soft,
+      shadowColor: palette.shadowColor,
+      shadowOpacity: 0.07,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 2,
     },
     cardSelected: {
       borderColor: palette.accentRing,
-      backgroundColor: palette.accentSoft,
-      ...SHADOWS.soft,
+      backgroundColor: palette.surfaceStrong,
+      shadowColor: palette.accentRing,
+      shadowOpacity: 0.12,
     },
     cardDisabled: {
       opacity: 0.5,
     },
     visual: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
+      width: 60,
+      height: 60,
+      borderRadius: 30,
       alignItems: 'center',
       justifyContent: 'center',
+      backgroundColor: palette.accentSofter,
+      borderWidth: 1,
+      borderColor: withAlpha(palette.accentRing, 0.16),
     },
     copy: {
       flex: 1,
+      gap: 4,
     },
     title: {
       fontSize: SIZES.lg,
-      fontWeight: '700',
+      fontFamily: FONT_FAMILIES.display,
       color: colors.primaryText,
-      marginBottom: 2,
+      letterSpacing: -0.2,
     },
     subtitle: {
       fontSize: SIZES.text14,
       lineHeight: 20,
-      color: colors.gray,
+      color: withAlpha(colors.gray, 0.96),
     },
     checkSlot: {
-      width: 22,
+      width: 28,
+      height: 28,
+      borderRadius: 14,
       alignItems: 'center',
+      justifyContent: 'center',
+    },
+    checkSlotSelected: {
+      backgroundColor: palette.accentSoft,
     },
   });

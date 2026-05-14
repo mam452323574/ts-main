@@ -6,17 +6,17 @@ import {
 
 export const GAMIFICATION_ASSET_SOURCES: Record<GamificationMascotFilename, number> =
   {
-    [GAMIFICATION_EMPTY_FILENAME]: require('../assets/images/gamification/stade_0.png'),
-    'stade_1.png': require('../assets/images/gamification/stade_1.png'),
-    'stade_2.png': require('../assets/images/gamification/stade_2.png'),
-    'stade_3.png': require('../assets/images/gamification/stade_3.png'),
-    'stade_4.png': require('../assets/images/gamification/stade_4.png'),
-    'stade_5.png': require('../assets/images/gamification/stade_5.png'),
-    'stade_6.png': require('../assets/images/gamification/stade_6.png'),
-    'stade_7.png': require('../assets/images/gamification/stade_7.png'),
-    'stade_8.png': require('../assets/images/gamification/stade_8.png'),
-    'stade_9.png': require('../assets/images/gamification/stade_9.png'),
-    'stade_10.png': require('../assets/images/gamification/stade_10.png'),
+    [GAMIFICATION_EMPTY_FILENAME]: require('../assets/images/gamification/stade_0.webp'),
+    'stade_1.png': require('../assets/images/gamification/stade_1.webp'),
+    'stade_2.png': require('../assets/images/gamification/stade_2.webp'),
+    'stade_3.png': require('../assets/images/gamification/stade_3.webp'),
+    'stade_4.png': require('../assets/images/gamification/stade_4.webp'),
+    'stade_5.png': require('../assets/images/gamification/stade_5.webp'),
+    'stade_6.png': require('../assets/images/gamification/stade_6.webp'),
+    'stade_7.png': require('../assets/images/gamification/stade_7.webp'),
+    'stade_8.png': require('../assets/images/gamification/stade_8.webp'),
+    'stade_9.png': require('../assets/images/gamification/stade_9.webp'),
+    'stade_10.png': require('../assets/images/gamification/stade_10.webp'),
   };
 
 const GAMIFICATION_LEGACY_ASSET_ALIASES: Record<string, GamificationMascotFilename> =

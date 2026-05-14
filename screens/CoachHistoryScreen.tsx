@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -7,12 +7,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronLeft } from 'lucide-react-native';
 
+import { AppScreen } from '@/components/AppScreen';
 import { Button } from '@/components/Button';
 import { ModalHandle } from '@/components/ModalHandle';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { ScreenState } from '@/components/ScreenState';
 import { CoachHistoryCard } from '@/components/coach/CoachHistoryCard';
 import {
   BORDER_RADIUS,
@@ -23,7 +25,7 @@ import {
 } from '@/constants/theme';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useInfiniteCoachHistory } from '@/hooks/queries';
+import { useInfiniteCoachHistory } from '@/hooks/queries/useInfiniteCoachHistory';
 import { resolveCoachEntryPersonaPresentation } from '@/utils/coachEntryPersona';
 import { formatCoachHistoryDate } from '@/utils/coachFormatting';
 import {
@@ -61,6 +63,7 @@ export default function CoachHistoryScreen() {
   const [expandedHistoryEntryId, setExpandedHistoryEntryId] = useState<string | null>(
     null,
   );
+  const hasInitializedExpandedHistoryEntry = useRef(false);
   const excludeEntryId = Array.isArray(excludeEntryIdParam)
     ? excludeEntryIdParam[0] ?? null
     : excludeEntryIdParam ?? null;
@@ -85,6 +88,16 @@ export default function CoachHistoryScreen() {
   const showEmptyState = !showLoadingState && !showErrorState && historyEntries.length === 0;
   const isRefreshing =
     isFetching && historyEntries.length > 0 && !isFetchingNextPage;
+
+  useEffect(() => {
+    if (
+      !hasInitializedExpandedHistoryEntry.current &&
+      historyEntries.length > 0
+    ) {
+      setExpandedHistoryEntryId(historyEntries[0]?.id ?? null);
+      hasInitializedExpandedHistoryEntry.current = true;
+    }
+  }, [historyEntries]);
 
   useEffect(() => {
     if (
@@ -176,47 +189,34 @@ export default function CoachHistoryScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <AppScreen bottomInset={false} style={styles.safeArea}>
       <View style={styles.container}>
         <ModalHandle />
 
-        <View style={styles.header}>
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel={t('common.back')}
-            onPress={handleClose}
-            style={styles.backButton}
-            testID="coach-history-back-button"
-          >
-            <ChevronLeft color={colors.primaryText} size={20} />
-          </TouchableOpacity>
-
-          <View style={styles.headerCopy}>
-            <Text style={styles.headerTitle}>{t('coach.history_title')}</Text>
-            <Text style={styles.headerSubtitle}>{t('coach.history_screen_body')}</Text>
-          </View>
-        </View>
+        <ScreenHeader
+          title={t('coach.history_title')}
+          subtitle={t('coach.history_screen_body')}
+          onBack={handleClose}
+          topInset={false}
+          backTestID="coach-history-back-button"
+        />
 
         {showLoadingState ? (
           <View style={styles.stateContainer}>
-            <View
-              style={[styles.stateCard, styles.stateCardCentered]}
-              testID="coach-history-loading-state"
-            >
-              <ActivityIndicator color={colors.primary} />
-            </View>
+            <ScreenState tone="loading" testID="coach-history-loading-state" />
           </View>
         ) : null}
 
         {showErrorState ? (
           <View style={styles.stateContainer}>
-            <View style={styles.stateCard} testID="coach-history-error-state">
-              <Text style={styles.stateTitle}>{t('coach.error_title')}</Text>
-              <Text style={styles.stateBody}>{loadErrorBody}</Text>
-              <View style={styles.stateAction}>
-                <Button title={t('common.retry')} onPress={handleRetry} />
-              </View>
-            </View>
+            <ScreenState
+              tone="error"
+              title={t('coach.error_title')}
+              message={loadErrorBody}
+              actionLabel={t('common.retry')}
+              onAction={handleRetry}
+              testID="coach-history-error-state"
+            />
           </View>
         ) : null}
 
@@ -228,9 +228,11 @@ export default function CoachHistoryScreen() {
               const personaPresentation = resolveCoachEntryPersonaPresentation(item);
               const ctaRoute = resolveCoachCtaRoute(item.cta_route);
               const entryTimestamp = item.generated_at ?? item.created_at;
-              const modeLabel = item.prompt_type
-                ? t(`coach.prompts.${item.prompt_type}.title`)
-                : null;
+              const modeLabel =
+                item.question_text ??
+                (item.prompt_type
+                  ? t(`coach.prompts.${item.prompt_type}.title`)
+                  : null);
 
               return (
                 <CoachHistoryCard
@@ -258,6 +260,47 @@ export default function CoachHistoryScreen() {
                     priorities: t('coach.sections.priorities'),
                     action_steps: t('coach.sections.action_steps'),
                     warnings: t('coach.sections.warnings'),
+                    data_gaps: t('coach.sections.data_gaps'),
+                    meal_template: t('coach.sections.meal_template'),
+                    meal_swaps: t('coach.sections.meal_swaps'),
+                    shopping_list: t('coach.sections.shopping_list'),
+                    quick_recipe: t('coach.sections.quick_recipe'),
+                    daily_schedule: t('coach.sections.daily_schedule'),
+                    micro_routine: t('coach.sections.micro_routine'),
+                    habit_tracker: t('coach.sections.habit_tracker'),
+                    reminders: t('coach.sections.reminders'),
+                    knowledge_card: t('coach.sections.knowledge_card'),
+                    next_scan_suggestion: t('coach.sections.next_scan_suggestion'),
+                    signal_watch: t('coach.sections.signal_watch'),
+                    streak_celebration: t('coach.sections.streak_celebration'),
+                    today: t('coach.sections.today'),
+                    formatters: {
+                      inDays: (count: number) =>
+                        t('coach.sections.in_days', { count }),
+                      daysPerWeek: (count: number) =>
+                        t('coach.sections.days_per_week', { count }),
+                      minutes: (count: number) =>
+                        t('coach.sections.minutes', { count }),
+                    },
+                    shopping_sections: {
+                      frais: t('coach.sections.shopping_fresh'),
+                      sec: t('coach.sections.shopping_dry'),
+                      boissons: t('coach.sections.shopping_drinks'),
+                      snacks: t('coach.sections.shopping_snacks'),
+                      autre: t('coach.sections.shopping_other'),
+                    },
+                    scan_types: {
+                      face: t('coach.sections.scan_face'),
+                      body: t('coach.sections.scan_body'),
+                      nutrition: t('coach.sections.scan_nutrition'),
+                      super: t('coach.sections.scan_super'),
+                      health: t('coach.sections.scan_health'),
+                    },
+                    recurrences: {
+                      today: t('coach.sections.recurrence_today'),
+                      daily: t('coach.sections.recurrence_daily'),
+                      weekly: t('coach.sections.recurrence_weekly'),
+                    },
                   }}
                   disclaimerLabel={t('coach.disclaimer_label')}
                   disclaimer={resolveCoachDisclaimerText(item.disclaimer, t)}
@@ -286,22 +329,20 @@ export default function CoachHistoryScreen() {
             ListFooterComponent={renderFooter}
             ListEmptyComponent={
               showEmptyState ? (
-                <View style={styles.stateCard} testID="coach-history-empty-state">
-                  <Text style={styles.stateTitle}>{t('coach.history_empty_title')}</Text>
-                  <Text style={styles.stateBody}>{t('coach.history_empty_body')}</Text>
-                  <View style={styles.stateAction}>
-                    <Button
-                      title={t('coach.action_bar.primary')}
-                      onPress={handleStartNewAdvice}
-                    />
-                  </View>
-                </View>
+                <ScreenState
+                  tone="empty"
+                  title={t('coach.history_empty_title')}
+                  message={t('coach.history_empty_body')}
+                  actionLabel={t('coach.action_bar.primary')}
+                  onAction={handleStartNewAdvice}
+                  testID="coach-history-empty-state"
+                />
               ) : null
             }
           />
         ) : null}
       </View>
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 

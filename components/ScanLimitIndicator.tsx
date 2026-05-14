@@ -49,24 +49,27 @@ export function ScanLimitIndicator({
         ? Math.max(0, eligibility.available)
       : Math.max(0, limit - currentCount);              // Scans disponibles
   const progress = (remaining / limit) * 100;           // Barre de progression basée sur les scans restants (décroissante)
-  const isLimitReached = !eligibility.allowed;
+  const hasRemainingScans = remaining > 0;
+  const isLimitReached = !eligibility.allowed || !hasRemainingScans;
   const nextRechargeAt =
     parseTimestampMs(eligibility.next_recharge_at) ??
     parseTimestampMs(eligibility.nextRechargeAt) ??
     parseTimestampMs(eligibility.next_available_date);
-  const showRechargeTimer = limit > 0 && remaining < limit && !!nextRechargeAt;
+  const showRechargeTimer = limit > 0 && !hasRemainingScans && !!nextRechargeAt;
 
 
   return (
     <View style={styles.container}>
-      <View style={styles.countContainer}>
-        {/* Affiche les scans DISPONIBLES / limite totale */}
-        <Text style={[styles.countText, isLimitReached && styles.countTextDisabled]}>
-          {remaining}
-        </Text>
-        <Text style={styles.countSeparator}>/</Text>
-        <Text style={styles.limitText}>{limit}</Text>
-      </View>
+      {hasRemainingScans ? (
+        <View style={styles.countContainer}>
+          {/* Affiche les scans DISPONIBLES / limite totale */}
+          <Text style={[styles.countText, isLimitReached && styles.countTextDisabled]}>
+            {remaining}
+          </Text>
+          <Text style={styles.countSeparator}>/</Text>
+          <Text style={styles.limitText}>{limit}</Text>
+        </View>
+      ) : null}
 
       <View style={styles.progressContainer}>
         <View style={styles.progressBar}>
@@ -84,12 +87,12 @@ export function ScanLimitIndicator({
         <View style={styles.statusTimerContainer}>
           <NextScanTimer
             nextAvailableDate={nextRechargeAt}
-            scanLabel={limit > 1 ? `+1 ${t('common.in')}` : t('scan_limit.recharge')}
+            scanLabel={t('scan_limit.next_scan_in')}
             textColor={colors.gray}
             iconColor={colors.gray}
             mode="scannerCompact"
             serverClockOffsetMs={eligibility.server_clock_offset_ms}
-            padHours={limit > 1}
+            padHours
             onTimerComplete={onTimerComplete}
           />
         </View>

@@ -22,6 +22,7 @@ interface AppScreenProps {
   keyboardVerticalOffset?: number;
   contentContainerStyle?: StyleProp<ViewStyle>;
   style?: StyleProp<ViewStyle>;
+  testID?: string;
 }
 
 export function AppScreen({
@@ -33,6 +34,7 @@ export function AppScreen({
   keyboardVerticalOffset = 0,
   contentContainerStyle,
   style,
+  testID,
 }: AppScreenProps) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -92,7 +94,11 @@ export function AppScreen({
     );
   }
 
-  return <View style={[styles.container, { backgroundColor: colors.background }, style]}>{body}</View>;
+  return (
+    <View testID={testID} style={[styles.container, { backgroundColor: colors.background }, style]}>
+      {body}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({

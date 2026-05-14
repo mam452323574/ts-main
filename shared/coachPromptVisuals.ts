@@ -12,18 +12,25 @@ import {
   ShieldAlert,
   type LucideIcon,
 } from 'lucide-react-native';
+import type { ImageSourcePropType } from 'react-native';
 
 import {
+  getVisualMoodGradient,
+  getVisualMoodSurface,
   mixColors,
   type ThemeColors,
   withAlpha,
 } from '@/constants/theme';
 
-import type { CoachPromptType } from './coachPromptTypes';
+import type {
+  CoachGenerationPromptType,
+  CoachPromptType,
+} from './coachPromptTypes';
 
 export interface CoachPromptVisual {
   icon: LucideIcon;
   accentColor: string;
+  artworkSource: ImageSourcePropType;
 }
 
 export interface CoachPromptPalette {
@@ -44,60 +51,76 @@ export interface CoachPromptPalette {
   selectorSelectedBackdropColors: readonly [string, string];
 }
 
-export const COACH_PROMPT_VISUALS: Record<CoachPromptType, CoachPromptVisual> = {
+export const COACH_PROMPT_VISUALS: Record<CoachGenerationPromptType, CoachPromptVisual> = {
   latest_scan: {
     icon: ScanSearch,
-    accentColor: '#6CA7FF',
+    accentColor: '#7FA9D4',
+    artworkSource: require('../assets/images/coach/prompts/latest_scan.webp'),
+  },
+  latest_scan_issue_resolution: {
+    icon: ScanSearch,
+    accentColor: '#7FA9D4',
+    artworkSource: require('../assets/images/coach/prompts/latest_scan.webp'),
   },
   weekly_plan: {
     icon: CalendarDays,
-    accentColor: '#FFB85C',
+    accentColor: '#C99A64',
+    artworkSource: require('../assets/images/coach/prompts/weekly_plan.webp'),
   },
   recovery_plan: {
     icon: RefreshCw,
-    accentColor: '#C29EFF',
+    accentColor: '#A99BCF',
+    artworkSource: require('../assets/images/coach/prompts/recovery_plan.webp'),
   },
   nutrition_focus: {
     icon: Apple,
-    accentColor: '#53C6BB',
+    accentColor: '#72AFA8',
+    artworkSource: require('../assets/images/coach/prompts/nutrition_focus.webp'),
   },
   body_focus: {
     icon: Dumbbell,
-    accentColor: '#88A7FF',
+    accentColor: '#8D9EC8',
+    artworkSource: require('../assets/images/coach/prompts/body_focus.webp'),
   },
   face_focus: {
     icon: ScanFace,
-    accentColor: '#FF8F8B',
+    accentColor: '#D98B86',
+    artworkSource: require('../assets/images/coach/prompts/face_focus.webp'),
   },
   hydration_focus: {
     icon: Droplets,
-    accentColor: '#5EC2F6',
+    accentColor: '#78AAC8',
+    artworkSource: require('../assets/images/coach/prompts/hydration_focus.webp'),
   },
   sleep_coach: {
     icon: Moon,
-    accentColor: '#8B9DDB',
+    accentColor: '#8C98BD',
+    artworkSource: require('../assets/images/coach/prompts/sleep_coach.webp'),
   },
   risk_watch: {
     icon: ShieldAlert,
-    accentColor: '#E88A5C',
+    accentColor: '#C48667',
+    artworkSource: require('../assets/images/coach/prompts/risk_watch.webp'),
   },
   trend_review: {
     icon: LineChart,
-    accentColor: '#6FD39A',
+    accentColor: '#7FA9D4',
+    artworkSource: require('../assets/images/coach/prompts/trend_review.webp'),
   },
 };
 
 export function getCoachPromptVisual(
-  promptType: CoachPromptType,
+  promptType: CoachGenerationPromptType | CoachPromptType,
 ): CoachPromptVisual {
   return COACH_PROMPT_VISUALS[promptType] ?? {
     icon: Activity,
     accentColor: '#94A3B8',
+    artworkSource: require('../assets/images/coach/prompts/latest_scan.webp'),
   };
 }
 
 export function getCoachPromptPalette(
-  promptType: CoachPromptType,
+  promptType: CoachGenerationPromptType | CoachPromptType,
   colors: ThemeColors,
   isDark: boolean,
 ): CoachPromptPalette {
@@ -105,64 +128,114 @@ export function getCoachPromptPalette(
   const neutralSurface = colors.surfaceMuted ?? colors.cardBackground;
   const neutralBorder = colors.borderSubtle ?? colors.lightGray ?? '#E3E7EF';
   const strongBorder = colors.borderStrong ?? neutralBorder;
+  const idleSurface = getVisualMoodSurface(colors, isDark, {
+    mood: 'obsidian',
+    accentColor,
+    intensity: 'card',
+    shadow: false,
+  });
+  const selectedSurface = getVisualMoodSurface(colors, isDark, {
+    mood: 'premium',
+    accentColor,
+    intensity: 'card',
+    shadow: false,
+  });
+  const pressedSurface = getVisualMoodSurface(colors, isDark, {
+    mood: 'premium',
+    accentColor,
+    intensity: 'hero',
+    shadow: false,
+  });
+  const idleGradient = getVisualMoodGradient(
+    colors,
+    isDark,
+    'obsidian',
+    accentColor,
+  );
+  const selectedGradient = getVisualMoodGradient(
+    colors,
+    isDark,
+    'premium',
+    accentColor,
+  );
 
   if (isDark) {
     return {
       accentColor,
-      accentStrong: accentColor,
-      selectorBackgroundColor: mixColors(neutralSurface, accentColor, 0.07),
-      selectorSelectedBackgroundColor: mixColors(neutralSurface, accentColor, 0.16),
-      selectorPressedBackgroundColor: mixColors(neutralSurface, accentColor, 0.16),
-      selectorBorderColor: mixColors(neutralBorder, accentColor, 0.14),
-      selectorSelectedBorderColor: mixColors(neutralBorder, accentColor, 0.42),
-      selectorPressedBorderColor: mixColors(neutralBorder, accentColor, 0.22),
-      selectorIconBackgroundColor: mixColors(neutralSurface, accentColor, 0.26),
-      selectorSelectedIconBackgroundColor: mixColors(neutralSurface, accentColor, 0.26),
+      accentStrong: mixColors(colors.white, accentColor, 0.18),
+      selectorBackgroundColor: mixColors(
+        idleSurface.backgroundColor,
+        colors.cardBackground,
+        0.08,
+      ),
+      selectorSelectedBackgroundColor: mixColors(
+        selectedSurface.backgroundColor,
+        colors.cardBackground,
+        0.04,
+      ),
+      selectorPressedBackgroundColor: mixColors(
+        pressedSurface.backgroundColor,
+        colors.cardBackground,
+        0.02,
+      ),
+      selectorBorderColor: idleSurface.borderColor,
+      selectorSelectedBorderColor: selectedSurface.borderColor,
+      selectorPressedBorderColor: pressedSurface.borderColor,
+      selectorIconBackgroundColor: withAlpha(colors.background, 0.58),
+      selectorSelectedIconBackgroundColor: mixColors(colors.background, accentColor, 0.14),
       selectorIconColor: mixColors(colors.white, accentColor, 0.18),
       selectorSelectedBadgeColor: accentColor,
       selectorSelectedBadgeBorderColor: withAlpha(colors.cardBackground, 0.82),
       selectorBackdropColors: [
-        withAlpha(accentColor, 0.14),
-        withAlpha(accentColor, 0.02),
+        withAlpha(idleGradient[0], 0.78),
+        withAlpha(idleGradient[1], 0.12),
       ],
       selectorSelectedBackdropColors: [
-        withAlpha(accentColor, 0.22),
-        withAlpha(accentColor, 0.02),
+        withAlpha(selectedGradient[0], 0.62),
+        withAlpha(selectedGradient[1], 0.1),
       ],
     };
   }
 
-  const accentStrong = mixColors(accentColor, colors.primaryText, 0.42);
+  const accentStrong = mixColors(accentColor, colors.primaryText, 0.48);
 
   return {
     accentColor,
     accentStrong,
-    selectorBackgroundColor: mixColors(colors.cardBackground, accentStrong, 0.16),
-    selectorSelectedBackgroundColor: mixColors(
+    selectorBackgroundColor: mixColors(
+      idleSurface.backgroundColor,
       colors.cardBackground,
-      accentStrong,
-      0.28,
+      0.24,
     ),
-    selectorPressedBackgroundColor: mixColors(colors.cardBackground, accentStrong, 0.22),
-    selectorBorderColor: mixColors(neutralBorder, accentStrong, 0.44),
-    selectorSelectedBorderColor: mixColors(strongBorder, accentStrong, 0.62),
-    selectorPressedBorderColor: mixColors(strongBorder, accentStrong, 0.54),
-    selectorIconBackgroundColor: mixColors(colors.cardBackground, accentStrong, 0.12),
+    selectorSelectedBackgroundColor: mixColors(
+      selectedSurface.backgroundColor,
+      colors.cardBackground,
+      0.2,
+    ),
+    selectorPressedBackgroundColor: mixColors(
+      pressedSurface.backgroundColor,
+      colors.cardBackground,
+      0.16,
+    ),
+    selectorBorderColor: mixColors(idleSurface.borderColor, neutralBorder, 0.34),
+    selectorSelectedBorderColor: mixColors(selectedSurface.borderColor, strongBorder, 0.22),
+    selectorPressedBorderColor: mixColors(pressedSurface.borderColor, strongBorder, 0.18),
+    selectorIconBackgroundColor: mixColors(colors.cardBackground, accentStrong, 0.075),
     selectorSelectedIconBackgroundColor: mixColors(
       colors.cardBackground,
       accentStrong,
-      0.16,
+      0.1,
     ),
     selectorIconColor: accentStrong,
     selectorSelectedBadgeColor: accentStrong,
     selectorSelectedBadgeBorderColor: withAlpha(colors.cardBackground, 0.92),
     selectorBackdropColors: [
-      withAlpha(accentStrong, 0.09),
-      withAlpha(accentStrong, 0.02),
+      withAlpha(idleGradient[0], 0.2),
+      withAlpha(idleGradient[1], 0.05),
     ],
     selectorSelectedBackdropColors: [
-      withAlpha(accentStrong, 0.14),
-      withAlpha(accentStrong, 0.03),
+      withAlpha(selectedGradient[0], 0.28),
+      withAlpha(selectedGradient[1], 0.065),
     ],
   };
 }

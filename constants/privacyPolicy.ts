@@ -60,7 +60,7 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
         title: '4. Finalites du traitement',
         paragraphs: ['Nous utilisons vos donnees pour :'],
         bullets: [
-          'executer les scans et generer des resultats d analyse sante par IA ;',
+          'executer les scans et generer des resultats d analyse sante ;',
           "afficher votre historique et vos scores dans l'application ;",
           'gerer l authentification, la securite du compte et les abonnements ;',
           'ameliorer la fiabilite du service et resoudre les incidents techniques.',
@@ -153,7 +153,7 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
         title: '4. Why we process data',
         paragraphs: ['We use your data to:'],
         bullets: [
-          'run scans and generate AI health analysis results;',
+          'run scans and generate health analysis results;',
           'show your history and scores inside the app;',
           'manage authentication, account security, and subscriptions;',
           'improve service reliability and resolve technical incidents.',
@@ -246,7 +246,7 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
         title: '4. Finalita del trattamento',
         paragraphs: ['Utilizziamo i tuoi dati per:'],
         bullets: [
-          'eseguire scan e generare risultati di analisi salute basati su IA;',
+          'eseguire scan e generare risultati di analisi salute;',
           "mostrare cronologia e punteggi all'interno dell'app;",
           'gestire autenticazione, sicurezza dell account e abbonamenti;',
           'migliorare affidabilita del servizio e risolvere incidenti tecnici.',
@@ -339,7 +339,7 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
         title: '4. Finalidades do tratamento',
         paragraphs: ['Utilizamos os seus dados para:'],
         bullets: [
-          'executar scans e gerar resultados de analise de saude com IA;',
+          'executar scans e gerar resultados de analise de saude;',
           'mostrar o seu historico e as suas pontuacoes dentro da app;',
           'gerir autenticacao, seguranca da conta e subscricoes;',
           'melhorar a fiabilidade do servico e resolver incidentes tecnicos.',
@@ -432,7 +432,7 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
         title: '4. Por que tratamos los datos',
         paragraphs: ['Utilizamos tus datos para:'],
         bullets: [
-          'ejecutar escaneos y generar resultados de analisis de salud con IA;',
+          'ejecutar escaneos y generar resultados de analisis de salud;',
           'mostrar tu historial y tus puntuaciones dentro de la app;',
           'gestionar autenticacion, seguridad de la cuenta y suscripciones;',
           'mejorar la fiabilidad del servicio y resolver incidencias tecnicas.',
@@ -525,7 +525,7 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
         title: '4. Zwecke der Verarbeitung',
         paragraphs: ['Wir verwenden deine Daten, um:'],
         bullets: [
-          'Scans auszufuhren und KI-gestutzte Gesundheitsanalysen zu erzeugen;',
+          'Scans auszufuhren und Gesundheitsanalysen zu erzeugen;',
           'deinen Verlauf und deine Scores in der App anzuzeigen;',
           'Authentifizierung, Kontosicherheit und Abonnements zu verwalten;',
           'die Zuverlassigkeit des Dienstes zu verbessern und technische Vorfalle zu beheben.',

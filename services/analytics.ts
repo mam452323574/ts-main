@@ -28,6 +28,7 @@ export type AnalyticsEventName =
   | 'coach_prompt_blocked_no_scans'
   | 'coach_prompt_blocked_quota_unavailable'
   | 'coach_prompt_blocked_quota_exhausted'
+  | 'coach_scan_result_auto_submit_started'
   | 'coach_prompt_submitted'
   | 'coach_response_received'
   | 'coach_generation_failed'

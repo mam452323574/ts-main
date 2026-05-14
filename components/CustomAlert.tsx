@@ -3,7 +3,16 @@ import { Animated, Modal, StyleSheet, Text, TouchableOpacity, TouchableWithoutFe
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AlertTriangle, Check, Crown, Shield, Sparkles } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
-import { FONT_WEIGHTS, mixColors, SIZES, SPACING } from '@/constants/theme';
+import {
+  BORDER_RADIUS,
+  FONT_WEIGHTS,
+  SIZES,
+  SPACING,
+  getThemeTokens,
+  getThemedSurface,
+  mixColors,
+  withAlpha,
+} from '@/constants/theme';
 
 export type AlertVariant = 'info' | 'success' | 'warning' | 'danger' | 'premium';
 export type AlertButtonTone = 'solid' | 'soft' | 'ghost';
@@ -43,51 +52,51 @@ const getVariantTokens = (variant: AlertVariant, colors: any, isDark: boolean): 
     case 'success':
       return {
         iconColor: colors.success,
-        iconBg: isDark ? 'rgba(48,209,88,0.2)' : '#EAF9EF',
-        iconBorder: isDark ? 'rgba(48,209,88,0.45)' : mixColors(colors.borderSubtle ?? '#CDEED8', colors.success, 0.28),
+        iconBg: withAlpha(colors.success, isDark ? 0.18 : 0.1),
+        iconBorder: withAlpha(colors.success, isDark ? 0.45 : 0.24),
         primaryButton: colors.success,
-        softButton: isDark ? 'rgba(48,209,88,0.18)' : '#EAF9EF',
-        softText: isDark ? '#8FE9AD' : '#1E7A43',
+        softButton: withAlpha(colors.success, isDark ? 0.16 : 0.1),
+        softText: isDark ? mixColors(colors.success, colors.white, 0.42) : mixColors(colors.success, colors.primaryText, 0.18),
         emoji: '✅',
       };
     case 'warning':
       return {
         iconColor: colors.warning,
-        iconBg: isDark ? 'rgba(255,159,10,0.2)' : '#FFF6E9',
-        iconBorder: isDark ? 'rgba(255,159,10,0.45)' : mixColors(colors.borderSubtle ?? '#FFE3BF', colors.warning, 0.28),
+        iconBg: withAlpha(colors.warning, isDark ? 0.18 : 0.1),
+        iconBorder: withAlpha(colors.warning, isDark ? 0.45 : 0.24),
         primaryButton: colors.warning,
-        softButton: isDark ? 'rgba(255,159,10,0.18)' : '#FFF6E9',
-        softText: isDark ? '#FFD08B' : '#9C6100',
+        softButton: withAlpha(colors.warning, isDark ? 0.16 : 0.1),
+        softText: isDark ? mixColors(colors.warning, colors.white, 0.38) : mixColors(colors.warning, colors.primaryText, 0.2),
         emoji: '⚠️',
       };
     case 'danger':
       return {
         iconColor: colors.error,
-        iconBg: isDark ? 'rgba(255,69,58,0.2)' : '#FFEFF0',
-        iconBorder: isDark ? 'rgba(255,69,58,0.45)' : mixColors(colors.borderSubtle ?? '#FFD2D5', colors.error, 0.3),
+        iconBg: withAlpha(colors.error, isDark ? 0.18 : 0.1),
+        iconBorder: withAlpha(colors.error, isDark ? 0.45 : 0.24),
         primaryButton: colors.error,
-        softButton: isDark ? 'rgba(255,69,58,0.18)' : '#FFEFF0',
-        softText: isDark ? '#FFA6A1' : '#A81E2B',
+        softButton: withAlpha(colors.error, isDark ? 0.16 : 0.1),
+        softText: isDark ? mixColors(colors.error, colors.white, 0.38) : mixColors(colors.error, colors.primaryText, 0.16),
         emoji: '🛟',
       };
     case 'premium':
       return {
-        iconColor: '#D4A31D',
-        iconBg: isDark ? 'rgba(212,163,29,0.2)' : '#FFF9EA',
-        iconBorder: isDark ? 'rgba(212,163,29,0.45)' : mixColors(colors.borderSubtle ?? '#F5E4B4', '#D4A31D', 0.22),
-        primaryButton: colors.primary,
-        softButton: isDark ? 'rgba(212,163,29,0.16)' : '#FFF7DF',
-        softText: isDark ? '#FFD676' : '#8C6A07',
+        iconColor: colors.gold,
+        iconBg: withAlpha(colors.gold, isDark ? 0.18 : 0.12),
+        iconBorder: withAlpha(colors.gold, isDark ? 0.45 : 0.28),
+        primaryButton: colors.primaryText,
+        softButton: withAlpha(colors.gold, isDark ? 0.14 : 0.12),
+        softText: colors.gold,
         emoji: '✨',
       };
     default:
       return {
         iconColor: colors.primary,
-        iconBg: isDark ? 'rgba(10,132,255,0.2)' : '#EAF3FF',
-        iconBorder: isDark ? 'rgba(10,132,255,0.45)' : mixColors(colors.borderSubtle ?? '#CDE2FF', colors.primary, 0.24),
-        primaryButton: colors.primary,
-        softButton: isDark ? 'rgba(10,132,255,0.16)' : '#EDF5FF',
-        softText: isDark ? '#90C3FF' : '#0F5EC2',
+        iconBg: withAlpha(colors.primary, isDark ? 0.18 : 0.1),
+        iconBorder: withAlpha(colors.primary, isDark ? 0.45 : 0.24),
+        primaryButton: colors.primaryText,
+        softButton: withAlpha(colors.primary, isDark ? 0.14 : 0.1),
+        softText: colors.primary,
         emoji: '💡',
       };
   }
@@ -254,11 +263,20 @@ export function CustomAlert({
   );
 }
 
-const createStyles = (colors: any, isDark: boolean, insets: any) =>
-  StyleSheet.create({
+const createStyles = (colors: any, isDark: boolean, insets: any) => {
+  const tokens = getThemeTokens(isDark);
+  const modalSurface = getThemedSurface({
+    colors,
+    isDark,
+    variant: 'glass',
+    border: true,
+    shadow: true,
+  });
+
+  return StyleSheet.create({
     overlay: {
       flex: 1,
-      backgroundColor: isDark ? 'rgba(3,6,14,0.7)' : 'rgba(10,16,32,0.42)',
+      backgroundColor: tokens.scrim,
       justifyContent: 'center',
       alignItems: 'center',
       paddingTop: insets.top + SPACING.xl,
@@ -266,21 +284,19 @@ const createStyles = (colors: any, isDark: boolean, insets: any) =>
       paddingHorizontal: SPACING.xl,
     },
     modalContainer: {
-      backgroundColor: colors.cardBackground,
-      borderRadius: 30,
+      backgroundColor: modalSurface.backgroundColor,
+      borderRadius: BORDER_RADIUS.hero,
       padding: SPACING.xl,
       alignItems: 'center',
       maxWidth: 370,
       width: '100%',
       borderWidth: 1,
-      borderColor: isDark
-        ? 'rgba(255,255,255,0.08)'
-        : (colors.borderSubtle ?? '#EBEEF6'),
-      shadowColor: '#0D1428',
-      shadowOffset: { width: 0, height: 16 },
-      shadowOpacity: isDark ? 0.4 : 0.18,
-      shadowRadius: 28,
-      elevation: 12,
+      borderColor: modalSurface.borderColor,
+      shadowColor: modalSurface.shadowColor,
+      shadowOffset: modalSurface.shadowOffset,
+      shadowOpacity: modalSurface.shadowOpacity,
+      shadowRadius: modalSurface.shadowRadius,
+      elevation: modalSurface.elevation,
     },
     headlineWrap: {
       alignItems: 'center',
@@ -305,7 +321,7 @@ const createStyles = (colors: any, isDark: boolean, insets: any) =>
       color: colors.primaryText,
       marginBottom: SPACING.xs,
       textAlign: 'center',
-      letterSpacing: -0.2,
+      letterSpacing: 0,
     },
     message: {
       fontSize: SIZES.md,
@@ -326,7 +342,7 @@ const createStyles = (colors: any, isDark: boolean, insets: any) =>
     button: {
       paddingVertical: 14,
       paddingHorizontal: SPACING.md,
-      borderRadius: 16,
+      borderRadius: BORDER_RADIUS.lg,
       alignItems: 'center',
       minHeight: 46,
       justifyContent: 'center',
@@ -335,7 +351,7 @@ const createStyles = (colors: any, isDark: boolean, insets: any) =>
     buttonSoft: {
       borderWidth: 1,
       borderColor: isDark
-        ? 'rgba(255,255,255,0.1)'
+        ? withAlpha(colors.white, 0.1)
         : (colors.borderSubtle ?? '#E6EBF4'),
     },
     buttonGhost: {
@@ -347,8 +363,9 @@ const createStyles = (colors: any, isDark: boolean, insets: any) =>
       letterSpacing: 0.1,
     },
     buttonTextSolid: {
-      color: '#FFFFFF',
+      color: colors.background,
     },
     buttonTextSoft: {},
     buttonTextGhost: {},
   });
+};

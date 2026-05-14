@@ -4,7 +4,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Check, Crown, Sparkles, X } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
-import { FONT_WEIGHTS, SHADOWS, SIZES, SPACING, getAndroidLightSurface } from '@/constants/theme';
+import {
+  BORDER_RADIUS,
+  FONT_WEIGHTS,
+  SHADOWS,
+  SIZES,
+  SPACING,
+  getAndroidLightSurface,
+  getObsidianSurface,
+} from '@/constants/theme';
+import { buildPremiumHealthPalette, type PremiumHealthPalette } from '@/constants/premiumHealth';
 import { Button } from '@/components/Button';
 import { useLanguage } from '@/contexts/LanguageContext';
 
@@ -44,7 +53,14 @@ export const ContextualPaywall: React.FC<ContextualPaywallProps> = ({
   const { t } = useLanguage();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const styles = useMemo(() => createStyles(colors, isDark, insets), [colors, insets, isDark]);
+  const premiumHealth = useMemo(
+    () => buildPremiumHealthPalette(colors, isDark),
+    [colors, isDark],
+  );
+  const styles = useMemo(
+    () => createStyles(colors, isDark, insets, premiumHealth),
+    [colors, insets, isDark, premiumHealth],
+  );
 
   const handlePrimaryPress = () => {
     onClose();
@@ -77,11 +93,11 @@ export const ContextualPaywall: React.FC<ContextualPaywallProps> = ({
 
                 <View style={styles.heroWrap}>
                   <View style={styles.iconContainer}>
-                    {icon || <Crown color="#D4A31D" size={31} />}
+                    {icon || <Crown color={colors.gold} size={31} />}
                   </View>
                   {badgeIcon !== null ? (
                     <View style={styles.sparkleBadge} testID="contextual-paywall-badge">
-                      {badgeIcon ?? <Sparkles color="#D4A31D" size={14} />}
+                      {badgeIcon ?? <Sparkles color={colors.gold} size={14} />}
                     </View>
                   ) : null}
                 </View>
@@ -119,7 +135,11 @@ export const ContextualPaywall: React.FC<ContextualPaywallProps> = ({
 
                 <View style={styles.footer}>
                   <View style={styles.primaryButtonWrap}>
-                    <Button title={primaryButtonText || defaultPrimaryText} onPress={handlePrimaryPress} />
+                    <Button
+                      title={primaryButtonText || defaultPrimaryText}
+                      onPress={handlePrimaryPress}
+                      variant="premium"
+                    />
                   </View>
                   <TouchableOpacity onPress={onClose} style={styles.secondaryButton}>
                     <Text
@@ -142,7 +162,12 @@ export const ContextualPaywall: React.FC<ContextualPaywallProps> = ({
   );
 };
 
-const createStyles = (colors: any, isDark: boolean, insets: any) => {
+const createStyles = (
+  colors: any,
+  isDark: boolean,
+  insets: any,
+  premiumHealth: PremiumHealthPalette,
+) => {
   const isAndroidLight = Platform.OS === 'android' && !isDark;
   const androidLightSurface = isAndroidLight
     ? getAndroidLightSurface(colors, {
@@ -157,11 +182,23 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => {
         elevation: 8,
       })
     : null;
+  const obsidianSurface = isDark
+    ? getObsidianSurface(colors, {
+        accentColor: colors.gold,
+        intensity: 'premium',
+        backgroundAlpha: 0.08,
+        borderAlpha: 0.26,
+        shadowOpacity: 0.24,
+        shadowRadius: 30,
+        shadowOffsetY: 14,
+        elevation: 10,
+      })
+    : null;
 
   return StyleSheet.create({
     overlay: {
       flex: 1,
-      backgroundColor: isDark ? 'rgba(3,8,16,0.72)' : 'rgba(10,16,32,0.42)',
+      backgroundColor: premiumHealth.scrim,
       justifyContent: 'center',
       alignItems: 'center',
       paddingTop: insets.top + SPACING.lg,
@@ -171,31 +208,33 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => {
     shell: {
       width: '100%',
       maxWidth: 410,
-      borderRadius: 30,
+      borderRadius: BORDER_RADIUS.hero,
       ...(isAndroidLight
         ? androidLightSurface?.shadowStyle
-        : {
-            shadowColor: '#0D1428',
+        : (obsidianSurface?.shadowStyle ?? {
+            shadowColor: premiumHealth.shadowColor,
             shadowOffset: { width: 0, height: 14 },
-            shadowOpacity: isDark ? 0.38 : 0.14,
+            shadowOpacity: 0.14,
             shadowRadius: 24,
             elevation: 11,
-          }),
+          })),
       position: 'relative',
     },
     surface: {
-      borderRadius: 30,
+      borderRadius: BORDER_RADIUS.hero,
       paddingHorizontal: SPACING.xl,
       paddingTop: SPACING.xl,
       paddingBottom: SPACING.lg,
       alignItems: 'center',
-      backgroundColor: isAndroidLight ? androidLightSurface?.backgroundColor : colors.cardBackground,
+      backgroundColor: isAndroidLight
+        ? androidLightSurface?.backgroundColor
+        : (obsidianSurface?.backgroundColor ?? premiumHealth.surfaceRaised),
       borderWidth: 1,
       borderColor: isAndroidLight
         ? androidLightSurface?.borderColor
         : isDark
-          ? 'rgba(255,255,255,0.08)'
-          : (colors.borderSubtle ?? '#EBEEF6'),
+          ? (obsidianSurface?.borderColor ?? premiumHealth.borderStrong)
+          : premiumHealth.borderSubtle,
       overflow: 'hidden',
       position: 'relative',
     },
@@ -209,8 +248,10 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => {
       justifyContent: 'center',
       alignItems: 'center',
       backgroundColor: isDark
-        ? 'rgba(255,255,255,0.08)'
-        : (colors.surfaceMuted ?? '#F4F6FB'),
+        ? premiumHealth.secondaryActionBackground
+        : premiumHealth.secondaryActionBackground,
+      borderWidth: 1,
+      borderColor: premiumHealth.secondaryActionBorder,
     },
     heroWrap: {
       alignItems: 'center',
@@ -222,9 +263,9 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => {
       borderRadius: 36,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: isDark ? 'rgba(212,163,29,0.2)' : '#FFF9EA',
+      backgroundColor: premiumHealth.premiumAccentMuted,
       borderWidth: 1,
-      borderColor: isDark ? 'rgba(212,163,29,0.44)' : '#F5E4B4',
+      borderColor: premiumHealth.borderStrong,
     },
     sparkleBadge: {
       marginTop: SPACING.xs,
@@ -233,9 +274,9 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => {
       borderRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: isDark ? 'rgba(212,163,29,0.14)' : '#FFF4CF',
+      backgroundColor: premiumHealth.premiumAccentSoft,
       borderWidth: 1,
-      borderColor: isDark ? 'rgba(212,163,29,0.2)' : '#F6E3A8',
+      borderColor: premiumHealth.borderStrong,
     },
     title: {
       fontSize: SIZES.xl,
@@ -243,14 +284,14 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => {
       textAlign: 'center',
       color: colors.primaryText,
       marginBottom: SPACING.xs,
-      letterSpacing: -0.2,
+      letterSpacing: 0,
       flexShrink: 1,
     },
     subtitle: {
       fontSize: SIZES.md,
       fontWeight: FONT_WEIGHTS.semiBold,
       textAlign: 'center',
-      color: colors.primary,
+      color: premiumHealth.trustAccent,
       marginBottom: SPACING.sm,
       flexShrink: 1,
     },
@@ -267,13 +308,9 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => {
       marginBottom: SPACING.lg,
       borderRadius: 18,
       padding: SPACING.md,
-      backgroundColor: isDark
-        ? 'rgba(255,255,255,0.05)'
-        : (colors.surfaceMuted ?? '#F7F8FC'),
+      backgroundColor: premiumHealth.trustAccentMuted,
       borderWidth: 1,
-      borderColor: isDark
-        ? 'rgba(255,255,255,0.07)'
-        : (colors.borderSubtle ?? '#E9ECF5'),
+      borderColor: premiumHealth.borderSubtle,
       gap: SPACING.sm,
     },
     bulletItem: {
@@ -287,9 +324,7 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => {
       borderRadius: 11,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: isDark
-        ? 'rgba(10,132,255,0.18)'
-        : (colors.surfaceAccent ?? '#EAF3FF'),
+      backgroundColor: premiumHealth.trustAccentSoft,
       marginTop: 1,
     },
     bulletText: {
@@ -311,13 +346,9 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => {
       paddingVertical: SPACING.sm,
       alignItems: 'center',
       borderRadius: 14,
-      backgroundColor: isDark
-        ? 'rgba(255,255,255,0.06)'
-        : (colors.surfaceMuted ?? '#F3F6FC'),
+      backgroundColor: premiumHealth.secondaryActionBackground,
       borderWidth: 1,
-      borderColor: isDark
-        ? 'rgba(255,255,255,0.09)'
-        : (colors.borderSubtle ?? '#E6EBF4'),
+      borderColor: premiumHealth.secondaryActionBorder,
     },
     secondaryButtonText: {
       fontSize: SIZES.sm,

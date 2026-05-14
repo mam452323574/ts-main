@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   Camera,
   Eye,
@@ -21,15 +22,24 @@ import {
 import {
   AuthHero,
   AuthInput,
-  AuthSelectCard,
   AuthShell,
   AuthStepDots,
   AuthThemeVisual,
+  OnboardingHeroStage,
+  useAuthPalette,
 } from '@/components/auth';
 import { AvatarCropModal, type AvatarCropAsset } from '@/components/AvatarCropModal';
 import { Button } from '@/components/Button';
 import { ProfileAvatar } from '@/components/ProfileAvatar';
-import { BORDER_RADIUS, SIZES, SPACING, ThemeType, mixColors, withAlpha } from '@/constants/theme';
+import {
+  BORDER_RADIUS,
+  FONT_FAMILIES,
+  SIZES,
+  SPACING,
+  ThemeType,
+  mixColors,
+  withAlpha,
+} from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -49,9 +59,8 @@ import {
 } from '@/utils/username';
 
 const SIGNUP_STEPS: PreAuthOnboardingStep[] = [
-  'theme',
-  'username',
-  'avatar',
+  'intro',
+  'profile',
   'account',
 ];
 
@@ -68,7 +77,7 @@ export default function SignUpScreen() {
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
   const [hydrating, setHydrating] = useState(true);
-  const [step, setStep] = useState<PreAuthOnboardingStep>('theme');
+  const [step, setStep] = useState<PreAuthOnboardingStep>('intro');
   const initialTheme: ThemeType =
     activeTheme === 'light' || activeTheme === 'dark' ? activeTheme : 'dark';
   const [selectedTheme, setSelectedTheme] = useState<ThemeType>(initialTheme);
@@ -188,7 +197,7 @@ export default function SignUpScreen() {
     setTheme(nextTheme);
     await updatePreAuthOnboardingDraft({
       selectedTheme: nextTheme,
-      lastStep: 'theme',
+      lastStep: 'profile',
     });
   };
 
@@ -199,7 +208,7 @@ export default function SignUpScreen() {
       setError(null);
       scheduleDraftSave({
         username: normalizedUsername,
-        lastStep: 'username',
+        lastStep: 'profile',
       });
     },
     [scheduleDraftSave],
@@ -244,16 +253,16 @@ export default function SignUpScreen() {
   );
 
   const handleBack = () => {
-    if (step === 'theme') {
+    if (step === 'intro') {
       router.back();
       return;
     }
 
-    const previousStep = SIGNUP_STEPS[currentStepIndex - 1] ?? 'theme';
+    const previousStep = SIGNUP_STEPS[currentStepIndex - 1] ?? 'intro';
     void persistStep(previousStep);
   };
 
-  const handleUsernameContinue = () => {
+  const handleProfileContinue = () => {
     if (!username) {
       setError(t('onboarding.error_username_empty'));
       return;
@@ -264,7 +273,7 @@ export default function SignUpScreen() {
       return;
     }
 
-    void persistStep('avatar');
+    void persistStep('account');
   };
 
   const showPermissionAlert = (message: string) => {
@@ -344,9 +353,8 @@ export default function SignUpScreen() {
     await updatePreAuthOnboardingDraft({
       avatarLocalUri: null,
       avatarSkipped: true,
-      lastStep: 'account',
+      lastStep: 'profile',
     });
-    await persistStep('account');
   };
 
   const handleAvatarCropCancel = () => {
@@ -371,7 +379,7 @@ export default function SignUpScreen() {
       await updatePreAuthOnboardingDraft({
         avatarLocalUri: preparedLocalUri,
         avatarSkipped: false,
-        lastStep: 'avatar',
+        lastStep: 'profile',
       });
       setAvatarCropAsset(null);
     } catch (avatarError) {
@@ -380,20 +388,6 @@ export default function SignUpScreen() {
     } finally {
       setPreparingAvatar(false);
     }
-  };
-
-  const handleAvatarContinue = async () => {
-    if (!avatarLocalUri) {
-      await handleSkipAvatar();
-      return;
-    }
-
-    await updatePreAuthOnboardingDraft({
-      avatarLocalUri,
-      avatarSkipped: false,
-      lastStep: 'account',
-    });
-    await persistStep('account');
   };
 
   const handleSignUp = async () => {
@@ -504,145 +498,198 @@ export default function SignUpScreen() {
     }
   };
 
-  const renderThemeStep = () => (
+  const renderIntroStep = () => (
     <>
       <AuthHero
         brand="HEALTH SCAN"
-        title={t('onboarding.theme_step_title')}
-        subtitle={t('onboarding.theme_step_subtitle')}
+        title={t('onboarding.intro_step_title')}
+        subtitle={t('onboarding.intro_step_subtitle')}
+        visual={<IntroStepVisual />}
       />
-      <View style={styles.optionGroup}>
-        <AuthSelectCard
-          selected={selectedTheme === 'dark'}
-          onPress={() => void handleThemeSelect('dark')}
-          title={t('onboarding.theme.dark')}
-          subtitle={t('onboarding.theme.dark_desc')}
-          testID="signup-theme-dark"
-          visual={<AuthThemeVisual theme="dark" />}
-        />
-        <AuthSelectCard
-          selected={selectedTheme === 'light'}
-          onPress={() => void handleThemeSelect('light')}
-          title={t('onboarding.theme.light')}
-          subtitle={t('onboarding.theme.light_desc')}
-          testID="signup-theme-light"
-          visual={<AuthThemeVisual theme="light" />}
-        />
+      <View style={styles.infoContainer}>
+        <Text style={styles.infoText}>{t('onboarding.intro_step_note')}</Text>
       </View>
       <Button
         title={t('common.next')}
-        onPress={() => void persistStep('username')}
-        variant="primary"
+        onPress={() => void persistStep('profile')}
+        variant="premium"
         size="lg"
       />
     </>
   );
 
-  const renderUsernameStep = () => (
+  const renderProfileStep = () => (
     <>
       <AuthHero
         brand="HEALTH SCAN"
-        title={t('onboarding.username_step_title')}
-        subtitle={t('onboarding.username_step_subtitle')}
-      />
-      <AuthInput
-        label={t('onboarding.username_label')}
-        icon={UserRound}
-        placeholder={t('onboarding.username_placeholder')}
-        value={username}
-        onChangeText={handleUsernameChange}
-        autoCapitalize="none"
-        autoComplete="off"
-        testID="signup-username-input"
-        status={
-          usernameIsInvalid
-            ? 'error'
-            : usernameValidation.valid
-              ? 'success'
-              : 'idle'
-        }
-        statusMessage={
-          usernameIsInvalid
-            ? t('onboarding.username_status.invalid')
-            : usernameValidation.valid
-              ? t('onboarding.username_status.ready')
-              : undefined
-        }
-      />
-      <Button
-        title={t('common.next')}
-        onPress={handleUsernameContinue}
-        disabled={!usernameValidation.valid}
-        variant="primary"
-        size="lg"
-      />
-    </>
-  );
-
-  const renderAvatarStep = () => (
-    <>
-      <AuthHero
-        brand="HEALTH SCAN"
-        title={t('onboarding.avatar_pre_auth_title')}
-        subtitle={t('onboarding.avatar_pre_auth_subtitle')}
-      />
-      <View style={styles.avatarStage}>
-        <View style={styles.avatarHalo}>
-          <ProfileAvatar
-            avatarUrl={avatarLocalUri}
+        title={t('onboarding.profile_step_title')}
+        subtitle={t('onboarding.profile_step_subtitle')}
+        visual={
+          <ProfileStepVisual
             username={username}
-            size={148}
-            testID="signup-avatar-preview"
+            hasAvatar={!!avatarLocalUri}
           />
-        </View>
-        {avatarLocalUri ? (
-          <Text style={styles.avatarSelectedText}>
-            {t('onboarding.avatar_selected')}
+        }
+      />
+      <View style={styles.profileSection}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>
+            {t('onboarding.username_step_title')}
           </Text>
+          <Text style={styles.sectionSubtitle}>
+            {t('onboarding.username_step_subtitle')}
+          </Text>
+        </View>
+        <AuthInput
+          label={t('onboarding.username_label')}
+          icon={UserRound}
+          placeholder={t('onboarding.username_placeholder')}
+          value={username}
+          onChangeText={handleUsernameChange}
+          autoCapitalize="none"
+          autoComplete="off"
+          testID="signup-username-input"
+          status={
+            usernameIsInvalid
+              ? 'error'
+              : usernameValidation.valid
+                ? 'success'
+                : 'idle'
+          }
+          statusMessage={
+            usernameIsInvalid
+              ? t('onboarding.username_status.invalid')
+              : usernameValidation.valid
+                ? t('onboarding.username_status.ready')
+                : undefined
+          }
+        />
+      </View>
+
+      <View style={styles.profileSection}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>
+            {t('onboarding.avatar_pre_auth_title')}
+          </Text>
+          <Text style={styles.sectionSubtitle}>
+            {t('onboarding.avatar_pre_auth_subtitle')}
+          </Text>
+        </View>
+        <View style={styles.avatarStage}>
+          <View style={styles.avatarHalo}>
+            <ProfileAvatar
+              avatarUrl={avatarLocalUri}
+              username={username}
+              size={148}
+              testID="signup-avatar-preview"
+            />
+          </View>
+          {avatarLocalUri ? (
+            <Text style={styles.avatarSelectedText}>
+              {t('onboarding.avatar_selected')}
+            </Text>
+          ) : null}
+        </View>
+        <View style={styles.avatarActions}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => void takeAvatarPhoto()}
+            style={({ pressed }) => [
+              styles.secondaryAction,
+              pressed && styles.secondaryActionPressed,
+            ]}
+            testID="signup-avatar-camera"
+          >
+            <Camera color={colors.primaryText} size={20} />
+            <Text style={styles.secondaryActionLabel}>
+              {t('onboarding.avatar_take_photo')}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => void pickAvatarFromLibrary()}
+            style={({ pressed }) => [
+              styles.secondaryAction,
+              pressed && styles.secondaryActionPressed,
+            ]}
+            testID="signup-avatar-library"
+          >
+            <ImagePlus color={colors.primaryText} size={20} />
+            <Text style={styles.secondaryActionLabel}>
+              {t('onboarding.avatar_choose_gallery')}
+            </Text>
+          </Pressable>
+        </View>
+        {!avatarLocalUri ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => void handleSkipAvatar()}
+            style={styles.skipPressable}
+            testID="signup-avatar-skip"
+          >
+            <Text style={styles.skipLabel}>{t('onboarding.avatar_skip')}</Text>
+          </Pressable>
         ) : null}
       </View>
-      <View style={styles.avatarActions}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => void takeAvatarPhoto()}
-          style={({ pressed }) => [
-            styles.secondaryAction,
-            pressed && styles.secondaryActionPressed,
-          ]}
-          testID="signup-avatar-camera"
-        >
-          <Camera color={colors.primaryText} size={20} />
-          <Text style={styles.secondaryActionLabel}>
-            {t('onboarding.avatar_take_photo')}
+
+      <View style={styles.profileSection}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>
+            {t('onboarding.profile_theme_title')}
           </Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => void pickAvatarFromLibrary()}
-          style={({ pressed }) => [
-            styles.secondaryAction,
-            pressed && styles.secondaryActionPressed,
-          ]}
-          testID="signup-avatar-library"
-        >
-          <ImagePlus color={colors.primaryText} size={20} />
-          <Text style={styles.secondaryActionLabel}>
-            {t('onboarding.avatar_choose_gallery')}
+          <Text style={styles.sectionSubtitle}>
+            {t('onboarding.profile_theme_subtitle')}
           </Text>
-        </Pressable>
+        </View>
+        <View style={styles.themeChoiceRow}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => void handleThemeSelect('dark')}
+            style={({ pressed }) => [
+              styles.themeChoiceCard,
+              selectedTheme === 'dark' && styles.themeChoiceCardActive,
+              pressed && styles.themeChoiceCardPressed,
+            ]}
+            testID="signup-theme-dark"
+          >
+            <AuthThemeVisual theme="dark" size={52} />
+            <View style={styles.themeChoiceCopy}>
+              <Text style={styles.themeChoiceTitle}>
+                {t('onboarding.theme.dark')}
+              </Text>
+              <Text style={styles.themeChoiceSubtitle}>
+                {t('onboarding.theme.dark_desc')}
+              </Text>
+            </View>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => void handleThemeSelect('light')}
+            style={({ pressed }) => [
+              styles.themeChoiceCard,
+              selectedTheme === 'light' && styles.themeChoiceCardActive,
+              pressed && styles.themeChoiceCardPressed,
+            ]}
+            testID="signup-theme-light"
+          >
+            <AuthThemeVisual theme="light" size={52} />
+            <View style={styles.themeChoiceCopy}>
+              <Text style={styles.themeChoiceTitle}>
+                {t('onboarding.theme.light')}
+              </Text>
+              <Text style={styles.themeChoiceSubtitle}>
+                {t('onboarding.theme.light_desc')}
+              </Text>
+            </View>
+          </Pressable>
+        </View>
       </View>
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => void handleSkipAvatar()}
-        style={styles.skipPressable}
-        testID="signup-avatar-skip"
-      >
-        <Text style={styles.skipLabel}>{t('onboarding.avatar_skip')}</Text>
-      </Pressable>
+
       <Button
-        title={avatarLocalUri ? t('common.next') : t('onboarding.avatar_skip')}
-        onPress={() => void handleAvatarContinue()}
-        variant="primary"
+        title={t('common.next')}
+        onPress={handleProfileContinue}
+        disabled={!usernameValidation.valid}
+        variant="premium"
         size="lg"
       />
     </>
@@ -654,6 +701,7 @@ export default function SignUpScreen() {
         brand="HEALTH SCAN"
         title={t('onboarding.account_step_title')}
         subtitle={t('onboarding.account_step_subtitle')}
+        visual={<AccountStepVisual />}
       />
       <View style={styles.accountForm}>
         <AuthInput
@@ -699,7 +747,7 @@ export default function SignUpScreen() {
         onPress={handleSignUp}
         loading={loading}
         disabled={loading || !email || !password || !confirmPassword}
-        variant="primary"
+        variant="premium"
         size="lg"
       />
     </>
@@ -707,15 +755,13 @@ export default function SignUpScreen() {
 
   const renderCurrentStep = () => {
     switch (step) {
-      case 'username':
-        return renderUsernameStep();
-      case 'avatar':
-        return renderAvatarStep();
+      case 'profile':
+        return renderProfileStep();
       case 'account':
         return renderAccountStep();
-      case 'theme':
+      case 'intro':
       default:
-        return renderThemeStep();
+        return renderIntroStep();
     }
   };
 
@@ -768,6 +814,198 @@ export default function SignUpScreen() {
   );
 }
 
+function IntroStepVisual() {
+  const { colors, isDark } = useTheme();
+  const palette = useAuthPalette();
+  const styles = useMemo(
+    () => createHeroVisualStyles(colors, isDark, palette),
+    [colors, isDark, palette],
+  );
+
+  return (
+    <OnboardingHeroStage
+      accentColor={colors.primary}
+      style={styles.visualStage}
+      contentStyle={styles.visualStageContent}
+    >
+      <View style={styles.introHeroShell}>
+        <LinearGradient
+          colors={[
+            withAlpha(colors.primary, isDark ? 0.18 : 0.1),
+            withAlpha(colors.gold, isDark ? 0.08 : 0.12),
+          ]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.introHeroBackdrop}
+        />
+        <View style={styles.introHeroCard}>
+          <View style={styles.introHeroBadgeRow}>
+            <View style={styles.introHeroBadge}>
+              <Text style={styles.introHeroBadgeText}>SCAN</Text>
+            </View>
+            <View style={styles.introHeroBadge}>
+              <Text style={styles.introHeroBadgeText}>COMPARE</Text>
+            </View>
+          </View>
+          <View style={styles.introHeroHeadline}>
+            <View style={styles.introHeroIconWrap}>
+              <Camera color={colors.primaryText} size={28} />
+            </View>
+            <View style={styles.introHeroBars}>
+              <View style={styles.introHeroBar} />
+              <View style={[styles.introHeroBar, styles.introHeroBarShort]} />
+            </View>
+          </View>
+          <View style={styles.introHeroMetricRow}>
+            <View style={styles.introHeroMetricCard}>
+              <View style={styles.introHeroMetricDot} />
+              <View style={styles.introHeroMetricBars}>
+                <View style={styles.introHeroMetricBar} />
+                <View
+                  style={[
+                    styles.introHeroMetricBar,
+                    styles.introHeroMetricBarShort,
+                  ]}
+                />
+              </View>
+            </View>
+            <View
+              style={[
+                styles.introHeroMetricCard,
+                styles.introHeroMetricCardSoft,
+              ]}
+            >
+              <View
+                style={[
+                  styles.introHeroMetricDot,
+                  styles.introHeroMetricDotSoft,
+                ]}
+              />
+              <View style={styles.introHeroMetricBars}>
+                <View style={styles.introHeroMetricBar} />
+                <View
+                  style={[
+                    styles.introHeroMetricBar,
+                    styles.introHeroMetricBarShort,
+                  ]}
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+        <View style={styles.heroMicroRow}>
+          <View style={styles.heroMicroChip} />
+          <View style={[styles.heroMicroChip, styles.heroMicroChipWide]} />
+          <View style={styles.heroMicroChip} />
+        </View>
+      </View>
+    </OnboardingHeroStage>
+  );
+}
+
+function ProfileStepVisual({
+  username,
+  hasAvatar,
+}: {
+  username: string;
+  hasAvatar: boolean;
+}) {
+  const { colors, isDark } = useTheme();
+  const palette = useAuthPalette();
+  const styles = useMemo(
+    () => createHeroVisualStyles(colors, isDark, palette),
+    [colors, isDark, palette],
+  );
+  const handle = username.length > 0 ? `@${username}` : '@healthscan';
+
+  return (
+    <OnboardingHeroStage
+      accentColor={colors.primary}
+      style={styles.visualStage}
+      contentStyle={styles.visualStageContent}
+    >
+      <View style={styles.usernameHeroShell}>
+        <View style={styles.usernameChip}>
+          <UserRound color={colors.primaryText} size={22} />
+          <Text numberOfLines={1} style={styles.usernameChipLabel}>
+            {handle}
+          </Text>
+        </View>
+        <View style={styles.usernameMetricRow}>
+          <View style={styles.usernameMetricCard}>
+            <View style={styles.usernameMetricDot} />
+            <View style={styles.usernameMetricBars}>
+              <View style={styles.usernameMetricBar} />
+              <View
+                style={[styles.usernameMetricBar, styles.usernameMetricBarShort]}
+              />
+            </View>
+          </View>
+        <View style={[styles.usernameMetricCard, styles.usernameMetricCardSoft]}>
+          <View style={[styles.usernameMetricDot, styles.usernameMetricDotAlt]} />
+          <View style={styles.usernameMetricBars}>
+              <View style={styles.usernameMetricBar} />
+              <View
+                style={[styles.usernameMetricBar, styles.usernameMetricBarShort]}
+              />
+            </View>
+          </View>
+        </View>
+        <View style={styles.profileHeroStatus}>
+          <View
+            style={[
+              styles.profileHeroStatusDot,
+              hasAvatar && styles.profileHeroStatusDotReady,
+            ]}
+          />
+          <View style={styles.profileHeroStatusBars}>
+            <View style={styles.profileHeroStatusBar} />
+            <View
+              style={[
+                styles.profileHeroStatusBar,
+                styles.profileHeroStatusBarShort,
+              ]}
+            />
+          </View>
+        </View>
+      </View>
+    </OnboardingHeroStage>
+  );
+}
+
+function AccountStepVisual() {
+  const { colors, isDark } = useTheme();
+  const palette = useAuthPalette();
+  const styles = useMemo(
+    () => createHeroVisualStyles(colors, isDark, palette),
+    [colors, isDark, palette],
+  );
+
+  return (
+    <OnboardingHeroStage
+      accentColor={colors.gold}
+      style={styles.visualStage}
+      contentStyle={styles.visualStageContent}
+    >
+      <View style={styles.accountHeroShell}>
+        <View style={styles.accountHeroCardPrimary}>
+          <Mail color={colors.primaryText} size={24} />
+          <View style={styles.accountHeroCardBars}>
+            <View style={styles.accountHeroBar} />
+            <View style={[styles.accountHeroBar, styles.accountHeroBarShort]} />
+          </View>
+        </View>
+        <View style={styles.accountHeroCardSecondary}>
+          <Lock color={colors.primaryText} size={22} />
+        </View>
+        <View style={styles.accountHeroShield}>
+          <View style={styles.accountHeroShieldInner} />
+        </View>
+      </View>
+    </OnboardingHeroStage>
+  );
+}
+
 const createStyles = (colors: any, isDark: boolean) =>
   StyleSheet.create({
     loadingContainer: {
@@ -776,22 +1014,47 @@ const createStyles = (colors: any, isDark: boolean) =>
       justifyContent: 'center',
     },
     stepDots: {
-      marginBottom: SPACING.md,
+      marginBottom: SPACING.sm,
     },
     stepContent: {
-      gap: SPACING.lg,
+      gap: SPACING.xl,
     },
-    optionGroup: {
+    profileSection: {
       gap: SPACING.md,
+      padding: SPACING.lg,
+      borderRadius: BORDER_RADIUS.xl,
+      borderWidth: 1,
+      borderColor: withAlpha(colors.primaryText, isDark ? 0.1 : 0.06),
+      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.04 : 0.02),
+    },
+    sectionHeader: {
+      gap: SPACING.xs,
+    },
+    sectionTitle: {
+      color: colors.primaryText,
+      fontSize: SIZES.lg,
+      fontFamily: FONT_FAMILIES.display,
+      letterSpacing: -0.2,
+    },
+    sectionSubtitle: {
+      color: colors.gray,
+      fontSize: SIZES.sm,
+      lineHeight: 20,
     },
     avatarStage: {
       alignItems: 'center',
       gap: SPACING.md,
     },
     avatarHalo: {
-      padding: SPACING.md,
+      padding: SPACING.lg,
       borderRadius: 200,
-      backgroundColor: mixColors(colors.cardBackground, colors.primary, isDark ? 0.10 : 0.06),
+      backgroundColor: mixColors(
+        colors.cardBackground,
+        colors.primary,
+        isDark ? 0.1 : 0.06,
+      ),
+      borderWidth: 1,
+      borderColor: withAlpha(colors.primary, isDark ? 0.18 : 0.1),
     },
     avatarSelectedText: {
       color: colors.success,
@@ -810,11 +1073,11 @@ const createStyles = (colors: any, isDark: boolean) =>
       paddingHorizontal: SPACING.md,
       borderRadius: BORDER_RADIUS.pill,
       borderWidth: 1,
-      borderColor: withAlpha(colors.primary, isDark ? 0.30 : 0.20),
-      backgroundColor: withAlpha(colors.primary, isDark ? 0.06 : 0.04),
+      borderColor: withAlpha(colors.primaryText, isDark ? 0.14 : 0.08),
+      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.05 : 0.03),
     },
     secondaryActionPressed: {
-      backgroundColor: withAlpha(colors.primary, isDark ? 0.14 : 0.10),
+      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.1 : 0.06),
     },
     secondaryActionLabel: {
       color: colors.primaryText,
@@ -831,14 +1094,56 @@ const createStyles = (colors: any, isDark: boolean) =>
       fontSize: SIZES.sm,
       fontWeight: '600',
     },
+    themeChoiceRow: {
+      gap: SPACING.sm,
+    },
+    themeChoiceCard: {
+      minHeight: 84,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.md,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.md,
+      borderRadius: BORDER_RADIUS.xl,
+      borderWidth: 1,
+      borderColor: withAlpha(colors.primaryText, isDark ? 0.12 : 0.08),
+      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.04 : 0.02),
+    },
+    themeChoiceCardActive: {
+      borderColor: withAlpha(colors.primary, isDark ? 0.42 : 0.22),
+      backgroundColor: withAlpha(colors.primary, isDark ? 0.1 : 0.06),
+    },
+    themeChoiceCardPressed: {
+      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.08 : 0.04),
+    },
+    themeChoiceCopy: {
+      flex: 1,
+      gap: 4,
+    },
+    themeChoiceTitle: {
+      color: colors.primaryText,
+      fontSize: SIZES.md,
+      fontWeight: '700',
+    },
+    themeChoiceSubtitle: {
+      color: colors.gray,
+      fontSize: SIZES.sm,
+      lineHeight: 18,
+    },
     accountForm: {
       gap: SPACING.md,
     },
     infoContainer: {
-      backgroundColor: mixColors(colors.cardBackground, colors.primary, isDark ? 0.08 : 0.05),
+      backgroundColor: mixColors(
+        colors.cardBackground,
+        colors.primary,
+        isDark ? 0.08 : 0.05,
+      ),
       paddingVertical: SPACING.md,
       paddingHorizontal: SPACING.lg,
       borderRadius: BORDER_RADIUS.xl,
+      borderWidth: 1,
+      borderColor: withAlpha(colors.primary, isDark ? 0.18 : 0.1),
     },
     infoText: {
       color: colors.gray,
@@ -870,5 +1175,462 @@ const createStyles = (colors: any, isDark: boolean) =>
     loginLink: {
       color: colors.primary,
       fontWeight: '700',
+    },
+  });
+
+const createHeroVisualStyles = (
+  colors: any,
+  isDark: boolean,
+  palette: ReturnType<typeof useAuthPalette>,
+) =>
+  StyleSheet.create({
+    visualStage: {
+      minHeight: 248,
+    },
+    visualStageContent: {
+      paddingHorizontal: SPACING.xl,
+      paddingVertical: SPACING.lg,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    introHeroShell: {
+      width: '100%',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: SPACING.lg,
+    },
+    introHeroBackdrop: {
+      position: 'absolute',
+      top: 10,
+      left: '12%',
+      width: '76%',
+      height: 136,
+      borderRadius: 999,
+      transform: [{ scaleX: 1.16 }],
+    },
+    introHeroCard: {
+      width: '100%',
+      gap: SPACING.md,
+      paddingHorizontal: SPACING.lg,
+      paddingVertical: SPACING.lg,
+      borderRadius: BORDER_RADIUS.hero,
+      backgroundColor: palette.surfaceGlass,
+      borderWidth: 1,
+      borderColor: palette.heroBorder,
+    },
+    introHeroBadgeRow: {
+      flexDirection: 'row',
+      gap: SPACING.sm,
+      flexWrap: 'wrap',
+    },
+    introHeroBadge: {
+      paddingHorizontal: SPACING.md,
+      paddingVertical: 6,
+      borderRadius: BORDER_RADIUS.pill,
+      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.08 : 0.05),
+      borderWidth: 1,
+      borderColor: withAlpha(colors.primaryText, isDark ? 0.1 : 0.06),
+    },
+    introHeroBadgeText: {
+      color: colors.primaryText,
+      fontSize: SIZES.xs,
+      fontWeight: '800',
+      letterSpacing: 1.1,
+    },
+    introHeroHeadline: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.md,
+    },
+    introHeroIconWrap: {
+      width: 64,
+      height: 64,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: withAlpha(colors.primary, isDark ? 0.18 : 0.12),
+      borderWidth: 1,
+      borderColor: withAlpha(colors.primary, isDark ? 0.28 : 0.16),
+    },
+    introHeroBars: {
+      flex: 1,
+      gap: 8,
+    },
+    introHeroBar: {
+      width: '100%',
+      height: 10,
+      borderRadius: 999,
+      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.18 : 0.08),
+    },
+    introHeroBarShort: {
+      width: '56%',
+    },
+    introHeroMetricRow: {
+      flexDirection: 'row',
+      gap: SPACING.md,
+    },
+    introHeroMetricCard: {
+      flex: 1,
+      minHeight: 68,
+      borderRadius: BORDER_RADIUS.xl,
+      padding: SPACING.md,
+      gap: SPACING.sm,
+      backgroundColor: withAlpha(colors.primary, isDark ? 0.12 : 0.08),
+      borderWidth: 1,
+      borderColor: withAlpha(colors.primary, isDark ? 0.2 : 0.12),
+    },
+    introHeroMetricCardSoft: {
+      backgroundColor: withAlpha(colors.gold, isDark ? 0.16 : 0.1),
+      borderColor: withAlpha(colors.gold, isDark ? 0.24 : 0.16),
+    },
+    introHeroMetricDot: {
+      width: 16,
+      height: 16,
+      borderRadius: 8,
+      backgroundColor: colors.primary,
+    },
+    introHeroMetricDotSoft: {
+      backgroundColor: colors.gold,
+    },
+    introHeroMetricBars: {
+      gap: 7,
+    },
+    introHeroMetricBar: {
+      width: '100%',
+      height: 7,
+      borderRadius: 999,
+      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.16 : 0.08),
+    },
+    introHeroMetricBarShort: {
+      width: '58%',
+    },
+    themeVisualShell: {
+      width: '100%',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: SPACING.lg,
+    },
+    themeOrbBackdrop: {
+      position: 'absolute',
+      top: 12,
+      left: '16%',
+      width: '68%',
+      height: 124,
+      borderRadius: 999,
+      transform: [{ scaleX: 1.14 }],
+    },
+    themePreviewRow: {
+      width: '100%',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: SPACING.md,
+    },
+    themePreviewOrb: {
+      width: 92,
+      height: 92,
+      borderRadius: 46,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: withAlpha(colors.primaryText, isDark ? 0.1 : 0.06),
+      backgroundColor: withAlpha(colors.white, isDark ? 0.04 : 0.7),
+    },
+    themePreviewOrbDark: {
+      backgroundColor: withAlpha('#0F1622', isDark ? 0.92 : 0.82),
+    },
+    themePreviewOrbLight: {
+      backgroundColor: withAlpha(colors.white, isDark ? 0.8 : 0.98),
+    },
+    themePreviewOrbActive: {
+      borderColor: palette.accentRing,
+      shadowColor: palette.accentRing,
+      shadowOpacity: 0.12,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 3,
+    },
+    themeSelectionRail: {
+      width: 44,
+      height: 112,
+      borderRadius: 999,
+      padding: 6,
+      justifyContent: 'flex-start',
+      backgroundColor: palette.secondaryActionFill,
+      borderWidth: 1,
+      borderColor: palette.secondaryActionBorder,
+    },
+    themeSelectionKnob: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: palette.progressActive,
+      shadowColor: palette.progressActive,
+      shadowOpacity: 0.24,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 3,
+    },
+    themeSelectionKnobLight: {
+      marginTop: 'auto',
+    },
+    heroMicroRow: {
+      flexDirection: 'row',
+      gap: SPACING.sm,
+      alignItems: 'center',
+    },
+    heroMicroChip: {
+      width: 52,
+      height: 8,
+      borderRadius: 999,
+      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.14 : 0.08),
+    },
+    heroMicroChipWide: {
+      width: 82,
+    },
+    usernameHeroShell: {
+      width: '100%',
+      alignItems: 'center',
+      gap: SPACING.lg,
+    },
+    usernameChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+      maxWidth: '100%',
+      paddingHorizontal: SPACING.lg,
+      paddingVertical: SPACING.md,
+      borderRadius: BORDER_RADIUS.pill,
+      backgroundColor: palette.surfaceGlass,
+      borderWidth: 1,
+      borderColor: palette.heroBorder,
+    },
+    usernameChipLabel: {
+      flexShrink: 1,
+      fontFamily: FONT_FAMILIES.display,
+      fontSize: 22,
+      color: colors.primaryText,
+      letterSpacing: -0.2,
+    },
+    usernameMetricRow: {
+      width: '100%',
+      flexDirection: 'row',
+      gap: SPACING.md,
+      justifyContent: 'center',
+    },
+    usernameMetricCard: {
+      flex: 1,
+      minHeight: 74,
+      borderRadius: BORDER_RADIUS.xl,
+      padding: SPACING.md,
+      gap: SPACING.sm,
+      backgroundColor: withAlpha(colors.primary, isDark ? 0.12 : 0.08),
+      borderWidth: 1,
+      borderColor: withAlpha(colors.primary, isDark ? 0.22 : 0.12),
+    },
+    usernameMetricCardSoft: {
+      backgroundColor: withAlpha(colors.secondary, isDark ? 0.12 : 0.08),
+      borderColor: withAlpha(colors.secondary, isDark ? 0.2 : 0.1),
+    },
+    usernameMetricDot: {
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      backgroundColor: colors.primary,
+    },
+    usernameMetricDotAlt: {
+      backgroundColor: colors.secondary,
+    },
+    usernameMetricBars: {
+      gap: 8,
+    },
+    usernameMetricBar: {
+      width: '100%',
+      height: 8,
+      borderRadius: 999,
+      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.18 : 0.1),
+    },
+    usernameMetricBarShort: {
+      width: '58%',
+    },
+    profileHeroStatus: {
+      flex: 1,
+      minHeight: 74,
+      borderRadius: BORDER_RADIUS.xl,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.md,
+      gap: SPACING.sm,
+      justifyContent: 'center',
+      backgroundColor: palette.surfaceGlass,
+      borderWidth: 1,
+      borderColor: palette.secondaryActionBorder,
+    },
+    profileHeroStatusDot: {
+      width: 16,
+      height: 16,
+      borderRadius: 8,
+      backgroundColor: withAlpha(colors.gray, 0.64),
+    },
+    profileHeroStatusDotReady: {
+      backgroundColor: colors.success,
+    },
+    profileHeroStatusBars: {
+      gap: 6,
+    },
+    profileHeroStatusBar: {
+      width: '100%',
+      height: 7,
+      borderRadius: 999,
+      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.14 : 0.08),
+    },
+    profileHeroStatusBarShort: {
+      width: '58%',
+    },
+    avatarHeroShell: {
+      width: '100%',
+      minHeight: 180,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarHeroRing: {
+      width: 138,
+      height: 138,
+      borderRadius: 69,
+      alignItems: 'center',
+      justifyContent: 'center',
+      transform: [{ scaleX: 1.02 }],
+    },
+    avatarHeroCore: {
+      width: 106,
+      height: 106,
+      borderRadius: 53,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: palette.surfaceGlass,
+      borderWidth: 1,
+      borderColor: palette.heroBorder,
+    },
+    avatarOrbitDot: {
+      position: 'absolute',
+      width: 14,
+      height: 14,
+      borderRadius: 7,
+      backgroundColor: withAlpha(colors.white, isDark ? 0.74 : 0.92),
+      borderWidth: 1,
+      borderColor: withAlpha(colors.secondary, isDark ? 0.28 : 0.18),
+    },
+    avatarOrbitDotTop: {
+      top: 10,
+    },
+    avatarOrbitDotRight: {
+      right: '18%',
+      top: '42%',
+    },
+    avatarOrbitDotLeft: {
+      left: '18%',
+      top: '56%',
+    },
+    avatarHeroStatus: {
+      position: 'absolute',
+      right: '6%',
+      bottom: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+      minWidth: 108,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.sm,
+      borderRadius: BORDER_RADIUS.pill,
+      backgroundColor: palette.surfaceGlass,
+      borderWidth: 1,
+      borderColor: palette.secondaryActionBorder,
+    },
+    avatarHeroStatusDot: {
+      width: 16,
+      height: 16,
+      borderRadius: 8,
+      backgroundColor: withAlpha(colors.gray, 0.6),
+    },
+    avatarHeroStatusDotReady: {
+      backgroundColor: colors.success,
+    },
+    avatarHeroStatusBars: {
+      flex: 1,
+      gap: 6,
+    },
+    avatarHeroStatusBar: {
+      width: '100%',
+      height: 7,
+      borderRadius: 999,
+      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.14 : 0.08),
+    },
+    avatarHeroStatusBarShort: {
+      width: '58%',
+    },
+    accountHeroShell: {
+      width: '100%',
+      minHeight: 180,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    accountHeroCardPrimary: {
+      width: '76%',
+      minHeight: 110,
+      borderRadius: BORDER_RADIUS.hero,
+      paddingHorizontal: SPACING.lg,
+      paddingVertical: SPACING.lg,
+      justifyContent: 'space-between',
+      backgroundColor: palette.surfaceGlass,
+      borderWidth: 1,
+      borderColor: palette.heroBorder,
+    },
+    accountHeroCardBars: {
+      gap: 10,
+    },
+    accountHeroBar: {
+      width: '100%',
+      height: 8,
+      borderRadius: 999,
+      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.16 : 0.08),
+    },
+    accountHeroBarShort: {
+      width: '52%',
+    },
+    accountHeroCardSecondary: {
+      position: 'absolute',
+      right: '12%',
+      top: 24,
+      width: 68,
+      height: 68,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: withAlpha(colors.gold, isDark ? 0.18 : 0.12),
+      borderWidth: 1,
+      borderColor: withAlpha(colors.gold, isDark ? 0.28 : 0.18),
+    },
+    accountHeroShield: {
+      position: 'absolute',
+      left: '12%',
+      bottom: 8,
+      width: 72,
+      height: 72,
+      borderRadius: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: withAlpha(colors.success, isDark ? 0.18 : 0.12),
+      borderWidth: 1,
+      borderColor: withAlpha(colors.success, isDark ? 0.24 : 0.14),
+      transform: [{ rotate: '-10deg' }],
+    },
+    accountHeroShieldInner: {
+      width: 26,
+      height: 32,
+      borderTopLeftRadius: 13,
+      borderTopRightRadius: 13,
+      borderBottomLeftRadius: 8,
+      borderBottomRightRadius: 8,
+      backgroundColor: colors.success,
+      transform: [{ rotate: '10deg' }],
     },
   });

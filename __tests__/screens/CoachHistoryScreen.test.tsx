@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { fireEvent, render } from '@testing-library/react-native';
 
 import CoachHistoryScreen from '@/screens/CoachHistoryScreen';
@@ -55,6 +55,9 @@ jest.mock('@/components/ModalHandle', () => ({
 jest.mock('@/hooks/queries', () => ({
   useInfiniteCoachHistory: (...args: unknown[]) => mockUseInfiniteCoachHistory(...args),
 }));
+jest.mock('@/hooks/queries/useInfiniteCoachHistory', () => ({
+  useInfiniteCoachHistory: (...args: unknown[]) => mockUseInfiniteCoachHistory(...args),
+}));
 
 describe('CoachHistoryScreen', () => {
   beforeEach(() => {
@@ -101,7 +104,7 @@ describe('CoachHistoryScreen', () => {
     expect(screen.queryByTestId('coach-history-card-entry-active')).toBeNull();
     expect(screen.getByTestId('coach-history-card-entry-older')).toBeTruthy();
     expect(screen.getByTestId('coach-history-card-entry-older-date')).toBeTruthy();
-    expect(screen.getByTestId('coach-history-card-entry-older-preview')).toBeTruthy();
+    expect(screen.getByTestId('coach-history-card-entry-older-expanded')).toBeTruthy();
   });
 
   it('hides a history CTA when the provider route is not supported', () => {
@@ -119,8 +122,6 @@ describe('CoachHistoryScreen', () => {
     };
 
     const screen = render(<CoachHistoryScreen />);
-
-    fireEvent.press(screen.getByTestId('coach-history-card-entry-invalid-cta-toggle'));
 
     expect(screen.getByTestId('coach-history-card-entry-invalid-cta-expanded')).toBeTruthy();
     expect(screen.queryByText('Open plan')).toBeNull();
@@ -143,8 +144,6 @@ describe('CoachHistoryScreen', () => {
 
     const screen = render(<CoachHistoryScreen />);
 
-    fireEvent.press(screen.getByTestId('coach-history-card-entry-cta-toggle'));
-
     expect(screen.getByTestId('coach-history-card-entry-cta-expanded')).toBeTruthy();
 
     expect(screen.queryByText('Open plan')).toBeNull();
@@ -152,6 +151,147 @@ describe('CoachHistoryScreen', () => {
     fireEvent.press(screen.getByText("Voir l'historique"));
 
     expect(mockRouterPush).toHaveBeenCalledWith('/coach-history');
+  });
+
+  it('renders saved Coach v2 nutrition sections in expanded history cards', () => {
+    mockCoachHistoryState = {
+      ...mockCoachHistoryState,
+      data: [
+        createCoachEntry({
+          id: 'entry-nutrition',
+          title: 'Ton fuel du jour',
+          body: 'Fallback body.',
+          content: {
+            title: 'Ton fuel du jour',
+            summary: 'Un bowl simple pour tenir sans stress.',
+            context_notes: [],
+            priorities: [],
+            action_steps: ['Prepare ton bowl demain midi.'],
+            warnings: [],
+            encouragement: null,
+            primary_metric_delta: null,
+            data_gaps: [],
+            confidence: 'high',
+            meal_template: {
+              name: 'Bowl Boost Proteines',
+              when: 'midi',
+              prep_min: 12,
+              ingredients: [{ item: 'Poulet', portion: '150 g' }],
+              why: null,
+            },
+            quick_recipe: {
+              name: 'Bowl express',
+              total_min: null,
+              steps: ['Cuire le quinoa.', 'Dresser le bol.'],
+              tags: [],
+            },
+            habit_tracker: [
+              {
+                label: 'Bowl proteine midi',
+                target_days: 6,
+                window: 'midi',
+              },
+            ],
+          },
+        }),
+      ],
+    };
+
+    const screen = render(<CoachHistoryScreen />);
+
+    expect(screen.getByTestId('coach-section-meal_template')).toBeTruthy();
+    expect(screen.getByText('Prochain repas')).toBeTruthy();
+    expect(screen.getByText(/Bowl Boost Proteines/)).toBeTruthy();
+    expect(screen.getByTestId('coach-section-quick_recipe')).toBeTruthy();
+    expect(screen.getByText('Recette flash')).toBeTruthy();
+    expect(screen.getByTestId('coach-section-habit_tracker')).toBeTruthy();
+    expect(screen.getByText('Bowl proteine midi · 6j/7 · midi')).toBeTruthy();
+    expect(screen.queryByText(/\[missing/)).toBeNull();
+    expect(screen.queryByText('meal_template')).toBeNull();
+    expect(screen.queryByText('null')).toBeNull();
+  });
+
+  it('renders saved weekly schedule sections when history entries include enriched structured content', () => {
+    mockCoachHistoryState = {
+      ...mockCoachHistoryState,
+      data: [
+        createCoachEntry({
+          id: 'entry-weekly',
+          title: 'Cadre tranquille',
+          body: [
+            'Prenons un moment. Voici un cadre tranquille pour la semaine.',
+            'Agenda de la semaine :',
+            'Lundi 08:00 - Respiration 4-6 + etirements doux (10 min)',
+          ].join('\n'),
+          content: {
+            title: 'Cadre tranquille',
+            summary: 'Prenons un moment. Voici un cadre tranquille pour la semaine.',
+            context_notes: [],
+            priorities: [],
+            action_steps: ['Respire 4-6 chaque matin.'],
+            warnings: [],
+            encouragement: null,
+            primary_metric_delta: null,
+            data_gaps: [],
+            confidence: 'high',
+            daily_schedule: [
+              {
+                day: 'Lundi',
+                slots: [
+                  {
+                    time: '08:00',
+                    duration_min: 10,
+                    action: 'Respiration 4-6 + etirements doux (10 min)',
+                    tag: null,
+                  },
+                ],
+              },
+            ],
+          },
+        }),
+      ],
+    };
+
+    const screen = render(<CoachHistoryScreen />);
+
+    expect(screen.getByTestId('coach-section-daily_schedule')).toBeTruthy();
+    expect(screen.getByText('Lundi')).toBeTruthy();
+    expect(screen.getByText(/08:00/)).toBeTruthy();
+  });
+
+  it('opens only the newest history card by default and does not reopen it after a manual close', () => {
+    mockCoachHistoryState = {
+      ...mockCoachHistoryState,
+      data: [
+        createCoachEntry({
+          id: 'entry-newest',
+          title: 'Newest guidance',
+          generated_at: '2026-04-09T08:00:00.000Z',
+        }),
+        createCoachEntry({
+          id: 'entry-older',
+          title: 'Older guidance',
+          generated_at: '2026-04-07T08:00:00.000Z',
+        }),
+      ],
+    };
+
+    const screen = render(<CoachHistoryScreen />);
+
+    expect(screen.getByTestId('coach-history-card-entry-newest-expanded')).toBeTruthy();
+    expect(screen.queryByTestId('coach-history-card-entry-older-expanded')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('coach-history-card-entry-newest-toggle'));
+
+    expect(screen.queryByTestId('coach-history-card-entry-newest-expanded')).toBeNull();
+
+    mockCoachHistoryState = {
+      ...mockCoachHistoryState,
+      isFetching: true,
+    };
+    screen.rerender(<CoachHistoryScreen />);
+
+    expect(screen.queryByTestId('coach-history-card-entry-newest-expanded')).toBeNull();
   });
 
   it('keeps the persisted persona on history cards and falls back to a neutral coach when it is missing', () => {
@@ -174,9 +314,9 @@ describe('CoachHistoryScreen', () => {
 
     const screen = render(<CoachHistoryScreen />);
 
-    expect(screen.getByText('coach.personas.strict_tough.title')).toBeTruthy();
+    expect(screen.getByText('Strict & Exigeant')).toBeTruthy();
     expect(screen.getByText('Coach')).toBeTruthy();
-    expect(screen.queryAllByText('coach.personas.gentle_supportive.title')).toHaveLength(0);
+    expect(screen.queryAllByText('Doux & Bienveillant')).toHaveLength(0);
   });
 
   it('shows a loading state while entries are fetching for the first load', () => {
@@ -315,7 +455,7 @@ describe('CoachHistoryScreen', () => {
     expect(screen.getByTestId('coach-history-error-state')).toBeTruthy();
     expect(refetch).not.toHaveBeenCalled();
 
-    fireEvent.press(screen.getByText(/Retry|Reessayer|Réessayer/i));
+    fireEvent.press(screen.getByText(/retry|essayer/i));
 
     expect(refetch).toHaveBeenCalled();
   });
@@ -339,5 +479,25 @@ describe('CoachHistoryScreen', () => {
 
     expect(mockRouterDismiss).toHaveBeenCalled();
     expect(mockRouterBack).not.toHaveBeenCalled();
+  });
+
+  it('shows the saved coach question instead of the generic mode title when available', () => {
+    mockCoachHistoryState = {
+      ...mockCoachHistoryState,
+      data: [
+        createCoachEntry({
+          id: 'entry-question',
+          prompt_type: 'latest_scan',
+          question_text:
+            'Sur quoi je dois me concentrer avant ma seance ce soir ?',
+        }),
+      ],
+    };
+
+    const screen = render(<CoachHistoryScreen />);
+
+    expect(
+      screen.getByText('Sur quoi je dois me concentrer avant ma seance ce soir ?'),
+    ).toBeTruthy();
   });
 });

@@ -3,7 +3,7 @@ import { act, fireEvent, render } from '@testing-library/react-native';
 import { Keyboard, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 
 import SocialCommentsScreen from '@/screens/SocialCommentsScreen';
-import { SPACING } from '@/constants/theme';
+import { BORDER_RADIUS, SPACING } from '@/constants/theme';
 import { SocialServiceError } from '@/services/social';
 
 const mockBack = jest.fn();
@@ -152,6 +152,26 @@ jest.mock('@/hooks/queries', () => ({
     return result;
   },
   useSocialPostDetail: (...args: unknown[]) => mockUseSocialPostDetail(...args),
+  useSocialMutations: () => mockUseSocialMutations(),
+}));
+jest.mock('@/hooks/queries/useSocialComments', () => ({
+  useSocialComments: (...args: unknown[]) => {
+    const result = mockUseSocialComments(...args);
+    if (
+      result &&
+      typeof result === 'object' &&
+      !('comments' in result) &&
+      Array.isArray(result.data)
+    ) {
+      return { ...result, comments: result.data };
+    }
+    return result;
+  },
+}));
+jest.mock('@/hooks/queries/useSocialPostDetail', () => ({
+  useSocialPostDetail: (...args: unknown[]) => mockUseSocialPostDetail(...args),
+}));
+jest.mock('@/hooks/queries/useSocialMutations', () => ({
   useSocialMutations: () => mockUseSocialMutations(),
 }));
 
@@ -1591,6 +1611,21 @@ describe('SocialCommentsScreen', () => {
     ).toBeTruthy();
   });
 
+  it('renders each comment inside the new inset thread card shell', () => {
+    const screen = render(<SocialCommentsScreen />);
+    const commentCardStyle = StyleSheet.flatten(
+      screen.getByTestId('social-comment-card-comment-1').props.style,
+    );
+
+    expect(commentCardStyle).toEqual(
+      expect.objectContaining({
+        marginHorizontal: SPACING.page,
+        borderRadius: BORDER_RADIUS.lg,
+        borderWidth: 1,
+      }),
+    );
+  });
+
   it('keeps manual keyboard insets disabled and matches list bottom padding to the measured footer height', () => {
     const screen = render(<SocialCommentsScreen />);
     const list = screen.getByTestId('social-comments-list');
@@ -1630,10 +1665,12 @@ describe('SocialCommentsScreen', () => {
 
     expect(composerRow.findByProps({ testID: 'social-comments-input' })).toBeTruthy();
     expect(composerRow.findByProps({ testID: 'social-comments-submit' })).toBeTruthy();
+    expect(composerRow.findByProps({ testID: 'social-comments-composer-avatar-fallback' })).toBeTruthy();
+    expect(screen.getByTestId('social-comments-emoji-row')).toBeTruthy();
     expect(StyleSheet.flatten(composerRow.props.style)).toEqual(
       expect.objectContaining({
         flexDirection: 'row',
-        alignItems: 'flex-end',
+        alignItems: 'center',
         gap: SPACING.sm,
         width: '100%',
       }),

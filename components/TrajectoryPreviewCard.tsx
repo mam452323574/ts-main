@@ -61,30 +61,44 @@ export function TrajectoryPreviewCard({
   const isLocked = model.premiumRenderState === 'locked';
   const isLoading = model.premiumRenderState === 'loading';
   const isSuperScanPremium = visualVariant === 'super-scan-premium';
+  const editorialCoolAccent = mixColors(
+    colors.secondary,
+    colors.primary,
+    isDark ? 0.44 : 0.3,
+  );
   const premiumWarmAccent = isSuperScanPremium
     ? isDark
       ? mixColors(PREMIUM_TRAJECTORY_BRONZE, PREMIUM_TRAJECTORY_CHAMPAGNE, 0.62)
       : mixColors(PREMIUM_TRAJECTORY_CHAMPAGNE, PREMIUM_TRAJECTORY_BRONZE, 0.38)
     : colors.gold;
+  const resolvedAccent = isLoading
+    ? mixColors(colors.gray, colors.white, isDark ? 0.08 : 0.02)
+    : isSuperScanPremium
+      ? premiumWarmAccent
+      : isLocked
+        ? colors.gold
+        : editorialCoolAccent;
   const premiumWarmText = isSuperScanPremium
     ? mixColors(
         premiumWarmAccent,
         isDark ? colors.white : colors.primaryText,
         isDark ? 0.12 : 0.18,
       )
-    : colors.gold;
+    : mixColors(
+        resolvedAccent,
+        isDark ? colors.white : colors.primaryText,
+        isLocked ? (isDark ? 0.12 : 0.18) : isDark ? 0.18 : 0.24,
+      );
   const surfaceAccent = isLoading
     ? colors.primaryText
-    : isSuperScanPremium
-      ? mixColors(colors.primaryText, premiumWarmAccent, isDark ? 0.14 : 0.08)
-      : colors.gold;
+    : mixColors(colors.primaryText, resolvedAccent, isDark ? 0.14 : 0.08);
   const chartStrokeWidth = isLoading ? 2 : 2.25;
   const chartLineOpacity = isLoading ? 0.68 : isLocked ? 0.82 : 0.86;
   const chartLineColor = isLoading
     ? mixColors(colors.gray, colors.white, isDark ? 0.08 : 0.02)
     : isSuperScanPremium
       ? mixColors(colors.primaryText, premiumWarmAccent, isDark ? 0.2 : 0.1)
-      : mixColors(colors.gold, colors.white, isDark ? 0.18 : 0.08);
+      : mixColors(resolvedAccent, colors.white, isLocked ? (isDark ? 0.18 : 0.08) : isDark ? 0.08 : 0.16);
   const chartFillStart = isLoading
     ? withAlpha(chartLineColor, isDark ? 0.1 : 0.08)
     : isSuperScanPremium
@@ -93,7 +107,7 @@ export function TrajectoryPreviewCard({
           isLocked ? (isDark ? 0.14 : 0.11) : isDark ? 0.12 : 0.09,
         )
       : withAlpha(
-          mixColors(colors.gold, colors.white, isDark ? 0.12 : 0.06),
+          mixColors(resolvedAccent, colors.white, isDark ? 0.12 : 0.1),
           isLocked ? (isDark ? 0.18 : 0.14) : isDark ? 0.16 : 0.12,
         );
   const chartFillEnd = isLoading
@@ -103,7 +117,7 @@ export function TrajectoryPreviewCard({
           mixColors(colors.primary, premiumWarmAccent, isDark ? 0.12 : 0.08),
           isDark ? 0.015 : 0.02,
         )
-      : withAlpha(mixColors(colors.warning, colors.gold, 0.35), isDark ? 0.02 : 0.03);
+      : withAlpha(mixColors(colors.primaryDark ?? colors.primary, resolvedAccent, 0.32), isDark ? 0.02 : 0.03);
   const chartGridColor = isLoading
     ? withAlpha(colors.gray, isDark ? 0.16 : 0.12)
     : withAlpha(
@@ -114,31 +128,29 @@ export function TrajectoryPreviewCard({
     ? withAlpha(colors.primaryText, isDark ? 0.08 : 0.06)
     : isSuperScanPremium
       ? withAlpha(premiumWarmAccent, isDark ? 0.16 : 0.08)
-      : withAlpha(colors.gold, isDark ? 0.24 : 0.16);
+      : withAlpha(resolvedAccent, isLocked ? (isDark ? 0.24 : 0.16) : isDark ? 0.14 : 0.08);
   const premiumTagBorderColor = isLoading
     ? withAlpha(colors.primaryText, isDark ? 0.12 : 0.1)
     : isSuperScanPremium
       ? withAlpha(mixColors(premiumWarmAccent, colors.gray, 0.18), isDark ? 0.22 : 0.16)
-      : withAlpha(colors.gold, isDark ? 0.26 : 0.22);
+      : withAlpha(resolvedAccent, isLocked ? (isDark ? 0.26 : 0.22) : isDark ? 0.18 : 0.14);
   const chartFrameBackgroundColor = isSuperScanPremium
     ? isDark
       ? mixColors(colors.cardBackground, PREMIUM_TRAJECTORY_GRAPHITE, 0.44)
       : mixColors(colors.cardBackground, PREMIUM_TRAJECTORY_MIST, 0.28)
     : isDark
-      ? withAlpha(colors.white, 0.022)
-      : withAlpha(colors.white, 0.72);
+      ? withAlpha(colors.background, 0.78)
+      : withAlpha(colors.white, 0.82);
   const chartFrameBorderColor = isSuperScanPremium
     ? withAlpha(mixColors(premiumWarmAccent, colors.gray, 0.18), isDark ? 0.14 : 0.1)
-    : isDark
-      ? withAlpha(colors.gold, 0.1)
-      : withAlpha(colors.gold, 0.08);
+    : withAlpha(resolvedAccent, isLocked ? (isDark ? 0.16 : 0.12) : isDark ? 0.14 : 0.1);
   const chartScrimColor = isSuperScanPremium
     ? isDark
-      ? 'rgba(7, 10, 18, 0.42)'
-      : 'rgba(237, 240, 246, 0.52)'
+      ? withAlpha(colors.background, 0.42)
+      : withAlpha(colors.grayLight ?? colors.white, 0.52)
     : isDark
-      ? 'rgba(7, 10, 18, 0.34)'
-      : 'rgba(255, 248, 235, 0.36)';
+      ? withAlpha(colors.background, 0.34)
+      : withAlpha(colors.white, 0.36);
   const lockBadgeBackgroundColor = isSuperScanPremium
     ? isDark
       ? withAlpha(mixColors(colors.cardBackground, PREMIUM_TRAJECTORY_GRAPHITE, 0.72), 0.96)
@@ -148,29 +160,29 @@ export function TrajectoryPreviewCard({
       : withAlpha(colors.white, 0.9);
   const lockBadgeBorderColor = isSuperScanPremium
     ? withAlpha(mixColors(premiumWarmAccent, colors.gray, 0.12), isDark ? 0.24 : 0.18)
-    : withAlpha(colors.gold, isDark ? 0.34 : 0.28);
+    : withAlpha(resolvedAccent, isDark ? 0.34 : 0.28);
   const checkpointBackgroundColor = isSuperScanPremium
     ? isDark
       ? mixColors(colors.cardBackground, PREMIUM_TRAJECTORY_GRAPHITE, 0.32)
       : mixColors(colors.cardBackground, PREMIUM_TRAJECTORY_MIST, 0.22)
     : isDark
-      ? withAlpha(colors.white, 0.05)
-      : withAlpha(colors.white, 0.74);
+      ? withAlpha(colors.white, 0.045)
+      : withAlpha(colors.white, 0.76);
   const checkpointBorderColor = isSuperScanPremium
     ? withAlpha(mixColors(colors.gray, premiumWarmAccent, 0.1), isDark ? 0.1 : 0.08)
     : isDark
-      ? withAlpha(colors.gold, 0.12)
-      : withAlpha(colors.gold, 0.1);
+      ? withAlpha(resolvedAccent, 0.12)
+      : withAlpha(resolvedAccent, 0.1);
   const checkpointHighlightedBackgroundColor = isSuperScanPremium
     ? isDark
       ? mixColors(colors.cardBackground, premiumWarmAccent, 0.14)
       : mixColors(colors.cardBackground, premiumWarmAccent, 0.08)
     : isDark
-      ? withAlpha(colors.gold, 0.18)
-      : withAlpha(colors.gold, 0.14);
+      ? withAlpha(resolvedAccent, isLocked ? 0.18 : 0.16)
+      : withAlpha(resolvedAccent, isLocked ? 0.14 : 0.1);
   const checkpointHighlightedBorderColor = isSuperScanPremium
     ? withAlpha(premiumWarmAccent, isDark ? 0.24 : 0.18)
-    : withAlpha(colors.gold, isDark ? 0.3 : 0.24);
+    : withAlpha(resolvedAccent, isDark ? 0.3 : 0.24);
   const checkpointHighlightedLabelColor = isSuperScanPremium
     ? isDark
       ? withAlpha(colors.white, 0.84)
@@ -180,7 +192,7 @@ export function TrajectoryPreviewCard({
       : withAlpha(colors.primaryText, 0.78);
   const checkpointHighlightedValueColor = isSuperScanPremium
     ? mixColors(colors.primaryText, premiumWarmAccent, isDark ? 0.08 : 0.12)
-    : colors.primaryText;
+    : mixColors(colors.primaryText, resolvedAccent, isDark ? 0.08 : 0.1);
 
   const chartWidth = Math.max(
     windowWidth - SPACING.page * 2 - layout.blockPadding * 2,
@@ -284,11 +296,11 @@ export function TrajectoryPreviewCard({
   );
   const ctaColors = isDark
     ? (isSuperScanPremium
-        ? ([
-            mixColors(PREMIUM_TRAJECTORY_BRONZE, premiumWarmAccent, 0.44),
-            premiumWarmAccent,
-          ] as const)
-        : ([
+    ? ([
+        mixColors(PREMIUM_TRAJECTORY_BRONZE, premiumWarmAccent, 0.44),
+        premiumWarmAccent,
+      ] as const)
+    : ([
             mixColors(colors.gold, colors.white, 0.18),
             mixColors(colors.warning, colors.gold, 0.72),
           ] as const))
@@ -301,7 +313,9 @@ export function TrajectoryPreviewCard({
             mixColors(colors.gold, colors.white, 0.24),
             mixColors(colors.warning, colors.gold, 0.58),
           ] as const));
-  const ctaTextColor = isSuperScanPremium ? '#2B2115' : '#3B2A00';
+  const ctaTextColor = isSuperScanPremium
+    ? mixColors(colors.primaryText, colors.warning, isDark ? 0.58 : 0.76)
+    : mixColors(colors.primaryText, colors.warning, isDark ? 0.66 : 0.82);
 
   return (
     <View style={styles.shell} testID="trajectory-preview-card">
@@ -313,6 +327,7 @@ export function TrajectoryPreviewCard({
             isDark,
             kind: 'feature',
             accentColor: surfaceAccent,
+            surfaceVariant: isLocked || isLoading ? 'wellnessPremium' : 'soft',
           }),
         ]}
       >
@@ -580,7 +595,7 @@ const createStyles = (
       lineHeight: 22,
       fontWeight: FONT_WEIGHTS.bold,
       color: colors.primaryText,
-      letterSpacing: -0.2,
+      letterSpacing: 0,
       includeFontPadding: false,
     },
     premiumTag: {
@@ -611,6 +626,11 @@ const createStyles = (
       minHeight: layout.chartHeight,
       alignItems: 'center',
       justifyContent: 'center',
+      shadowColor: colors.background,
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: isDark ? 0.18 : 0.08,
+      shadowRadius: 22,
+      elevation: 3,
     },
     chart: {
       marginLeft: layout.isCompact ? -SPACING.sm : -(SPACING.sm + 2),
@@ -642,7 +662,7 @@ const createStyles = (
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1,
-      shadowColor: '#0F172A',
+      shadowColor: colors.background,
       shadowOffset: { width: 0, height: 6 },
       shadowOpacity: isDark ? 0.24 : 0.12,
       shadowRadius: 16,
@@ -656,7 +676,7 @@ const createStyles = (
       fontWeight: FONT_WEIGHTS.bold,
       color: colors.primaryText,
       lineHeight: layout.heroTitleLineHeight,
-      letterSpacing: -0.25,
+      letterSpacing: 0,
       includeFontPadding: false,
     },
     loadingHeadline: {
@@ -687,7 +707,7 @@ const createStyles = (
       gap: 2,
     },
     checkpointCardHighlighted: {
-      shadowColor: '#0F172A',
+      shadowColor: colors.background,
       shadowOffset: { width: 0, height: 6 },
       shadowOpacity: isDark ? 0.2 : 0.1,
       shadowRadius: 14,
@@ -733,7 +753,7 @@ const createStyles = (
       lineHeight: layout.bodyTextLineHeight,
       fontWeight: FONT_WEIGHTS.bold,
       textAlign: 'center',
-      letterSpacing: -0.1,
+      letterSpacing: 0,
       includeFontPadding: false,
     },
   });

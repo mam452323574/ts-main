@@ -28,6 +28,18 @@ export const APP_TRANSLATION_OVERRIDES: Record<LocaleCode, TranslationTree> = {
         message: "Une erreur inattendue s'est produite.",
       },
     },
+    coach: {
+      scan_result_cta: {
+        eyebrow: 'Suite du scan',
+        title: 'Ton prochain conseil est pret',
+        body_fallback: 'Transformer ce point en plan concret.',
+        body_suffix:
+          'Ton coach peut te proposer un plan simple a appliquer tout de suite.',
+        question_label: 'Question prete',
+        action: 'Demander au coach',
+        action_direct: 'Obtenir mon conseil',
+      },
+    },
   },
   en: {
     common: {
@@ -53,6 +65,18 @@ export const APP_TRANSLATION_OVERRIDES: Record<LocaleCode, TranslationTree> = {
       },
       error_boundary: {
         message: 'An unexpected error occurred.',
+      },
+    },
+    coach: {
+      scan_result_cta: {
+        eyebrow: 'After the scan',
+        title: 'Your next advice is ready',
+        body_fallback: 'Turn this point into a concrete plan.',
+        body_suffix:
+          'Your coach can suggest a simple plan you can start right away.',
+        question_label: 'Ready question',
+        action: 'Ask coach',
+        action_direct: 'Get my advice',
       },
     },
   },
@@ -267,6 +291,18 @@ export const APP_TRANSLATION_OVERRIDES: Record<LocaleCode, TranslationTree> = {
         message: 'Si e verificato un errore imprevisto.',
       },
     },
+    coach: {
+      scan_result_cta: {
+        eyebrow: 'Dopo lo scan',
+        title: 'Il tuo prossimo consiglio e pronto',
+        body_fallback: 'Trasforma questo punto in un piano concreto.',
+        body_suffix:
+          'Il coach puo proporti un piano semplice da iniziare subito.',
+        question_label: 'Domanda pronta',
+        action: 'Chiedi al coach',
+        action_direct: 'Ottieni il mio consiglio',
+      },
+    },
   },
   pt: {
     common: {
@@ -478,6 +514,18 @@ export const APP_TRANSLATION_OVERRIDES: Record<LocaleCode, TranslationTree> = {
       },
       error_boundary: {
         message: 'Ocorreu um erro inesperado.',
+      },
+    },
+    coach: {
+      scan_result_cta: {
+        eyebrow: 'Depois do scan',
+        title: 'O teu proximo conselho esta pronto',
+        body_fallback: 'Transforma este ponto num plano concreto.',
+        body_suffix:
+          'O coach pode sugerir um plano simples para comecares ja.',
+        question_label: 'Pergunta pronta',
+        action: 'Perguntar ao coach',
+        action_direct: 'Obter o meu conselho',
       },
     },
   },
@@ -694,6 +742,18 @@ export const APP_TRANSLATION_OVERRIDES: Record<LocaleCode, TranslationTree> = {
         message: 'Se ha producido un error inesperado.',
       },
     },
+    coach: {
+      scan_result_cta: {
+        eyebrow: 'Despues del escaneo',
+        title: 'Tu proximo consejo esta listo',
+        body_fallback: 'Convierte este punto en un plan concreto.',
+        body_suffix:
+          'El coach puede proponerte un plan simple para empezar ahora mismo.',
+        question_label: 'Pregunta lista',
+        action: 'Preguntar al coach',
+        action_direct: 'Obtener mi consejo',
+      },
+    },
   },
   de: {
     common: {
@@ -907,6 +967,18 @@ export const APP_TRANSLATION_OVERRIDES: Record<LocaleCode, TranslationTree> = {
       },
       error_boundary: {
         message: 'Es ist ein unerwarteter Fehler aufgetreten.',
+      },
+    },
+    coach: {
+      scan_result_cta: {
+        eyebrow: 'Nach dem Scan',
+        title: 'Dein naechster Rat ist bereit',
+        body_fallback: 'Diesen Punkt in einen konkreten Plan verwandeln.',
+        body_suffix:
+          'Dein Coach kann dir einen einfachen Plan vorschlagen, den du sofort starten kannst.',
+        question_label: 'Fertige Frage',
+        action: 'Coach fragen',
+        action_direct: 'Meinen Rat holen',
       },
     },
   },

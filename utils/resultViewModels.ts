@@ -2,7 +2,6 @@ import { isFieldLocked } from '@/constants/premiumFields';
 import {
   AnalysisResult,
   DetectedCondition,
-  FatDistributionPriorityZone,
   FatDistributionScanResult,
   PremiumPotentialHistoryPoint,
   ScanFaceResult,
@@ -22,11 +21,11 @@ import {
   safeGaugeScore,
 } from '@/utils/scanFormatters';
 import {
-  localizeQualitativeLevel,
+  localizeDisplayNutritionVitaminKeys,
+  localizeDisplayQualitativeLevel,
+  localizeDisplayVerdict,
   localizeSuperScanDisclaimerKey,
   localizeSuperScanSummaryKey,
-  localizeVerdict,
-  localizeNutritionVitaminKeys,
 } from '@/utils/resultLocalization';
 import {
   isFatDistributionScanResult,
@@ -75,16 +74,28 @@ export interface ResultMetricViewModel {
   premiumRenderState?: PremiumRenderState;
 }
 
+export interface ResultLongTextSectionViewModel {
+  id: string;
+  icon: ResultIconToken;
+  title: string;
+  body?: string;
+  tags?: string[];
+  theme: ResultItemThemeSpec;
+  premiumRenderState?: PremiumRenderState;
+  collapsedMaxLines?: number;
+}
+
 export interface ResultMacroViewModel {
   title: string;
-  items: Array<{
+  items: {
     id: string;
     icon: ResultIconToken;
     label: string;
     value: string;
     valueVariant: ResultValueVariant;
     theme: ResultItemThemeSpec;
-  }>;
+    premiumRenderState?: PremiumRenderState;
+  }[];
 }
 
 export interface ResultTrajectoryCheckpointViewModel {
@@ -127,6 +138,7 @@ export interface ScanResultViewModel {
   metrics: ResultMetricViewModel[];
   premiumMetrics: ResultMetricViewModel[];
   macros?: ResultMacroViewModel;
+  nutritionLongSections?: ResultLongTextSectionViewModel[];
 }
 
 export interface LegacySuperScanResultViewModel {
@@ -143,6 +155,7 @@ export interface FatDistributionPrimaryMetricViewModel {
   id: 'body_fat' | 'facial_fat' | 'water_retention';
   label: string;
   value: string;
+  premiumRenderState?: PremiumRenderState;
 }
 
 export interface FatDistributionAreaViewModel {
@@ -191,6 +204,7 @@ function readPreferredText(value: unknown) {
 }
 
 type MetricViewModelOverrides = {
+  id?: string;
   titleMaxLines?: number;
   valueMaxLines?: number;
   premiumRenderState?: PremiumRenderState;
@@ -209,7 +223,7 @@ function metric(
   const { semanticValueKey, themeOverrides } = overrides;
 
   return {
-    id,
+    id: overrides.id ?? id,
     icon: id,
     title,
     value,
@@ -220,17 +234,81 @@ function metric(
       semanticValueKey,
       overrides: themeOverrides,
     }),
-    titleMaxLines: overrides.titleMaxLines ?? 2,
+    titleMaxLines: overrides.titleMaxLines ?? 1,
     valueMaxLines: overrides.valueMaxLines ?? (valueVariant === 'text' ? 3 : 1),
     premiumRenderState: overrides.premiumRenderState,
   };
+}
+
+function longTextSection(options: {
+  scanType: ResultScanIconToken;
+  id: string;
+  icon: ResultIconToken;
+  themeMetricId: ResultMetricIconToken;
+  title: string;
+  body?: string | null;
+  tags?: string[];
+  premiumRenderState?: PremiumRenderState;
+  collapsedMaxLines?: number;
+  themeOverrides?: Partial<ResultItemThemeSpec>;
+}): ResultLongTextSectionViewModel | null {
+  const body = readPreferredText(options.body);
+  const tags = options.tags?.filter((tag) => tag.trim().length > 0) ?? [];
+
+  if (
+    !body &&
+    tags.length === 0 &&
+    options.premiumRenderState !== 'locked' &&
+    options.premiumRenderState !== 'loading'
+  ) {
+    return null;
+  }
+
+  return {
+    id: options.id,
+    icon: options.icon,
+    title: options.title,
+    ...(body ? { body } : {}),
+    ...(tags.length > 0 ? { tags } : {}),
+    theme: resolveResultItemThemeSpec({
+      scanType: options.scanType,
+      metricId: options.themeMetricId,
+      overrides: options.themeOverrides,
+    }),
+    premiumRenderState: options.premiumRenderState,
+    collapsedMaxLines: options.collapsedMaxLines,
+  };
+}
+
+function optionalScore100Metric(
+  scanType: ResultScanIconToken,
+  id: ResultMetricIconToken,
+  title: string,
+  rawValue: unknown,
+  formatOptions: { locale?: string | null; t: TranslateFn },
+  overrides: MetricViewModelOverrides = {},
+) {
+  const numericValue = parseSafeNumber(rawValue);
+
+  if (numericValue === null) {
+    return null;
+  }
+
+  return metric(
+    scanType,
+    id,
+    title,
+    formatScore100(numericValue, formatOptions),
+    'fraction',
+    overrides,
+  );
 }
 
 function resolvePremiumMetricRenderState(options: {
   premiumRenderState: PremiumRenderState;
   scanType: 'face' | 'body' | 'nutrition';
   fieldKey: string;
-}) {
+}): PremiumRenderState {
   if (options.premiumRenderState !== 'locked') {
     return options.premiumRenderState;
   }
@@ -303,6 +381,137 @@ function resolvePremiumMetricValue(options: {
   }
 }
 
+function premiumMetric(options: {
+  scanType: ResultScanIconToken;
+  id?: string;
+  icon: ResultMetricIconToken;
+  title: string;
+  fieldKey: string;
+  unlockedValue: string;
+  valueVariant: ResultValueVariant;
+  premiumRenderState: PremiumRenderState;
+  t: TranslateFn;
+  overrides?: Omit<MetricViewModelOverrides, 'id' | 'premiumRenderState'>;
+}) {
+  const nextPremiumRenderState = resolvePremiumMetricRenderState({
+    premiumRenderState: options.premiumRenderState,
+    scanType: options.scanType,
+    fieldKey: options.fieldKey,
+  });
+
+  return metric(
+    options.scanType,
+    options.icon,
+    options.title,
+    resolvePremiumMetricValue({
+      premiumRenderState: nextPremiumRenderState,
+      unlockedValue: options.unlockedValue,
+      t: options.t,
+    }),
+    options.valueVariant,
+    {
+      ...options.overrides,
+      ...(options.id ? { id: options.id } : {}),
+      premiumRenderState: nextPremiumRenderState,
+    },
+  );
+}
+
+function optionalPremiumScore100Metric(options: {
+  scanType: ResultScanIconToken;
+  id?: string;
+  icon: ResultMetricIconToken;
+  title: string;
+  fieldKey: string;
+  rawValue: unknown;
+  formatOptions: { locale?: string | null; t: TranslateFn };
+  premiumRenderState: PremiumRenderState;
+  overrides?: Omit<MetricViewModelOverrides, 'id' | 'premiumRenderState'>;
+}) {
+  const numericValue = parseSafeNumber(options.rawValue);
+
+  if (numericValue === null) {
+    return null;
+  }
+
+  return premiumMetric({
+    scanType: options.scanType,
+    id: options.id,
+    icon: options.icon,
+    title: options.title,
+    fieldKey: options.fieldKey,
+    unlockedValue: formatScore100(numericValue, options.formatOptions),
+    valueVariant: 'fraction',
+    premiumRenderState: options.premiumRenderState,
+    t: options.formatOptions.t,
+    overrides: options.overrides,
+  });
+}
+
+function optionalPremiumScore10Metric(options: {
+  scanType: ResultScanIconToken;
+  id?: string;
+  icon: ResultMetricIconToken;
+  title: string;
+  fieldKey: string;
+  rawValue: unknown;
+  formatOptions: { locale?: string | null; t: TranslateFn };
+  premiumRenderState: PremiumRenderState;
+  overrides?: Omit<MetricViewModelOverrides, 'id' | 'premiumRenderState'>;
+}) {
+  const numericValue = parseSafeNumber(options.rawValue);
+
+  if (numericValue === null) {
+    return null;
+  }
+
+  return premiumMetric({
+    scanType: options.scanType,
+    id: options.id,
+    icon: options.icon,
+    title: options.title,
+    fieldKey: options.fieldKey,
+    unlockedValue: formatScore10(numericValue, options.formatOptions),
+    valueVariant: 'fraction',
+    premiumRenderState: options.premiumRenderState,
+    t: options.formatOptions.t,
+    overrides: options.overrides,
+  });
+}
+
+function optionalPremiumNumericMetric(options: {
+  scanType: ResultScanIconToken;
+  id?: string;
+  icon: ResultMetricIconToken;
+  title: string;
+  fieldKey: string;
+  rawValue: unknown;
+  premiumRenderState: PremiumRenderState;
+  t: TranslateFn;
+  formatValue: (numericValue: number) => string;
+  valueVariant?: ResultValueVariant;
+  overrides?: Omit<MetricViewModelOverrides, 'id' | 'premiumRenderState'>;
+}) {
+  const numericValue = parseSafeNumber(options.rawValue);
+
+  if (numericValue === null) {
+    return null;
+  }
+
+  return premiumMetric({
+    scanType: options.scanType,
+    id: options.id,
+    icon: options.icon,
+    title: options.title,
+    fieldKey: options.fieldKey,
+    unlockedValue: options.formatValue(numericValue),
+    valueVariant: options.valueVariant ?? 'numeric',
+    premiumRenderState: options.premiumRenderState,
+    t: options.t,
+    overrides: options.overrides,
+  });
+}
+
 type QuickStatViewModelOverrides = {
   labelMaxLines?: number;
   valueMaxLines?: number;
@@ -344,6 +553,7 @@ type MacroItemViewModel = ResultMacroViewModel['items'][number];
 type MacroItemOverrides = {
   semanticValueKey?: string | null;
   themeOverrides?: Partial<ResultItemThemeSpec>;
+  premiumRenderState?: PremiumRenderState;
 };
 
 function macroItem(
@@ -368,11 +578,40 @@ function macroItem(
       semanticValueKey,
       overrides: themeOverrides,
     }),
+    premiumRenderState: overrides.premiumRenderState,
   };
 }
 
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max);
+function localizeVitaminTags(
+  values: string[],
+  t: TranslateFn,
+  locale?: string | null,
+) {
+  return values
+    .map((value) =>
+      localizeDisplayNutritionVitaminKeys([value], null, t, {
+        locale,
+        emptyFallback: '',
+      })
+    )
+    .filter((value) => value.trim().length > 0);
+}
+
+function isSameAsTagList(value: string | null, tags: string[], locale?: string | null) {
+  if (!value || tags.length === 0) {
+    return false;
+  }
+
+  const commaList = tags.join(', ');
+  const localizedList =
+    typeof Intl !== 'undefined' && typeof Intl.ListFormat === 'function'
+      ? new Intl.ListFormat(locale ?? 'en', {
+          style: 'short',
+          type: 'conjunction',
+        }).format(tags)
+      : commaList;
+
+  return value === commaList || value === localizedList;
 }
 
 function resolveTrajectoryBaseScore(
@@ -426,13 +665,8 @@ export function buildScanResultViewModel(options: {
 
   switch (analysisData.scan_type) {
     case 'face':
-      return {
-        scanType: 'face',
-        typeLabel: t('scan.face.type_label'),
-        scoreLabel: t('scan.face.score_label'),
-        score: safeGaugeScore(analysisData.face_score),
-        analysisQualityLabel: resolveAnalysisQualityLabel({ analysisData, t }),
-        quickStats: [
+      {
+        const quickStats = [
           quickStat(
             'face',
             'perceived_age',
@@ -444,9 +678,10 @@ export function buildScanResultViewModel(options: {
             'face',
             'face_shape',
             t('common.metrics.face_shape'),
-            localizeQualitativeLevel(
+            localizeDisplayQualitativeLevel(
               'face_shape',
               analysisData.face_shape_key,
+              analysisData.face_shape_fallback_text,
               t,
               '-',
             ),
@@ -456,8 +691,64 @@ export function buildScanResultViewModel(options: {
               semanticValueKey: analysisData.face_shape_key,
             },
           ),
-        ],
-        metrics: [
+        ];
+        const extendedFaceMetrics = [
+          optionalPremiumScore100Metric({
+            scanType: 'face',
+            icon: 'skin_clarity',
+            title: t('common.metrics.skin_clarity'),
+            fieldKey: 'skin_clarity_score',
+            rawValue: analysisData.skin_clarity_score,
+            formatOptions,
+            premiumRenderState,
+          }),
+          optionalPremiumScore100Metric({
+            scanType: 'face',
+            icon: 'skin_evenness',
+            title: t('common.metrics.skin_evenness'),
+            fieldKey: 'skin_evenness_score',
+            rawValue: analysisData.skin_evenness_score,
+            formatOptions,
+            premiumRenderState,
+          }),
+          optionalPremiumScore100Metric({
+            scanType: 'face',
+            icon: 'under_eye_shadow',
+            title: t('common.metrics.under_eye_shadow'),
+            fieldKey: 'under_eye_shadow_score',
+            rawValue: analysisData.under_eye_shadow_score,
+            formatOptions,
+            premiumRenderState,
+          }),
+          optionalPremiumScore100Metric({
+            scanType: 'face',
+            icon: 'pore_visibility',
+            title: t('common.metrics.pore_visibility'),
+            fieldKey: 'pore_visibility_score',
+            rawValue: analysisData.pore_visibility_score,
+            formatOptions,
+            premiumRenderState,
+          }),
+          optionalPremiumScore100Metric({
+            scanType: 'face',
+            icon: 'complexion_redness',
+            title: t('common.metrics.complexion_redness'),
+            fieldKey: 'complexion_redness_score',
+            rawValue: analysisData.complexion_redness_score,
+            formatOptions,
+            premiumRenderState,
+          }),
+          optionalPremiumScore100Metric({
+            scanType: 'face',
+            icon: 'sleep_quality',
+            title: t('common.metrics.sleep_quality'),
+            fieldKey: 'perceived_sleep_quality',
+            rawValue: analysisData.perceived_sleep_quality,
+            formatOptions,
+            premiumRenderState,
+          }),
+        ].filter((item): item is ResultMetricViewModel => item !== null);
+        const metrics = [
           metric(
             'face',
             'symmetry',
@@ -465,13 +756,16 @@ export function buildScanResultViewModel(options: {
             formatPercentage(analysisData.symmetry_percentage, formatOptions),
             'numeric',
           ),
-          metric(
-            'face',
-            'fatigue',
-            t('common.metrics.fatigue'),
-            formatScore100(analysisData.fatigue_level, formatOptions),
-            'fraction',
-          ),
+          premiumMetric({
+            scanType: 'face',
+            icon: 'fatigue',
+            title: t('common.metrics.fatigue'),
+            fieldKey: 'fatigue_level',
+            unlockedValue: formatScore100(analysisData.fatigue_level, formatOptions),
+            valueVariant: 'fraction',
+            premiumRenderState,
+            t,
+          }),
           metric(
             'face',
             'hydration',
@@ -479,95 +773,74 @@ export function buildScanResultViewModel(options: {
             formatScore100(analysisData.hydration_level, formatOptions),
             'fraction',
           ),
-          metric(
-            'face',
-            'photogenic',
-            t('common.metrics.photogenic'),
-            formatScore10(analysisData.photogenic_score, formatOptions),
-            'fraction',
-          ),
-        ],
-        premiumMetrics: [
-          (() => {
-            const nextPremiumRenderState = resolvePremiumMetricRenderState({
-              premiumRenderState,
-              scanType: 'face',
-              fieldKey: 'skin_quality_score',
-            });
+          premiumMetric({
+            scanType: 'face',
+            icon: 'photogenic',
+            title: t('common.metrics.photogenic'),
+            fieldKey: 'photogenic_score',
+            unlockedValue: formatScore10(analysisData.photogenic_score, formatOptions),
+            valueVariant: 'fraction',
+            premiumRenderState,
+            t,
+          }),
+          ...extendedFaceMetrics,
+        ];
+        const premiumMetrics = [
+          premiumMetric({
+            scanType: 'face',
+            icon: 'skin_quality',
+            title: t('common.metrics.skin_quality'),
+            fieldKey: 'skin_quality_score',
+            unlockedValue: formatScore100(analysisData.skin_quality_score, formatOptions),
+            valueVariant: 'fraction',
+            premiumRenderState,
+            t,
+          }),
+          premiumMetric({
+            scanType: 'face',
+            icon: 'glow',
+            title: t('common.metrics.glow'),
+            fieldKey: 'energy_score',
+            unlockedValue: formatScore10(resolveFaceGlowScore(analysisData), formatOptions),
+            valueVariant: 'fraction',
+            premiumRenderState,
+            t,
+          }),
+          premiumMetric({
+            scanType: 'face',
+            icon: 'collagen',
+            title: t('common.metrics.collagen'),
+            fieldKey: 'collagen_level',
+            unlockedValue: formatScore100(analysisData.collagen_level, formatOptions),
+            valueVariant: 'fraction',
+            premiumRenderState,
+            t,
+          }),
+        ];
 
-            return metric(
-              'face',
-              'skin_quality',
-              t('common.metrics.skin_quality'),
-              resolvePremiumMetricValue({
-                premiumRenderState: nextPremiumRenderState,
-                unlockedValue: formatScore100(analysisData.skin_quality_score, formatOptions),
-                t,
-              }),
-              'fraction',
-              {
-                premiumRenderState: nextPremiumRenderState,
-              },
-            );
-          })(),
-          (() => {
-            const nextPremiumRenderState = resolvePremiumMetricRenderState({
-              premiumRenderState,
-              scanType: 'face',
-              fieldKey: 'energy_score',
-            });
-
-            return metric(
-              'face',
-              'glow',
-              t('common.metrics.glow'),
-              resolvePremiumMetricValue({
-                premiumRenderState: nextPremiumRenderState,
-                unlockedValue: formatScore10(resolveFaceGlowScore(analysisData), formatOptions),
-                t,
-              }),
-              'fraction',
-              { premiumRenderState: nextPremiumRenderState },
-            );
-          })(),
-          (() => {
-            const nextPremiumRenderState = resolvePremiumMetricRenderState({
-              premiumRenderState,
-              scanType: 'face',
-              fieldKey: 'collagen_level',
-            });
-
-            return metric(
-              'face',
-              'collagen',
-              t('common.metrics.collagen'),
-              resolvePremiumMetricValue({
-                premiumRenderState: nextPremiumRenderState,
-                unlockedValue: formatScore100(analysisData.collagen_level, formatOptions),
-                t,
-              }),
-              'fraction',
-              { premiumRenderState: nextPremiumRenderState },
-            );
-          })(),
-        ],
+        return {
+        scanType: 'face',
+        typeLabel: t('scan.face.type_label'),
+        scoreLabel: t('scan.face.score_label'),
+        score: safeGaugeScore(analysisData.face_score),
+        analysisQualityLabel: resolveAnalysisQualityLabel({ analysisData, t }),
+        quickStats,
+        metrics,
+        premiumMetrics,
       } satisfies ScanResultViewModel;
+      }
 
     case 'body':
-      return {
-        scanType: 'body',
-        typeLabel: t('scan.body.type_label'),
-        scoreLabel: t('scan.body.score_label'),
-        score: safeGaugeScore(analysisData.body_score),
-        analysisQualityLabel: resolveAnalysisQualityLabel({ analysisData, t }),
-        quickStats: [
+      {
+        const quickStats = [
           quickStat(
             'body',
             'body_type',
             t('common.metrics.body_type'),
-            localizeQualitativeLevel(
+            localizeDisplayQualitativeLevel(
               'body_type',
               analysisData.body_type_key,
+              analysisData.body_type_fallback_text,
               t,
               '-',
             ),
@@ -581,9 +854,10 @@ export function buildScanResultViewModel(options: {
             'body',
             'muscle_mass',
             t('common.metrics.muscle_mass'),
-            localizeQualitativeLevel(
+            localizeDisplayQualitativeLevel(
               'muscle_mass',
               analysisData.muscle_mass_key,
+              analysisData.muscle_mass_fallback_text,
               t,
               '-',
             ),
@@ -593,8 +867,8 @@ export function buildScanResultViewModel(options: {
               semanticValueKey: analysisData.muscle_mass_key,
             },
           ),
-        ],
-        metrics: [
+        ];
+        const metrics = [
           metric(
             'body',
             'waist',
@@ -602,13 +876,16 @@ export function buildScanResultViewModel(options: {
             formatCm(analysisData.waist_estimation_cm, formatOptions),
             'text',
           ),
-          metric(
-            'body',
-            'strength',
-            t('common.metrics.strength'),
-            formatScore100(analysisData.strength_index, formatOptions),
-            'fraction',
-          ),
+          premiumMetric({
+            scanType: 'body',
+            icon: 'strength',
+            title: t('common.metrics.strength'),
+            fieldKey: 'strength_index',
+            unlockedValue: formatScore100(analysisData.strength_index, formatOptions),
+            valueVariant: 'fraction',
+            premiumRenderState,
+            t,
+          }),
           metric(
             'body',
             'bmi',
@@ -616,89 +893,131 @@ export function buildScanResultViewModel(options: {
             formatBMI(analysisData.bmi_estimate, formatOptions),
             'numeric',
           ),
-          metric(
-            'body',
-            'metabolic_age',
-            t('common.metrics.metabolic_age'),
-            formatAge(analysisData.metabolic_age, formatOptions),
-            'text',
-          ),
-        ],
-        premiumMetrics: [
-          (() => {
-            const nextPremiumRenderState = resolvePremiumMetricRenderState({
-              premiumRenderState,
-              scanType: 'body',
-              fieldKey: 'body_fat_percentage',
-            });
+          premiumMetric({
+            scanType: 'body',
+            icon: 'metabolic_age',
+            title: t('common.metrics.metabolic_age'),
+            fieldKey: 'metabolic_age',
+            unlockedValue: formatAge(analysisData.metabolic_age, formatOptions),
+            valueVariant: 'text',
+            premiumRenderState,
+            t,
+          }),
+        ];
+        const premiumMetrics = [
+          premiumMetric({
+            scanType: 'body',
+            icon: 'body_fat',
+            title: t('common.metrics.body_fat'),
+            fieldKey: 'body_fat_percentage',
+            unlockedValue: formatPercentage(analysisData.body_fat_percentage, formatOptions),
+            valueVariant: 'numeric',
+            premiumRenderState,
+            t,
+          }),
+          premiumMetric({
+            scanType: 'body',
+            icon: 'posture',
+            title: t('common.metrics.posture'),
+            fieldKey: 'posture_score',
+            unlockedValue: formatScore10(analysisData.posture_score, formatOptions),
+            valueVariant: 'fraction',
+            premiumRenderState,
+            t,
+          }),
+          premiumMetric({
+            scanType: 'body',
+            icon: 'body_symmetry',
+            title: t('common.metrics.symmetry'),
+            fieldKey: 'body_symmetry',
+            unlockedValue: formatScore100(analysisData.body_symmetry, formatOptions),
+            valueVariant: 'fraction',
+            premiumRenderState,
+            t,
+          }),
+          optionalPremiumScore100Metric({
+            scanType: 'body',
+            id: 'muscle_definition',
+            icon: 'strength',
+            title: t('common.metrics.definition'),
+            fieldKey: 'muscle_definition_score',
+            rawValue: analysisData.muscle_definition_score,
+            formatOptions,
+            premiumRenderState,
+          }),
+          optionalPremiumScore100Metric({
+            scanType: 'body',
+            id: 'midsection_definition',
+            icon: 'body_fat',
+            title: t('common.metrics.definition'),
+            fieldKey: 'midsection_definition_score',
+            rawValue: analysisData.midsection_definition_score,
+            formatOptions,
+            premiumRenderState,
+          }),
+          optionalPremiumScore100Metric({
+            scanType: 'body',
+            id: 'shoulder_alignment',
+            icon: 'posture',
+            title: t('common.metrics.posture'),
+            fieldKey: 'shoulder_alignment_score',
+            rawValue: analysisData.shoulder_alignment_score,
+            formatOptions,
+            premiumRenderState,
+          }),
+          optionalPremiumScore100Metric({
+            scanType: 'body',
+            id: 'recovery_readiness',
+            icon: 'fatigue',
+            title: t('common.metrics.sleep_quality'),
+            fieldKey: 'recovery_readiness_score',
+            rawValue: analysisData.recovery_readiness_score,
+            formatOptions,
+            premiumRenderState,
+          }),
+          optionalPremiumScore100Metric({
+            scanType: 'body',
+            id: 'body_tension',
+            icon: 'fatigue',
+            title: t('common.metrics.fatigue'),
+            fieldKey: 'body_tension_indicator_score',
+            rawValue: analysisData.body_tension_indicator_score,
+            formatOptions,
+            premiumRenderState,
+          }),
+        ].filter((item): item is ResultMetricViewModel => item !== null);
 
-            return metric(
-              'body',
-              'body_fat',
-              t('common.metrics.body_fat'),
-              resolvePremiumMetricValue({
-                premiumRenderState: nextPremiumRenderState,
-                unlockedValue: formatPercentage(analysisData.body_fat_percentage, formatOptions),
-                t,
-              }),
-              'numeric',
-              {
-                premiumRenderState: nextPremiumRenderState,
-              },
-            );
-          })(),
-          (() => {
-            const nextPremiumRenderState = resolvePremiumMetricRenderState({
-              premiumRenderState,
-              scanType: 'body',
-              fieldKey: 'posture_score',
-            });
-
-            return metric(
-              'body',
-              'posture',
-              t('common.metrics.posture'),
-              resolvePremiumMetricValue({
-                premiumRenderState: nextPremiumRenderState,
-                unlockedValue: formatScore10(analysisData.posture_score, formatOptions),
-                t,
-              }),
-              'fraction',
-              { premiumRenderState: nextPremiumRenderState },
-            );
-          })(),
-          (() => {
-            const nextPremiumRenderState = resolvePremiumMetricRenderState({
-              premiumRenderState,
-              scanType: 'body',
-              fieldKey: 'body_symmetry',
-            });
-
-            return metric(
-              'body',
-              'body_symmetry',
-              t('common.metrics.symmetry'),
-              resolvePremiumMetricValue({
-                premiumRenderState: nextPremiumRenderState,
-                unlockedValue: formatScore100(analysisData.body_symmetry, formatOptions),
-                t,
-              }),
-              'fraction',
-              { premiumRenderState: nextPremiumRenderState },
-            );
-          })(),
-        ],
+        return {
+        scanType: 'body',
+        typeLabel: t('scan.body.type_label'),
+        scoreLabel: t('scan.body.score_label'),
+        score: safeGaugeScore(analysisData.body_score),
+        analysisQualityLabel: resolveAnalysisQualityLabel({ analysisData, t }),
+        quickStats,
+        metrics,
+        premiumMetrics,
       } satisfies ScanResultViewModel;
+      }
 
     case 'nutrition':
     default:
-      return {
-        scanType: 'nutrition',
-        typeLabel: t('scan.nutrition.type_label'),
-        scoreLabel: t('scan.nutrition.score_label'),
-        score: safeGaugeScore(analysisData.plate_health_score),
-        analysisQualityLabel: resolveAnalysisQualityLabel({ analysisData, t }),
-        quickStats: [
+      {
+        const proteinPremiumRenderState = resolvePremiumMetricRenderState({
+          premiumRenderState,
+          scanType: 'nutrition',
+          fieldKey: 'protein_grams',
+        });
+        const carbsPremiumRenderState = resolvePremiumMetricRenderState({
+          premiumRenderState,
+          scanType: 'nutrition',
+          fieldKey: 'carbs_grams',
+        });
+        const fatsPremiumRenderState = resolvePremiumMetricRenderState({
+          premiumRenderState,
+          scanType: 'nutrition',
+          fieldKey: 'fat_grams',
+        });
+        const quickStats = [
           quickStat(
             'nutrition',
             'calories',
@@ -710,7 +1029,12 @@ export function buildScanResultViewModel(options: {
             'nutrition',
             'verdict',
             t('common.metrics.verdict'),
-            localizeVerdict(analysisData.verdict_key, t, '-'),
+            localizeDisplayVerdict(
+              analysisData.verdict_key,
+              analysisData.verdict_fallback_text,
+              t,
+              '-',
+            ),
             'text',
             {
               span: 'full',
@@ -718,48 +1042,26 @@ export function buildScanResultViewModel(options: {
               semanticValueKey: analysisData.verdict_key,
             },
           ),
-        ],
-        macros: {
-          title: t('scan.nutrition.macros_title'),
-          items: [
-            macroItem(
-              'nutrition',
-              'proteins',
-              t('common.metrics.proteins'),
-              formatGrams(analysisData.protein_grams, formatOptions),
-              'text',
-            ),
-            macroItem(
-              'nutrition',
-              'carbs',
-              t('common.metrics.carbs'),
-              formatGrams(analysisData.carbs_grams, formatOptions),
-              'text',
-            ),
-            macroItem(
-              'nutrition',
-              'fats',
-              t('common.metrics.fats'),
-              formatGrams(analysisData.fat_grams, formatOptions),
-              'text',
-            ),
-          ],
-        },
-        metrics: [
-          metric(
-            'nutrition',
-            'satiety',
-            t('common.metrics.satiety'),
-            formatScore10(analysisData.satiety_index, formatOptions),
-            'fraction',
-          ),
+        ];
+        const metrics = [
+          premiumMetric({
+            scanType: 'nutrition',
+            icon: 'satiety',
+            title: t('common.metrics.satiety'),
+            fieldKey: 'satiety_index',
+            unlockedValue: formatScore10(analysisData.satiety_index, formatOptions),
+            valueVariant: 'fraction',
+            premiumRenderState,
+            t,
+          }),
           metric(
             'nutrition',
             'ingredients',
             t('common.metrics.ingredient_quality'),
-            localizeQualitativeLevel(
+            localizeDisplayQualitativeLevel(
               'ingredient_quality',
               analysisData.ingredient_quality_key,
+              analysisData.ingredient_quality_fallback_text,
               t,
               '-',
             ),
@@ -769,65 +1071,362 @@ export function buildScanResultViewModel(options: {
               semanticValueKey: analysisData.ingredient_quality_key,
             },
           ),
-        ],
-        premiumMetrics: [
-          (() => {
-            const nextPremiumRenderState = resolvePremiumMetricRenderState({
-              premiumRenderState,
-              scanType: 'nutrition',
-              fieldKey: 'glycemic_index_label',
-            });
+        ];
+        const premiumMetrics = [
+          premiumMetric({
+            scanType: 'nutrition',
+            icon: 'glycemic',
+            title: t('common.metrics.glycemic_index'),
+            fieldKey: 'glycemic_index_label',
+            unlockedValue: localizeDisplayQualitativeLevel(
+              'glycemic_index',
+              analysisData.glycemic_index_key,
+              analysisData.glycemic_index_fallback_text,
+              t,
+              '-',
+            ),
+            valueVariant: 'text',
+            premiumRenderState,
+            t,
+            overrides: {
+              valueMaxLines: 2,
+              semanticValueKey: analysisData.glycemic_index_key,
+            },
+          }),
+          optionalPremiumNumericMetric({
+            scanType: 'nutrition',
+            id: 'fiber',
+            icon: 'ingredients',
+            title: t('common.metrics.fiber'),
+            fieldKey: 'fiber_grams_estimate',
+            rawValue: analysisData.fiber_grams_estimate,
+            premiumRenderState,
+            t,
+            formatValue: (value) => formatGrams(value, formatOptions),
+            valueVariant: 'text',
+          }),
+          optionalPremiumNumericMetric({
+            scanType: 'nutrition',
+            id: 'sugar',
+            icon: 'carbs',
+            title: t('common.metrics.sugar'),
+            fieldKey: 'sugar_grams_estimate',
+            rawValue: analysisData.sugar_grams_estimate,
+            premiumRenderState,
+            t,
+            formatValue: (value) => formatGrams(value, formatOptions),
+            valueVariant: 'text',
+          }),
+          optionalPremiumScore100Metric({
+            scanType: 'nutrition',
+            id: 'processing_level',
+            icon: 'ingredients',
+            title: t('common.metrics.processing_level'),
+            fieldKey: 'processing_level_score',
+            rawValue: analysisData.processing_level_score,
+            formatOptions,
+            premiumRenderState,
+          }),
+          optionalPremiumScore100Metric({
+            scanType: 'nutrition',
+            id: 'sodium_level',
+            icon: 'glycemic',
+            title: t('common.metrics.sodium_level'),
+            fieldKey: 'sodium_level_score',
+            rawValue: analysisData.sodium_level_score,
+            formatOptions,
+            premiumRenderState,
+          }),
+          optionalPremiumScore100Metric({
+            scanType: 'nutrition',
+            id: 'meal_balance',
+            icon: 'verdict',
+            title: t('common.metrics.meal_balance'),
+            fieldKey: 'meal_balance_score',
+            rawValue: analysisData.meal_balance_score,
+            formatOptions,
+            premiumRenderState,
+          }),
+          optionalPremiumScore100Metric({
+            scanType: 'nutrition',
+            id: 'inflammation_index',
+            icon: 'glycemic',
+            title: t('common.metrics.inflammation_index'),
+            fieldKey: 'inflammation_index_score',
+            rawValue: analysisData.inflammation_index_score,
+            formatOptions,
+            premiumRenderState,
+          }),
+          optionalPremiumScore100Metric({
+            scanType: 'nutrition',
+            id: 'color_diversity',
+            icon: 'vitamins',
+            title: t('common.metrics.color_diversity'),
+            fieldKey: 'color_diversity_score',
+            rawValue: analysisData.color_diversity_score,
+            formatOptions,
+            premiumRenderState,
+          }),
+          optionalPremiumNumericMetric({
+            scanType: 'nutrition',
+            id: 'vegetable_ratio',
+            icon: 'ingredients',
+            title: t('common.metrics.vegetable_ratio'),
+            fieldKey: 'vegetable_portion_ratio',
+            rawValue: analysisData.vegetable_portion_ratio,
+            premiumRenderState,
+            t,
+            formatValue: (value) => formatPercentage(value, formatOptions),
+          }),
+          optionalPremiumScore100Metric({
+            scanType: 'nutrition',
+            id: 'protein_visibility',
+            icon: 'proteins',
+            title: t('common.metrics.protein_visibility'),
+            fieldKey: 'protein_visibility_score',
+            rawValue: analysisData.protein_visibility_score,
+            formatOptions,
+            premiumRenderState,
+          }),
+          optionalPremiumScore100Metric({
+            scanType: 'nutrition',
+            id: 'whole_grain',
+            icon: 'carbs',
+            title: t('common.metrics.whole_grain'),
+            fieldKey: 'whole_grain_indicator_score',
+            rawValue: analysisData.whole_grain_indicator_score,
+            formatOptions,
+            premiumRenderState,
+          }),
+          optionalPremiumScore100Metric({
+            scanType: 'nutrition',
+            id: 'meal_freshness',
+            icon: 'ingredients',
+            title: t('common.metrics.meal_freshness'),
+            fieldKey: 'meal_freshness_score',
+            rawValue: analysisData.meal_freshness_score,
+            formatOptions,
+            premiumRenderState,
+          }),
+        ].filter((item): item is ResultMetricViewModel => item !== null);
+        const resolveNutritionSectionState = (fieldKey: string) =>
+          resolvePremiumMetricRenderState({
+            premiumRenderState,
+            scanType: 'nutrition',
+            fieldKey,
+          });
+        const resolveNutritionSectionBody = (
+          fieldKey: string,
+          unlockedValue?: string | null,
+        ) => {
+          const nextPremiumRenderState = resolveNutritionSectionState(fieldKey);
 
-            return metric(
+          return {
+            nextPremiumRenderState,
+            body:
+              nextPremiumRenderState === 'unlocked'
+                ? unlockedValue
+                : resolvePremiumMetricValue({
+                    premiumRenderState: nextPremiumRenderState,
+                    unlockedValue: unlockedValue ?? '-',
+                    t,
+                  }),
+          };
+        };
+        const vitaminsPremiumRenderState = resolvePremiumMetricRenderState({
+          premiumRenderState,
+          scanType: 'nutrition',
+          fieldKey: 'main_vitamins',
+        });
+        const vitaminTags = localizeVitaminTags(
+          analysisData.main_vitamin_keys,
+          t,
+          locale,
+        );
+        const displayVitamins = localizeDisplayNutritionVitaminKeys(
+          analysisData.main_vitamin_keys,
+          analysisData.main_vitamins_fallback_text,
+          t,
+          {
+            locale,
+            emptyFallback: '-',
+          },
+        );
+        const vitaminFallbackText = readPreferredText(
+          analysisData.main_vitamins_fallback_text,
+        );
+        const vitaminBody =
+          vitaminFallbackText && !isSameAsTagList(vitaminFallbackText, vitaminTags, locale)
+            ? vitaminFallbackText
+            : vitaminTags.length === 0 && displayVitamins !== '-'
+              ? displayVitamins
+              : null;
+        const micronutrientsSection = resolveNutritionSectionBody(
+          'micronutrients',
+          analysisData.micronutrients,
+        );
+        const nutritionPointsSection = resolveNutritionSectionBody(
+          'nutrition_points',
+          analysisData.nutrition_points,
+        );
+        const recommendationsSection = resolveNutritionSectionBody(
+          'recommendations',
+          analysisData.recommendations,
+        );
+        const dietaryDetailsSection = resolveNutritionSectionBody(
+          'dietary_details',
+          analysisData.dietary_details,
+        );
+        const plateAnalysisSection = resolveNutritionSectionBody(
+          'plate_analysis',
+          analysisData.plate_analysis,
+        );
+        const estimatedCompositionSection = resolveNutritionSectionBody(
+          'estimated_composition',
+          analysisData.estimated_composition,
+        );
+        const nutritionLongSections = [
+          longTextSection({
+            scanType: 'nutrition',
+            id: 'vitamins',
+            icon: 'vitamins',
+            themeMetricId: 'vitamins',
+            title: t('scan.nutrition.long_sections.vitamins'),
+            body:
+              vitaminsPremiumRenderState === 'unlocked'
+                ? vitaminBody
+                : resolvePremiumMetricValue({
+                    premiumRenderState: vitaminsPremiumRenderState,
+                    unlockedValue: displayVitamins,
+                    t,
+                  }),
+            tags: vitaminsPremiumRenderState === 'unlocked' ? vitaminTags : [],
+            premiumRenderState: vitaminsPremiumRenderState,
+            collapsedMaxLines: 4,
+          }),
+          longTextSection({
+            scanType: 'nutrition',
+            id: 'micronutrients',
+            icon: 'vitamins',
+            themeMetricId: 'vitamins',
+            title: t('scan.nutrition.long_sections.micronutrients'),
+            body: micronutrientsSection.body,
+            premiumRenderState: micronutrientsSection.nextPremiumRenderState,
+            collapsedMaxLines: 4,
+          }),
+          longTextSection({
+            scanType: 'nutrition',
+            id: 'nutrition-points',
+            icon: 'ingredients',
+            themeMetricId: 'ingredients',
+            title: t('scan.nutrition.long_sections.nutrition_points'),
+            body: nutritionPointsSection.body,
+            premiumRenderState: nutritionPointsSection.nextPremiumRenderState,
+            collapsedMaxLines: 4,
+          }),
+          longTextSection({
+            scanType: 'nutrition',
+            id: 'recommendations',
+            icon: 'verdict',
+            themeMetricId: 'verdict',
+            title: t('scan.nutrition.long_sections.recommendations'),
+            body: recommendationsSection.body,
+            premiumRenderState: recommendationsSection.nextPremiumRenderState,
+            collapsedMaxLines: 4,
+          }),
+          longTextSection({
+            scanType: 'nutrition',
+            id: 'dietary-details',
+            icon: 'ingredients',
+            themeMetricId: 'ingredients',
+            title: t('scan.nutrition.long_sections.dietary_details'),
+            body: dietaryDetailsSection.body,
+            premiumRenderState: dietaryDetailsSection.nextPremiumRenderState,
+            collapsedMaxLines: 4,
+          }),
+          longTextSection({
+            scanType: 'nutrition',
+            id: 'plate-analysis',
+            icon: 'nutrition',
+            themeMetricId: 'satiety',
+            title: t('scan.nutrition.long_sections.plate_analysis'),
+            body: plateAnalysisSection.body,
+            premiumRenderState: plateAnalysisSection.nextPremiumRenderState,
+            collapsedMaxLines: 5,
+          }),
+          longTextSection({
+            scanType: 'nutrition',
+            id: 'estimated-composition',
+            icon: 'calories',
+            themeMetricId: 'calories',
+            title: t('scan.nutrition.long_sections.estimated_composition'),
+            body: estimatedCompositionSection.body,
+            premiumRenderState: estimatedCompositionSection.nextPremiumRenderState,
+            collapsedMaxLines: 4,
+          }),
+        ].filter(
+          (section): section is ResultLongTextSectionViewModel => section !== null,
+        );
+
+        return {
+        scanType: 'nutrition',
+        typeLabel: t('scan.nutrition.type_label'),
+        scoreLabel: t('scan.nutrition.score_label'),
+        score: safeGaugeScore(analysisData.plate_health_score),
+        analysisQualityLabel: resolveAnalysisQualityLabel({ analysisData, t }),
+        quickStats,
+        macros: {
+          title: t('scan.nutrition.macros_title'),
+          items: [
+            macroItem(
               'nutrition',
-              'glycemic',
-              t('common.metrics.glycemic_index'),
+              'proteins',
+              t('common.metrics.proteins'),
               resolvePremiumMetricValue({
-                premiumRenderState: nextPremiumRenderState,
-                unlockedValue: localizeQualitativeLevel(
-                  'glycemic_index',
-                  analysisData.glycemic_index_key,
-                t,
-                '-',
-                ),
+                premiumRenderState: proteinPremiumRenderState,
+                unlockedValue: formatGrams(analysisData.protein_grams, formatOptions),
                 t,
               }),
               'text',
               {
-                premiumRenderState: nextPremiumRenderState,
-                valueMaxLines: 2,
-                semanticValueKey: analysisData.glycemic_index_key,
+                premiumRenderState: proteinPremiumRenderState,
               },
-            );
-          })(),
-          (() => {
-            const nextPremiumRenderState = resolvePremiumMetricRenderState({
-              premiumRenderState,
-              scanType: 'nutrition',
-              fieldKey: 'main_vitamins',
-            });
-
-            return metric(
+            ),
+            macroItem(
               'nutrition',
-              'vitamins',
-              t('common.metrics.vitamins'),
+              'carbs',
+              t('common.metrics.carbs'),
               resolvePremiumMetricValue({
-                premiumRenderState: nextPremiumRenderState,
-                unlockedValue: localizeNutritionVitaminKeys(analysisData.main_vitamin_keys, t, {
-                  locale,
-                  emptyFallback: '-',
-                }),
+                premiumRenderState: carbsPremiumRenderState,
+                unlockedValue: formatGrams(analysisData.carbs_grams, formatOptions),
                 t,
               }),
               'text',
               {
-                premiumRenderState: nextPremiumRenderState,
-                valueMaxLines: 3,
+                premiumRenderState: carbsPremiumRenderState,
               },
-            );
-          })(),
-        ],
+            ),
+            macroItem(
+              'nutrition',
+              'fats',
+              t('common.metrics.fats'),
+              resolvePremiumMetricValue({
+                premiumRenderState: fatsPremiumRenderState,
+                unlockedValue: formatGrams(analysisData.fat_grams, formatOptions),
+                t,
+              }),
+              'text',
+              {
+                premiumRenderState: fatsPremiumRenderState,
+              },
+            ),
+          ],
+        },
+        metrics,
+        premiumMetrics,
+        nutritionLongSections,
       } satisfies ScanResultViewModel;
+      }
   }
 }
 
@@ -986,8 +1585,10 @@ function createFatDistributionPrimaryMetric(options: {
   id: FatDistributionPrimaryMetricViewModel['id'];
   label: string;
   rawValue: unknown;
+  t: TranslateFn;
   locale?: string | null;
-}) {
+  premiumRenderState: PremiumRenderState;
+}): FatDistributionPrimaryMetricViewModel | null {
   const numericValue = parseSafeNumber(options.rawValue);
 
   if (numericValue === null) {
@@ -997,7 +1598,12 @@ function createFatDistributionPrimaryMetric(options: {
   return {
     id: options.id,
     label: options.label,
-    value: formatPercentage(numericValue, { locale: options.locale }),
+    value: resolvePremiumMetricValue({
+      premiumRenderState: options.premiumRenderState,
+      unlockedValue: formatPercentage(numericValue, { locale: options.locale }),
+      t: options.t,
+    }),
+    premiumRenderState: options.premiumRenderState,
   } satisfies FatDistributionPrimaryMetricViewModel;
 }
 
@@ -1037,8 +1643,9 @@ export function buildFatDistributionSuperScanResultViewModel(options: {
   analysisData: FatDistributionScanResult;
   t: TranslateFn;
   locale?: string | null;
+  premiumRenderState?: PremiumRenderState;
 }) {
-  const { analysisData, t, locale } = options;
+  const { analysisData, t, locale, premiumRenderState = 'unlocked' } = options;
 
   return {
     kind: 'fat_distribution',
@@ -1048,19 +1655,25 @@ export function buildFatDistributionSuperScanResultViewModel(options: {
         id: 'body_fat',
         label: t('common.metrics.body_fat'),
         rawValue: analysisData.global_body_fat_estimate_percent,
+        t,
         locale,
+        premiumRenderState,
       }),
       createFatDistributionPrimaryMetric({
         id: 'facial_fat',
         label: t('common.metrics.facial_fat'),
         rawValue: analysisData.global_facial_fat_estimate_percent,
+        t,
         locale,
+        premiumRenderState,
       }),
       createFatDistributionPrimaryMetric({
         id: 'water_retention',
         label: t('common.metrics.water_retention'),
         rawValue: analysisData.global_water_retention_estimate_percent,
+        t,
         locale,
+        premiumRenderState,
       }),
     ].filter(
       (

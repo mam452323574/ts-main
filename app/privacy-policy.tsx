@@ -1,11 +1,13 @@
 import { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
-import { ChevronLeft } from 'lucide-react-native';
+import { AppScreen } from '@/components/AppScreen';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { Surface } from '@/components/Surface';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { SIZES, SPACING, FONT_WEIGHTS } from '@/constants/theme';
+import { BORDER_RADIUS, SIZES, SPACING, FONT_WEIGHTS } from '@/constants/theme';
 import { getPrivacyPolicyContent } from '@/constants/privacyPolicy';
 
 export default function PrivacyPolicyScreen() {
@@ -17,26 +19,17 @@ export default function PrivacyPolicyScreen() {
   const policy = useMemo(() => getPrivacyPolicyContent(locale), [locale]);
 
   return (
-    <View style={styles.container}>
+    <AppScreen topInset={false} bottomInset={false} style={styles.container}>
       <Stack.Screen options={{ title: t('settings.privacy_policy') }} />
 
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-          activeOpacity={0.8}
-        >
-          <ChevronLeft color={colors.primaryText} size={24} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('settings.privacy_policy')}</Text>
-      </View>
+      <ScreenHeader title={t('settings.privacy_policy')} onBack={() => router.back()} centered />
 
       <ScrollView
         style={styles.content}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.localeSection}>
+        <Surface variant="raised" style={styles.localeSection}>
           <View style={styles.localeBadge}>
             <Text style={styles.localeBadgeText}>{policy.label}</Text>
           </View>
@@ -59,11 +52,11 @@ export default function PrivacyPolicyScreen() {
               ))}
             </View>
           ))}
-        </View>
+        </Surface>
 
         <View style={styles.bottomSpacing} />
       </ScrollView>
-    </View>
+    </AppScreen>
   );
 }
 
@@ -71,25 +64,6 @@ const createStyles = (colors: any, insets: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: insets.top + SPACING.sm,
-    paddingBottom: SPACING.md,
-    paddingHorizontal: SPACING.page,
-    backgroundColor: colors.cardBackground,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.lightGray,
-  },
-  backButton: {
-    padding: SPACING.xs,
-    marginRight: SPACING.sm,
-  },
-  headerTitle: {
-    fontSize: SIZES.text18,
-    fontWeight: FONT_WEIGHTS.bold,
-    color: colors.primaryText,
   },
   content: {
     flex: 1,
@@ -106,22 +80,18 @@ const createStyles = (colors: any, insets: any) => StyleSheet.create({
     marginBottom: SPACING.md,
   },
   localeSection: {
-    padding: SPACING.lg,
-    borderRadius: 24,
-    backgroundColor: colors.cardBackground,
-    borderWidth: 1,
-    borderColor: colors.lightGray,
+    borderRadius: BORDER_RADIUS.xl,
   },
   localeBadge: {
     alignSelf: 'flex-start',
     borderRadius: 999,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryText,
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs,
     marginBottom: SPACING.md,
   },
   localeBadgeText: {
-    color: colors.white,
+    color: colors.background,
     fontSize: SIZES.text12,
     fontWeight: FONT_WEIGHTS.bold,
   },

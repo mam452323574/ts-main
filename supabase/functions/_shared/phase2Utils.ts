@@ -422,6 +422,22 @@ export async function sha256Hex(value: string) {
     .join('');
 }
 
+function normalizePayloadForHash(payload: Record<string, unknown>) {
+  if (!isRecord(payload.payload)) {
+    return payload;
+  }
+
+  const {
+    generated_at: _generatedAt,
+    ...stableInnerPayload
+  } = payload.payload;
+
+  return {
+    ...payload,
+    payload: stableInnerPayload,
+  };
+}
+
 export async function buildNormalizedPayloadHash(payload: Record<string, unknown>) {
-  return sha256Hex(stableStringify(payload));
+  return sha256Hex(stableStringify(normalizePayloadForHash(payload)));
 }

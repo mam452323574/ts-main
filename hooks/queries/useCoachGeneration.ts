@@ -11,20 +11,27 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { CoachServiceError, generateCoachGuidance } from '@/services/coach';
 import type {
+  CoachGenerationPromptType,
   CoachGuidanceResult,
   CoachPersonaKey,
-  CoachPromptType,
+  CoachQuestionKey,
+  ScanCoachIntent,
 } from '@/types';
 
 interface GenerateCoachGuidanceInput {
-  promptType: CoachPromptType;
+  promptType: CoachGenerationPromptType;
   personaKey: CoachPersonaKey;
+  questionKey?: CoachQuestionKey | null;
+  questionText?: string | null;
+  scanId?: string | null;
+  selectedScanId?: string | null;
+  scanIntent?: ScanCoachIntent | null;
   forceRefresh?: boolean;
 }
 
 export function useCoachGeneration() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, userProfile, refreshUserProfile } = useAuth();
   const { locale } = useLanguage();
 
   return useMutation<
@@ -32,21 +39,39 @@ export function useCoachGeneration() {
     CoachServiceError,
     GenerateCoachGuidanceInput
   >({
-    mutationFn: ({ promptType, personaKey, forceRefresh }) =>
+    mutationFn: ({
+      promptType,
+      personaKey,
+      questionKey,
+      questionText,
+      scanId,
+      selectedScanId,
+      scanIntent,
+      forceRefresh,
+    }) =>
       generateCoachGuidance({
         promptType,
         personaKey,
+        questionKey,
+        questionText,
+        scanId,
+        selectedScanId,
+        scanIntent,
         forceRefresh,
         locale,
+        coachProfileMemory: userProfile?.inferred_persona ?? null,
       }),
     onSuccess: async (data) => {
       if (data.quota) {
         queryClient.setQueryData(getCoachQuotaQueryKey(user?.id), data.quota);
       }
 
-      await queryClient.invalidateQueries({
-        queryKey: GROWTH_EXPERIENCE_QUERY_KEY(user?.id),
-      });
+      await Promise.all([
+        user ? refreshUserProfile() : Promise.resolve(),
+        queryClient.invalidateQueries({
+          queryKey: GROWTH_EXPERIENCE_QUERY_KEY(user?.id),
+        }),
+      ]);
     },
     onSettled: async () => {
       await Promise.all([

@@ -12,6 +12,19 @@ export const RESULT_METRIC_ICON_TOKENS = [
   'hydration',
   'photogenic',
   'skin_quality',
+  'skin_clarity',
+  'under_eye_shadow',
+  'under_eye_volume',
+  'eye_openness',
+  'complexion_redness',
+  'pore_visibility',
+  'skin_evenness',
+  'skin_radiance',
+  'lip_dryness',
+  'forehead_smoothness',
+  't_zone_oiliness',
+  'stress_level',
+  'sleep_quality',
   'glow',
   'collagen',
   'body_type',
@@ -66,6 +79,7 @@ export type ResultLucideIconName =
   | 'Droplets'
   | 'Dumbbell'
   | 'Egg'
+  | 'Eye'
   | 'Flame'
   | 'Gauge'
   | 'HeartPulse'
@@ -77,6 +91,7 @@ export type ResultLucideIconName =
   | 'Ruler'
   | 'Salad'
   | 'Scale'
+  | 'CircleDot'
   | 'ScanFace'
   | 'ShieldCheck'
   | 'ShieldQuestionMark'
@@ -116,6 +131,19 @@ export const RESULT_ICON_CATALOG: Record<ResultIconToken, ResultIconDescriptor> 
   hydration: lucide('Droplets'),
   photogenic: lucide('Camera'),
   skin_quality: lucide('Sparkle'),
+  skin_clarity: lucide('Sparkle'),
+  under_eye_shadow: lucide('MoonStar'),
+  under_eye_volume: lucide('Droplet'),
+  eye_openness: lucide('Eye'),
+  complexion_redness: lucide('ThermometerSun'),
+  pore_visibility: lucide('CircleDot'),
+  skin_evenness: lucide('ShieldCheck'),
+  skin_radiance: lucide('SunMedium'),
+  lip_dryness: lucide('Droplet'),
+  forehead_smoothness: lucide('Sparkle'),
+  t_zone_oiliness: lucide('Droplets'),
+  stress_level: lucide('HeartPulse'),
+  sleep_quality: lucide('MoonStar'),
   glow: lucide('SunMedium'),
   collagen: lucide('Orbit'),
   body_type: lucide('PersonStanding'),

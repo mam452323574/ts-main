@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet } from 'react-native';
 import { fireEvent, render } from '@testing-library/react-native';
 import { ConditionCard } from '@/components/ConditionCard';
+import { mixColors, withAlpha } from '@/constants/theme';
 
 const mockPush = jest.fn();
 const useWindowDimensionsSpy = jest.spyOn(
@@ -53,6 +54,10 @@ jest.mock('@/contexts/LanguageContext', () => ({
           'Premium unlocks the next-step guidance for this signal.',
         'condition_card.loading.explanation': 'Explanation is syncing.',
         'condition_card.loading.advice': 'Advice is syncing.',
+        'metric_card.blurred_text': '••••••',
+        'metric_card.loading_value': '...',
+        'metric_card.premium_label': 'PREMIUM',
+        'metric_card.loading_label': 'LOADING',
         'qualitative_levels.severity.moderate': 'Moderate',
         'scan.super.conditions.unknown.label': 'Unknown finding',
         'scan.super.categories.general': 'General',
@@ -155,6 +160,24 @@ describe('ConditionCard', () => {
     expect(getByText('General')).toBeTruthy();
   });
 
+  it('keeps condition severity as localized accents instead of a full-card wash', () => {
+    const { getByTestId } = render(
+      <ConditionCard condition={lockedCondition} premiumRenderState="locked" />,
+    );
+
+    const rootStyle = StyleSheet.flatten(
+      getByTestId('condition-card-root').props.style,
+    );
+    const probabilityStyle = StyleSheet.flatten(
+      getByTestId('condition-card-probability-card').props.style,
+    );
+
+    expect(rootStyle.backgroundColor).toBe(mixColors('#FFFFFF', '#FF9F2E', 0.022));
+    expect(rootStyle.borderColor).toBe(withAlpha('#FF9F2E', 0.06));
+    expect(probabilityStyle.backgroundColor).toBe(withAlpha('#FF9F2E', 0.065));
+    expect(probabilityStyle.borderColor).toBe(withAlpha('#FF9F2E', 0.13));
+  });
+
   it('maps category badges to the centralized icon catalog, including fallback and custom categories', () => {
     const { getByTestId, rerender } = render(
       <ConditionCard condition={lockedCondition} premiumRenderState="locked" />,
@@ -185,6 +208,9 @@ describe('ConditionCard', () => {
     expect(getByTestId('condition-card-unlock-advice')).toBeTruthy();
     expect(getByText('Premium adds the full explanation behind this signal.')).toBeTruthy();
     expect(getByText('Premium unlocks the next-step guidance for this signal.')).toBeTruthy();
+    expect(queryByText('85%')).toBeNull();
+    expect(getByText('••••••')).toBeTruthy();
+    expect(getByText('PREMIUM')).toBeTruthy();
     expect(queryByText('Premium explanation kept behind the lock.')).toBeNull();
     expect(queryByText('Premium advice kept behind the lock.')).toBeNull();
   });
@@ -273,7 +299,7 @@ describe('ConditionCard', () => {
 
     expect(getByTestId('condition-card-probability-label').props.numberOfLines).toBe(2);
     expect(probabilityCardStyle.alignSelf).toBe('flex-start');
-    expect(probabilityCardStyle.borderRadius).toBe(16);
+    expect(probabilityCardStyle.borderRadius).toBe(18);
     expect(probabilityValueStyle.fontSize).toBe(24);
   });
 });

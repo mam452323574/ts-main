@@ -9,6 +9,7 @@ import {
   INVALID_COACH_RESPONSE_ERROR_CODE,
   resolveCoachPayload,
 } from '../_shared/coachPayload.ts';
+import { applyCoachProfileUpdatesForEntry } from '../_shared/coachProfileMemory.ts';
 import {
   COACH_GENERATE_RESPONSE_WEBHOOK_TIMEOUT_MS,
   COACH_RESPONSE_TOO_LARGE_ERROR_CODE,
@@ -45,6 +46,12 @@ import {
   readOptionalString,
 } from '../_shared/phase2Utils.ts';
 import { getDefaultCoachDisclaimer } from '../../../shared/coachCopy.ts';
+import {
+  normalizeCoachQuestionKey,
+  normalizeCoachQuestionText,
+  resolveCoachQuestionSelection,
+} from '../../../shared/coachQuestions.ts';
+import { normalizeCoachGenerationPromptType } from '../../../shared/coachPromptTypes.ts';
 import type {
   CoachGenerateRequest,
   CoachGenerateResponse,
@@ -62,18 +69,9 @@ interface EdgeRuntimeLike {
   waitUntil?: (promise: Promise<unknown>) => void;
 }
 
-const COACH_PROMPT_TYPE_VALUES = [
-  'latest_scan',
-  'weekly_plan',
-  'recovery_plan',
-  'nutrition_focus',
-  'body_focus',
-  'face_focus',
-  'hydration_focus',
-  'sleep_coach',
-  'risk_watch',
-  'trend_review',
-] as const;
+type CoachPromptTypeValue = NonNullable<
+  ReturnType<typeof normalizeCoachGenerationPromptType>
+>;
 
 export const COACH_GENERATE_REQUEST_MAX_BYTES = 64 * 1024;
 
@@ -112,17 +110,16 @@ async function enforceCoachGenerationRateLimit(client: any, userId: string) {
   }
 }
 
-function readCoachPromptType(value: unknown): string | null {
-  return typeof value === 'string' &&
-    (COACH_PROMPT_TYPE_VALUES as readonly string[]).includes(value)
-    ? value
-    : null;
+function readCoachPromptType(value: unknown): CoachPromptTypeValue | null {
+  return normalizeCoachGenerationPromptType(value);
 }
 
 interface PendingCoachEntry {
   id: string;
   persona_key?: string | null;
   prompt_type?: string | null;
+  question_key?: string | null;
+  question_text?: string | null;
   response_version?: 1 | 2 | null;
   status?: Phase2CoachEntryStatus | null;
   title?: string | null;
@@ -149,6 +146,94 @@ interface RunPendingCoachGenerationTaskOptions {
   resolvedLocale: string | null;
   persona: ReturnType<typeof getCoachPersona>;
   webhookEndpoints: Awaited<ReturnType<typeof requireCoachGenerateWebhookEndpoints>>;
+}
+
+interface CoachWebhookInvalidResponseMetadata {
+  providerFailureKind: 'json_parse_failed' | 'agent_output_parse_failed';
+  providerFailureStage: 'n8n_chain_llm';
+  providerNodeType: string | null;
+  providerNodeName: string | null;
+}
+
+const COACH_INVALID_PROVIDER_RESPONSE_PATTERNS = [
+  /unterminated string in json/i,
+  /unexpected end of json input/i,
+  /json\.parse/i,
+  /failed to parse agent steps/i,
+] as const;
+
+const COACH_CHAIN_LLM_MARKERS = [
+  /@n8n\/n8n-nodes-langchain\.chainllm/i,
+  /chainllm\.node\.ts/i,
+  /chainllm/i,
+] as const;
+
+function buildCoachWebhookFailureHaystack(
+  webhookResult: Awaited<
+    ReturnType<typeof postCoachGenerateWebhook>
+  >['webhookResult'],
+) {
+  return [
+    webhookResult.rawText,
+    webhookResult.payload ? JSON.stringify(webhookResult.payload) : null,
+  ]
+    .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    .join('\n');
+}
+
+function extractCoachProviderNodeType(text: string) {
+  const labeledMatch = text.match(/Node type\s+([^\r\n]+)/i);
+  if (labeledMatch?.[1]) {
+    return labeledMatch[1].trim();
+  }
+
+  const inlineMatch = text.match(/(@n8n\/n8n-nodes-langchain\.chainLlm)/i);
+  return inlineMatch?.[1] ?? null;
+}
+
+function extractCoachProviderNodeName(text: string) {
+  const directMatch = text.match(/^\s*(Coach [^\r\n"]+?)\s*$/m);
+  if (directMatch?.[1]) {
+    return directMatch[1].trim();
+  }
+
+  const quotedMatch = text.match(/"([^"\r\n]*Coach [^"\r\n]+)"/i);
+  return quotedMatch?.[1]?.trim() ?? null;
+}
+
+function resolveInvalidCoachWebhookResponseMetadata(
+  webhookResult: Awaited<
+    ReturnType<typeof postCoachGenerateWebhook>
+  >['webhookResult'],
+): CoachWebhookInvalidResponseMetadata | null {
+  if (webhookResult.status < 500) {
+    return null;
+  }
+
+  const haystack = buildCoachWebhookFailureHaystack(webhookResult);
+  if (!haystack) {
+    return null;
+  }
+
+  const hasParseSignal = COACH_INVALID_PROVIDER_RESPONSE_PATTERNS.some((pattern) =>
+    pattern.test(haystack),
+  );
+  const hasChainSignal = COACH_CHAIN_LLM_MARKERS.some((pattern) =>
+    pattern.test(haystack),
+  );
+
+  if (!hasParseSignal || !hasChainSignal) {
+    return null;
+  }
+
+  return {
+    providerFailureKind: /failed to parse agent steps/i.test(haystack)
+      ? 'agent_output_parse_failed'
+      : 'json_parse_failed',
+    providerFailureStage: 'n8n_chain_llm',
+    providerNodeType: extractCoachProviderNodeType(haystack),
+    providerNodeName: extractCoachProviderNodeName(haystack),
+  };
 }
 
 function normalizeCoachLocale(locale?: string) {
@@ -248,6 +333,87 @@ async function attachCoachQuotaEventBestEffort(
   }
 }
 
+function resolveCoachBackgroundErrorCode(error: unknown) {
+  if (error instanceof Phase2HttpError) {
+    if (error.code === COACH_RESPONSE_TOO_LARGE_ERROR_CODE) {
+      return COACH_RESPONSE_TOO_LARGE_ERROR_CODE;
+    }
+
+    if (error.code === INVALID_COACH_RESPONSE_ERROR_CODE) {
+      return INVALID_COACH_RESPONSE_ERROR_CODE;
+    }
+
+    if (error.code) {
+      return error.code;
+    }
+
+    if (error.status === 502 || error.status === 503) {
+      return 'coach_webhook_failed';
+    }
+  }
+
+  return 'coach_generation_failed';
+}
+
+function buildCoachBackgroundErrorPayload(
+  error: unknown,
+  options: {
+    errorCode: string;
+    requestId: string;
+    usedFallback: boolean;
+  },
+) {
+  const errorRecord = isRecord(error) ? error : null;
+  const errorCode =
+    error instanceof Phase2HttpError
+      ? error.code
+      : readOptionalString(errorRecord?.code);
+  const errorStatus =
+    error instanceof Phase2HttpError
+      ? error.status
+      : typeof errorRecord?.status === 'number'
+        ? errorRecord.status
+        : undefined;
+
+  return summarizeProviderPayload(null, {
+    error_name:
+      error instanceof Error
+        ? error.name
+        : readOptionalString(errorRecord?.name) ?? undefined,
+    code: errorCode ?? undefined,
+    status: errorStatus,
+    error_code: options.errorCode,
+    fallback: options.usedFallback,
+    provider: 'n8n',
+    request_id: options.requestId,
+    source: 'coach_generation',
+  });
+}
+
+async function updateCoachEntryToError(
+  client: any,
+  entryId: string,
+  values: {
+    status: 'error';
+    error_code: string;
+    response_payload_json: Record<string, unknown>;
+  },
+) {
+  const { error } = await client
+    .from('coach_entries')
+    .update(values)
+    .eq('id', entryId);
+
+  if (error) {
+    throw createPhase2DatabaseError(error, {
+      contextLabel: 'Coach generation error finalization',
+      fallbackCode: 'coach_entry_error_finalize_failed',
+      fallbackMessage: 'Failed to mark the coach response as failed',
+      relationName: 'coach_entries',
+    });
+  }
+}
+
 export function buildCoachResponse(
   entry: any,
   cached: boolean,
@@ -256,14 +422,37 @@ export function buildCoachResponse(
   const fallbackDisclaimer = getDefaultCoachDisclaimer(
     typeof entry?.locale === 'string' ? entry.locale : null,
   );
-  const legacyPromptType = isRecord(entry?.request_payload_json)
-    ? readCoachPromptType(entry.request_payload_json.prompt_type)
+  const requestPayloadJson = isRecord(entry?.request_payload_json)
+    ? entry.request_payload_json
     : null;
+  const legacyPromptType = requestPayloadJson
+    ? readCoachPromptType(requestPayloadJson.prompt_type)
+    : null;
+  const promptType = readCoachPromptType(entry.prompt_type) ?? legacyPromptType;
   const responseVersion: 1 | 2 =
     entry?.response_version === 2 ? 2 : 1;
   const content = isRecord(entry?.content_json)
     ? (entry.content_json as Record<string, unknown>)
     : null;
+  const rawQuestionKey =
+    normalizeCoachQuestionKey(entry?.question_key) ??
+    (requestPayloadJson
+      ? normalizeCoachQuestionKey(requestPayloadJson.question_key)
+      : null);
+  const rawQuestionText =
+    normalizeCoachQuestionText(entry?.question_text) ??
+    normalizeCoachQuestionText(requestPayloadJson?.question_text);
+  const resolvedQuestionSelection = promptType
+    ? resolveCoachQuestionSelection({
+        promptType,
+        questionKey: rawQuestionKey,
+        questionText: rawQuestionText,
+        locale: typeof entry?.locale === 'string' ? entry.locale : null,
+      })
+    : {
+        questionKey: rawQuestionKey,
+        questionText: rawQuestionText,
+      };
 
   return {
     success: true,
@@ -272,7 +461,9 @@ export function buildCoachResponse(
     persona_key: isCoachPersonaKey(entry.persona_key)
       ? entry.persona_key
       : DEFAULT_COACH_PERSONA_KEY,
-    prompt_type: readCoachPromptType(entry.prompt_type) ?? legacyPromptType,
+    prompt_type: promptType,
+    question_key: resolvedQuestionSelection.questionKey ?? null,
+    question_text: resolvedQuestionSelection.questionText ?? null,
     response_version: responseVersion,
     status: (entry.status as Phase2CoachEntryStatus) ?? 'pending',
     title: typeof entry.title === 'string' ? entry.title : null,
@@ -357,7 +548,17 @@ export async function runPendingCoachGenerationTask(
   let webhookResult: Awaited<
     ReturnType<typeof postCoachGenerateWebhook>
   >['webhookResult'];
+  let terminalEntryWritten = false;
+  const markPendingEntryError = async (values: {
+    status: 'error';
+    error_code: string;
+    response_payload_json: Record<string, unknown>;
+  }) => {
+    await updateCoachEntryToError(client, pendingEntry.id, values);
+    terminalEntryWritten = true;
+  };
 
+  try {
   try {
     const webhookCall = await postCoachGenerateWebhook({
       endpoints: webhookEndpoints,
@@ -382,39 +583,29 @@ export async function runPendingCoachGenerationTask(
   } catch (error) {
     if (error instanceof Phase2HttpError) {
       if (error.code === COACH_RESPONSE_TOO_LARGE_ERROR_CODE) {
-        await client
-          .from('coach_entries')
-          .update({
-            status: 'error',
-            error_code: COACH_RESPONSE_TOO_LARGE_ERROR_CODE,
-            response_payload_json: summarizeProviderPayload(null, {
-              error_code: COACH_RESPONSE_TOO_LARGE_ERROR_CODE,
-              fallback: usedFallback,
-              provider: 'n8n',
-              request_id: requestId,
-              source: 'coach_generation',
-            }),
-          })
-          .eq('id', pendingEntry.id);
+        await markPendingEntryError({
+          status: 'error',
+          error_code: COACH_RESPONSE_TOO_LARGE_ERROR_CODE,
+          response_payload_json: buildCoachBackgroundErrorPayload(error, {
+            errorCode: COACH_RESPONSE_TOO_LARGE_ERROR_CODE,
+            usedFallback,
+            requestId,
+          }),
+        });
       }
 
       throw error;
     }
 
-    await client
-      .from('coach_entries')
-      .update({
-        status: 'error',
-        error_code: 'coach_webhook_unreachable',
-        response_payload_json: summarizeProviderPayload(null, {
-          error_code: 'coach_webhook_unreachable',
-          fallback: usedFallback,
-          provider: 'n8n',
-          request_id: requestId,
-          source: 'coach_generation',
-        }),
-      })
-      .eq('id', pendingEntry.id);
+    await markPendingEntryError({
+      status: 'error',
+      error_code: 'coach_webhook_unreachable',
+      response_payload_json: buildCoachBackgroundErrorPayload(error, {
+        errorCode: 'coach_webhook_unreachable',
+        usedFallback,
+        requestId,
+      }),
+    });
 
     throw new Phase2HttpError(
       502,
@@ -424,20 +615,39 @@ export async function runPendingCoachGenerationTask(
   }
 
   if (!webhookResult.ok) {
-    await client
-      .from('coach_entries')
-      .update({
-        status: 'error',
-        error_code: `coach_webhook_${webhookResult.status}`,
-        response_payload_json: summarizeWebhookResult(webhookResult, {
-          fallback: usedFallback,
-          provider: 'n8n',
-          request_id: requestId,
-          source: 'coach_generation',
-          error_code: `coach_webhook_${webhookResult.status}`,
+    const invalidResponseMetadata =
+      resolveInvalidCoachWebhookResponseMetadata(webhookResult);
+
+    if (invalidResponseMetadata) {
+      await markPendingEntryError(
+        buildInvalidCoachResponseEntryValues({
+          payload: webhookResult.payload,
+          usedFallback,
+          requestId,
+          webhookStatus: webhookResult.status,
+          responseBodyPresent: webhookResult.bodyPresent,
+          ...invalidResponseMetadata,
         }),
-      })
-      .eq('id', pendingEntry.id);
+      );
+
+      throw new Phase2HttpError(
+        502,
+        INVALID_COACH_RESPONSE_ERROR_CODE,
+        'Coach generation provider returned an invalid response',
+      );
+    }
+
+    await markPendingEntryError({
+      status: 'error',
+      error_code: `coach_webhook_${webhookResult.status}`,
+      response_payload_json: summarizeWebhookResult(webhookResult, {
+        fallback: usedFallback,
+        provider: 'n8n',
+        request_id: requestId,
+        source: 'coach_generation',
+        error_code: `coach_webhook_${webhookResult.status}`,
+      }),
+    });
 
     throw new Phase2HttpError(
       502,
@@ -454,17 +664,15 @@ export async function runPendingCoachGenerationTask(
       error instanceof Phase2HttpError &&
       error.code === INVALID_COACH_RESPONSE_ERROR_CODE
     ) {
-      await client
-        .from('coach_entries')
-        .update(
-          buildInvalidCoachResponseEntryValues({
-            payload: webhookResult.payload,
-            usedFallback,
-            requestId,
-            webhookStatus: webhookResult.status,
-          }),
-        )
-        .eq('id', pendingEntry.id);
+      await markPendingEntryError(
+        buildInvalidCoachResponseEntryValues({
+          payload: webhookResult.payload,
+          usedFallback,
+          requestId,
+          webhookStatus: webhookResult.status,
+          responseBodyPresent: webhookResult.bodyPresent,
+        }),
+      );
     }
 
     throw error;
@@ -500,6 +708,44 @@ export async function runPendingCoachGenerationTask(
       fallbackMessage: 'Failed to finalize coach response',
       relationName: 'coach_entries',
     });
+  }
+
+  terminalEntryWritten = true;
+
+  await applyCoachProfileUpdatesForEntry(client, {
+    id: finalEntry.id,
+    user_id: userId,
+    content_json: isRecord(finalEntry.content_json)
+      ? finalEntry.content_json
+      : null,
+  });
+  } catch (error) {
+    if (!terminalEntryWritten) {
+      const errorCode = resolveCoachBackgroundErrorCode(error);
+
+      try {
+        await markPendingEntryError({
+          status: 'error',
+          error_code: errorCode,
+          response_payload_json: buildCoachBackgroundErrorPayload(error, {
+            errorCode,
+            usedFallback,
+            requestId,
+          }),
+        });
+      } catch (markError) {
+        logPhase2Error(
+          '[coach-generate-response] Failed to mark pending entry as errored',
+          markError,
+          {
+            request_id: requestId,
+            entry_id: pendingEntry.id,
+          },
+        );
+      }
+    }
+
+    throw error;
   }
 }
 
@@ -645,6 +891,13 @@ export async function handleCoachGenerateResponseRequest(req: Request) {
       persona_key: requestBody.persona_key,
       prompt_type: readCoachPromptType(
         isRecord(requestBody.payload) ? requestBody.payload.prompt_type : null,
+      ),
+      question_key:
+        normalizeCoachQuestionKey(
+          isRecord(requestBody.payload) ? requestBody.payload.question_key : null,
+        ),
+      question_text: normalizeCoachQuestionText(
+        isRecord(requestBody.payload) ? requestBody.payload.question_text : null,
       ),
       response_version: 1,
       content_json: null,

@@ -6,6 +6,7 @@ export { AuthSelectCard } from './AuthSelectCard';
 export { AuthStepDots } from './AuthStepDots';
 export { AuthOTPInput } from './AuthOTPInput';
 export { OnboardingSlide } from './OnboardingSlide';
+export { OnboardingHeroStage } from './OnboardingHeroStage';
 export { PhoneMockup } from './PhoneMockup';
 export { AuthThemeVisual } from './AuthThemeVisual';
 export { useAuthPalette, buildAuthPalette } from './tokens';

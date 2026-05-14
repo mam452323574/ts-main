@@ -116,6 +116,99 @@ Deno.test('normalizeScanAnalysisLanguage supports the app languages with French 
   assertEquals(normalizeScanAnalysisLanguage('nl'), 'fr', 'Unsupported language should fall back to French');
 });
 
+Deno.test('resolveNormalizedScanAnalysisPayload preserves bounded qualitative fallback fields for standard scans', () => {
+  const faceResult = resolveNormalizedScanAnalysisPayload(
+    {
+      scan_type: 'face',
+      face_score: 81,
+      perceived_age: 29,
+      skin_quality_score: 74,
+      symmetry_percentage: 88,
+      fatigue_level: 18,
+      glow_index: 7,
+      face_shape: 'Oval\u0007',
+      face_shape_key: 'oval',
+      face_shape_fallback_text: 'Ovale',
+      collagen_level: 62,
+      hydration_level: 67,
+      photogenic_score: 8,
+    },
+    'face',
+  ) as Record<string, unknown>;
+
+  assertEquals(
+    faceResult.face_shape,
+    'Oval',
+    'Face shape text should be preserved after control-character sanitization',
+  );
+  assertEquals(
+    faceResult.face_shape_key,
+    'oval',
+    'Face shape key should be preserved for storage',
+  );
+  assertEquals(
+    faceResult.face_shape_fallback_text,
+    'Ovale',
+    'Face fallback text should be preserved for historical rendering',
+  );
+
+  const nutritionResult = resolveNormalizedScanAnalysisPayload(
+    {
+      scan_type: 'nutrition',
+      plate_health_score: 82,
+      calories_estimate: 640,
+      protein_grams: 31,
+      carbs_grams: 44,
+      fat_grams: 19,
+      verdict_key: 'energisant_mais_gras',
+      verdict_fallback_text: 'Chef\u0007 special',
+      glycemic_index_key: 'slow_release',
+      glycemic_index_label: 'Slow release',
+      glycemic_index_fallback_text: 'Slow release',
+      satiety_index: 8,
+      ingredient_quality_key: 'farm_fresh',
+      ingredient_quality: 'Farm fresh',
+      ingredient_quality_fallback_text: 'Farm fresh',
+      main_vitamin_keys: ['Vitamin B3', '', 'Omega 3'],
+      main_vitamins: 'Vitamin P',
+      main_vitamins_fallback_text: 'A'.repeat(2_500),
+      short_verdict: 'Balanced meal',
+    },
+    'nutrition',
+  ) as Record<string, unknown>;
+
+  assertEquals(
+    nutritionResult.verdict_fallback_text,
+    'Chef special',
+    'Verdict fallback text should be sanitized and preserved',
+  );
+  assertEquals(
+    nutritionResult.glycemic_index_fallback_text,
+    'Slow release',
+    'Glycemic fallback text should be preserved for storage',
+  );
+  assertEquals(
+    nutritionResult.ingredient_quality_fallback_text,
+    'Farm fresh',
+    'Ingredient quality fallback text should be preserved for storage',
+  );
+  assertEquals(
+    JSON.stringify(nutritionResult.main_vitamin_keys),
+    JSON.stringify(['Vitamin B3', 'Omega 3']),
+    'Vitamin key arrays should remain trimmed string arrays',
+  );
+  assertEquals(
+    nutritionResult.main_vitamins,
+    'Vitamin P',
+    'Vitamin display text should be preserved for fallback rendering',
+  );
+  assertEquals(
+    (nutritionResult.main_vitamins_fallback_text as string).length,
+    2_000,
+    'Long vitamin fallback text should be bounded before storage',
+  );
+});
+
 Deno.test('resolveNormalizedScanAnalysisPayload accepts partial but clearly new SuperScan payloads', () => {
   const result = resolveNormalizedScanAnalysisPayload(
     {

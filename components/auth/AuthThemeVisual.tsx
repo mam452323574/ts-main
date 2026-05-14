@@ -1,8 +1,11 @@
 import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Moon, Sun } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { withAlpha } from '@/constants/theme';
+import { useAuthPalette } from './tokens';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface AuthThemeVisualProps {
   theme: 'dark' | 'light';
@@ -14,24 +17,40 @@ interface AuthThemeVisualProps {
  * Factorise le pattern utilisé dans SignUpScreen et UsernameSetupScreen.
  */
 export function AuthThemeVisual({ theme, size = 56 }: AuthThemeVisualProps) {
-  const styles = useMemo(() => createStyles(size), [size]);
+  const palette = useAuthPalette();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(size, palette, colors), [size, palette, colors]);
 
   if (theme === 'dark') {
     return (
-      <View style={[styles.badge, styles.badgeDark]}>
-        <Moon color="#FFFFFF" size={size * 0.46} />
-      </View>
+      <LinearGradient
+        colors={[palette.surfaceStrong, palette.surface]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.badge, styles.badgeDark]}
+      >
+        <Moon color={palette.inverseText} size={size * 0.46} />
+      </LinearGradient>
     );
   }
 
   return (
-    <View style={[styles.badge, styles.badgeLight]}>
-      <Sun color="#1D1D1F" size={size * 0.46} />
-    </View>
+    <LinearGradient
+      colors={[withAlpha(colors.white, 0.98), palette.surface]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={[styles.badge, styles.badgeLight]}
+    >
+      <Sun color={colors.primaryText} size={size * 0.46} />
+    </LinearGradient>
   );
 }
 
-const createStyles = (size: number) =>
+const createStyles = (
+  size: number,
+  palette: ReturnType<typeof useAuthPalette>,
+  colors: any,
+) =>
   StyleSheet.create({
     badge: {
       width: size,
@@ -39,13 +58,12 @@ const createStyles = (size: number) =>
       borderRadius: size / 2,
       alignItems: 'center',
       justifyContent: 'center',
+      borderWidth: 1,
     },
     badgeDark: {
-      backgroundColor: '#0B0B0E',
+      borderColor: palette.heroBorder,
     },
     badgeLight: {
-      backgroundColor: '#F4F5F7',
-      borderWidth: 1,
-      borderColor: withAlpha('#000000', 0.06),
+      borderColor: withAlpha(colors.primaryText, 0.08),
     },
   });

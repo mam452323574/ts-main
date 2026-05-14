@@ -3,7 +3,14 @@ import type {
   CoachPersonaDefinition,
   CoachPersonaKey,
 } from '@/shared/coachPersonas';
-import type { CoachPromptType } from '@/shared/coachPromptTypes';
+import type {
+  CoachQuestionHints,
+  CoachQuestionKey,
+} from '@/shared/coachQuestions';
+import type {
+  CoachGenerationPromptType,
+  CoachPromptType,
+} from '@/shared/coachPromptTypes';
 import type {
   CoachConfidence,
   CoachMetricDirection,
@@ -13,9 +20,22 @@ import type {
   CoachResponseVersion,
   CoachStructuredContent,
 } from '@/shared/coachContent';
-
+import type {
+  CoachScanIntentPayload,
+  ScanCoachIntent,
+  ScanCoachIntentSeverity,
+} from '@/shared/scanCoachIntent';
 export type { CoachPersonaDefinition, CoachPersonaKey } from '@/shared/coachPersonas';
-export type { CoachPromptType } from '@/shared/coachPromptTypes';
+export type { CoachQuestionHints, CoachQuestionKey } from '@/shared/coachQuestions';
+export type {
+  CoachGenerationPromptType,
+  CoachPromptType,
+} from '@/shared/coachPromptTypes';
+export type {
+  CoachScanIntentPayload,
+  ScanCoachIntent,
+  ScanCoachIntentSeverity,
+} from '@/shared/scanCoachIntent';
 export type {
   CoachConfidence,
   CoachMetricDirection,
@@ -433,6 +453,7 @@ export interface ScanFaceResult extends NormalizedAnalysisBase {
   glow_index?: number | null;
   energy_score?: number | null;
   face_shape_key: ScanCatalogKey;
+  face_shape_fallback_text?: string | null;
   collagen_level: number;
   hydration_level: number;
   photogenic_score: number;
@@ -496,7 +517,9 @@ export interface ScanBodyResult extends NormalizedAnalysisBase {
   body_score: number;
   body_fat_percentage: number;
   muscle_mass_key: ScanCatalogKey;
+  muscle_mass_fallback_text?: string | null;
   body_type_key: ScanCatalogKey;
+  body_type_fallback_text?: string | null;
   posture_score: number;
   waist_estimation_cm: number;
   strength_index: number;
@@ -538,8 +561,50 @@ export interface LegacyScanNutritionResult {
   ingredient_quality_i18n?: unknown;
   main_vitamins?: LocalizedTextValue;
   main_vitamins_i18n?: unknown;
+  main_vitamin_keys?: ScanVitaminKey[];
+  main_vitamins_fallback_text?: string | null;
   short_verdict?: LocalizedTextValue;
   short_verdict_i18n?: unknown;
+  micronutrients?: LocalizedTextValue;
+  micronutrients_i18n?: unknown;
+  main_micronutrients?: LocalizedTextValue;
+  main_micronutrients_i18n?: unknown;
+  micronutrient_details?: LocalizedTextValue;
+  micronutrient_details_i18n?: unknown;
+  nutrition_points?: LocalizedTextValue;
+  nutrition_points_i18n?: unknown;
+  nutritional_points?: LocalizedTextValue;
+  nutritional_points_i18n?: unknown;
+  nutrition_highlights?: LocalizedTextValue;
+  nutrition_highlights_i18n?: unknown;
+  recommendations?: LocalizedTextValue;
+  recommendations_i18n?: unknown;
+  nutrition_recommendations?: LocalizedTextValue;
+  nutrition_recommendations_i18n?: unknown;
+  dietary_recommendations?: LocalizedTextValue;
+  dietary_recommendations_i18n?: unknown;
+  actionable_advice?: LocalizedTextValue;
+  actionable_advice_i18n?: unknown;
+  dietary_details?: LocalizedTextValue;
+  dietary_details_i18n?: unknown;
+  food_details?: LocalizedTextValue;
+  food_details_i18n?: unknown;
+  meal_details?: LocalizedTextValue;
+  meal_details_i18n?: unknown;
+  plate_analysis?: LocalizedTextValue;
+  plate_analysis_i18n?: unknown;
+  meal_analysis?: LocalizedTextValue;
+  meal_analysis_i18n?: unknown;
+  dish_analysis?: LocalizedTextValue;
+  dish_analysis_i18n?: unknown;
+  analysis_text?: LocalizedTextValue;
+  analysis_text_i18n?: unknown;
+  estimated_composition?: LocalizedTextValue;
+  estimated_composition_i18n?: unknown;
+  composition_estimated?: LocalizedTextValue;
+  composition_estimated_i18n?: unknown;
+  composition_details?: LocalizedTextValue;
+  composition_details_i18n?: unknown;
 }
 
 export interface LegacyNormalizedScanNutritionResult extends LegacyNormalizedAnalysisBase {
@@ -553,8 +618,10 @@ export interface LegacyNormalizedScanNutritionResult extends LegacyNormalizedAna
   verdict_key: ScanCatalogKey;
   verdict_fallback_text?: string | null;
   glycemic_index_key: ScanCatalogKey;
+  glycemic_index_fallback_text?: string | null;
   satiety_index: number;
   ingredient_quality_key: ScanCatalogKey;
+  ingredient_quality_fallback_text?: string | null;
   main_vitamin_keys: ScanVitaminKey[];
   main_vitamins_fallback_text?: string | null;
 }
@@ -568,10 +635,20 @@ export interface ScanNutritionResult extends NormalizedAnalysisBase {
   carbs_grams: number;
   fat_grams: number;
   verdict_key: ScanCatalogKey;
+  verdict_fallback_text?: string | null;
   glycemic_index_key: ScanCatalogKey;
+  glycemic_index_fallback_text?: string | null;
   satiety_index: number;
   ingredient_quality_key: ScanCatalogKey;
+  ingredient_quality_fallback_text?: string | null;
   main_vitamin_keys: ScanVitaminKey[];
+  main_vitamins_fallback_text?: string | null;
+  micronutrients?: string | null;
+  nutrition_points?: string | null;
+  recommendations?: string | null;
+  dietary_details?: string | null;
+  plate_analysis?: string | null;
+  estimated_composition?: string | null;
   fiber_grams_estimate?: number | null;
   sugar_grams_estimate?: number | null;
   processing_level_score?: number | null;
@@ -833,9 +910,18 @@ export interface CoachScanDigest {
   scan_id: string;
   scan_type: ScanType;
   captured_at: string;
-  normalized_scan_type: 'face' | 'body' | 'nutrition' | 'super_health_v2';
+  normalized_scan_type:
+    | 'face'
+    | 'body'
+    | 'nutrition'
+    | 'super_health_v2'
+    | 'fat_distribution_scan_v2';
   metrics: Record<string, unknown>;
 }
+
+export type CoachScanIntentSeverity = ScanCoachIntentSeverity;
+
+export type CoachScanIntent = ScanCoachIntent;
 
 export type CoachRelevantFlag =
   | 'has_recent_decline'
@@ -843,6 +929,8 @@ export type CoachRelevantFlag =
   | 'low_hydration'
   | 'high_fatigue'
   | 'high_body_fat'
+  | 'high_facial_fat'
+  | 'high_water_retention'
   | 'low_protein'
   | 'high_risk_scan'
   | 'urgent_attention_flag'
@@ -983,18 +1071,32 @@ export interface CoachSuperKeyMetrics {
   detected_conditions: DetectedCondition[];
 }
 
+export interface CoachFatDistributionKeyMetrics {
+  global_body_fat_estimate_percent: number | null;
+  global_facial_fat_estimate_percent: number | null;
+  global_water_retention_estimate_percent: number;
+  analysis_summary: string;
+  dominant_storage_pattern: string;
+  priority_zones: FatDistributionPriorityZone[];
+  area_count: number;
+}
+
 export type CoachKeyMetrics =
   | CoachFaceKeyMetrics
   | CoachBodyKeyMetrics
   | CoachNutritionKeyMetrics
-  | CoachSuperKeyMetrics;
+  | CoachSuperKeyMetrics
+  | CoachFatDistributionKeyMetrics;
 
 export interface CoachScanRichContext {
   scan_id: string;
   scan_type: ScanType;
   normalized_scan_type: CoachScanDigest['normalized_scan_type'];
   captured_at: string;
-  analysis_result_normalized: AnalysisResult | SuperScanResult;
+  analysis_result_normalized:
+    | AnalysisResult
+    | SuperScanResult
+    | FatDistributionScanResult;
   analysis_meta: ScanAnalysisMeta | null;
   key_metrics: CoachKeyMetrics;
   raw_fallback_fields: Record<string, unknown> | null;
@@ -1231,9 +1333,14 @@ export interface PersistedInferredPersona {
 
 export interface CoachGuidancePayload {
   payload_version: 2;
-  prompt_type: CoachPromptType;
+  prompt_type: CoachGenerationPromptType;
+  question_key?: CoachQuestionKey | null;
+  question_text?: string | null;
+  question_hints?: CoachQuestionHints | null;
   generated_at: string;
   scan_count_7d: number;
+  selected_scan_id?: string | null;
+  scan_intent?: CoachScanIntentPayload | null;
   selected_scan: CoachScanDigest | null;
   recent_scans: CoachScanDigest[];
   by_type?: Partial<Record<ScanType, CoachScanDigest | null>>;
@@ -1243,6 +1350,7 @@ export interface CoachGuidancePayload {
   comparison_to_previous: CoachComparisonToPrevious;
   trend_summary: CoachTrendSummary;
   inferred_persona: CoachInferredPersona | null;
+  coach_profile_memory: PersistedInferredPersona | null;
 }
 
 export interface SocialPost {
@@ -1326,7 +1434,9 @@ export interface CoachEntry {
   disclaimer: string;
   persona_key: CoachPersonaKey;
   has_valid_persona?: boolean;
-  prompt_type?: CoachPromptType | null;
+  prompt_type?: CoachGenerationPromptType | null;
+  question_key?: CoachQuestionKey | null;
+  question_text?: string | null;
   response_version?: CoachResponseVersion | null;
   content?: CoachStructuredContent | null;
   cta_label: string | null;
@@ -1633,7 +1743,9 @@ export interface CoachGenerateResponse {
   cached: boolean;
   entry_id: string;
   persona_key: CoachPersonaKey;
-  prompt_type: CoachPromptType | null;
+  prompt_type: CoachGenerationPromptType | null;
+  question_key?: CoachQuestionKey | null;
+  question_text?: string | null;
   response_version: CoachResponseVersion;
   status: CoachEntryStatus;
   title: string | null;

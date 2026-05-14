@@ -9,11 +9,10 @@ import {
 } from 'react-native';
 import {
   Flag,
+  Ellipsis,
   Heart,
   MessageCircle,
   Share2,
-  ThumbsDown,
-  Trash2,
 } from 'lucide-react-native';
 
 import { SocialCategoryPill } from './SocialCategoryPill';
@@ -25,7 +24,6 @@ import { useTheme } from '@/contexts/ThemeContext';
 import {
   BORDER_RADIUS,
   FONT_WEIGHTS,
-  SHADOWS,
   SIZES,
   SPACING,
   withAlpha,
@@ -43,11 +41,12 @@ interface SocialPostCardProps {
   onPress?: (() => void) | null;
   onAvatarPress?: (() => void) | null;
   onLikePress: () => void;
-  onDislikePress: () => void;
+  onDislikePress?: () => void;
   onCommentPress: () => void;
   onDeletePress?: (() => void) | null;
-  onReportPress: () => void;
+  onReportPress?: (() => void) | null;
   onSharePress?: (() => void) | null;
+  onMorePress?: (() => void) | null;
 }
 
 export function SocialPostCard({
@@ -55,19 +54,19 @@ export function SocialPostCard({
   currentUserId,
   commentsEnabled = true,
   reactionsDisabled = false,
-  deleteDisabled = false,
   onPress,
   onAvatarPress,
   onLikePress,
-  onDislikePress,
   onCommentPress,
-  onDeletePress,
-  onReportPress,
   onSharePress,
+  onMorePress,
 }: SocialPostCardProps) {
-  const { colors } = useTheme();
+  const { colors, isDark = false } = useTheme();
   const { t } = useLanguage();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const styles = useMemo(
+    () => createStyles(colors, Boolean(isDark)),
+    [colors, isDark],
+  );
   const isOwnPost = currentUserId === post.author_id;
   const canReactToPost =
     post.moderation_status === 'approved' ||
@@ -82,6 +81,7 @@ export function SocialPostCard({
     () => normalizeTrustedImageUri(post.image_url),
     [post.image_url],
   );
+  const shouldShowMoreButton = !!onMorePress;
 
   return (
     <Pressable
@@ -98,7 +98,23 @@ export function SocialPostCard({
           meta={createdLabel}
           onAvatarPress={onAvatarPress}
           testID={`social-post-identity-${post.id}`}
-          trailing={<SocialCategoryPill category={post.category} />}
+          trailing={
+            <View style={styles.trailingActions}>
+              <SocialCategoryPill category={post.category} compact />
+              {shouldShowMoreButton ? (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={t('social.actions.more')}
+                  hitSlop={8}
+                  onPress={onMorePress}
+                  style={styles.moreButton}
+                  testID={`social-post-more-${post.id}`}
+                >
+                  <Ellipsis color={colors.primaryText} size={20} />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          }
         />
       </View>
 
@@ -113,7 +129,12 @@ export function SocialPostCard({
       ) : null}
 
       {safeImageUri ? (
-        <Pressable disabled={!onPress} onPress={onPress ?? undefined} style={styles.imageWrap}>
+        <Pressable
+          disabled={!onPress}
+          onPress={onPress ?? undefined}
+          style={styles.imageWrap}
+          testID={`social-post-image-wrap-${post.id}`}
+        >
           <Image
             source={{ uri: safeImageUri }}
             resizeMode="cover"
@@ -123,48 +144,33 @@ export function SocialPostCard({
         </Pressable>
       ) : null}
 
-      <View style={styles.actions}>
+      <View style={styles.actionBar}>
         <TouchableOpacity
           accessibilityRole="button"
+          accessibilityLabel={t('social.actions.like')}
+          accessibilityState={{
+            disabled: reactionsAreDisabled,
+            selected: post.viewer_reaction === 'like',
+          }}
           disabled={reactionsAreDisabled}
           onPress={onLikePress}
-          style={[
-            styles.actionButton,
-            reactionsAreDisabled ? styles.actionButtonDisabled : null,
-          ]}
+          style={[styles.iconAction, reactionsAreDisabled && styles.actionButtonDisabled]}
           testID={`social-post-like-${post.id}`}
         >
           <Heart
             color={post.viewer_reaction === 'like' ? colors.error : colors.primaryText}
+            fill={post.viewer_reaction === 'like' ? colors.error : 'transparent'}
             size={18}
           />
           <Text style={styles.actionLabel}>{post.like_count}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          accessibilityRole="button"
-          disabled={reactionsAreDisabled}
-          onPress={onDislikePress}
-          style={[
-            styles.actionButton,
-            reactionsAreDisabled ? styles.actionButtonDisabled : null,
-          ]}
-          testID={`social-post-dislike-${post.id}`}
-        >
-          <ThumbsDown
-            color={
-              post.viewer_reaction === 'dislike' ? colors.warning : colors.primaryText
-            }
-            size={18}
-          />
-          <Text style={styles.actionLabel}>{post.dislike_count}</Text>
-        </TouchableOpacity>
-
         {commentsEnabled ? (
           <TouchableOpacity
             accessibilityRole="button"
+            accessibilityLabel={t('social.actions.comment')}
             onPress={onCommentPress}
-            style={styles.actionButton}
+            style={styles.iconAction}
             testID={`social-post-comment-${post.id}`}
           >
             <MessageCircle color={colors.primaryText} size={18} />
@@ -175,104 +181,133 @@ export function SocialPostCard({
         {onSharePress && post.asset_url ? (
           <TouchableOpacity
             accessibilityRole="button"
+            accessibilityLabel={t('social.actions.share_short')}
             onPress={onSharePress}
-            style={styles.actionButton}
+            style={styles.iconAction}
             testID={`social-post-share-${post.id}`}
           >
             <Share2 color={colors.primaryText} size={18} />
-            <Text style={styles.actionLabel}>{t('social.actions.share')}</Text>
+            <Text style={styles.actionLabel}>{t('social.actions.share_short')}</Text>
           </TouchableOpacity>
         ) : null}
 
-        {isOwnPost && onDeletePress ? (
-          <TouchableOpacity
-            accessibilityRole="button"
-            disabled={deleteDisabled}
-            onPress={onDeletePress}
-            style={[
-              styles.actionButton,
-              deleteDisabled ? styles.actionButtonDisabled : null,
-            ]}
-            testID={`social-post-delete-${post.id}`}
-          >
-            <Trash2 color={colors.error} size={18} />
-            <Text style={[styles.actionLabel, styles.dangerActionLabel]}>
-              {deleteDisabled
-                ? t('social.actions.deleting')
-                : t('social.actions.delete')}
+        {post.viewer_reaction === 'dislike' ? (
+          <View style={styles.feedbackBadge} testID={`social-post-disliked-${post.id}`}>
+            <Flag color={colors.warning} size={14} />
+            <Text style={styles.feedbackBadgeLabel}>
+              {t('social.actions.not_interested_applied')}
             </Text>
-          </TouchableOpacity>
-        ) : null}
-
-        {!isOwnPost ? (
-          <TouchableOpacity
-            accessibilityRole="button"
-            onPress={onReportPress}
-            style={styles.actionButton}
-            testID={`social-post-report-${post.id}`}
-          >
-            <Flag color={colors.primaryText} size={18} />
-            <Text style={styles.actionLabel}>{t('social.actions.report')}</Text>
-          </TouchableOpacity>
+          </View>
         ) : null}
       </View>
     </Pressable>
   );
 }
 
-const createStyles = (colors: any) =>
-  StyleSheet.create({
+const createStyles = (colors: any, isDark: boolean) => {
+  const neutralBorder = colors.borderSubtle ?? withAlpha(colors.primaryText, isDark ? 0.12 : 0.08);
+  const neutralMutedSurface =
+    colors.surfaceMuted ?? withAlpha(colors.primaryText, isDark ? 0.1 : 0.04);
+
+  return StyleSheet.create({
     card: {
-      borderRadius: BORDER_RADIUS.xl,
+      marginHorizontal: SPACING.page,
+      paddingVertical: SPACING.md,
+      gap: SPACING.md,
+      borderRadius: BORDER_RADIUS.card,
       backgroundColor: colors.cardBackground,
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
-      padding: SPACING.lg,
-      gap: SPACING.md,
-      ...SHADOWS.card,
+      borderColor: neutralBorder,
+      shadowColor: 'transparent',
+      shadowOpacity: 0,
+      shadowRadius: 0,
+      shadowOffset: { width: 0, height: 0 },
+      elevation: 0,
     },
     header: {
+      paddingHorizontal: SPACING.lg,
       alignItems: 'stretch',
     },
     badgeRow: {
-      marginTop: -4,
+      marginTop: -2,
+      paddingHorizontal: SPACING.lg,
     },
     caption: {
+      paddingHorizontal: SPACING.lg,
       fontSize: SIZES.text16,
-      lineHeight: 24,
+      lineHeight: 23,
       color: colors.primaryText,
     },
     imageWrap: {
+      marginHorizontal: SPACING.sm,
       borderRadius: BORDER_RADIUS.lg,
       overflow: 'hidden',
+      backgroundColor: neutralMutedSurface,
+      borderWidth: 1,
+      borderColor: neutralBorder,
     },
     postImage: {
       width: '100%',
       aspectRatio: 4 / 5,
-      backgroundColor: withAlpha(colors.primaryText, 0.04),
+      backgroundColor: neutralMutedSurface,
     },
-    actions: {
+    actionBar: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: SPACING.md,
+      gap: SPACING.lg,
       alignItems: 'center',
+      paddingHorizontal: SPACING.lg,
     },
-    actionButton: {
+    iconAction: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: SPACING.xs,
+      minHeight: 32,
+      paddingVertical: 2,
     },
     actionButtonDisabled: {
       opacity: 0.45,
     },
     actionLabel: {
       fontSize: SIZES.text14,
-      fontWeight: FONT_WEIGHTS.semiBold,
+      fontWeight: FONT_WEIGHTS.medium,
       color: colors.primaryText,
     },
     dangerActionLabel: {
       color: colors.error,
     },
+    trailingActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+    },
+    moreButton: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: neutralMutedSurface,
+      borderWidth: 1,
+      borderColor: neutralBorder,
+    },
+    feedbackBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.xs,
+      minHeight: 30,
+      paddingHorizontal: SPACING.sm,
+      borderRadius: BORDER_RADIUS.full,
+      backgroundColor: withAlpha(colors.warning, 0.12),
+      borderWidth: 1,
+      borderColor: withAlpha(colors.warning, 0.24),
+    },
+    feedbackBadgeLabel: {
+      fontSize: SIZES.text12,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      color: colors.warning,
+    },
   });
+};
 
 export default SocialPostCard;

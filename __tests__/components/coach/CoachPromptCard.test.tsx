@@ -6,12 +6,11 @@ import { CoachPromptCard } from '@/components/coach/CoachPromptCard';
 import {
   DARK_COLORS,
   LIGHT_COLORS,
-  mixColors,
+  SPACING,
   withAlpha,
 } from '@/constants/theme';
 import {
   getCoachPromptPalette,
-  getCoachPromptVisual,
 } from '@/shared/coachPromptVisuals';
 import type { CoachPromptType } from '@/types';
 
@@ -30,23 +29,23 @@ const PROMPT_CASES: ReadonlyArray<{
 }> = [
   {
     promptType: 'latest_scan',
-    accentColor: '#6CA7FF',
+    accentColor: '#7FA9D4',
   },
   {
     promptType: 'weekly_plan',
-    accentColor: '#FFB85C',
+    accentColor: '#C99A64',
   },
   {
     promptType: 'nutrition_focus',
-    accentColor: '#53C6BB',
+    accentColor: '#72AFA8',
   },
   {
     promptType: 'body_focus',
-    accentColor: '#88A7FF',
+    accentColor: '#8D9EC8',
   },
   {
     promptType: 'face_focus',
-    accentColor: '#FF8F8B',
+    accentColor: '#D98B86',
   },
 ];
 
@@ -81,7 +80,7 @@ describe('CoachPromptCard', () => {
         screen.getByTestId(`${testID}-accent`).props.style,
       );
 
-      expect(accentStyle.backgroundColor).toBe(withAlpha(accentColor, 0.72));
+      expect(accentStyle.backgroundColor).toBe(withAlpha(accentColor, 0.46));
       expect(screen.getByText(`Title ${promptType}`)).toBeTruthy();
       expect(screen.getByText(`Subtitle ${promptType}`)).toBeTruthy();
     },
@@ -145,10 +144,29 @@ describe('CoachPromptCard', () => {
       />,
     );
 
+    const selectorArtworkFrame = screen.getByTestId(
+      'coach-prompt-selector-subtitle-artwork-frame',
+    );
+    const selectorArtwork = screen.getByTestId(
+      'coach-prompt-selector-subtitle-artwork',
+    );
+    const selectorArtworkFrameStyle = StyleSheet.flatten(
+      selectorArtworkFrame.props.style,
+    );
+    const selectorArtworkStyle = StyleSheet.flatten(selectorArtwork.props.style);
+
     expect(screen.getByText("Today's priority")).toBeTruthy();
     expect(
       screen.getByText('What should I adjust first after my latest scan?'),
     ).toBeTruthy();
+    expect(selectorArtworkFrame).toBeTruthy();
+    expect(selectorArtworkFrameStyle.marginTop).toBe(-(SPACING.sm + 2));
+    expect(selectorArtworkFrameStyle.marginHorizontal).toBe(-SPACING.md);
+    expect(selectorArtworkFrameStyle.borderWidth).toBe(0);
+    expect(selectorArtworkFrameStyle.backgroundColor).toBeUndefined();
+    expect(selectorArtworkFrameStyle.height).toBe(142);
+    expect(selectorArtwork).toBeTruthy();
+    expect(selectorArtworkStyle.transform).toEqual([{ scale: 1.06 }]);
     expect(screen.queryByTestId('coach-prompt-selector-subtitle-chevron')).toBeNull();
   });
 
@@ -166,6 +184,7 @@ describe('CoachPromptCard', () => {
     );
 
     expect(screen.getByTestId('coach-prompt-selector')).toBeTruthy();
+    expect(screen.getByTestId('coach-prompt-selector-artwork')).toBeTruthy();
     expect(screen.getByTestId('coach-prompt-selector-icon')).toBeTruthy();
     expect(screen.getByTestId('coach-prompt-selector-selected-badge')).toBeTruthy();
     expect(screen.getByTestId('coach-prompt-selector-selected-icon')).toBeTruthy();
@@ -180,14 +199,44 @@ describe('CoachPromptCard', () => {
     });
   });
 
+  it('keeps selector artwork visible under premium lock chrome', () => {
+    render(
+      <CoachPromptCard
+        promptType="weekly_plan"
+        title="Weekly plan"
+        subtitle="Build a simple seven-day rhythm."
+        onPress={jest.fn()}
+        mode="selector"
+        locked
+        lockedBadgeLabel="Premium"
+        lockedHint="Tap to unlock"
+        testID="coach-prompt-selector-locked"
+      />,
+    );
+
+    const lockedArtworkFrame = screen.getByTestId(
+      'coach-prompt-selector-locked-artwork-frame',
+    );
+    const lockedArtworkFrameStyle = StyleSheet.flatten(
+      lockedArtworkFrame.props.style,
+    );
+
+    expect(screen.getByTestId('coach-prompt-selector-locked-artwork')).toBeTruthy();
+    expect(lockedArtworkFrameStyle.marginTop).toBe(-(SPACING.sm + 2));
+    expect(lockedArtworkFrameStyle.marginHorizontal).toBe(-SPACING.md);
+    expect(lockedArtworkFrameStyle.borderWidth).toBe(0);
+    expect(lockedArtworkFrameStyle.backgroundColor).toBeUndefined();
+    expect(lockedArtworkFrameStyle.height).toBe(154);
+    expect(screen.getByTestId('coach-prompt-selector-locked-lock-scrim')).toBeTruthy();
+    expect(screen.getByTestId('coach-prompt-selector-locked-lock-badge')).toBeTruthy();
+    expect(screen.getByText('Premium')).toBeTruthy();
+  });
+
   it('uses stronger selector surfaces in light mode without washing out the icon', () => {
     mockThemeState.colors = LIGHT_COLORS;
     mockThemeState.isDark = false;
 
     const promptType: CoachPromptType = 'hydration_focus';
-    const accentColor = getCoachPromptVisual(promptType).accentColor;
-    const accentStrong = mixColors(accentColor, LIGHT_COLORS.primaryText, 0.42);
-
     const palette = getCoachPromptPalette(promptType, LIGHT_COLORS, false);
 
     const { rerender } = render(
@@ -208,31 +257,19 @@ describe('CoachPromptCard', () => {
     );
     const idleBackdrop = screen.getByTestId('coach-prompt-selector-light-backdrop');
 
-    expect(idleStyle.backgroundColor).toBe(
-      mixColors(LIGHT_COLORS.cardBackground, accentStrong, 0.16),
-    );
-    expect(idleStyle.borderColor).toBe(
-      mixColors(LIGHT_COLORS.borderSubtle, accentStrong, 0.44),
-    );
-    expect(palette.selectorPressedBackgroundColor).toBe(
-      mixColors(LIGHT_COLORS.cardBackground, accentStrong, 0.22),
-    );
-    expect(palette.selectorPressedBorderColor).toBe(
-      mixColors(LIGHT_COLORS.borderStrong, accentStrong, 0.54),
-    );
+    expect(screen.getByTestId('coach-prompt-selector-light-artwork')).toBeTruthy();
+    expect(idleStyle.backgroundColor).toBe(palette.selectorBackgroundColor);
+    expect(idleStyle.borderColor).toBe(palette.selectorBorderColor);
     expect(palette.selectorPressedBackgroundColor).not.toBe(
       palette.selectorBackgroundColor,
     );
     expect(idleIconStyle.backgroundColor).toBe(
-      mixColors(LIGHT_COLORS.cardBackground, accentStrong, 0.12),
+      palette.selectorIconBackgroundColor,
     );
     expect(
       screen.getByTestId('coach-prompt-selector-light-icon-glyph').props.color,
-    ).toBe(accentStrong);
-    expect(idleBackdrop.props.colors).toEqual([
-      withAlpha(accentStrong, 0.09),
-      withAlpha(accentStrong, 0.02),
-    ]);
+    ).toBe(palette.selectorIconColor);
+    expect(idleBackdrop.props.colors).toEqual(palette.selectorBackdropColors);
 
     rerender(
       <CoachPromptCard
@@ -258,29 +295,30 @@ describe('CoachPromptCard', () => {
     const selectedBackdrop = screen.getByTestId('coach-prompt-selector-light-backdrop');
 
     expect(selectedStyle.backgroundColor).toBe(
-      mixColors(LIGHT_COLORS.cardBackground, accentStrong, 0.28),
+      palette.selectorSelectedBackgroundColor,
     );
-    expect(selectedStyle.borderColor).toBe(
-      mixColors(LIGHT_COLORS.borderStrong, accentStrong, 0.62),
-    );
+    expect(selectedStyle.borderColor).toBe(palette.selectorSelectedBorderColor);
     expect(selectedIconStyle.backgroundColor).toBe(
-      mixColors(LIGHT_COLORS.cardBackground, accentStrong, 0.16),
+      palette.selectorSelectedIconBackgroundColor,
     );
-    expect(selectedBackdrop.props.colors).toEqual([
-      withAlpha(accentStrong, 0.14),
-      withAlpha(accentStrong, 0.03),
-    ]);
-    expect(selectedBadgeStyle.backgroundColor).toBe(accentStrong);
+    expect(selectedBackdrop.props.colors).toEqual(
+      palette.selectorSelectedBackdropColors,
+    );
+    expect(selectedBadgeStyle.backgroundColor).toBe(
+      palette.selectorSelectedBadgeColor,
+    );
     expect(selectedBadgeStyle.borderColor).toBe(
-      withAlpha(LIGHT_COLORS.cardBackground, 0.92),
+      palette.selectorSelectedBadgeBorderColor,
     );
     expect(
       screen.getByTestId('coach-prompt-selector-light-selected-icon').props.color,
     ).toBe(LIGHT_COLORS.white);
-    expect(getContrast(accentStrong, selectedIconStyle.backgroundColor)).toBeGreaterThanOrEqual(
-      3,
-    );
-    expect(getContrast(LIGHT_COLORS.white, accentStrong)).toBeGreaterThanOrEqual(4);
+    expect(
+      getContrast(palette.selectorIconColor, selectedIconStyle.backgroundColor),
+    ).toBeGreaterThanOrEqual(3);
+    expect(
+      getContrast(LIGHT_COLORS.white, palette.selectorSelectedBadgeColor),
+    ).toBeGreaterThanOrEqual(4);
   });
 });
 

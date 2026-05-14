@@ -77,6 +77,7 @@ jest.mock('@/supabase/functions/_shared/phase2Utils.ts', () => ({
 
 import { getCoachPersona } from '@/shared/coachPersonas';
 import {
+  buildCoachResponse,
   COACH_GENERATE_REQUEST_MAX_BYTES,
   handleCoachGenerateResponseRequest,
   runPendingCoachGenerationTask,
@@ -253,47 +254,174 @@ function createRequestClient(options: {
   };
 }
 
-function createWorkerClient() {
+function createWorkerClient(options: {
+  appliedEntryIds?: string[];
+  inferredPersona?: Record<string, unknown> | null;
+  updatedAt?: string;
+} = {}) {
   const updates: Array<{
     payload: Record<string, unknown>;
     columnName: string;
     value: string;
   }> = [];
+  const ledgerUpserts: Array<Record<string, unknown>> = [];
+  const ledgerDeletes: Array<{ columnName: string; value: string }> = [];
+  const userProfileUpdates: Array<{
+    payload: Record<string, unknown>;
+    expectedUpdatedAt: string | null;
+    matched: boolean;
+  }> = [];
+  const appliedEntryIds = new Set(options.appliedEntryIds ?? []);
+  let inferredPersona = options.inferredPersona ?? null;
+  let updatedAt = options.updatedAt ?? '2026-04-06T08:00:00.000Z';
 
   return {
     updates,
+    ledgerUpserts,
+    ledgerDeletes,
+    userProfileUpdates,
+    getPersistedPersona: () => inferredPersona,
     client: {
       from: jest.fn((tableName: string) => {
-        if (tableName !== 'coach_entries') {
-          throw new Error(`Unexpected table ${tableName}`);
+        if (tableName === 'coach_entries') {
+          return {
+            update: jest.fn((payload: Record<string, unknown>) => ({
+              eq: jest.fn((columnName: string, value: string) => {
+                updates.push({ payload, columnName, value });
+
+                if (payload.status === 'ready') {
+                  return {
+                    select: jest.fn(() => ({
+                      single: jest.fn().mockResolvedValue({
+                        data: {
+                          id: value,
+                          ...payload,
+                        },
+                        error: null,
+                      }),
+                    })),
+                  };
+                }
+
+                return Promise.resolve({
+                  data: null,
+                  error: null,
+                });
+              }),
+            })),
+          };
         }
 
-        return {
-          update: jest.fn((payload: Record<string, unknown>) => ({
-            eq: jest.fn((columnName: string, value: string) => {
-              updates.push({ payload, columnName, value });
+        if (tableName === 'coach_profile_update_applications') {
+          return {
+            upsert: jest.fn((payload: Record<string, unknown>) => ({
+              select: jest.fn(() => {
+                ledgerUpserts.push(payload);
+                const coachEntryId =
+                  typeof payload.coach_entry_id === 'string'
+                    ? payload.coach_entry_id
+                    : '';
+                const inserted = !appliedEntryIds.has(coachEntryId);
+                if (inserted) {
+                  appliedEntryIds.add(coachEntryId);
+                }
+                return Promise.resolve({
+                  data: inserted ? [{ coach_entry_id: coachEntryId }] : [],
+                  error: null,
+                });
+              }),
+            })),
+            delete: jest.fn(() => ({
+              eq: jest.fn((columnName: string, value: string) => {
+                ledgerDeletes.push({ columnName, value });
+                appliedEntryIds.delete(value);
+                return Promise.resolve({
+                  data: null,
+                  error: null,
+                });
+              }),
+            })),
+          };
+        }
 
-              if (payload.status === 'ready') {
-                return {
-                  select: jest.fn(() => ({
-                    single: jest.fn().mockResolvedValue({
-                      data: {
-                        id: value,
-                        ...payload,
-                      },
-                      error: null,
-                    }),
-                  })),
-                };
-              }
+        if (tableName === 'user_profiles') {
+          return {
+            select: jest.fn(() => {
+              const filters: {
+                eq: jest.Mock;
+                single: jest.Mock;
+                maybeSingle: jest.Mock;
+              } = {
+                eq: jest.fn(() => filters),
+                single: jest.fn().mockResolvedValue({
+                  data: {
+                    inferred_persona: inferredPersona,
+                    updated_at: updatedAt,
+                  },
+                  error: null,
+                }),
+                maybeSingle: jest.fn().mockResolvedValue({
+                  data: {
+                    inferred_persona: inferredPersona,
+                    updated_at: updatedAt,
+                  },
+                  error: null,
+                }),
+              };
 
-              return Promise.resolve({
-                data: null,
-                error: null,
-              });
+              return filters;
             }),
-          })),
-        };
+            update: jest.fn((payload: Record<string, unknown>) => {
+              let expectedUpdatedAt: string | null = null;
+              const filters: {
+                eq: jest.Mock;
+                select: jest.Mock;
+              } = {
+                eq: jest.fn((columnName: string, value: string) => {
+                  if (columnName === 'updated_at') {
+                    expectedUpdatedAt = value;
+                  }
+                  return filters;
+                }),
+                select: jest.fn(() => {
+                  const matched =
+                    expectedUpdatedAt === null || expectedUpdatedAt === updatedAt;
+                  userProfileUpdates.push({
+                    payload,
+                    expectedUpdatedAt,
+                    matched,
+                  });
+                  if (matched) {
+                    inferredPersona =
+                      (payload.inferred_persona as Record<string, unknown> | null) ??
+                      null;
+                    if (
+                      inferredPersona &&
+                      typeof inferredPersona.last_updated_at === 'string'
+                    ) {
+                      updatedAt = inferredPersona.last_updated_at;
+                    }
+                  }
+                  return Promise.resolve({
+                    data: matched
+                      ? [
+                          {
+                            inferred_persona: inferredPersona,
+                            updated_at: updatedAt,
+                          },
+                        ]
+                      : [],
+                    error: null,
+                  });
+                }),
+              };
+
+              return filters;
+            }),
+          };
+        }
+
+        throw new Error(`Unexpected table ${tableName}`);
       }),
     },
   };
@@ -336,6 +464,40 @@ describe('coach generate response handler', () => {
   afterAll(() => {
     (globalThis as typeof globalThis & { EdgeRuntime?: unknown }).EdgeRuntime =
       originalEdgeRuntime;
+  });
+
+  it('normalizes legacy trend prompt and question aliases when building the API response', () => {
+    const response = buildCoachResponse(
+      {
+        id: 'entry-legacy-trend',
+        persona_key: 'patient_calm',
+        prompt_type: 'trend_comparison',
+        question_key: 'trend_comparison__week_progress_review',
+        question_text: null,
+        response_version: 1,
+        status: 'ready',
+        title: 'Lecture de tendance',
+        body: 'On voit une tendance utile.',
+        disclaimer:
+          'Wellness guidance only. This is not a diagnosis or medical advice.',
+        cta_label: null,
+        cta_route: null,
+        content_json: null,
+        response_payload_json: {},
+        request_payload_json: {},
+        source: 'n8n',
+        expires_at: null,
+        locale: 'fr',
+      },
+      false,
+      null,
+    );
+
+    expect(response.prompt_type).toBe('trend_review');
+    expect(response.question_key).toBe('trend_review__week_progress_review');
+    expect(response.question_text).toBe(
+      "Dis-moi ce qui s'ameliore, ce qui bloque et quoi continuer cette semaine.",
+    );
   });
 
   it('returns pending immediately and schedules background processing for fresh generations', async () => {
@@ -466,6 +628,76 @@ describe('coach generate response handler', () => {
       expect.objectContaining({
         p_user_id: 'user-1',
         p_source: 'coach_cache',
+      }),
+    );
+  });
+
+  it('persists question_key and question_text on pending entries and returns them immediately', async () => {
+    const requestClient = createRequestClient({
+      pendingEntry: {
+        id: 'entry-question',
+        persona_key: 'gentle_supportive',
+        prompt_type: 'latest_scan',
+        question_key: 'latest_scan__three_simple_actions',
+        question_text:
+          "Quelles 3 actions simples auront le plus d'impact d'ici ce soir ?",
+        status: 'pending',
+        title: null,
+        body: null,
+        disclaimer:
+          'Wellness guidance only. This is not a diagnosis or medical advice.',
+        cta_label: null,
+        cta_route: null,
+        source: 'n8n',
+        expires_at: null,
+        response_payload_json: {},
+      },
+    });
+    mockParseCoachGenerateRequest.mockReturnValueOnce({
+      payload: {
+        payload_version: 2,
+        prompt_type: 'latest_scan',
+        latest_scan: { scan_id: 'scan-1' },
+        question_key: 'latest_scan__three_simple_actions',
+        question_text:
+          "Quelles 3 actions simples auront le plus d'impact d'ici ce soir ?",
+      },
+      persona_key: 'gentle_supportive',
+    });
+    mockCreateServiceRoleClient.mockReturnValue(requestClient);
+    mockPostCoachGenerateWebhook.mockReturnValue(new Promise(() => undefined));
+
+    const response = await handleCoachGenerateResponseRequest(
+      new Request('https://example.com/functions/v1/coach-generate-response', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer token-123',
+        },
+        body: JSON.stringify({ payload: { payload_version: 2 } }),
+      }),
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      entry_id: 'entry-question',
+      question_key: 'latest_scan__three_simple_actions',
+      question_text:
+        "Quelles 3 actions simples auront le plus d'impact d'ici ce soir ?",
+    });
+
+    const coachEntriesRelation = requestClient.from.mock.results
+      .filter((_, index) => requestClient.from.mock.calls[index]?.[0] === 'coach_entries')
+      .map((result) => result.value)
+      .find((relation) => relation?.upsert?.mock?.calls?.length > 0);
+
+    expect(coachEntriesRelation.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        question_key: 'latest_scan__three_simple_actions',
+        question_text:
+          "Quelles 3 actions simples auront le plus d'impact d'ici ce soir ?",
+      }),
+      expect.objectContaining({
+        onConflict: 'user_id,cache_key',
       }),
     );
   });
@@ -607,6 +839,81 @@ describe('coach generate response handler', () => {
     });
   });
 
+  it('applies ready-entry profile_updates only once per coach_entry id', async () => {
+    const { client, ledgerUpserts, userProfileUpdates, getPersistedPersona } =
+      createWorkerClient();
+
+    mockPostCoachGenerateWebhook.mockResolvedValue({
+      webhookResult: {
+        ok: true,
+        status: 200,
+        payload: {
+          title: 'Ready coach guidance',
+          body: 'Keep the plan simple this week.',
+          disclaimer:
+            'Wellness guidance only. This is not a diagnosis or medical advice.',
+          content: {
+            title: 'Ready coach guidance',
+            summary: 'Stay steady.',
+            context_notes: [],
+            priorities: [],
+            action_steps: [],
+            warnings: [],
+            encouragement: null,
+            primary_metric_delta: null,
+            data_gaps: [],
+            confidence: null,
+            profile_updates: {
+              detected_diet_signals: ['protein_focus'],
+              detected_strong_focus: 'nutrition',
+              suggested_goals: ['Hydration'],
+              suggested_persona_key: 'patient_calm',
+            },
+          },
+        },
+        bodyPresent: true,
+        rawText: '{"title":"Ready coach guidance"}',
+      },
+      usedFallback: false,
+      fallbackReason: null,
+    });
+
+    const taskOptions = {
+      cacheKey: 'cache-key-1',
+      client,
+      featureFlags: createFeatureFlags(),
+      inputHash: 'hash-1',
+      pendingEntry: {
+        id: 'entry-pending',
+      },
+      persona: getCoachPersona('gentle_supportive'),
+      requestBody: {
+        payload: { payload_version: 2 },
+        persona_key: 'gentle_supportive',
+      },
+      requestId: 'req-1',
+      resolvedLocale: 'fr',
+      userId: 'user-1',
+      webhookEndpoints: {
+        primaryUrl: 'https://primary.example/webhook',
+        fallbackUrl: null,
+      },
+    } as const;
+
+    await runPendingCoachGenerationTask(taskOptions);
+    await runPendingCoachGenerationTask(taskOptions);
+
+    expect(ledgerUpserts).toHaveLength(2);
+    expect(userProfileUpdates.filter((entry) => entry.matched)).toHaveLength(1);
+    expect(getPersistedPersona()).toMatchObject({
+      detected_diet_signals: ['protein_focus'],
+      detected_strong_focus: 'nutrition',
+      suggested_goals: ['Hydration'],
+      suggested_persona_key: 'patient_calm',
+      update_count: 1,
+    });
+  });
+
   it('marks the same pending entry as errored when the provider fails', async () => {
     const { client, updates } = createWorkerClient();
 
@@ -663,6 +970,66 @@ describe('coach generate response handler', () => {
           provider: 'n8n',
           source: 'coach_generation',
           error_code: 'coach_webhook_503',
+        }),
+      }),
+    });
+  });
+
+  it('marks the pending entry as errored when a Phase2 webhook setup error is thrown', async () => {
+    const Phase2HttpErrorModule = jest.requireActual(
+      '@/supabase/functions/_shared/phase2Errors',
+    ) as { Phase2HttpError: new (status: number, code: string, message: string) => Error };
+    const { client, updates } = createWorkerClient();
+
+    mockPostCoachGenerateWebhook.mockRejectedValue(
+      new Phase2HttpErrorModule.Phase2HttpError(
+        500,
+        'invalid_webhook_auth_configuration',
+        'Webhook auth is misconfigured',
+      ),
+    );
+
+    await expect(
+      runPendingCoachGenerationTask({
+        cacheKey: 'cache-key-1',
+        client,
+        featureFlags: createFeatureFlags(),
+        inputHash: 'hash-1',
+        pendingEntry: {
+          id: 'entry-pending',
+        },
+        persona: getCoachPersona('gentle_supportive'),
+        requestBody: {
+          payload: { payload_version: 2 },
+          persona_key: 'gentle_supportive',
+        },
+        requestId: 'req-1',
+        resolvedLocale: 'fr',
+        userId: 'user-1',
+        webhookEndpoints: {
+          primaryUrl: 'https://primary.example/webhook',
+          fallbackUrl: null,
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: 'invalid_webhook_auth_configuration',
+      status: 500,
+    });
+
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toMatchObject({
+      columnName: 'id',
+      value: 'entry-pending',
+      payload: expect.objectContaining({
+        status: 'error',
+        error_code: 'invalid_webhook_auth_configuration',
+        response_payload_json: expect.objectContaining({
+          request_id: 'req-1',
+          provider: 'n8n',
+          source: 'coach_generation',
+          error_code: 'invalid_webhook_auth_configuration',
+          code: 'invalid_webhook_auth_configuration',
+          status: 500,
         }),
       }),
     });
@@ -818,6 +1185,79 @@ describe('coach generate response handler', () => {
           provider: 'n8n',
           request_id: 'req-1',
           source: 'coach_generation',
+        }),
+      }),
+    });
+  });
+
+  it('stores n8n JSON parse-like 500 responses as invalid coach payloads with safe diagnostics', async () => {
+    const { client, updates } = createWorkerClient();
+
+    mockPostCoachGenerateWebhook.mockResolvedValue({
+      webhookResult: {
+        ok: false,
+        status: 500,
+        payload: {
+          error: 'Unterminated string in JSON at position 3629',
+        },
+        bodyPresent: true,
+        rawText: [
+          'Coach Strict / weekly_plan',
+          'Node type',
+          '@n8n/n8n-nodes-langchain.chainLlm',
+          'NodeOperationError: Unterminated string in JSON at position 3629',
+          'at ChainLlm.node.ts:107:13',
+        ].join('\n'),
+      },
+      usedFallback: false,
+      fallbackReason: null,
+    });
+
+    await expect(
+      runPendingCoachGenerationTask({
+        cacheKey: 'cache-key-1',
+        client,
+        featureFlags: createFeatureFlags(),
+        inputHash: 'hash-1',
+        pendingEntry: {
+          id: 'entry-pending',
+        },
+        persona: getCoachPersona('strict_tough'),
+        requestBody: {
+          payload: { payload_version: 2, prompt_type: 'weekly_plan' },
+          persona_key: 'strict_tough',
+        },
+        requestId: 'req-parse-1',
+        resolvedLocale: 'fr',
+        userId: 'user-1',
+        webhookEndpoints: {
+          primaryUrl: 'https://primary.example/webhook',
+          fallbackUrl: null,
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: 'invalid_coach_response',
+      status: 502,
+    });
+
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toMatchObject({
+      columnName: 'id',
+      value: 'entry-pending',
+      payload: expect.objectContaining({
+        status: 'error',
+        error_code: 'invalid_coach_response',
+        response_payload_json: expect.objectContaining({
+          request_id: 'req-parse-1',
+          webhook_status: 500,
+          response_body_present: true,
+          provider: 'n8n',
+          source: 'coach_generation',
+          error_code: 'invalid_coach_response',
+          provider_failure_kind: 'json_parse_failed',
+          provider_failure_stage: 'n8n_chain_llm',
+          provider_node_type: '@n8n/n8n-nodes-langchain.chainLlm',
+          provider_node_name: 'Coach Strict / weekly_plan',
         }),
       }),
     });

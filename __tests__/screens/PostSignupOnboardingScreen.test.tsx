@@ -2,6 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import * as mockReactNative from 'react-native';
 
+import { SUPPORTED_LOCALES, type LocaleCode } from '@/i18n/config';
 import PostSignupOnboardingScreen from '@/screens/PostSignupOnboardingScreen';
 import { DARK_COLORS, LIGHT_COLORS, SPACING } from '@/constants/theme';
 
@@ -9,8 +10,6 @@ const mockReplace = jest.fn();
 const mockMarkTutorialSeen = jest.fn();
 const mockUpdateAvatarUrl = jest.fn();
 const mockClearPostSignupOnboardingPending = jest.fn();
-const mockClearPostSignupOnboardingAvatarHandled = jest.fn();
-const mockHasPostSignupOnboardingAvatarHandled = jest.fn();
 const mockEnsureGrowthExperience = jest.fn();
 const mockShouldPresentEntryOffer = jest.fn();
 const mockFetchRevenueCatCustomerInfo = jest.fn();
@@ -57,8 +56,8 @@ jest.mock('@/constants/onboardingPromoAssets', () => {
 
   return {
     ...actual,
-    getOnboardingPromoAsset: (theme: any, locale: any, slide: any) =>
-      mockGetOnboardingPromoAsset(theme, locale, slide),
+    getOnboardingPromoAsset: (theme: any, slide: any) =>
+      mockGetOnboardingPromoAsset(theme, slide),
   };
 });
 
@@ -173,6 +172,12 @@ jest.mock('@/hooks/queries', () => ({
   useFeatureFlags: () => mockUseFeatureFlags(),
   useGrowthExperience: () => mockUseGrowthExperience(),
 }));
+jest.mock('@/hooks/queries/useFeatureFlags', () => ({
+  useFeatureFlags: () => mockUseFeatureFlags(),
+}));
+jest.mock('@/hooks/queries/useGrowthExperience', () => ({
+  useGrowthExperience: () => mockUseGrowthExperience(),
+}));
 
 jest.mock('@/hooks/usePostSignupOnboardingPending', () => ({
   usePostSignupOnboardingPending: () => mockUsePostSignupOnboardingPending(),
@@ -193,10 +198,6 @@ jest.mock('@/services/revenueCatOfferings', () => ({
 jest.mock('@/utils/postSignupOnboarding', () => ({
   clearPostSignupOnboardingPending: (...args: unknown[]) =>
     mockClearPostSignupOnboardingPending(...args),
-  clearPostSignupOnboardingAvatarHandled: (...args: unknown[]) =>
-    mockClearPostSignupOnboardingAvatarHandled(...args),
-  hasPostSignupOnboardingAvatarHandled: (...args: unknown[]) =>
-    mockHasPostSignupOnboardingAvatarHandled(...args),
 }));
 
 jest.mock('@/utils/entryOfferSession', () => ({
@@ -205,6 +206,93 @@ jest.mock('@/utils/entryOfferSession', () => ({
       mockMarkAutoPresentationStarted(...args),
   },
 }));
+
+const SLIDE_KEYS = ['scanner', 'coach', 'analytics', 'social', 'fridge'] as const;
+
+const LOCALE_COPY: Record<
+  LocaleCode,
+  {
+    next: string;
+    skip: string;
+    enterApp: string;
+    slide1Title: string;
+    slide1Subtitle: string;
+  }
+> = {
+  fr: {
+    next: 'Suivant',
+    skip: 'Passer',
+    enterApp: "Ouvrir l'app",
+    slide1Title: 'Scanne d abord. Devine moins.',
+    slide1Subtitle:
+      'Une photo pour vos repas, votre visage ou votre corps. Health Scan en fait un point de depart clair.',
+  },
+  en: {
+    next: 'Next',
+    skip: 'Skip',
+    enterApp: 'Open app',
+    slide1Title: 'Scan first. Guess less.',
+    slide1Subtitle:
+      'One photo for your meals, face, or body. Health Scan turns it into a clear starting point.',
+  },
+  de: {
+    next: 'Weiter',
+    skip: 'Überspringen',
+    enterApp: 'App öffnen',
+    slide1Title: 'Scanne zuerst. Rate weniger.',
+    slide1Subtitle:
+      'Ein Foto für Mahlzeiten, Gesicht oder Körper. Health Scan macht daraus einen klaren Ausgangspunkt.',
+  },
+  it: {
+    next: 'Avanti',
+    skip: 'Salta',
+    enterApp: "Apri l'app",
+    slide1Title: 'Scansiona prima. Immagina meno.',
+    slide1Subtitle:
+      'Una foto per pasti, viso o corpo. Health Scan la trasforma in un punto di partenza chiaro.',
+  },
+  es: {
+    next: 'Siguiente',
+    skip: 'Omitir',
+    enterApp: 'Abrir la app',
+    slide1Title: 'Escanea primero. Adivina menos.',
+    slide1Subtitle:
+      'Una foto para tus comidas, rostro o cuerpo. Health Scan la convierte en un punto de partida claro.',
+  },
+  pt: {
+    next: 'Próximo',
+    skip: 'Pular',
+    enterApp: 'Abrir o app',
+    slide1Title: 'Escaneie primeiro. Suponha menos.',
+    slide1Subtitle:
+      'Uma foto para refeições, rosto ou corpo. O Health Scan transforma isso em um ponto de partida claro.',
+  },
+};
+
+function buildLanguageMock(locale: LocaleCode) {
+  const copy = LOCALE_COPY[locale];
+
+  return {
+    t: (key: string) =>
+      (
+        {
+          'common.next': copy.next,
+          'common.skip': copy.skip,
+          'common.error': 'Erreur',
+          'onboarding.enter_app': copy.enterApp,
+          'onboarding.slide_1_title': copy.slide1Title,
+          'onboarding.slide_1_subtitle': copy.slide1Subtitle,
+          'onboarding.social_avatar_prompt_title':
+            'Ajoutez une photo pour etre reconnu plus vite',
+          'onboarding.social_avatar_prompt_subtitle':
+            'Optionnel, mais pratique quand vous partagez vos scans et votre progression.',
+        } as Record<string, string>
+      )[key] ?? key,
+    locale,
+    language: locale,
+    changeLanguage: jest.fn(),
+  };
+}
 
 describe('PostSignupOnboardingScreen', () => {
   beforeEach(() => {
@@ -228,8 +316,6 @@ describe('PostSignupOnboardingScreen', () => {
     mockMarkTutorialSeen.mockResolvedValue(undefined);
     mockUpdateAvatarUrl.mockResolvedValue(undefined);
     mockClearPostSignupOnboardingPending.mockResolvedValue(undefined);
-    mockClearPostSignupOnboardingAvatarHandled.mockResolvedValue(undefined);
-    mockHasPostSignupOnboardingAvatarHandled.mockResolvedValue(false);
     mockEnsureGrowthExperience.mockResolvedValue({ experience: 'default' });
     mockShouldPresentEntryOffer.mockReturnValue(false);
     mockFetchRevenueCatCustomerInfo.mockResolvedValue({ entitlements: {} });
@@ -241,18 +327,17 @@ describe('PostSignupOnboardingScreen', () => {
       t: (key: string) =>
         ({
           'common.next': 'Suivant',
-          'onboarding.avatar_title': 'Ajoutez une photo de profil',
-          'onboarding.avatar_subtitle': "C'est optionnel pour l'instant.",
-          'onboarding.avatar_change_title': 'Photo de profil',
-          'onboarding.avatar_change_subtitle':
-            'Gardez-la ou changez-la plus tard.',
-          'onboarding.avatar_skip': 'Passer pour le moment',
+          'common.skip': 'Passer',
+          'common.error': 'Erreur',
           'onboarding.enter_app': "Ouvrir l'app",
-          'onboarding.slide_1_eyebrow': 'Scanner',
-          'onboarding.slide_1_title': 'Scanne ce qui compte',
+          'onboarding.social_avatar_prompt_title':
+            'Ajoutez une photo pour etre reconnu plus vite',
+          'onboarding.social_avatar_prompt_subtitle':
+            'Optionnel, mais pratique quand vous partagez vos scans et votre progression.',
+          'onboarding.slide_1_title': 'Scanne d abord. Devine moins.',
           'onboarding.slide_1_subtitle':
-            'Capture visage, corps et repas en quelques secondes.',
-        })[key] ?? key,
+            'Une photo pour vos repas, votre visage ou votre corps. Health Scan en fait un point de depart clair.',
+        } as Record<string, string>)[key] ?? key,
       locale: 'fr',
       language: 'fr',
       changeLanguage: jest.fn(),
@@ -283,12 +368,12 @@ describe('PostSignupOnboardingScreen', () => {
     });
   });
 
-  it('renders the avatar step first without rendering the intro slides', async () => {
+  it('renders the slides flow immediately without an avatar step', async () => {
     render(<PostSignupOnboardingScreen />);
 
-    expect(await screen.findByTestId('post-signup-avatar-step')).toBeTruthy();
-    expect(screen.queryByTestId('post-signup-slides-step')).toBeNull();
-    expect(screen.queryByText('Ouvrir l\'app')).toBeNull();
+    expect(await screen.findByTestId('post-signup-slides-step')).toBeTruthy();
+    expect(screen.getByTestId('post-signup-promo-slide-scanner')).toBeTruthy();
+    expect(screen.queryByTestId('post-signup-avatar-step')).toBeNull();
   });
 
   it('compacts onboarding content padding on short Android devices', async () => {
@@ -317,117 +402,92 @@ describe('PostSignupOnboardingScreen', () => {
     );
   });
 
-  it('starts directly on slides when the pre-auth flow already handled avatar', async () => {
-    mockHasPostSignupOnboardingAvatarHandled.mockResolvedValue(true);
-
-    render(<PostSignupOnboardingScreen />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('post-signup-slides-step')).toBeTruthy();
-    });
-
-    expect(screen.queryByTestId('post-signup-avatar-step')).toBeNull();
-  });
-
-  it('lets a user without an avatar skip cleanly into the slides step', async () => {
-    render(<PostSignupOnboardingScreen />);
-
-    fireEvent.press(await screen.findByTestId('post-signup-skip-avatar'));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('post-signup-slides-step')).toBeTruthy();
-    });
-
-    expect(screen.getByTestId('post-signup-promo-slide-scanner')).toBeTruthy();
-    expect(screen.queryByTestId('post-signup-avatar-step')).toBeNull();
-  });
-
   it('renders the localized light promo hero with native slide copy when the active locale has an asset', async () => {
-    mockUseLanguage.mockReturnValue({
-      t: (key: string) =>
-        ({
-          'common.next': 'Next',
-          'onboarding.avatar_change_title': 'Profile photo',
-          'onboarding.avatar_change_subtitle': 'Keep it or change it later.',
-          'onboarding.enter_app': 'Open app',
-          'onboarding.slide_1_eyebrow': 'Scanner',
-          'onboarding.slide_1_title': 'Scan what matters',
-          'onboarding.slide_1_subtitle':
-            'Capture face, body, and meals in seconds.',
-        })[key] ?? key,
-      locale: 'en',
-      language: 'en',
-      changeLanguage: jest.fn(),
-    });
-    mockUseAuth.mockReturnValue({
-      user: { id: 'user-123', email: 'test@example.com' },
-      userProfile: {
-        id: 'user-123',
-        username: 'testuser',
-        avatar_url: 'avatars/existing-user.jpg',
-        has_seen_tutorial: false,
-        account_tier: 'free',
-      },
-      isEmailVerified: true,
-      markTutorialSeen: mockMarkTutorialSeen,
-      updateAvatarUrl: mockUpdateAvatarUrl,
-    });
+    mockUseLanguage.mockReturnValue(buildLanguageMock('en'));
 
     render(<PostSignupOnboardingScreen />);
-
-    await screen.findByTestId('post-signup-avatar-step');
-
-    fireEvent.press(screen.getByText('Next'));
 
     await waitFor(() => {
       expect(screen.getByTestId('post-signup-promo-slide-scanner')).toBeTruthy();
     });
 
-    expect(screen.getByText('Scan what matters')).toBeTruthy();
+    expect(screen.getByText('Scan first. Guess less.')).toBeTruthy();
     expect(
-      screen.getByText('Capture face, body, and meals in seconds.'),
+      screen.getByText(
+        'One photo for your meals, face, or body. Health Scan turns it into a clear starting point.',
+      ),
     ).toBeTruthy();
     expect(screen.queryByTestId('post-signup-fallback-slide-scanner')).toBeNull();
   });
 
-  it('renders final promo heroes for every onboarding slide', async () => {
-    mockUseAuth.mockReturnValue({
-      user: { id: 'user-123', email: 'test@example.com' },
-      userProfile: {
-        id: 'user-123',
-        username: 'testuser',
-        avatar_url: 'avatars/existing-user.jpg',
-        has_seen_tutorial: false,
-        account_tier: 'free',
-      },
-      isEmailVerified: true,
-      markTutorialSeen: mockMarkTutorialSeen,
-      updateAvatarUrl: mockUpdateAvatarUrl,
-    });
+  it.each(SUPPORTED_LOCALES)(
+    'renders promo heroes in the new slide order for %s',
+    async (locale) => {
+      const copy = LOCALE_COPY[locale];
 
-    render(<PostSignupOnboardingScreen />);
+      mockUseLanguage.mockReturnValue(buildLanguageMock(locale));
 
-    await screen.findByTestId('post-signup-avatar-step');
+      render(<PostSignupOnboardingScreen />);
 
-    fireEvent.press(screen.getByText('Suivant'));
-
-    const slideKeys = ['scanner', 'coach', 'social', 'analytics', 'fridge'];
-
-    for (const [index, slideKey] of slideKeys.entries()) {
       await waitFor(() => {
+        expect(screen.getByTestId('post-signup-promo-slide-scanner')).toBeTruthy();
+      });
+
+      expect(screen.getByText(copy.slide1Title)).toBeTruthy();
+      expect(screen.getByText(copy.slide1Subtitle)).toBeTruthy();
+
+      for (const [index, slideKey] of SLIDE_KEYS.entries()) {
         expect(
           screen.getByTestId(`post-signup-promo-slide-${slideKey}`),
         ).toBeTruthy();
-      });
+        expect(
+          screen.queryByTestId(`post-signup-fallback-slide-${slideKey}`),
+        ).toBeNull();
 
-      expect(
-        screen.queryByTestId(`post-signup-fallback-slide-${slideKey}`),
-      ).toBeNull();
-
-      if (index < slideKeys.length - 1) {
-        fireEvent.press(screen.getByText('Suivant'));
+        if (index < SLIDE_KEYS.length - 1) {
+          fireEvent.press(screen.getByText(copy.next));
+          await waitFor(() => {
+            expect(
+              screen.getByTestId(
+                `post-signup-promo-slide-${SLIDE_KEYS[index + 1]}`,
+              ),
+            ).toBeTruthy();
+          });
+        }
       }
-    }
+    },
+  );
+
+  it('skips directly to the final slide and swaps the CTA', async () => {
+    render(<PostSignupOnboardingScreen />);
+
+    fireEvent.press(await screen.findByText('Passer'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('post-signup-promo-slide-fridge')).toBeTruthy();
+    });
+
+    expect(screen.getByText("Ouvrir l'app")).toBeTruthy();
+  });
+
+  it('shows an optional avatar prompt on the social slide and lets the user resolve it inline', async () => {
+    render(<PostSignupOnboardingScreen />);
+
+    fireEvent.press(await screen.findByText('Suivant'));
+    fireEvent.press(screen.getByText('Suivant'));
+    fireEvent.press(screen.getByText('Suivant'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('post-signup-social-avatar-prompt'),
+      ).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByTestId('avatar-picker-select'));
+
+    await waitFor(() => {
+      expect(mockUpdateAvatarUrl).toHaveBeenCalledWith('avatars/test-user.jpg');
+    });
   });
 
   it('uses a restrained hero crop for standard vertical promo assets', async () => {
@@ -437,8 +497,6 @@ describe('PostSignupOnboardingScreen', () => {
 
     try {
       render(<PostSignupOnboardingScreen />);
-
-      fireEvent.press(await screen.findByTestId('post-signup-skip-avatar'));
 
       await waitFor(() => {
         expect(
@@ -463,8 +521,6 @@ describe('PostSignupOnboardingScreen', () => {
     try {
       render(<PostSignupOnboardingScreen />);
 
-      fireEvent.press(await screen.findByTestId('post-signup-skip-avatar'));
-
       await waitFor(() => {
         expect(
           screen.getByTestId('post-signup-promo-hero-image-scanner'),
@@ -480,89 +536,15 @@ describe('PostSignupOnboardingScreen', () => {
     }
   });
 
-  it('renders the localized dark promo hero when the active locale has a dark scanner asset', async () => {
-    mockUseLanguage.mockReturnValue({
-      t: (key: string) =>
-        ({
-          'common.next': 'Next',
-          'onboarding.avatar_change_title': 'Profile photo',
-          'onboarding.avatar_change_subtitle': 'Keep it or change it later.',
-          'onboarding.enter_app': 'Open app',
-        })[key] ?? key,
-      locale: 'en',
-      language: 'en',
-      changeLanguage: jest.fn(),
-    });
+  it('renders the localized dark promo hero for the scanner asset', async () => {
+    mockUseLanguage.mockReturnValue(buildLanguageMock('fr'));
     mockUseTheme.mockReturnValue({
       colors: DARK_COLORS,
       isDark: true,
       toggleTheme: jest.fn(),
     });
-    mockUseAuth.mockReturnValue({
-      user: { id: 'user-123', email: 'test@example.com' },
-      userProfile: {
-        id: 'user-123',
-        username: 'testuser',
-        avatar_url: 'avatars/existing-user.jpg',
-        has_seen_tutorial: false,
-        account_tier: 'free',
-      },
-      isEmailVerified: true,
-      markTutorialSeen: mockMarkTutorialSeen,
-      updateAvatarUrl: mockUpdateAvatarUrl,
-    });
 
     render(<PostSignupOnboardingScreen />);
-
-    await screen.findByTestId('post-signup-avatar-step');
-
-    fireEvent.press(screen.getByText('Next'));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('post-signup-promo-slide-scanner')).toBeTruthy();
-    });
-
-    expect(screen.queryByTestId('post-signup-fallback-slide-scanner')).toBeNull();
-  });
-
-  it('renders the localized dark promo hero for the french scanner asset', async () => {
-    mockUseLanguage.mockReturnValue({
-      t: (key: string) =>
-        ({
-          'common.next': 'Suivant',
-          'onboarding.avatar_change_title': 'Photo de profil',
-          'onboarding.avatar_change_subtitle':
-            'Gardez-la ou changez-la plus tard.',
-          'onboarding.enter_app': "Ouvrir l'app",
-        })[key] ?? key,
-      locale: 'fr',
-      language: 'fr',
-      changeLanguage: jest.fn(),
-    });
-    mockUseTheme.mockReturnValue({
-      colors: DARK_COLORS,
-      isDark: true,
-      toggleTheme: jest.fn(),
-    });
-    mockUseAuth.mockReturnValue({
-      user: { id: 'user-123', email: 'test@example.com' },
-      userProfile: {
-        id: 'user-123',
-        username: 'testuser',
-        avatar_url: 'avatars/existing-user.jpg',
-        has_seen_tutorial: false,
-        account_tier: 'free',
-      },
-      isEmailVerified: true,
-      markTutorialSeen: mockMarkTutorialSeen,
-      updateAvatarUrl: mockUpdateAvatarUrl,
-    });
-
-    render(<PostSignupOnboardingScreen />);
-
-    await screen.findByTestId('post-signup-avatar-step');
-
-    fireEvent.press(screen.getByText('Suivant'));
 
     await waitFor(() => {
       expect(screen.getByTestId('post-signup-promo-slide-scanner')).toBeTruthy();
@@ -572,38 +554,15 @@ describe('PostSignupOnboardingScreen', () => {
   });
 
   it('passes the light theme through to the fridge fallback preview', async () => {
-    mockGetOnboardingPromoAsset.mockImplementation((theme, locale, slide) =>
+    mockGetOnboardingPromoAsset.mockImplementation((theme, slide) =>
       slide === 'fridge'
         ? null
-        : mockActualOnboardingPromoAssets.getOnboardingPromoAsset(
-            theme,
-            locale,
-            slide,
-          ),
+        : mockActualOnboardingPromoAssets.getOnboardingPromoAsset(theme, slide),
     );
-    mockUseAuth.mockReturnValue({
-      user: { id: 'user-123', email: 'test@example.com' },
-      userProfile: {
-        id: 'user-123',
-        username: 'testuser',
-        avatar_url: 'avatars/existing-user.jpg',
-        has_seen_tutorial: false,
-        account_tier: 'free',
-      },
-      isEmailVerified: true,
-      markTutorialSeen: mockMarkTutorialSeen,
-      updateAvatarUrl: mockUpdateAvatarUrl,
-    });
 
     render(<PostSignupOnboardingScreen />);
 
-    await screen.findByTestId('post-signup-avatar-step');
-
-    fireEvent.press(screen.getByText('Suivant'));
-    fireEvent.press(screen.getByText('Suivant'));
-    fireEvent.press(screen.getByText('Suivant'));
-    fireEvent.press(screen.getByText('Suivant'));
-    fireEvent.press(screen.getByText('Suivant'));
+    fireEvent.press(await screen.findByText('Passer'));
 
     await waitFor(() => {
       expect(screen.getByTestId('post-signup-fallback-slide-fridge')).toBeTruthy();
@@ -617,43 +576,20 @@ describe('PostSignupOnboardingScreen', () => {
   });
 
   it('passes the dark theme through to the fridge fallback preview', async () => {
-    mockGetOnboardingPromoAsset.mockImplementation((theme, locale, slide) =>
+    mockGetOnboardingPromoAsset.mockImplementation((theme, slide) =>
       slide === 'fridge'
         ? null
-        : mockActualOnboardingPromoAssets.getOnboardingPromoAsset(
-            theme,
-            locale,
-            slide,
-          ),
+        : mockActualOnboardingPromoAssets.getOnboardingPromoAsset(theme, slide),
     );
     mockUseTheme.mockReturnValue({
       colors: DARK_COLORS,
       isDark: true,
       toggleTheme: jest.fn(),
     });
-    mockUseAuth.mockReturnValue({
-      user: { id: 'user-123', email: 'test@example.com' },
-      userProfile: {
-        id: 'user-123',
-        username: 'testuser',
-        avatar_url: 'avatars/existing-user.jpg',
-        has_seen_tutorial: false,
-        account_tier: 'free',
-      },
-      isEmailVerified: true,
-      markTutorialSeen: mockMarkTutorialSeen,
-      updateAvatarUrl: mockUpdateAvatarUrl,
-    });
 
     render(<PostSignupOnboardingScreen />);
 
-    await screen.findByTestId('post-signup-avatar-step');
-
-    fireEvent.press(screen.getByText('Suivant'));
-    fireEvent.press(screen.getByText('Suivant'));
-    fireEvent.press(screen.getByText('Suivant'));
-    fireEvent.press(screen.getByText('Suivant'));
-    fireEvent.press(screen.getByText('Suivant'));
+    fireEvent.press(await screen.findByText('Passer'));
 
     await waitFor(() => {
       expect(screen.getByTestId('post-signup-fallback-slide-fridge')).toBeTruthy();
@@ -666,89 +602,20 @@ describe('PostSignupOnboardingScreen', () => {
     );
   });
 
-  it('keeps existing-avatar users on the full avatar step before the slides', async () => {
-    mockUseAuth.mockReturnValue({
-      user: { id: 'user-123', email: 'test@example.com' },
-      userProfile: {
-        id: 'user-123',
-        username: 'testuser',
-        avatar_url: 'avatars/existing-user.jpg',
-        has_seen_tutorial: false,
-        account_tier: 'free',
-      },
-      isEmailVerified: true,
-      markTutorialSeen: mockMarkTutorialSeen,
-      updateAvatarUrl: mockUpdateAvatarUrl,
-    });
-
+  it('completes onboarding from the final slide and clears the pending flag', async () => {
     render(<PostSignupOnboardingScreen />);
 
-    expect(await screen.findByTestId('post-signup-avatar-step')).toBeTruthy();
-    expect(screen.queryByTestId('post-signup-skip-avatar')).toBeNull();
-    expect(screen.getByText('Photo de profil')).toBeTruthy();
-
-    fireEvent.press(screen.getByText('Suivant'));
+    fireEvent.press(await screen.findByText('Passer'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('post-signup-slides-step')).toBeTruthy();
-    });
-  });
-
-  it('moves from the avatar step to the slides after an avatar selection', async () => {
-    render(<PostSignupOnboardingScreen />);
-
-    fireEvent.press(await screen.findByTestId('avatar-picker-select'));
-
-    await waitFor(() => {
-      expect(mockUpdateAvatarUrl).toHaveBeenCalledWith('avatars/test-user.jpg');
+      expect(screen.getByText("Ouvrir l'app")).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByText('Suivant'));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('post-signup-slides-step')).toBeTruthy();
-    });
-
-    expect(screen.queryByTestId('post-signup-avatar-step')).toBeNull();
-  });
-
-  it('completes onboarding from the slides step and clears the pending flag', async () => {
-    mockUseAuth.mockReturnValue({
-      user: { id: 'user-123', email: 'test@example.com' },
-      userProfile: {
-        id: 'user-123',
-        username: 'testuser',
-        avatar_url: 'avatars/existing-user.jpg',
-        has_seen_tutorial: false,
-        account_tier: 'free',
-      },
-      isEmailVerified: true,
-      markTutorialSeen: mockMarkTutorialSeen,
-      updateAvatarUrl: mockUpdateAvatarUrl,
-    });
-
-    render(<PostSignupOnboardingScreen />);
-
-    await screen.findByTestId('post-signup-avatar-step');
-
-    // 1 press : avatar -> slide 0
-    fireEvent.press(screen.getByText('Suivant'));
-    // 4 presses : slide 0 -> 1 -> 2 -> 3 -> 4 (last)
-    fireEvent.press(screen.getByText('Suivant'));
-    fireEvent.press(screen.getByText('Suivant'));
-    fireEvent.press(screen.getByText('Suivant'));
-    fireEvent.press(screen.getByText('Suivant'));
-
-    await waitFor(() => {
-      expect(screen.getByText('Ouvrir l\'app')).toBeTruthy();
-    });
-
-    fireEvent.press(screen.getByText('Ouvrir l\'app'));
+    fireEvent.press(screen.getByText("Ouvrir l'app"));
 
     await waitFor(() => {
       expect(mockMarkTutorialSeen).toHaveBeenCalledTimes(1);
       expect(mockClearPostSignupOnboardingPending).toHaveBeenCalledWith('user-123');
-      expect(mockClearPostSignupOnboardingAvatarHandled).toHaveBeenCalledWith('user-123');
       expect(mockReplace).toHaveBeenCalledWith('/(tabs)');
     });
 

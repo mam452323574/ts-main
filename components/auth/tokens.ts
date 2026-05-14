@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ThemeColors, mixColors, withAlpha } from '@/constants/theme';
+import { buildPremiumHealthPalette } from '@/constants/premiumHealth';
 
 export interface AuthPalette {
   accent: string;
@@ -9,10 +10,20 @@ export interface AuthPalette {
   accentRing: string;
   accentText: string;
   surface: string;
+  surfaceStrong: string;
+  surfaceGlass: string;
   surfaceSubtle: string;
   divider: string;
   inverseText: string;
   background: string;
+  heroGlowPrimary: string;
+  heroGlowSecondary: string;
+  heroBorder: string;
+  secondaryActionFill: string;
+  secondaryActionBorder: string;
+  progressInactive: string;
+  progressActive: string;
+  shadowColor: string;
 }
 
 export interface OnboardingPalette {
@@ -40,36 +51,82 @@ export interface OnboardingPalette {
   backgroundGradient: [string, string, string];
   cardGradient: [string, string, string];
   ctaFill: string;
+  secondaryActionFill: string;
+  secondaryActionBorder: string;
+  progressActive: string;
+  progressInactive: string;
+  heroScrimStrong: string;
+  heroScrimSoft: string;
+  shadowColor: string;
 }
 
 export function buildAuthPalette(colors: ThemeColors, isDark: boolean): AuthPalette {
+  const elevatedSurface = colors.surfaceElevated ?? colors.cardBackground;
+  const background = isDark
+    ? mixColors(colors.background, colors.primary, 0.08)
+    : mixColors(colors.background, colors.gold, 0.06);
+  const accent = isDark
+    ? mixColors(colors.primary, colors.white, 0.08)
+    : mixColors(colors.primary, colors.white, 0.02);
+
   return {
-    accent: colors.primary,
-    accentSoft: withAlpha(colors.primary, isDark ? 0.18 : 0.12),
-    accentSofter: mixColors(colors.cardBackground, colors.primary, isDark ? 0.10 : 0.05),
-    accentRing: colors.primary,
-    accentText: colors.primary,
-    surface: colors.cardBackground,
-    surfaceSubtle: mixColors(colors.cardBackground, colors.primary, isDark ? 0.05 : 0.03),
-    divider: withAlpha(colors.primary, isDark ? 0.18 : 0.14),
+    accent,
+    accentSoft: withAlpha(accent, isDark ? 0.14 : 0.12),
+    accentSofter: isDark
+      ? mixColors(elevatedSurface, accent, 0.1)
+      : mixColors(colors.cardBackground, accent, 0.08),
+    accentRing: accent,
+    accentText: accent,
+    surface: isDark
+      ? mixColors(elevatedSurface, colors.white, 0.02)
+      : mixColors(colors.cardBackground, colors.white, 0.12),
+    surfaceStrong: isDark
+      ? mixColors(elevatedSurface, colors.white, 0.05)
+      : mixColors(colors.cardBackground, colors.primaryText, 0.025),
+    surfaceGlass:
+      colors.surfaceGlass ??
+      withAlpha(isDark ? elevatedSurface : colors.cardBackground, isDark ? 0.88 : 0.92),
+    surfaceSubtle: mixColors(
+      isDark ? elevatedSurface : colors.cardBackground,
+      accent,
+      isDark ? 0.08 : 0.05,
+    ),
+    divider: isDark ? withAlpha(colors.white, 0.08) : withAlpha(accent, 0.16),
     inverseText: colors.background,
-    background: colors.background,
+    background,
+    heroGlowPrimary: withAlpha(accent, isDark ? 0.22 : 0.14),
+    heroGlowSecondary: withAlpha(colors.gold, isDark ? 0.16 : 0.12),
+    heroBorder: withAlpha(accent, isDark ? 0.24 : 0.18),
+    secondaryActionFill: isDark
+      ? withAlpha(colors.white, 0.06)
+      : withAlpha(colors.primaryText, 0.03),
+    secondaryActionBorder: isDark
+      ? withAlpha(colors.white, 0.12)
+      : withAlpha(colors.primaryText, 0.08),
+    progressInactive: isDark
+      ? withAlpha(colors.white, 0.14)
+      : withAlpha(colors.primaryText, 0.1),
+    progressActive: accent,
+    shadowColor: isDark ? accent : colors.primaryText,
   };
 }
 
 export function buildOnboardingPalette(
   colors: ThemeColors,
-  _isDark: boolean,
+  isDark: boolean,
 ): OnboardingPalette {
-  const background = '#050B14';
-  const backgroundMid = '#081322';
-  const backgroundDeep = '#0D1B2E';
-  const surface = '#0B1628';
-  const surfaceElevated = '#101F36';
-  const textPrimary = '#F8FBFF';
-  const textSecondary = '#A9BAD6';
-  const textMuted = '#6F86A8';
-  const accentStrong = mixColors(colors.primary, colors.white, 0.14);
+  const premiumHealth = buildPremiumHealthPalette(colors, isDark);
+  const background = premiumHealth.canvas;
+  const backgroundMid = premiumHealth.canvasElevated;
+  const backgroundDeep = premiumHealth.surfaceBase;
+  const surface = premiumHealth.surfaceBase;
+  const surfaceElevated = premiumHealth.surfaceRaised;
+  const textPrimary = isDark ? '#F6FBFF' : '#16212B';
+  const textSecondary = isDark ? '#B7C6D4' : '#60707D';
+  const textMuted = isDark ? '#7F92A3' : '#86929D';
+  const accent = premiumHealth.trustAccent;
+  const accentSecondary = premiumHealth.premiumAccent;
+  const accentStrong = mixColors(accent, colors.white, isDark ? 0.16 : 0.06);
 
   return {
     background,
@@ -77,29 +134,42 @@ export function buildOnboardingPalette(
     backgroundDeep,
     surface,
     surfaceElevated,
-    surfaceSoft: mixColors(surface, colors.primary, 0.1),
-    surfaceGlass: withAlpha(surfaceElevated, 0.88),
+    surfaceSoft: mixColors(surface, accent, isDark ? 0.12 : 0.08),
+    surfaceGlass: premiumHealth.surfaceGlass,
     textPrimary,
     textSecondary,
     textMuted,
-    accent: colors.primary,
+    accent,
     accentStrong,
-    accentSoft: withAlpha(colors.primary, 0.22),
-    accentSofter: withAlpha(colors.primary, 0.1),
-    accentSecondary: colors.secondary,
-    accentSecondarySoft: withAlpha(colors.secondary, 0.16),
-    border: withAlpha(textSecondary, 0.18),
-    borderStrong: withAlpha(colors.primary, 0.34),
-    inactive: withAlpha(textSecondary, 0.22),
-    glow: withAlpha(colors.primary, 0.16),
-    glowSecondary: withAlpha(colors.secondary, 0.12),
-    backgroundGradient: [background, backgroundMid, backgroundDeep],
+    accentSoft: withAlpha(accent, isDark ? 0.24 : 0.18),
+    accentSofter: withAlpha(accent, isDark ? 0.12 : 0.08),
+    accentSecondary: accentSecondary,
+    accentSecondarySoft: withAlpha(accentSecondary, isDark ? 0.16 : 0.12),
+    border: premiumHealth.borderSubtle,
+    borderStrong: premiumHealth.borderStrong,
+    inactive: withAlpha(textSecondary, isDark ? 0.22 : 0.18),
+    glow: withAlpha(accent, isDark ? 0.12 : 0.08),
+    glowSecondary: withAlpha(accentSecondary, isDark ? 0.14 : 0.08),
+    backgroundGradient: premiumHealth.moduleGradient,
     cardGradient: [
-      mixColors(surfaceElevated, colors.primary, 0.2),
-      mixColors(surfaceElevated, colors.secondary, 0.14),
+      mixColors(surfaceElevated, accent, isDark ? 0.18 : 0.12),
+      mixColors(surfaceElevated, accentSecondary, isDark ? 0.1 : 0.08),
       surface,
     ],
-    ctaFill: mixColors(colors.primary, colors.secondary, 0.22),
+    ctaFill: isDark ? '#F7FBFF' : '#16202A',
+    secondaryActionFill: isDark
+      ? withAlpha('#F7FBFF', 0.05)
+      : withAlpha('#16202A', 0.035),
+    secondaryActionBorder: isDark
+      ? withAlpha('#F7FBFF', 0.12)
+      : withAlpha('#16202A', 0.08),
+    progressActive: accent,
+    progressInactive: isDark
+      ? withAlpha(textPrimary, 0.14)
+      : withAlpha(textPrimary, 0.1),
+    heroScrimStrong: withAlpha(background, isDark ? 0.88 : 0.74),
+    heroScrimSoft: withAlpha(background, isDark ? 0.54 : 0.24),
+    shadowColor: isDark ? accent : textPrimary,
   };
 }
 

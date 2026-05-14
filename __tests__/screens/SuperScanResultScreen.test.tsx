@@ -46,6 +46,37 @@ const mockThemeColors = {
   white: '#FFFFFF',
 };
 
+const expectTransparentResultHeader = (style: unknown) => {
+  expect(StyleSheet.flatten(style)).toEqual(
+    expect.objectContaining({
+      backgroundColor: 'transparent',
+      borderBottomColor: 'transparent',
+      borderBottomWidth: 0,
+    }),
+  );
+};
+
+const collectTestIds = (node: any, acc: string[] = []): string[] => {
+  if (!node) {
+    return acc;
+  }
+
+  if (Array.isArray(node)) {
+    node.forEach((child) => collectTestIds(child, acc));
+    return acc;
+  }
+
+  if (node.props?.testID) {
+    acc.push(node.props.testID);
+  }
+
+  if (Array.isArray(node.children)) {
+    node.children.forEach((child: any) => collectTestIds(child, acc));
+  }
+
+  return acc;
+};
+
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     canDismiss: mockCanDismiss,
@@ -65,6 +96,12 @@ jest.mock('@/contexts/AuthContext', () => ({
 
 jest.mock('@/hooks/queries', () => ({
   usePremiumPotential: (...args: any[]) => mockUsePremiumPotential(...args),
+  useFeatureFlags: (...args: any[]) => mockUseFeatureFlags(...args),
+}));
+jest.mock('@/hooks/queries/usePremiumPotential', () => ({
+  usePremiumPotential: (...args: any[]) => mockUsePremiumPotential(...args),
+}));
+jest.mock('@/hooks/queries/useFeatureFlags', () => ({
   useFeatureFlags: (...args: any[]) => mockUseFeatureFlags(...args),
 }));
 
@@ -253,6 +290,9 @@ describe('SuperScanResultScreen', () => {
     const { getByText, getByTestId } = render(<SuperScanResultScreen />);
 
     expect(getByTestId('super-scan-empty-state')).toBeTruthy();
+    expectTransparentResultHeader(
+      getByTestId('super-scan-result-screen-header').props.style,
+    );
     expect(getByText(i18n.t('common.results.no_data'))).toBeTruthy();
     expect(getByText(i18n.t('common.home_back'))).toBeTruthy();
   });
@@ -267,24 +307,22 @@ describe('SuperScanResultScreen', () => {
       ),
     });
 
-    const { getByTestId } = render(<SuperScanResultScreen />);
+    const { getByTestId, queryByTestId } = render(<SuperScanResultScreen />);
     const expectedPalette = resolveLegacySuperScanPalette({
       colors: mockThemeColors as any,
       isDark: false,
       globalRiskScore: 84,
       urgencyFlag: true,
     });
-    const scoreCardStyle = StyleSheet.flatten(
-      getByTestId('super-scan-score-card').props.style,
-    );
 
     expect(getByTestId('super-scan-background-layer').props.colors).toEqual(
       expectedPalette.backgroundGradient,
     );
-    expect(getByTestId('super-scan-score-card').props.colors).toEqual(
-      expectedPalette.heroGradient,
+    expectTransparentResultHeader(
+      getByTestId('super-scan-result-screen-header').props.style,
     );
-    expect(scoreCardStyle.borderColor).toBe(expectedPalette.heroBorderColor);
+    expect(getByTestId('result-hero-surface')).toBeTruthy();
+    expect(queryByTestId('super-scan-score-card')).toBeNull();
   });
 
   it('applies the recovery premium palette to low-risk legacy results', () => {
@@ -297,7 +335,7 @@ describe('SuperScanResultScreen', () => {
       ),
     });
 
-    const { getByTestId } = render(<SuperScanResultScreen />);
+    const { getByTestId, queryByTestId } = render(<SuperScanResultScreen />);
     const expectedPalette = resolveLegacySuperScanPalette({
       colors: mockThemeColors as any,
       isDark: false,
@@ -308,12 +346,91 @@ describe('SuperScanResultScreen', () => {
     expect(getByTestId('super-scan-background-layer').props.colors).toEqual(
       expectedPalette.backgroundGradient,
     );
-    expect(getByTestId('super-scan-score-card').props.colors).toEqual(
-      expectedPalette.heroGradient,
+    expect(getByTestId('result-hero-surface')).toBeTruthy();
+    expect(queryByTestId('super-scan-score-card')).toBeNull();
+  });
+
+  it('promotes the legacy super scan coach CTA and navigates with auto submit', () => {
+    mockParams.mockReturnValue({
+      analysisData: JSON.stringify(makeResult({ global_risk_score: 78 })),
+      scanId: 'scan-super-cta',
+    });
+
+    const rendered = render(<SuperScanResultScreen />);
+    const testIds = collectTestIds(rendered.toJSON());
+
+    expect(rendered.getByTestId('super-scan-coach-cta-question-preview')).toBeTruthy();
+    expect(testIds.indexOf('super-scan-coach-cta')).toBeGreaterThan(
+      testIds.indexOf('result-hero-surface'),
+    );
+    expect(testIds.indexOf('super-scan-coach-cta')).toBeLessThan(
+      testIds.indexOf('super-scan-priority-findings'),
+    );
+
+    fireEvent.press(rendered.getByTestId('super-scan-coach-cta-button'));
+
+    expect(mockPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/coach',
+        params: expect.objectContaining({
+          source: 'scan_result',
+          autoSubmit: '1',
+          scanId: 'scan-super-cta',
+          scanType: 'super',
+          promptType: 'latest_scan_issue_resolution',
+          fallbackPromptType: 'latest_scan',
+          scanIntent: expect.any(String),
+        }),
+      }),
+    );
+    const pushedParams = mockPush.mock.calls[0][0].params;
+    expect(JSON.parse(decodeURIComponent(pushedParams.scanIntent))).toMatchObject({
+      scan_id: 'scan-super-cta',
+      scan_type: 'super',
+      priority_metric: 'global_risk_score',
+      prompt_type: 'latest_scan_issue_resolution',
+      fallback_prompt_type: 'latest_scan',
+    });
+  });
+
+  it('promotes the fat distribution coach CTA near the top and keeps auto submit', () => {
+    mockUserProfile = { account_tier: 'premium' };
+    mockParams.mockReturnValue({
+      analysisData: JSON.stringify(makeFatDistributionResult()),
+      scanId: 'scan-fat-cta',
+    });
+
+    const rendered = render(<SuperScanResultScreen />);
+    const testIds = collectTestIds(rendered.toJSON());
+
+    expect(rendered.getByTestId('super-scan-fat-coach-cta-question-preview')).toBeTruthy();
+    expect(testIds.indexOf('super-scan-fat-coach-cta')).toBeGreaterThan(
+      testIds.indexOf('result-hero-surface'),
+    );
+    expect(testIds.indexOf('super-scan-fat-coach-cta')).toBeLessThan(
+      testIds.indexOf('super-scan-fat-main-metrics'),
+    );
+
+    fireEvent.press(rendered.getByTestId('super-scan-fat-coach-cta-button'));
+
+    expect(mockPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/coach',
+        params: expect.objectContaining({
+          source: 'scan_result',
+          autoSubmit: '1',
+          scanId: 'scan-fat-cta',
+          scanType: 'super',
+          promptType: 'latest_scan_issue_resolution',
+          fallbackPromptType: 'latest_scan',
+          scanIntent: expect.any(String),
+        }),
+      }),
     );
   });
 
   it('renders the new fat distribution format with a dedicated UI and no legacy affordances', () => {
+    mockUserProfile = { account_tier: 'premium' };
     mockParams.mockReturnValue({
       analysisData: JSON.stringify(
         makeFatDistributionResult({
@@ -356,7 +473,40 @@ describe('SuperScanResultScreen', () => {
     expect(queryByTestId('super-scan-score-value')).toBeNull();
   });
 
+  it('locks fat distribution zones and area details for free users', () => {
+    mockParams.mockReturnValue({
+      analysisData: JSON.stringify(
+        makeFatDistributionResult({
+          priority_zones: ['Abdomen'],
+          areas_analysis: [
+            {
+              area_name: 'Abdomen',
+              subcutaneous_fat_percent: 31,
+              water_retention_percent: 14,
+              definition_percent: 46,
+              dominant_type: 'Subcutaneous',
+              confidence: 0.84,
+              explanation: 'Storage is more visible through the midsection.',
+              actionable_advice: 'Keep steps high and recovery steady.',
+            },
+          ],
+        }),
+      ),
+    });
+
+    const { getAllByText, getByTestId, queryByTestId, queryByText } = render(
+      <SuperScanResultScreen />,
+    );
+
+    expect(getByTestId('super-scan-fat-priority-zones-premium')).toBeTruthy();
+    expect(getAllByText('Area analysis').length).toBeGreaterThan(0);
+    expect(queryByTestId('super-scan-fat-priority-zone-0')).toBeNull();
+    expect(queryByText('Abdomen')).toBeNull();
+    expect(queryByText('Storage is more visible through the midsection.')).toBeNull();
+  });
+
   it('applies the aqua palette and emphasizes water retention when it is globally dominant', () => {
+    mockUserProfile = { account_tier: 'premium' };
     mockParams.mockReturnValue({
       analysisData: JSON.stringify(
         makeFatDistributionResult({
@@ -399,6 +549,7 @@ describe('SuperScanResultScreen', () => {
   });
 
   it('applies the contour palette and emphasizes body fat when it is globally dominant', () => {
+    mockUserProfile = { account_tier: 'premium' };
     mockParams.mockReturnValue({
       analysisData: JSON.stringify(
         makeFatDistributionResult({
@@ -441,6 +592,7 @@ describe('SuperScanResultScreen', () => {
   });
 
   it('keeps the fat distribution screen stable with null metrics and empty arrays', () => {
+    mockUserProfile = { account_tier: 'premium' };
     mockParams.mockReturnValue({
       analysisData: JSON.stringify(
         makeFatDistributionResult({
@@ -457,7 +609,7 @@ describe('SuperScanResultScreen', () => {
 
     const { getByTestId, queryByTestId } = render(<SuperScanResultScreen />);
 
-    expect(getByTestId('super-scan-fat-summary')).toBeTruthy();
+    expect(queryByTestId('super-scan-fat-summary')).toBeNull();
     expect(queryByTestId('super-scan-fat-metric-body_fat')).toBeNull();
     expect(queryByTestId('super-scan-fat-metric-facial_fat')).toBeNull();
     expect(getByTestId('super-scan-fat-priority-zones-empty')).toBeTruthy();
@@ -475,6 +627,23 @@ describe('SuperScanResultScreen', () => {
 
     expect(getByText(i18n.t('scan.super.summaries.medical_attention'))).toBeTruthy();
     expect(getByText(i18n.t('scan.super.disclaimers.general'))).toBeTruthy();
+  });
+
+  it('keeps the Super Scan summary without duplicating the top finding rollup', () => {
+    mockParams.mockReturnValue({
+      analysisData: JSON.stringify(makeResult()),
+    });
+
+    const { getAllByText, getByText, queryByText } = render(<SuperScanResultScreen />);
+    const duplicatedFindingRollup = `${String(
+      i18n.t('scan.super.conditions.unknown.label'),
+    )} · ${String(i18n.t('qualitative_levels.severity.high'))} · 81%`;
+
+    expect(getByText(i18n.t('scan.super.summaries.medical_attention'))).toBeTruthy();
+    expect(queryByText(duplicatedFindingRollup)).toBeNull();
+    expect(getByText(i18n.t('scan.super.conditions_label'))).toBeTruthy();
+    expect(queryByText('81%')).toBeNull();
+    expect(getAllByText(i18n.t('metric_card.premium_label')).length).toBeGreaterThan(0);
   });
 
   it('renders preserved webhook free text ahead of generic super scan fallbacks', () => {

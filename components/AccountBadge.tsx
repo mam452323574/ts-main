@@ -2,7 +2,13 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useMemo } from 'react';
 import { Crown } from 'lucide-react-native';
 import { AccountTier } from '@/types';
-import { SIZES, SPACING, BORDER_RADIUS, FONT_WEIGHTS } from '@/constants/theme';
+import {
+  SIZES,
+  SPACING,
+  BORDER_RADIUS,
+  FONT_WEIGHTS,
+  getThemeTokens,
+} from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 
@@ -13,9 +19,10 @@ interface AccountBadgeProps {
 
 export function AccountBadge({ tier, size = 'medium' }: AccountBadgeProps) {
   const isPremium = tier === 'premium' || tier === 'admin';
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { t } = useLanguage();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const tokens = getThemeTokens(isDark);
 
   const sizeStyles = {
     small: {
@@ -41,20 +48,29 @@ export function AccountBadge({ tier, size = 'medium' }: AccountBadgeProps) {
     <View style={[styles.container, currentSize.container, isPremium ? styles.premium : styles.free]}>
       {isPremium && (
         <Crown
-          color={colors.white}
+          color={tokens.premium.foreground}
           size={currentSize.icon}
-          fill={colors.white}
+          fill={tokens.premium.foreground}
           style={styles.icon}
         />
       )}
-      <Text style={[styles.text, currentSize.text]}>
+      <Text
+        style={[
+          styles.text,
+          isPremium ? styles.textPremium : styles.textFree,
+          currentSize.text,
+        ]}
+      >
         {isPremium ? t('common.account_premium') : t('common.account_free')}
       </Text>
     </View>
   );
 }
 
-const createStyles = (colors: any) => StyleSheet.create({
+const createStyles = (colors: any, isDark: boolean) => {
+  const tokens = getThemeTokens(isDark);
+
+  return StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -74,17 +90,26 @@ const createStyles = (colors: any) => StyleSheet.create({
     paddingHorizontal: SPACING.lg,
   },
   premium: {
-    backgroundColor: colors.primary,
+    backgroundColor: tokens.premium.accent,
+    borderWidth: 1,
+    borderColor: tokens.premium.border,
   },
   free: {
-    backgroundColor: colors.gray,
+    backgroundColor: tokens.surfaceMuted.base,
+    borderWidth: 1,
+    borderColor: tokens.border.subtle,
   },
   icon: {
     marginRight: SPACING.xs,
   },
   text: {
-    color: colors.white,
     fontWeight: FONT_WEIGHTS.semiBold,
+  },
+  textPremium: {
+    color: tokens.premium.foreground,
+  },
+  textFree: {
+    color: colors.primaryText,
   },
   textSmall: {
     fontSize: SIZES.text12,
@@ -95,4 +120,5 @@ const createStyles = (colors: any) => StyleSheet.create({
   textLarge: {
     fontSize: SIZES.text16,
   },
-});
+  });
+};

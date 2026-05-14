@@ -4,6 +4,10 @@ import ExercisesScreen from '@/screens/ExercisesScreen';
 
 // Mock dependencies
 jest.mock('lucide-react-native', () => ({
+  AlertCircle: 'AlertCircle',
+  CheckCircle2: 'CheckCircle2',
+  Info: 'Info',
+  RefreshCw: 'RefreshCw',
   Search: 'Search',
 }));
 
@@ -21,6 +25,9 @@ jest.mock('@/components/ModalHandle', () => ({
 
 const mockUseExercises = jest.fn();
 jest.mock('@/hooks/queries', () => ({
+  useExercises: () => mockUseExercises(),
+}));
+jest.mock('@/hooks/queries/useExercises', () => ({
   useExercises: () => mockUseExercises(),
 }));
 

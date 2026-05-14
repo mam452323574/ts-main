@@ -13,7 +13,6 @@ import { SOCIAL_ADMIN_MODERATION_FILTERS } from '@/constants/social';
 import {
   BORDER_RADIUS,
   FONT_WEIGHTS,
-  SHADOWS,
   SPACING,
   withAlpha,
 } from '@/constants/theme';
@@ -22,6 +21,10 @@ import { useTheme } from '@/contexts/ThemeContext';
 import type { SocialAdminModerationFilter } from '@/types';
 
 import type { AdminModerationSortMode } from './adminModerationUtils';
+import {
+  buildAdminChromePalette,
+  resolveAdminSortAccent,
+} from './adminModerationTheme';
 
 const SORT_OPTIONS: AdminModerationSortMode[] = [
   'urgent',
@@ -44,14 +47,14 @@ function renderSortIcon(
   color: string,
 ) {
   if (mode === 'urgent') {
-    return <Siren color={color} size={16} />;
+    return <Siren color={color} size={15} />;
   }
 
   if (mode === 'oldest') {
-    return <ArrowUpAZ color={color} size={16} />;
+    return <ArrowUpAZ color={color} size={15} />;
   }
 
-  return <ArrowDownAZ color={color} size={16} />;
+  return <ArrowDownAZ color={color} size={15} />;
 }
 
 export function AdminModerationToolbar({
@@ -65,135 +68,176 @@ export function AdminModerationToolbar({
 }: AdminModerationToolbarProps) {
   const { colors } = useTheme();
   const { t } = useLanguage();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const chrome = useMemo(
+    () => buildAdminChromePalette(colors, selectedFilter),
+    [colors, selectedFilter],
+  );
+  const styles = useMemo(() => createStyles(chrome), [chrome]);
 
   return (
     <View style={styles.wrapper} testID="admin-social-toolbar">
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filterRow}
-        testID="admin-social-filters"
-      >
-        {SOCIAL_ADMIN_MODERATION_FILTERS.map((filter) => {
-          const isActive = filter === selectedFilter;
+      <View style={styles.filterPanel}>
+        <View style={styles.panelChrome} />
 
-          return (
-            <TouchableOpacity
-              key={filter}
-              accessibilityRole="button"
-              onPress={() => onFilterChange(filter)}
-              style={[
-                styles.filterPill,
-                isActive ? styles.filterPillActive : null,
-              ]}
-              testID={`admin-social-filter-${filter}`}
-            >
-              <View style={styles.filterTextWrap}>
-                <Text
-                  style={[
-                    styles.filterLabel,
-                    isActive ? styles.filterLabelActive : null,
-                  ]}
-                >
-                  {t(`social.admin.filters.${filter}`)}
-                </Text>
-                <View
-                  style={[
-                    styles.countBadge,
-                    isActive ? styles.countBadgeActive : null,
-                  ]}
-                >
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}
+          testID="admin-social-filters"
+        >
+          {SOCIAL_ADMIN_MODERATION_FILTERS.map((filter) => {
+            const isActive = filter === selectedFilter;
+
+            return (
+              <TouchableOpacity
+                key={filter}
+                accessibilityRole="button"
+                onPress={() => onFilterChange(filter)}
+                style={[
+                  styles.filterPill,
+                  isActive ? styles.filterPillActive : null,
+                ]}
+                testID={`admin-social-filter-${filter}`}
+              >
+                <View style={styles.filterTextWrap}>
                   <Text
                     style={[
-                      styles.countBadgeLabel,
-                      isActive ? styles.countBadgeLabelActive : null,
+                      styles.filterLabel,
+                      isActive ? styles.filterLabelActive : null,
                     ]}
                   >
-                    {counts[filter]}
+                    {t(`social.admin.filters.${filter}`)}
                   </Text>
+                  <View
+                    style={[
+                      styles.countBadge,
+                      isActive ? styles.countBadgeActive : null,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.countBadgeLabel,
+                        isActive ? styles.countBadgeLabelActive : null,
+                      ]}
+                    >
+                      {counts[filter]}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
 
-      <View style={styles.searchShell}>
-        <Search color={colors.gray} size={18} />
-        <TextInput
-          value={searchQuery}
-          onChangeText={onSearchChange}
-          placeholder={t('social.admin.toolbar.search_placeholder')}
-          placeholderTextColor={colors.gray}
-          style={styles.searchInput}
-          testID="admin-social-search-input"
-        />
-      </View>
+        <View style={styles.searchShell}>
+          <Search color={chrome.textMuted} size={18} />
+          <TextInput
+            value={searchQuery}
+            onChangeText={onSearchChange}
+            placeholder={t('social.admin.toolbar.search_placeholder')}
+            placeholderTextColor={chrome.textMuted}
+            style={styles.searchInput}
+            selectionColor={chrome.filterAccent}
+            testID="admin-social-search-input"
+          />
+        </View>
 
-      <View style={styles.sortRow} testID="admin-social-sort-row">
-        {SORT_OPTIONS.map((mode) => {
-          const isActive = mode === sortMode;
+        <View style={styles.sortTrack} testID="admin-social-sort-row">
+          {SORT_OPTIONS.map((mode) => {
+            const isActive = mode === sortMode;
+            const accent = resolveAdminSortAccent(mode, chrome);
 
-          return (
-            <TouchableOpacity
-              key={mode}
-              accessibilityRole="button"
-              onPress={() => onSortChange(mode)}
-              style={[
-                styles.sortPill,
-                isActive ? styles.sortPillActive : null,
-              ]}
-              testID={`admin-social-sort-${mode}`}
-            >
-              {renderSortIcon(
-                mode,
-                isActive ? colors.primary : colors.gray,
-              )}
-              <Text
+            return (
+              <TouchableOpacity
+                key={mode}
+                accessibilityRole="button"
+                onPress={() => onSortChange(mode)}
                 style={[
-                  styles.sortLabel,
-                  isActive ? styles.sortLabelActive : null,
+                  styles.sortPill,
+                  isActive
+                    ? [
+                        styles.sortPillActive,
+                        {
+                          backgroundColor: withAlpha(accent, 0.16),
+                          borderColor: withAlpha(accent, 0.26),
+                        },
+                      ]
+                    : null,
                 ]}
+                testID={`admin-social-sort-${mode}`}
               >
-                {t(`social.admin.sort.${mode}`)}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+                {renderSortIcon(
+                  mode,
+                  isActive ? accent : chrome.textMuted,
+                )}
+                <Text
+                  style={[
+                    styles.sortLabel,
+                    isActive ? { color: accent } : null,
+                  ]}
+                >
+                  {t(`social.admin.sort.${mode}`)}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
     </View>
   );
 }
 
-const createStyles = (colors: any) =>
+const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
   StyleSheet.create({
     wrapper: {
+      paddingTop: SPACING.xs + 2,
+    },
+    filterPanel: {
+      overflow: 'hidden',
+      borderRadius: BORDER_RADIUS.hero,
+      paddingHorizontal: SPACING.md,
+      paddingTop: SPACING.md,
+      paddingBottom: SPACING.md + 2,
       gap: SPACING.sm,
-      paddingHorizontal: SPACING.page,
-      paddingTop: SPACING.xs,
-      paddingBottom: SPACING.sm + 2,
-      backgroundColor: withAlpha(colors.background, 0.98),
-      borderBottomWidth: 1,
-      borderBottomColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.06),
-      ...SHADOWS.header,
+      backgroundColor: chrome.surfaceGlass,
+      borderWidth: 1,
+      borderColor: chrome.borderSubtle,
+      shadowColor: chrome.shadowColor,
+      shadowOffset: { width: 0, height: 14 },
+      shadowOpacity: 0.3,
+      shadowRadius: 22,
+      elevation: 7,
+    },
+    panelChrome: {
+      position: 'absolute',
+      top: -44,
+      right: -28,
+      width: 156,
+      height: 156,
+      borderRadius: 78,
+      backgroundColor: chrome.filterAccentHalo,
     },
     filterRow: {
       gap: SPACING.xs + 2,
-      paddingRight: SPACING.page,
+      paddingRight: SPACING.sm,
     },
     filterPill: {
-      minHeight: 40,
+      minHeight: 42,
       paddingHorizontal: SPACING.md,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: colors.surfaceMuted ?? colors.cardBackground,
-      borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
       justifyContent: 'center',
+      backgroundColor: chrome.surfaceMuted,
+      borderWidth: 1,
+      borderColor: chrome.borderSubtle,
     },
     filterPillActive: {
-      backgroundColor: colors.surfaceAccent ?? withAlpha(colors.primary, 0.12),
-      borderColor: withAlpha(colors.primary, 0.2),
+      backgroundColor: chrome.filterAccentSoft,
+      borderColor: chrome.filterAccentBorder,
+      shadowColor: chrome.shadowColor,
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.22,
+      shadowRadius: 18,
+      elevation: 4,
     },
     filterTextWrap: {
       flexDirection: 'row',
@@ -203,78 +247,83 @@ const createStyles = (colors: any) =>
     filterLabel: {
       fontSize: 13,
       fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.primaryText,
+      color: chrome.textSecondary,
     },
     filterLabelActive: {
-      color: colors.primary,
+      color: chrome.textPrimary,
     },
     countBadge: {
-      minWidth: 22,
-      height: 22,
-      borderRadius: 11,
+      minWidth: 24,
+      height: 24,
+      borderRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
       paddingHorizontal: SPACING.xs,
-      backgroundColor: colors.cardBackground,
+      backgroundColor: withAlpha(chrome.textPrimary, 0.04),
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderColor: chrome.borderSubtle,
     },
     countBadgeActive: {
-      backgroundColor: withAlpha(colors.primary, 0.16),
-      borderColor: withAlpha(colors.primary, 0.2),
+      backgroundColor: withAlpha(chrome.textPrimary, 0.08),
+      borderColor: chrome.filterAccentBorder,
     },
     countBadgeLabel: {
       fontSize: 11,
       fontWeight: FONT_WEIGHTS.bold,
-      color: colors.primaryText,
+      color: chrome.textMuted,
     },
     countBadgeLabelActive: {
-      color: colors.primary,
+      color: chrome.textPrimary,
     },
     searchShell: {
-      minHeight: 42,
-      borderRadius: BORDER_RADIUS.lg,
+      minHeight: 46,
+      borderRadius: BORDER_RADIUS.xl,
       paddingHorizontal: SPACING.md,
       flexDirection: 'row',
       alignItems: 'center',
       gap: SPACING.sm,
-      backgroundColor: colors.cardBackground,
+      backgroundColor: withAlpha(chrome.screenBackground, 0.48),
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderColor: chrome.borderSubtle,
     },
     searchInput: {
       flex: 1,
-      minHeight: 42,
-      color: colors.primaryText,
+      minHeight: 46,
+      color: chrome.textPrimary,
       fontSize: 13,
     },
-    sortRow: {
+    sortTrack: {
       flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: SPACING.xs + 2,
+      gap: SPACING.xs,
+      padding: 4,
+      borderRadius: BORDER_RADIUS.full,
+      backgroundColor: withAlpha(chrome.screenBackground, 0.44),
+      borderWidth: 1,
+      borderColor: chrome.borderSubtle,
     },
     sortPill: {
+      flex: 1,
       minHeight: 34,
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'center',
       gap: SPACING.xs,
-      paddingHorizontal: SPACING.sm + 2,
+      paddingHorizontal: SPACING.sm,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: colors.surfaceMuted ?? colors.cardBackground,
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderColor: 'transparent',
     },
     sortPillActive: {
-      backgroundColor: colors.surfaceAccent ?? withAlpha(colors.primary, 0.12),
-      borderColor: withAlpha(colors.primary, 0.2),
+      shadowColor: chrome.shadowColor,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.18,
+      shadowRadius: 16,
+      elevation: 3,
     },
     sortLabel: {
       fontSize: 11,
       fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.textMuted ?? colors.gray,
-    },
-    sortLabelActive: {
-      color: colors.primary,
+      color: chrome.textMuted,
     },
   });
 

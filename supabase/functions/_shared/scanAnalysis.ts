@@ -177,6 +177,20 @@ function readScanPayloadCandidate(payload: Record<string, unknown>) {
   );
 }
 
+function readProviderFailureMessage(payload: Record<string, unknown>) {
+  const topLevelMessage = readString(payload.error) ?? readString(payload.message);
+  if (topLevelMessage) {
+    return topLevelMessage;
+  }
+
+  const nestedData = isRecord(payload.data) ? payload.data : null;
+  if (nestedData && readString(nestedData.scan_type) === 'error') {
+    return readString(nestedData.message);
+  }
+
+  return null;
+}
+
 function normalizeSchemaVersion(value: unknown, fallbackVersion = 3) {
   return typeof value === 'number' && (value === 2 || value === 3 || value === 4)
     ? value
@@ -423,6 +437,15 @@ function sanitizeExtendedEnumKey<T extends readonly string[]>(
 
 function sanitizeExtendedFaceFields(candidate: Record<string, unknown>) {
   return {
+    face_shape: sanitizeBoundedText(candidate.face_shape, SCAN_TEXT_MAX_LABEL),
+    face_shape_key: sanitizeBoundedText(
+      candidate.face_shape_key,
+      SCAN_TEXT_MAX_LABEL,
+    ),
+    face_shape_fallback_text: sanitizeBoundedText(
+      candidate.face_shape_fallback_text,
+      SCAN_TEXT_MAX_LABEL,
+    ),
     skin_clarity_score: readBoundedNumber(candidate.skin_clarity_score, 0, 100),
     under_eye_shadow_score: readBoundedNumber(
       candidate.under_eye_shadow_score,
@@ -477,6 +500,27 @@ function sanitizeExtendedFaceFields(candidate: Record<string, unknown>) {
 
 function sanitizeExtendedBodyFields(candidate: Record<string, unknown>) {
   return {
+    muscle_mass_label: sanitizeBoundedText(
+      candidate.muscle_mass_label,
+      SCAN_TEXT_MAX_LABEL,
+    ),
+    muscle_mass_key: sanitizeBoundedText(
+      candidate.muscle_mass_key,
+      SCAN_TEXT_MAX_LABEL,
+    ),
+    muscle_mass_fallback_text: sanitizeBoundedText(
+      candidate.muscle_mass_fallback_text,
+      SCAN_TEXT_MAX_LABEL,
+    ),
+    body_type: sanitizeBoundedText(candidate.body_type, SCAN_TEXT_MAX_LABEL),
+    body_type_key: sanitizeBoundedText(
+      candidate.body_type_key,
+      SCAN_TEXT_MAX_LABEL,
+    ),
+    body_type_fallback_text: sanitizeBoundedText(
+      candidate.body_type_fallback_text,
+      SCAN_TEXT_MAX_LABEL,
+    ),
     muscle_definition_score: readBoundedNumber(
       candidate.muscle_definition_score,
       0,
@@ -547,6 +591,52 @@ function sanitizeExtendedBodyFields(candidate: Record<string, unknown>) {
 
 function sanitizeExtendedNutritionFields(candidate: Record<string, unknown>) {
   return {
+    verdict_key: sanitizeBoundedText(candidate.verdict_key, SCAN_TEXT_MAX_LABEL),
+    verdict_fallback_text: sanitizeBoundedText(
+      candidate.verdict_fallback_text,
+      SCAN_TEXT_MAX_LABEL,
+    ),
+    glycemic_index_key: sanitizeBoundedText(
+      candidate.glycemic_index_key,
+      SCAN_TEXT_MAX_LABEL,
+    ),
+    glycemic_index_label: sanitizeBoundedText(
+      candidate.glycemic_index_label,
+      SCAN_TEXT_MAX_LABEL,
+    ),
+    glycemic_index_fallback_text: sanitizeBoundedText(
+      candidate.glycemic_index_fallback_text,
+      SCAN_TEXT_MAX_LABEL,
+    ),
+    ingredient_quality_key: sanitizeBoundedText(
+      candidate.ingredient_quality_key,
+      SCAN_TEXT_MAX_LABEL,
+    ),
+    ingredient_quality: sanitizeBoundedText(
+      candidate.ingredient_quality,
+      SCAN_TEXT_MAX_LABEL,
+    ),
+    ingredient_quality_fallback_text: sanitizeBoundedText(
+      candidate.ingredient_quality_fallback_text,
+      SCAN_TEXT_MAX_LABEL,
+    ),
+    main_vitamin_keys: sanitizeBoundedTextArray(
+      candidate.main_vitamin_keys,
+      20,
+      SCAN_TEXT_MAX_LABEL,
+    ),
+    main_vitamins: sanitizeBoundedText(
+      candidate.main_vitamins,
+      SCAN_TEXT_MAX_PARAGRAPH,
+    ),
+    main_vitamins_fallback_text: sanitizeBoundedText(
+      candidate.main_vitamins_fallback_text,
+      SCAN_TEXT_MAX_PARAGRAPH,
+    ),
+    short_verdict: sanitizeBoundedText(
+      candidate.short_verdict,
+      SCAN_TEXT_MAX_LABEL,
+    ),
     fiber_grams_estimate: readBoundedNumber(
       candidate.fiber_grams_estimate,
       0,
@@ -1068,7 +1158,8 @@ export function resolveNormalizedScanAnalysisPayload(
     throw new Phase2HttpError(
       502,
       'analysis_failed',
-      readString(payload.error) ?? 'Scan analysis provider reported a failure',
+      readProviderFailureMessage(payload) ??
+        'Scan analysis provider reported a failure',
     );
   }
 

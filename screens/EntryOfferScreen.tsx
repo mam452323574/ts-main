@@ -6,8 +6,10 @@ import { Gift, Sparkles } from 'lucide-react-native';
 
 import { AppScreen } from '@/components/AppScreen';
 import { Button } from '@/components/Button';
+import { Surface } from '@/components/Surface';
 import { EntryOfferWheel } from '@/components/entryOffer/EntryOfferWheel';
-import { GROWTH_EXPERIENCE_QUERY_KEY, useFeatureFlags, useGrowthExperience } from '@/hooks/queries';
+import { useFeatureFlags } from '@/hooks/queries/useFeatureFlags';
+import { GROWTH_EXPERIENCE_QUERY_KEY, useGrowthExperience } from '@/hooks/queries/useGrowthExperience';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -27,6 +29,7 @@ import {
 import {
   BORDER_RADIUS,
   FONT_WEIGHTS,
+  SHADOWS,
   SIZES,
   SPACING,
   withAlpha,
@@ -340,9 +343,9 @@ export default function EntryOfferScreen() {
 
       <View style={styles.hero}>
         <View style={styles.iconWrap}>
-          <Gift color={colors.white} size={28} />
+          <Gift color={colors.gold} size={28} />
           <View style={styles.sparkleBadge}>
-            <Sparkles color={colors.white} size={14} />
+            <Sparkles color={colors.background} size={14} />
           </View>
         </View>
 
@@ -352,12 +355,12 @@ export default function EntryOfferScreen() {
       </View>
 
       {loadingOffering ? (
-        <View style={styles.stateCard} testID="entry-offer-loading-state">
+        <Surface variant="raised" style={styles.stateCard} testID="entry-offer-loading-state">
           <ActivityIndicator color={colors.primary} />
-        </View>
+        </Surface>
       ) : canDisplayOffer && resolvedOffering?.canShowPromo && resolvedOffering.selectedPackage ? (
         <>
-          <View style={styles.wheelCard}>
+          <Surface variant="premium" accentColor={colors.gold} style={styles.wheelCard}>
             <Text style={styles.sectionTitle}>{t('entry_offer.reveal_title')}</Text>
             <Text style={styles.sectionBody}>{t('entry_offer.reveal_body')}</Text>
 
@@ -389,9 +392,14 @@ export default function EntryOfferScreen() {
               disabled={revealed}
               testID="entry-offer-wheel"
             />
-          </View>
+          </Surface>
 
-          <View style={styles.rewardCard} testID="entry-offer-reward-card">
+          <Surface
+            variant="premium"
+            accentColor={colors.gold}
+            style={styles.rewardCard}
+            testID="entry-offer-reward-card"
+          >
             <View style={styles.rewardHeader}>
               <Text style={styles.rewardBadge}>{rewardBadge}</Text>
               <Text style={styles.rewardPrice}>{packagePrice}</Text>
@@ -410,10 +418,10 @@ export default function EntryOfferScreen() {
               loading={claiming}
               disabled={!revealed || claiming}
             />
-          </View>
+          </Surface>
         </>
       ) : (
-        <View style={styles.stateCard} testID="entry-offer-fallback-state">
+        <Surface variant="raised" style={styles.stateCard} testID="entry-offer-fallback-state">
           <Text style={styles.sectionTitle}>{t('entry_offer.unavailable_title')}</Text>
           <Text style={styles.sectionBody}>{t('entry_offer.unavailable_body')}</Text>
           {!hasActiveEntitlement ? (
@@ -427,7 +435,7 @@ export default function EntryOfferScreen() {
               }}
             />
           ) : null}
-        </View>
+        </Surface>
       )}
 
       <TouchableOpacity
@@ -466,8 +474,11 @@ const createStyles = (colors: any) =>
       borderRadius: 36,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.primary,
+      backgroundColor: withAlpha(colors.gold, 0.14),
       position: 'relative',
+      borderWidth: 1,
+      borderColor: withAlpha(colors.gold, 0.32),
+      ...SHADOWS.goldGlow,
     },
     sparkleBadge: {
       position: 'absolute',
@@ -478,12 +489,12 @@ const createStyles = (colors: any) =>
       borderRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.warning,
+      backgroundColor: colors.gold,
     },
     eyebrow: {
       fontSize: SIZES.text12,
       fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.primary,
+      color: colors.gold,
       textTransform: 'uppercase',
       letterSpacing: 0.6,
     },
@@ -501,19 +512,9 @@ const createStyles = (colors: any) =>
     },
     wheelCard: {
       gap: SPACING.md,
-      padding: SPACING.lg,
-      borderRadius: BORDER_RADIUS.xl,
-      backgroundColor: colors.cardBackground,
-      borderWidth: 1,
-      borderColor: withAlpha(colors.primary, 0.08),
     },
     rewardCard: {
       gap: SPACING.md,
-      padding: SPACING.lg,
-      borderRadius: BORDER_RADIUS.xl,
-      backgroundColor: colors.cardBackground,
-      borderWidth: 1,
-      borderColor: withAlpha(colors.primary, 0.08),
     },
     rewardHeader: {
       flexDirection: 'row',
@@ -524,7 +525,7 @@ const createStyles = (colors: any) =>
     rewardBadge: {
       fontSize: SIZES.text12,
       fontWeight: FONT_WEIGHTS.bold,
-      color: colors.primary,
+      color: colors.gold,
       textTransform: 'uppercase',
       letterSpacing: 0.5,
     },
@@ -547,15 +548,10 @@ const createStyles = (colors: any) =>
       fontSize: SIZES.text12,
       lineHeight: 18,
       fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.primary,
+      color: colors.gold,
     },
     stateCard: {
       gap: SPACING.sm,
-      padding: SPACING.lg,
-      borderRadius: BORDER_RADIUS.xl,
-      backgroundColor: colors.cardBackground,
-      borderWidth: 1,
-      borderColor: withAlpha(colors.primaryText, 0.08),
       alignItems: 'center',
       justifyContent: 'center',
     },

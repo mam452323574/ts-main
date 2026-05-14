@@ -129,6 +129,17 @@ jest.mock('@/hooks/queries', () => ({
   flattenSocialFeedPages: (pages: Array<{ items: unknown[] }> | undefined) =>
     pages?.flatMap((page) => page.items) ?? [],
 }));
+jest.mock('@/hooks/queries/useFeatureFlags', () => ({
+  useFeatureFlags: () => mockUseFeatureFlags(),
+}));
+jest.mock('@/hooks/queries/useSocialFeed', () => ({
+  useSocialFeed: (...args: unknown[]) => mockUseSocialFeed(...args),
+  flattenSocialFeedPages: (pages: Array<{ items: unknown[] }> | undefined) =>
+    pages?.flatMap((page) => page.items) ?? [],
+}));
+jest.mock('@/hooks/queries/useSocialMutations', () => ({
+  useSocialMutations: () => mockUseSocialMutations(),
+}));
 
 jest.mock('@/services/social', () => {
   const actual = jest.requireActual('@/services/social');
@@ -176,6 +187,7 @@ jest.mock('@/components/social/SocialPostCard', () => ({
     onDeletePress,
     onDislikePress,
     onLikePress,
+    onMorePress,
     onPress,
     onReportPress,
     onSharePress,
@@ -190,6 +202,7 @@ jest.mock('@/components/social/SocialPostCard', () => ({
     onLikePress: () => void;
     onCommentPress: () => void;
     onDeletePress?: (() => void) | null;
+    onMorePress?: (() => void) | null;
     onPress?: (() => void) | null;
     onReportPress: () => void;
     onSharePress?: (() => void) | null;
@@ -247,6 +260,13 @@ jest.mock('@/components/social/SocialPostCard', () => ({
             ReactLocal.createElement(Text, null, 'share'),
           )
         : null,
+      onMorePress
+        ? ReactLocal.createElement(
+            Pressable,
+            { onPress: onMorePress, testID: `more-enabled-${post.id}` },
+            ReactLocal.createElement(Text, null, 'more'),
+          )
+        : null,
       currentUserId === post.author_id
         ? ReactLocal.createElement(
             Pressable,
@@ -269,6 +289,59 @@ jest.mock('@/components/social/SocialPostCard', () => ({
             Pressable,
             { onPress: onCommentPress, testID: `comments-enabled-${post.id}` },
             ReactLocal.createElement(Text, null, 'comments'),
+          )
+        : null,
+    );
+  },
+}));
+
+jest.mock('@/components/social/SocialPostActionSheet', () => ({
+  SocialPostActionSheet: ({
+    visible,
+    onClose,
+    onDeletePress,
+    onNotInterestedPress,
+    onReportPress,
+  }: {
+    visible: boolean;
+    onClose: () => void;
+    onDeletePress?: (() => void) | null;
+    onNotInterestedPress?: (() => void) | null;
+    onReportPress?: (() => void) | null;
+  }) => {
+    if (!visible) {
+      return null;
+    }
+
+    const ReactLocal = require('react');
+    const { Pressable, Text, View } = require('react-native');
+    return ReactLocal.createElement(
+      View,
+      { testID: 'social-post-action-sheet' },
+      ReactLocal.createElement(
+        Pressable,
+        { onPress: onClose, testID: 'social-post-action-sheet-close' },
+        ReactLocal.createElement(Text, null, 'close'),
+      ),
+      onNotInterestedPress
+        ? ReactLocal.createElement(
+            Pressable,
+            { onPress: onNotInterestedPress, testID: 'social-post-action-not-interested' },
+            ReactLocal.createElement(Text, null, 'not interested'),
+          )
+        : null,
+      onReportPress
+        ? ReactLocal.createElement(
+            Pressable,
+            { onPress: onReportPress, testID: 'social-post-action-report' },
+            ReactLocal.createElement(Text, null, 'report'),
+          )
+        : null,
+      onDeletePress
+        ? ReactLocal.createElement(
+            Pressable,
+            { onPress: onDeletePress, testID: 'social-post-action-delete' },
+            ReactLocal.createElement(Text, null, 'delete'),
           )
         : null,
     );
@@ -447,7 +520,8 @@ describe('SocialScreen', () => {
     const screen = render(<SocialScreen />);
 
     expect(mockUseSocialFeed).toHaveBeenLastCalledWith('all');
-    expect(screen.getByTestId('social-filters-scroll').props.horizontal).toBe(true);
+    expect(screen.getByTestId('social-filters-control')).toBeTruthy();
+    expect(screen.queryByTestId('social-filters-scroll')).toBeNull();
 
     fireEvent.press(screen.getByTestId('social-pill-food'));
 
@@ -585,6 +659,31 @@ describe('SocialScreen', () => {
       reaction: 'like',
     });
     expect(mockMutate).toHaveBeenNthCalledWith(2, {
+      postId: 'post-1',
+      reaction: 'dislike',
+    });
+  });
+
+  it('routes not interested through the post action sheet', () => {
+    const mockMutate = jest.fn();
+    mockUseSocialMutations.mockReturnValue({
+      deletePostMutation: { mutateAsync: jest.fn() },
+      setReactionMutation: { mutate: mockMutate },
+      reportContentMutation: { mutate: jest.fn(), mutateAsync: jest.fn() },
+      reactionError: null,
+      clearReactionError: mockClearReactionError,
+      isDeletePending: jest.fn().mockReturnValue(false),
+      isReactionPending: jest.fn().mockReturnValue(false),
+    });
+
+    const screen = render(<SocialScreen />);
+
+    fireEvent.press(screen.getByTestId('more-enabled-post-1'));
+    expect(screen.getByTestId('social-post-action-sheet')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('social-post-action-not-interested'));
+
+    expect(mockMutate).toHaveBeenCalledWith({
       postId: 'post-1',
       reaction: 'dislike',
     });

@@ -152,12 +152,17 @@ describe('SignUpScreen friendly flow', () => {
     });
   });
 
-  it('starts on the theme step', async () => {
+  it('starts on the intro step', async () => {
     render(<SignUpScreen />);
 
-    expect(await screen.findByText('Choisissez votre ambiance')).toBeTruthy();
-    expect(screen.getByText('Sombre')).toBeTruthy();
-    expect(screen.getByText('Clair')).toBeTruthy();
+    expect(
+      await screen.findByText('Votre premier scan commence ici'),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Choisissez un pseudo, une apparence, puis confirmez votre email. Encore une étape avant votre premier scan.',
+      ),
+    ).toBeTruthy();
   });
 
   it('uses compact Android auth-shell spacing and keyboard height avoidance', async () => {
@@ -194,21 +199,21 @@ describe('SignUpScreen friendly flow', () => {
     );
   });
 
-  it('moves through username and avatar skip before showing account fields', async () => {
+  it('moves through profile setup and avatar skip before showing account fields', async () => {
     render(<SignUpScreen />);
 
     fireEvent.press(await screen.findByText('Suivant'));
-    expect(await screen.findByText('Comment doit-on vous appeler ?')).toBeTruthy();
+    expect(await screen.findByText('Préparez votre profil de scan')).toBeTruthy();
+    expect(screen.getByText('Sombre')).toBeTruthy();
+    expect(screen.getByText('Clair')).toBeTruthy();
 
     fireEvent.changeText(screen.getByTestId('signup-username-input'), 'Friendly User!');
     expect(screen.getByTestId('signup-username-input').props.value).toBe('friendlyuser');
-    expect(await screen.findByText('Pseudo pret')).toBeTruthy();
-
-    fireEvent.press(screen.getByText('Suivant'));
-    expect(await screen.findByText('Ajoutez une photo')).toBeTruthy();
+    expect(await screen.findByText('Pseudo prêt')).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('signup-avatar-skip'));
-    expect(await screen.findByText('Creez votre compte')).toBeTruthy();
+    fireEvent.press(screen.getByText('Suivant'));
+    expect(await screen.findByText('Créez votre compte')).toBeTruthy();
     expect(screen.getByPlaceholderText('Votre email')).toBeTruthy();
     expect(screen.getByPlaceholderText(passwordPlaceholder)).toBeTruthy();
   });
@@ -219,7 +224,6 @@ describe('SignUpScreen friendly flow', () => {
     fireEvent.press(await screen.findByText('Suivant'));
     fireEvent.changeText(screen.getByTestId('signup-username-input'), 'testuser');
     fireEvent.press(screen.getByText('Suivant'));
-    fireEvent.press(await screen.findByTestId('signup-avatar-skip'));
 
     fireEvent.changeText(await screen.findByPlaceholderText('Votre email'), 'test@example.com');
     fireEvent.changeText(screen.getByPlaceholderText(passwordPlaceholder), 'StrongerPass42!');
@@ -252,7 +256,6 @@ describe('SignUpScreen friendly flow', () => {
     fireEvent.press(await screen.findByText('Suivant'));
     fireEvent.changeText(screen.getByTestId('signup-username-input'), 'testuser');
     fireEvent.press(screen.getByText('Suivant'));
-    fireEvent.press(await screen.findByTestId('signup-avatar-skip'));
 
     fireEvent.changeText(await screen.findByPlaceholderText('Votre email'), 'test@example.com');
     fireEvent.changeText(screen.getByPlaceholderText(passwordPlaceholder), 'longenough');
@@ -276,7 +279,6 @@ describe('SignUpScreen friendly flow', () => {
     fireEvent.press(await screen.findByText('Suivant'));
     fireEvent.changeText(screen.getByTestId('signup-username-input'), 'testuser');
     fireEvent.press(screen.getByText('Suivant'));
-    fireEvent.press(await screen.findByTestId('signup-avatar-skip'));
 
     fireEvent.changeText(await screen.findByPlaceholderText('Votre email'), 'test@example.com');
     fireEvent.changeText(screen.getByPlaceholderText(passwordPlaceholder), 'StrongerPass42!');
@@ -303,8 +305,6 @@ describe('SignUpScreen friendly flow', () => {
 
     fireEvent.press(await screen.findByText('Suivant'));
     fireEvent.changeText(screen.getByTestId('signup-username-input'), 'testuser');
-    fireEvent.press(screen.getByText('Suivant'));
-
     fireEvent.press(await screen.findByTestId('signup-avatar-library'));
     fireEvent.press(await screen.findByTestId('signup-avatar-crop-confirm'));
 

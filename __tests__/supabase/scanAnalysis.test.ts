@@ -113,6 +113,27 @@ describe('scan analysis helpers', () => {
     });
   });
 
+  it('surfaces nested provider error messages without changing the failure code', () => {
+    try {
+      resolveNormalizedScanAnalysisPayload(
+        {
+          success: false,
+          data: {
+            scan_type: 'error',
+            message: 'Invalid scan response.',
+          },
+        },
+        'health',
+      );
+      throw new Error('Expected resolveNormalizedScanAnalysisPayload to throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(Phase2HttpError);
+      expect((error as Phase2HttpError).status).toBe(502);
+      expect((error as Phase2HttpError).code).toBe('analysis_failed');
+      expect((error as Error).message).toBe('Invalid scan response.');
+    }
+  });
+
   it('accepts fat_distribution_scan_v2 for super scans without forcing legacy fields', () => {
     expect(
       resolveNormalizedScanAnalysisPayload(

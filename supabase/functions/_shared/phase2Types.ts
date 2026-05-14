@@ -493,6 +493,8 @@ export interface CoachGenerateResponse {
   entry_id: string;
   persona_key: CoachPersonaKey;
   prompt_type: string | null;
+  question_key?: string | null;
+  question_text?: string | null;
   response_version: 1 | 2;
   status: Phase2CoachEntryStatus;
   title: string | null;

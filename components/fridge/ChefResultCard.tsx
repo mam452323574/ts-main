@@ -15,6 +15,7 @@ import {
 } from 'lucide-react-native';
 
 import { ChefModeIcon } from '@/components/fridge/ChefModeIcon';
+import { PremiumTeaserCard } from '@/components/results/PremiumTeaserCard';
 import {
   BORDER_RADIUS,
   FONT_WEIGHTS,
@@ -33,6 +34,7 @@ import {
   type ResultLayoutState,
 } from '@/utils/resultLayout';
 import { resolveChefSurfaceColors as resolveChefSurfaceThemeColors } from '@/utils/scanFlowVisualTheme';
+import type { PremiumRenderState } from '@/utils/subscription';
 
 type Translate = (scope: string, options?: Record<string, unknown>) => string;
 
@@ -47,6 +49,8 @@ export type ChefModeTheme = {
 type ChefResultCardProps = {
   imageUri?: string;
   mealResult: FridgeMealResult;
+  onPremiumPress?: () => void;
+  premiumRenderState?: PremiumRenderState;
   selectedMode: FridgeMealMode;
   t: Translate;
 };
@@ -340,6 +344,8 @@ function ChipList({
 export function ChefResultCard({
   imageUri,
   mealResult,
+  onPremiumPress,
+  premiumRenderState = 'unlocked',
   selectedMode,
   t,
 }: ChefResultCardProps) {
@@ -368,6 +374,39 @@ export function ChefResultCard({
   const hasAdviceSection = mealResult.tips.length > 0;
   const hasSubstitutionSection = mealResult.substitutions.length > 0;
   const hasAdditionsSection = mealResult.optional_additions.length > 0;
+  const isUnlocked = premiumRenderState === 'unlocked';
+  const isLocked = premiumRenderState === 'locked';
+  const renderPremiumTeaser = (
+    title: string,
+    testID: string,
+    lineCount = 3,
+  ) => (
+    <PremiumTeaserCard
+      accentColor={modeTheme.accent}
+      lineCount={lineCount}
+      onPress={isLocked ? onPremiumPress : undefined}
+      premiumRenderState={premiumRenderState}
+      testID={testID}
+      title={title}
+    />
+  );
+  const renderGatedSection = (
+    title: string,
+    testID: string,
+    children: ReactNode,
+    lineCount = 3,
+  ) => (
+    isUnlocked ? (
+      <Section
+        layout={layout}
+        modeTheme={modeTheme}
+        title={title}
+        testID={testID}
+      >
+        {children}
+      </Section>
+    ) : renderPremiumTeaser(title, testID, lineCount)
+  );
 
   return (
     <View style={styles.stack} testID="chef-result-card">
@@ -491,7 +530,7 @@ export function ChefResultCard({
           </View>
         </View>
 
-        {nutritionTags.length > 0 ? (
+        {isUnlocked && nutritionTags.length > 0 ? (
           <View style={styles.tagWrap} testID="chef-result-nutrition-tags">
             {nutritionTags.map((tag) => (
               <View key={tag} style={styles.tag}>
@@ -504,46 +543,45 @@ export function ChefResultCard({
         ) : null}
       </View>
 
-      <Section
-        layout={layout}
-        modeTheme={modeTheme}
-        title={t('fridge_scan_result.sections.why')}
-        testID="chef-result-section-why"
-      >
+      {renderGatedSection(
+        t('fridge_scan_result.sections.why'),
+        'chef-result-section-why',
         <BulletList
           accent={modeTheme.accent}
           items={mealResult.why_this_fits_the_goal}
-        />
-      </Section>
+        />,
+        3,
+      )}
 
-      <Section
-        layout={layout}
-        modeTheme={modeTheme}
-        title={t('fridge_scan_result.sections.ingredients')}
-        testID="chef-result-section-ingredients"
-      >
-        <Text {...RESULT_TEXT_PROPS} style={styles.subLabel}>
-          {t('fridge_scan_result.labels.used')}
-        </Text>
-        <ChipList accent={modeTheme.accent} items={mealResult.ingredients_used} />
+      {renderGatedSection(
+        t('fridge_scan_result.sections.ingredients'),
+        'chef-result-section-ingredients',
+        <>
+          <Text {...RESULT_TEXT_PROPS} style={styles.subLabel}>
+            {t('fridge_scan_result.labels.used')}
+          </Text>
+          <ChipList accent={modeTheme.accent} items={mealResult.ingredients_used} />
 
-        <Text {...RESULT_TEXT_PROPS} style={[styles.subLabel, styles.subLabelSpacing]}>
-          {t('fridge_scan_result.labels.detected')}
-        </Text>
-        <ChipList
-          accent={modeTheme.accent}
-          compact
-          items={mealResult.ingredients_detected}
-        />
-      </Section>
+          <Text {...RESULT_TEXT_PROPS} style={[styles.subLabel, styles.subLabelSpacing]}>
+            {t('fridge_scan_result.labels.detected')}
+          </Text>
+          <ChipList
+            accent={modeTheme.accent}
+            compact
+            items={mealResult.ingredients_detected}
+          />
+        </>,
+        4,
+      )}
 
-      {hasNutritionSection ? (
-        <Section
-          layout={layout}
-          modeTheme={modeTheme}
-          title={t('fridge_scan_result.sections.nutrition')}
-          testID="chef-result-section-nutrition"
-        >
+      {hasNutritionSection || !isUnlocked ? (
+        isUnlocked ? (
+          <Section
+            layout={layout}
+            modeTheme={modeTheme}
+            title={t('fridge_scan_result.sections.nutrition')}
+            testID="chef-result-section-nutrition"
+          >
           {nutritionTags.length > 0 ? (
             <View style={styles.nutritionGrid}>
               {nutritionTags.map((tag) => {
@@ -568,59 +606,57 @@ export function ChefResultCard({
               {mealResult.nutrition_estimate.note}
             </Text>
           ) : null}
-        </Section>
+          </Section>
+        ) : renderPremiumTeaser(
+          t('fridge_scan_result.sections.nutrition'),
+          'chef-result-section-nutrition',
+          3,
+        )
       ) : null}
 
-      <Section
-        layout={layout}
-        modeTheme={modeTheme}
-        title={t('fridge_scan_result.sections.preparation')}
-        testID="chef-result-section-preparation"
-      >
+      {renderGatedSection(
+        t('fridge_scan_result.sections.preparation'),
+        'chef-result-section-preparation',
         <StepList
           accent={modeTheme.accent}
           steps={mealResult.preparation_steps}
-        />
-      </Section>
+        />,
+        4,
+      )}
 
       {hasAdviceSection ? (
-        <Section
-          layout={layout}
-          modeTheme={modeTheme}
-          title={t('fridge_scan_result.sections.advice')}
-          testID="chef-result-section-advice"
-        >
-          <BulletList accent={modeTheme.accent} items={mealResult.tips} />
-        </Section>
+        renderGatedSection(
+          t('fridge_scan_result.sections.advice'),
+          'chef-result-section-advice',
+          <BulletList accent={modeTheme.accent} items={mealResult.tips} />,
+          3,
+        )
       ) : null}
 
       {hasAdditionsSection ? (
-        <Section
-          layout={layout}
-          modeTheme={modeTheme}
-          title={t('fridge_scan_result.sections.additions')}
-          testID="chef-result-section-additions"
-        >
+        renderGatedSection(
+          t('fridge_scan_result.sections.additions'),
+          'chef-result-section-additions',
           <ChipList
             accent={modeTheme.accent}
             items={mealResult.optional_additions}
-          />
-        </Section>
+          />,
+          2,
+        )
       ) : null}
 
       {hasSubstitutionSection ? (
-        <Section
-          layout={layout}
-          modeTheme={modeTheme}
-          title={t('fridge_scan_result.sections.substitutions')}
-          testID="chef-result-section-substitutions"
-        >
-          <BulletList accent={modeTheme.accent} items={mealResult.substitutions} />
-        </Section>
+        renderGatedSection(
+          t('fridge_scan_result.sections.substitutions'),
+          'chef-result-section-substitutions',
+          <BulletList accent={modeTheme.accent} items={mealResult.substitutions} />,
+          3,
+        )
       ) : null}
 
       {mealResult.caution_note ? (
-        <View style={styles.cautionCard} testID="chef-result-caution">
+        isUnlocked ? (
+          <View style={styles.cautionCard} testID="chef-result-caution">
           <AlertCircle
             color={modeTheme.accent}
             size={18}
@@ -634,7 +670,12 @@ export function ChefResultCard({
               {mealResult.caution_note}
             </Text>
           </View>
-        </View>
+          </View>
+        ) : renderPremiumTeaser(
+          t('fridge_scan_result.labels.caution'),
+          'chef-result-caution',
+          2,
+        )
       ) : null}
     </View>
   );

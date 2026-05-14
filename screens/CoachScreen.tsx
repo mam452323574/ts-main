@@ -1,22 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import {
-  SafeAreaView,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, History, ScanLine } from 'lucide-react-native';
+import { History, ScanLine } from 'lucide-react-native';
 
-import { Button } from '@/components/Button';
 import { CoachFeatureIcon } from '@/components/FeatureIcons';
+import { AppScreen } from '@/components/AppScreen';
+import { HeaderIconButton, ScreenHeader } from '@/components/ScreenHeader';
+import { ScreenState } from '@/components/ScreenState';
+import { CoachActionComposer } from '@/components/coach/CoachActionComposer';
 import { CoachGuidanceCard } from '@/components/coach/CoachGuidanceCard';
 import { CoachPersonaDetailsModal } from '@/components/coach/CoachPersonaDetailsModal';
 import { CoachSettingsInline } from '@/components/coach/CoachSettingsInline';
@@ -25,23 +26,18 @@ import {
   FONT_WEIGHTS,
   SIZES,
   SPACING,
+  getMainPageChrome,
+  getVisualMoodSurface,
   withAlpha,
 } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useCoachGeneration } from '@/hooks/queries/useCoachGeneration';
 import {
-  COACH_HISTORY_SUMMARY_QUERY_KEY,
-  COACH_LATEST_READY_ENTRY_QUERY_KEY,
-  getCoachQuotaQueryKey,
-  useCoachEntries,
-  useCoachGeneration,
-  useCoachHistorySummary,
-  useCoachQuota,
-  useCoachScans,
-  useLatestReadyCoachEntry,
-} from '@/hooks/queries';
-import { useApplyCoachProfileUpdates } from '@/hooks/useApplyCoachProfileUpdates';
+  COACH_SCREEN_SNAPSHOT_QUERY_KEY,
+  useCoachScreenSnapshot,
+} from '@/hooks/queries/useCoachScreenSnapshot';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { trackEvent } from '@/services/analytics';
 import {
@@ -59,14 +55,35 @@ import {
 import { markCoachSeen } from '@/services/growthExperience';
 import { getCoachPersonaVisual } from '@/shared/coachPersonaVisuals';
 import {
+  COACH_QUESTION_MAX_LENGTH,
+  buildDefaultCoachQuestionSelection,
+  getCoachQuestionTimeOfDay,
+  isCoachQuestionForPromptType,
+  normalizeCoachQuestionKey,
+  normalizeCoachQuestionText,
+  rankCoachQuestionsForPromptType,
+  resolveCoachQuestionSelection,
+  resolveCoachQuestionText,
+} from '@/shared/coachQuestions';
+import {
   COACH_PROMPT_TYPES,
   DEFAULT_COACH_PROMPT_TYPE,
+  normalizeCoachGenerationPromptType,
+  normalizeCoachPromptType,
+  resolveVisibleCoachPromptType,
+  type CoachGenerationPromptType,
+  type CoachPromptCategory,
 } from '@/shared/coachPromptTypes';
+import {
+  decodeScanCoachIntentParam,
+  type ScanCoachIntent,
+} from '@/utils/scanCoachIntent';
 import type {
   CoachEntry,
   CoachPersonaKey,
   CoachPrimaryMetricDelta,
   CoachPromptType,
+  CoachQuestionKey,
   CoachStructuredContent,
 } from '@/types';
 import { isRenderableCoachEntry } from '@/utils/coachHistory';
@@ -88,6 +105,7 @@ import {
   resolveCoachUserFacingErrorMessage,
 } from '@/utils/coachLocalization';
 import { resolveCoachCtaRoute } from '@/utils/coachRoutes';
+import { getMainTabBarMetrics } from '@/utils/mainTabBarMetrics';
 
 const PROMPT_TYPES: readonly CoachPromptType[] = COACH_PROMPT_TYPES;
 const DEFAULT_PROMPT_TYPE: CoachPromptType = DEFAULT_COACH_PROMPT_TYPE;
@@ -104,7 +122,8 @@ type CoachGuidanceViewModel = {
   body: string;
   disclaimer: string;
   persona_key: CoachPersonaKey;
-  prompt_type: CoachPromptType | null;
+  prompt_type: CoachGenerationPromptType | null;
+  question_text: string | null;
   content: CoachStructuredContent | null;
   primary_metric_delta: CoachPrimaryMetricDelta | null;
   cta_label: string | null;
@@ -116,6 +135,7 @@ type CoachGuidanceViewModel = {
 
 type CoachGuidanceSource = 'mutation' | 'tracked' | 'latest_ready';
 type CoachLoadErrorSource = 'entries' | 'scans' | 'latest_ready' | 'none';
+type CoachQuestionSelectionMode = 'auto' | 'preset' | 'free_text';
 
 type CoachRenderableCandidate = {
   status?: CoachEntry['status'] | null;
@@ -126,6 +146,80 @@ type CoachRenderableCandidate = {
 type CoachScreenProps = {
   variant?: 'stack' | 'tab';
 };
+
+type CoachScanResultContext = {
+  source: 'scan_result';
+  scanId: string | null;
+  scanType: string | null;
+  priorityMetric: string | null;
+  scanIntent: ScanCoachIntent | null;
+  generationPromptType: CoachGenerationPromptType | null;
+  routeSignature: string;
+  autoSubmit: boolean;
+};
+
+type CoachScanResultRouteRequest = CoachScanResultContext & {
+  promptType: CoachPromptType;
+  fallbackPromptType: CoachPromptType | null;
+  questionKey: CoachQuestionKey | null;
+  questionText: string | null;
+  signature: string;
+};
+
+function readCoachRouteParam(value: unknown) {
+  const rawValue = Array.isArray(value) ? value[0] : value;
+  return typeof rawValue === 'string' && rawValue.trim().length > 0
+    ? rawValue.trim()
+    : null;
+}
+
+function readCoachRouteBooleanParam(value: unknown) {
+  const normalizedValue = readCoachRouteParam(value)?.toLowerCase();
+  return (
+    normalizedValue === '1' ||
+    normalizedValue === 'true' ||
+    normalizedValue === 'yes'
+  );
+}
+
+function normalizeCoachRoutePromptType(
+  value: unknown,
+): CoachPromptType | null {
+  return normalizeCoachPromptType(value);
+}
+
+function normalizeCoachRouteGenerationPromptType(
+  value: unknown,
+): CoachGenerationPromptType | null {
+  return normalizeCoachGenerationPromptType(value);
+}
+
+function clampCoachRouteQuestionText(value: string | null) {
+  const normalizedText = normalizeCoachQuestionText(value);
+  if (!normalizedText) {
+    return null;
+  }
+
+  return Array.from(normalizedText).slice(0, COACH_QUESTION_MAX_LENGTH).join('');
+}
+
+function resolveScanResultFallbackQuestion(options: {
+  priorityMetric?: string | null;
+  locale?: string | null;
+}) {
+  const hasPriorityMetric = !!options.priorityMetric?.trim();
+  const localeKey = String(options.locale ?? '').trim().toLowerCase();
+
+  if (localeKey.startsWith('en')) {
+    return hasPriorityMetric
+      ? 'What should I improve from my latest scan?'
+      : 'How can I maintain my good results after this scan?';
+  }
+
+  return hasPriorityMetric
+    ? 'Que devrais-je améliorer à partir de mon dernier scan ?'
+    : 'Comment maintenir mes bons résultats après ce scan ?';
+}
 
 function hasRenderableCoachContent(
   entry: CoachRenderableCandidate | null | undefined,
@@ -226,16 +320,13 @@ function useCoachQuotaCountdown(
 
 export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}) {
   const router = useRouter();
+  const routeParams = useLocalSearchParams();
   const queryClient = useQueryClient();
   const { user, userProfile, updateCoachPersona } = useAuth();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { locale, t } = useLanguage();
   const { alertElement, showAlert } = useCustomAlert();
   const insets = useSafeAreaInsets();
-  const styles = useMemo(
-    () => createStyles(colors, insets, variant),
-    [colors, insets, variant],
-  );
   const coachAlertIcon = (
     <CoachFeatureIcon color={colors.primary} size={30} strokeWidth={2.3} />
   );
@@ -245,6 +336,9 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
   const trackedEntryTerminalInvalidationRef = useRef<string | null>(null);
   const [selectedPromptType, setSelectedPromptType] =
     useState<CoachPromptType>(DEFAULT_PROMPT_TYPE);
+  const [selectedQuestionKey, setSelectedQuestionKey] =
+    useState<CoachQuestionKey | null>(null);
+  const [questionDraft, setQuestionDraft] = useState('');
   const [submittingPromptType, setSubmittingPromptType] =
     useState<CoachPromptType | null>(null);
   const [pendingPersonaKey, setPendingPersonaKey] =
@@ -254,57 +348,113 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
   const [displayMode, setDisplayMode] = useState<'settings' | 'result'>(
     'settings',
   );
-  const {
-    data: entriesData,
-    error: entriesError,
-    isLoading: isEntriesLoading,
-    isFetching: isEntriesFetching,
-    refetch: refetchEntries,
-  } = useCoachEntries({
-    trackedEntryId,
-    limit: COACH_SCREEN_ENTRIES_LIMIT,
-  });
-  const entries = entriesData ?? [];
-  const hasEntriesData = entriesData !== undefined;
+  const [scanResultContext, setScanResultContext] =
+    useState<CoachScanResultContext | null>(null);
+  const questionSelectionModeRef = useRef<CoachQuestionSelectionMode>('free_text');
+  const previousPromptTypeRef = useRef<CoachPromptType>(DEFAULT_PROMPT_TYPE);
+  const previousLocaleRef = useRef(locale);
+  const appliedScanResultRouteSignatureRef = useRef<string | null>(null);
+  const autoSubmitAttemptedRouteSignatureRef = useRef<string | null>(null);
+  const pendingAutoSubmitRef = useRef(false);
+  const skipNextPromptTypeResetRef = useRef(false);
   const coachGeneration = useCoachGeneration();
-  const {
-    data: coachQuota,
-    error: coachQuotaError,
-    isFetching: isCoachQuotaFetching,
-    refetch: refetchCoachQuota,
-  } = useCoachQuota();
-
-  const {
-    data: recentScansData,
-    error: recentScansError,
-    isLoading: isScansLoading,
-    isFetching: isScansFetching,
-    refetch: refetchScans,
-  } = useCoachScans();
-  const recentScans = recentScansData ?? [];
-  const hasRecentScansData = recentScansData !== undefined;
-  const hasUsableCoachScans = recentScans.length > 0;
-  const hasConfirmedNoUsableCoachScans =
-    hasRecentScansData &&
-    !hasUsableCoachScans;
-  const handleCoachQuotaRechargeElapsed = useCallback(() => {
-    void refetchCoachQuota();
-  }, [refetchCoachQuota]);
-  const coachQuotaCountdownLabel = useCoachQuotaCountdown(
-    coachQuota?.next_recharge_at,
-    handleCoachQuotaRechargeElapsed,
-  );
-  const isCoachQuotaExhausted =
-    !!coachQuota &&
-    !coachQuota.unlimited &&
-    (coachQuota.available ?? 0) <= 0;
-  const isCoachQuotaUnknown = !coachQuota;
-  const isCoachQuotaUnavailable = !!coachQuotaError && !coachQuota;
 
   useEffect(() => {
     trackEvent('coach_opened');
     void markCoachSeen();
   }, []);
+
+  const scanResultRouteRequest = useMemo<CoachScanResultRouteRequest | null>(() => {
+    const source = readCoachRouteParam(routeParams.source);
+    const scanIntentParam = decodeScanCoachIntentParam(
+      routeParams.scanIntent ?? routeParams.scan_intent,
+    );
+    const scanId =
+      readCoachRouteParam(routeParams.selectedScanId) ??
+      readCoachRouteParam(routeParams.scanId) ??
+      scanIntentParam?.scan_id ??
+      null;
+    if (source !== 'scan_result') {
+      return null;
+    }
+
+    const scanType = readCoachRouteParam(routeParams.scanType);
+    const priorityMetric = readCoachRouteParam(routeParams.priorityMetric);
+    const autoSubmit = readCoachRouteBooleanParam(
+      routeParams.autoSubmit ?? routeParams.auto_submit,
+    );
+    const generationPromptType =
+      normalizeCoachRouteGenerationPromptType(
+        readCoachRouteParam(routeParams.promptType),
+      ) ??
+      normalizeCoachRouteGenerationPromptType(scanIntentParam?.prompt_type) ??
+      DEFAULT_PROMPT_TYPE;
+    const promptType = resolveVisibleCoachPromptType(generationPromptType);
+    const fallbackPromptType =
+      normalizeCoachRoutePromptType(
+        readCoachRouteParam(routeParams.fallback_prompt_type) ??
+          readCoachRouteParam(routeParams.fallbackPromptType),
+      ) ??
+      normalizeCoachRoutePromptType(scanIntentParam?.fallback_prompt_type) ??
+      null;
+    const questionKey = normalizeCoachQuestionKey(
+      readCoachRouteParam(routeParams.questionKey) ??
+        scanIntentParam?.question_key,
+    );
+    const questionText = clampCoachRouteQuestionText(
+      readCoachRouteParam(routeParams.question_text) ??
+        readCoachRouteParam(routeParams.question) ??
+        readCoachRouteParam(routeParams.questionText) ??
+        scanIntentParam?.question_text ??
+        null,
+    );
+    const signature = JSON.stringify({
+      source,
+      scanId,
+      scanType,
+      priorityMetric,
+      scanIntent: scanIntentParam,
+      generationPromptType,
+      autoSubmit,
+      promptType,
+      fallbackPromptType,
+      questionKey,
+      questionText,
+    });
+
+    return {
+      source: 'scan_result',
+      scanId,
+      scanType,
+      priorityMetric,
+      scanIntent: scanIntentParam,
+      generationPromptType,
+      routeSignature: signature,
+      autoSubmit,
+      promptType,
+      fallbackPromptType,
+      questionKey,
+      questionText,
+      signature,
+    };
+  }, [
+    routeParams.autoSubmit,
+    routeParams.auto_submit,
+    routeParams.fallbackPromptType,
+    routeParams.fallback_prompt_type,
+    routeParams.priorityMetric,
+    routeParams.promptType,
+    routeParams.question,
+    routeParams.questionKey,
+    routeParams.questionText,
+    routeParams.question_text,
+    routeParams.scanId,
+    routeParams.scan_intent,
+    routeParams.scanIntent,
+    routeParams.scanType,
+    routeParams.selectedScanId,
+    routeParams.source,
+  ]);
 
   const previewProfile = useMemo(() => {
     if (!pendingPersonaKey || !userProfile) {
@@ -321,6 +471,51 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     () => resolveCoachPersonaKeyFromProfile(previewProfile),
     [previewProfile],
   );
+  const coachSnapshotQuery = useCoachScreenSnapshot({
+    personaKey: activePersonaKey,
+    locale,
+    trackedEntryId,
+    entriesLimit: COACH_SCREEN_ENTRIES_LIMIT,
+  });
+  const isTrackedEntryStale = coachSnapshotQuery.isTrackedEntryStale === true;
+  const coachSnapshot = coachSnapshotQuery.data;
+  const refetchCoachSnapshot = coachSnapshotQuery.refetch;
+  const snapshotError = coachSnapshotQuery.error;
+  const entriesData = coachSnapshot?.entries;
+  const entriesError = snapshotError;
+  const isEntriesLoading = coachSnapshotQuery.isLoading;
+  const isEntriesFetching = coachSnapshotQuery.isFetching;
+  const entries = entriesData ?? [];
+  const hasEntriesData = entriesData !== undefined;
+  const coachQuota = coachSnapshot?.quota;
+  const coachQuotaError = snapshotError;
+  const isCoachQuotaFetching = coachSnapshotQuery.isFetching;
+  const refetchCoachQuota = refetchCoachSnapshot;
+  const recentScansData = coachSnapshot?.recentScans;
+  const recentScansError = snapshotError;
+  const isScansLoading = coachSnapshotQuery.isLoading;
+  const isScansFetching = coachSnapshotQuery.isFetching;
+  const recentScans = recentScansData ?? [];
+  const hasRecentScansData = recentScansData !== undefined;
+  const hasUsableCoachScans = recentScans.length > 0;
+  const hasConfirmedNoUsableCoachScans =
+    hasRecentScansData &&
+    !hasUsableCoachScans;
+  const hasScanResultSelectedScan =
+    !!scanResultRouteRequest?.scanId || !!scanResultContext?.scanId;
+  const handleCoachQuotaRechargeElapsed = useCallback(() => {
+    void refetchCoachQuota();
+  }, [refetchCoachQuota]);
+  const coachQuotaCountdownLabel = useCoachQuotaCountdown(
+    coachQuota?.next_recharge_at,
+    handleCoachQuotaRechargeElapsed,
+  );
+  const isCoachQuotaExhausted =
+    !!coachQuota &&
+    !coachQuota.unlimited &&
+    (coachQuota.available ?? 0) <= 0;
+  const isCoachQuotaUnknown = !coachQuota;
+  const isCoachQuotaUnavailable = !!coachQuotaError && !coachQuota;
   const activePersonaLocked = useMemo(
     () => isCoachPersonaLockedForProfile(activePersonaKey, userProfile),
     [activePersonaKey, userProfile],
@@ -332,6 +527,23 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
   const activePersonaVisual = useMemo(
     () => getCoachPersonaVisual(activePersonaKey),
     [activePersonaKey],
+  );
+  const styles = useMemo(
+    () => createStyles(colors, isDark, insets, variant, activePersonaVisual.haloTint),
+    [activePersonaVisual.haloTint, colors, insets, isDark, variant],
+  );
+  const coachChrome = useMemo(
+    () => getMainPageChrome(colors, isDark, 'coach'),
+    [colors, isDark],
+  );
+  const shellGradientColors = useMemo(
+    () =>
+      [
+        coachChrome.canvas,
+        coachChrome.canvasElevated,
+        coachChrome.canvas,
+      ] as [string, string, string],
+    [coachChrome],
   );
   const personaOptions = useMemo(
     () => getCoachPersonaOptionsForProfile(previewProfile),
@@ -377,18 +589,13 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
         : null,
     [personaOptionsWithVisuals, previewedPersonaKey],
   );
-  const {
-    data: latestReadyEntryData,
-    error: latestReadyEntryError,
-    isLoading: isLatestReadyEntryLoading,
-    refetch: refetchLatestReadyEntry,
-  } = useLatestReadyCoachEntry({
-    personaKey: activePersonaKey,
-    locale,
-  });
+  const latestReadyEntryData = coachSnapshot
+    ? coachSnapshot.latestReadyEntry
+    : undefined;
+  const latestReadyEntryError = snapshotError;
+  const isLatestReadyEntryLoading = coachSnapshotQuery.isLoading;
   const latestReadyEntry = latestReadyEntryData ?? null;
   const hasLatestReadyEntryData = latestReadyEntryData !== undefined;
-  useApplyCoachProfileUpdates(latestReadyEntry);
   const isPersonaSaving = pendingPersonaKey !== null;
   const generationGuidance: CoachGuidanceViewModel | null =
     !coachGeneration.isPending &&
@@ -400,6 +607,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
           disclaimer: coachGeneration.data.disclaimer,
           persona_key: coachGeneration.data.persona_key,
           prompt_type: coachGeneration.data.prompt_type ?? null,
+          question_text: coachGeneration.data.question_text ?? null,
           content: coachGeneration.data.content ?? null,
           primary_metric_delta:
             coachGeneration.data.content?.primary_metric_delta ?? null,
@@ -446,11 +654,18 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
       isRenderableCoachEntry(trackedCoachEntry) ? trackedCoachEntry : null,
     [trackedCoachEntry],
   );
-  const isTrackedEntryPending =
+  const isTrackedEntryStaleFailure =
     effectiveTrackedEntryId !== null &&
+    isTrackedEntryStale &&
     (!trackedCoachEntry ||
       (trackedCoachEntry.status ?? 'pending') === 'pending');
-  const isTrackedEntryError = trackedCoachEntry?.status === 'error';
+  const isTrackedEntryPending =
+    effectiveTrackedEntryId !== null &&
+    !isTrackedEntryStaleFailure &&
+    (!trackedCoachEntry ||
+      (trackedCoachEntry.status ?? 'pending') === 'pending');
+  const isTrackedEntryError =
+    trackedCoachEntry?.status === 'error' || isTrackedEntryStaleFailure;
   const hasGenerationFailure = effectiveTrackedEntryId
     ? isTrackedEntryError
     : coachGeneration.isError;
@@ -466,6 +681,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
         disclaimer: trackedReadyEntry.disclaimer,
         persona_key: trackedReadyEntry.persona_key,
         prompt_type: trackedReadyEntry.prompt_type ?? null,
+        question_text: trackedReadyEntry.question_text ?? null,
         content: trackedReadyEntry.content ?? null,
         primary_metric_delta:
           trackedReadyEntry.content?.primary_metric_delta ?? null,
@@ -487,6 +703,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
         disclaimer: latestReadyEntry.disclaimer,
         persona_key: latestReadyEntry.persona_key,
         prompt_type: latestReadyEntry.prompt_type ?? null,
+        question_text: latestReadyEntry.question_text ?? null,
         content: latestReadyEntry.content ?? null,
         primary_metric_delta:
           latestReadyEntry.content?.primary_metric_delta ?? null,
@@ -562,13 +779,8 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
         : displayedGuidanceSource === 'latest_ready'
           ? (latestReadyEntry?.id ?? null)
           : null;
-  const {
-    data: historySummaryData,
-    isLoading: isHistorySummaryLoading,
-    refetch: refetchHistorySummary,
-  } = useCoachHistorySummary({
-    excludeEntryId: activeEntryId,
-  });
+  const historySummaryData = coachSnapshot?.historySummary;
+  const isHistorySummaryLoading = coachSnapshotQuery.isLoading;
   const historySummary = historySummaryData;
   const hasHistorySummaryData = historySummaryData !== undefined;
   const hasHistoryEntries = (historySummary?.total_count ?? 0) > 0;
@@ -586,15 +798,17 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
         return;
       }
 
-      void refetchScans();
-      void refetchEntries();
-      void refetchLatestReadyEntry();
-      void refetchHistorySummary();
+      if (
+        !coachSnapshotQuery.isFetching &&
+        (!coachSnapshotQuery.isFetched || coachSnapshotQuery.isStale)
+      ) {
+        void refetchCoachSnapshot();
+      }
     }, [
-      refetchEntries,
-      refetchHistorySummary,
-      refetchLatestReadyEntry,
-      refetchScans,
+      coachSnapshotQuery.isFetched,
+      coachSnapshotQuery.isFetching,
+      coachSnapshotQuery.isStale,
+      refetchCoachSnapshot,
       user?.id,
     ]),
   );
@@ -633,13 +847,42 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
       ? trackedCoachProviderUnavailable
       : generationCoachProviderUnavailable ||
         persistedCoachProviderUnavailable);
+  const staleTrackedEntryFailureDebugInfo = useMemo(
+    () =>
+      isTrackedEntryStaleFailure
+        ? {
+            message: 'coach_generation_timed_out',
+            code: 'coach_generation_timed_out',
+            status: null,
+            requestId: null,
+            functionName: 'coach-generate-response',
+            details: {
+              tracked_entry_id: effectiveTrackedEntryId,
+              tracked_status:
+                trackedCoachEntry?.status ??
+                (!trackedCoachEntry ? 'missing' : 'pending'),
+            },
+            webhookStatus: null,
+            provider: 'n8n',
+            source: 'coach_generation',
+            fallbackUsed: null,
+            responseBodyPresent: null,
+          }
+        : null,
+    [effectiveTrackedEntryId, isTrackedEntryStaleFailure, trackedCoachEntry],
+  );
   const trackedEntryFailureDebugInfo = useMemo(
-    () => getCoachEntryFailureDebugInfo(trackedCoachEntry),
-    [trackedCoachEntry],
+    () =>
+      staleTrackedEntryFailureDebugInfo ??
+      getCoachEntryFailureDebugInfo(trackedCoachEntry),
+    [staleTrackedEntryFailureDebugInfo, trackedCoachEntry],
   );
   const trackedEntryFailureKind = useMemo(
-    () => resolveCoachFailureKindFromEntry(trackedCoachEntry),
-    [trackedCoachEntry],
+    () =>
+      isTrackedEntryStaleFailure
+        ? 'provider_request_failed'
+        : resolveCoachFailureKindFromEntry(trackedCoachEntry),
+    [isTrackedEntryStaleFailure, trackedCoachEntry],
   );
   const mutationFailureKind = useMemo(
     () => resolveCoachFailureKindFromError(coachGeneration.error),
@@ -706,10 +949,15 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
   );
   const displayedGuidanceModeLabel = useMemo(
     () =>
-      displayedGuidance?.prompt_type
-        ? t(`coach.prompts.${displayedGuidance.prompt_type}.title`)
-        : null,
-    [displayedGuidance?.prompt_type, t],
+      displayedGuidance?.question_text ??
+      (displayedGuidance?.prompt_type
+        ? t(
+            `coach.prompts.${resolveVisibleCoachPromptType(
+              displayedGuidance.prompt_type,
+            )}.title`,
+          )
+        : null),
+    [displayedGuidance?.prompt_type, displayedGuidance?.question_text, t],
   );
   const displayedGuidanceSectionLabels = useMemo(
     () => ({
@@ -718,6 +966,44 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
       action_steps: t('coach.sections.action_steps'),
       warnings: t('coach.sections.warnings'),
       data_gaps: t('coach.sections.data_gaps'),
+      meal_template: t('coach.sections.meal_template'),
+      meal_swaps: t('coach.sections.meal_swaps'),
+      shopping_list: t('coach.sections.shopping_list'),
+      quick_recipe: t('coach.sections.quick_recipe'),
+      daily_schedule: t('coach.sections.daily_schedule'),
+      micro_routine: t('coach.sections.micro_routine'),
+      habit_tracker: t('coach.sections.habit_tracker'),
+      reminders: t('coach.sections.reminders'),
+      knowledge_card: t('coach.sections.knowledge_card'),
+      next_scan_suggestion: t('coach.sections.next_scan_suggestion'),
+      signal_watch: t('coach.sections.signal_watch'),
+      streak_celebration: t('coach.sections.streak_celebration'),
+      today: t('coach.sections.today'),
+      formatters: {
+        inDays: (count: number) => t('coach.sections.in_days', { count }),
+        daysPerWeek: (count: number) =>
+          t('coach.sections.days_per_week', { count }),
+        minutes: (count: number) => t('coach.sections.minutes', { count }),
+      },
+      shopping_sections: {
+        frais: t('coach.sections.shopping_fresh'),
+        sec: t('coach.sections.shopping_dry'),
+        boissons: t('coach.sections.shopping_drinks'),
+        snacks: t('coach.sections.shopping_snacks'),
+        autre: t('coach.sections.shopping_other'),
+      },
+      scan_types: {
+        face: t('coach.sections.scan_face'),
+        body: t('coach.sections.scan_body'),
+        nutrition: t('coach.sections.scan_nutrition'),
+        super: t('coach.sections.scan_super'),
+        health: t('coach.sections.scan_health'),
+      },
+      recurrences: {
+        today: t('coach.sections.recurrence_today'),
+        daily: t('coach.sections.recurrence_daily'),
+        weekly: t('coach.sections.recurrence_weekly'),
+      },
     }),
     [t],
   );
@@ -744,6 +1030,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     !showProviderUnavailableState &&
     !showGenerationErrorState &&
     hasConfirmedNoUsableCoachScans &&
+    !hasScanResultSelectedScan &&
     !displayedGuidance &&
     !hasHistorySignal &&
     !isGenerationAwaitingResult &&
@@ -753,15 +1040,15 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     isPersonaSaving ||
     coachProviderUnavailable ||
     (isScansFetching && !hasRecentScansData);
-  const coachQuotaPrimaryLabel = useMemo(() => {
+  const coachQuotaStatusLabel = useMemo(() => {
     if (!coachQuota) {
       return isCoachQuotaFetching
-        ? t('coach.action_bar.primary_checking')
-        : t('coach.action_bar.primary_unavailable');
+        ? t('coach.action_bar.status_checking')
+        : t('coach.action_bar.status_unavailable');
     }
 
     if (coachQuota.unlimited) {
-      return t('coach.action_bar.primary_unlimited');
+      return t('coach.action_bar.status_unlimited');
     }
 
     const available = coachQuota.available ?? 0;
@@ -774,14 +1061,14 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
           })
         : t('coach.quota.recharge_soon');
 
-      return t('coach.action_bar.primary_exhausted', {
+      return t('coach.action_bar.status_exhausted', {
         available,
         limit,
         cooldown,
       });
     }
 
-    return t('coach.action_bar.primary_with_quota', { available, limit });
+    return t('coach.action_bar.status_available', { available, limit });
   }, [
     coachQuota,
     coachQuotaCountdownLabel,
@@ -803,6 +1090,62 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
       t(`coach.prompts.${promptType}.subtitle`),
     [t],
   );
+  const promptCategoryTitleResolver = useCallback(
+    (category: CoachPromptCategory) => t(`coach.prompt_categories.${category}`),
+    [t],
+  );
+  const questionRankingContext = useMemo(
+    () => ({
+      timeOfDay: getCoachQuestionTimeOfDay(),
+      primaryScanType: recentScans[0]?.scan_type ?? null,
+      hasSuperScan: recentScans.some((scan) => scan.scan_type === 'super'),
+      historyDepth: historySummary?.total_count ?? entries.length,
+    }),
+    [entries.length, historySummary?.total_count, recentScans],
+  );
+  const rankedQuestionDefinitions = useMemo(
+    () =>
+      rankCoachQuestionsForPromptType(
+        selectedPromptType,
+        questionRankingContext,
+      ),
+    [questionRankingContext, selectedPromptType],
+  );
+  const questionOptions = useMemo(
+    () =>
+      rankedQuestionDefinitions.map((question) => ({
+        key: question.key,
+        label: resolveCoachQuestionText(question.key, locale),
+      })),
+    [locale, rankedQuestionDefinitions],
+  );
+  const normalizedQuestionDraft = useMemo(
+    () => normalizeCoachQuestionText(questionDraft),
+    [questionDraft],
+  );
+  const selectedQuestionText = useMemo(
+    () =>
+      selectedQuestionKey
+        ? resolveCoachQuestionText(selectedQuestionKey, locale)
+        : null,
+    [locale, selectedQuestionKey],
+  );
+  const resolvedQuestionSelection = useMemo(
+    () =>
+      resolveCoachQuestionSelection({
+        promptType: selectedPromptType,
+        questionKey: selectedQuestionKey,
+        questionText: questionDraft,
+        locale,
+      }),
+    [locale, questionDraft, selectedPromptType, selectedQuestionKey],
+  );
+  const canSubmitSelectedQuestion =
+    selectedQuestionKey !== null || normalizedQuestionDraft !== null;
+  const selectedQuestionLabel =
+    normalizedQuestionDraft ??
+    selectedQuestionText ??
+    t('coach.questions.empty_summary');
 
   const inlinePersonaOptions = useMemo(
     () =>
@@ -826,6 +1169,76 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     [userProfile],
   );
 
+  useEffect(() => {
+    if (!scanResultRouteRequest) {
+      appliedScanResultRouteSignatureRef.current = null;
+      autoSubmitAttemptedRouteSignatureRef.current = null;
+      pendingAutoSubmitRef.current = false;
+      setScanResultContext(null);
+      return;
+    }
+
+    if (
+      appliedScanResultRouteSignatureRef.current ===
+      scanResultRouteRequest.signature
+    ) {
+      return;
+    }
+
+    const requestedPromptType = scanResultRouteRequest.promptType;
+    const requestedGenerationPromptType =
+      scanResultRouteRequest.generationPromptType;
+    const fallbackPromptType = scanResultRouteRequest.fallbackPromptType;
+    const resolvedPromptType = isPromptLockedForUser(requestedPromptType)
+      ? fallbackPromptType && !isPromptLockedForUser(fallbackPromptType)
+        ? fallbackPromptType
+        : DEFAULT_PROMPT_TYPE
+      : requestedPromptType;
+    const resolvedGenerationPromptType =
+      resolvedPromptType === requestedPromptType
+        ? requestedGenerationPromptType
+        : resolvedPromptType;
+    const resolvedQuestionKey =
+      scanResultRouteRequest.questionKey &&
+      isCoachQuestionForPromptType(
+        scanResultRouteRequest.questionKey,
+        resolvedPromptType,
+      )
+        ? scanResultRouteRequest.questionKey
+        : null;
+    const resolvedQuestionText =
+      scanResultRouteRequest.questionText ??
+      (resolvedQuestionKey
+        ? resolveCoachQuestionText(resolvedQuestionKey, locale)
+        : resolveScanResultFallbackQuestion({
+            priorityMetric: scanResultRouteRequest.priorityMetric,
+            locale,
+          }));
+
+    appliedScanResultRouteSignatureRef.current =
+      scanResultRouteRequest.signature;
+    previousPromptTypeRef.current = resolvedPromptType;
+    skipNextPromptTypeResetRef.current = true;
+    questionSelectionModeRef.current = resolvedQuestionKey
+      ? 'preset'
+      : 'free_text';
+    setSelectedPromptType(resolvedPromptType);
+    setSelectedQuestionKey(resolvedQuestionKey);
+    setQuestionDraft(resolvedQuestionText);
+    setScanResultContext({
+      source: 'scan_result',
+      scanId: scanResultRouteRequest.scanId,
+      scanType: scanResultRouteRequest.scanType,
+      priorityMetric: scanResultRouteRequest.priorityMetric,
+      scanIntent: scanResultRouteRequest.scanIntent,
+      generationPromptType: resolvedGenerationPromptType,
+      routeSignature: scanResultRouteRequest.signature,
+      autoSubmit: scanResultRouteRequest.autoSubmit,
+    });
+    setTrackedEntryId(null);
+    setDisplayMode('settings');
+  }, [isPromptLockedForUser, locale, scanResultRouteRequest]);
+
   // Garde-fou : si le mode courant est verrouillé pour le tier actuel
   // (ex: l'utilisateur est passé free avec un mode premium en state local),
   // on rebascule sur le mode par défaut.
@@ -836,10 +1249,53 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
   }, [isPromptLockedForUser, selectedPromptType]);
 
   useEffect(() => {
-    if (hasGenerationGuidance) {
+    if (skipNextPromptTypeResetRef.current) {
+      skipNextPromptTypeResetRef.current = false;
+      return;
+    }
+
+    const promptTypeChanged = previousPromptTypeRef.current !== selectedPromptType;
+    previousPromptTypeRef.current = selectedPromptType;
+
+    if (!promptTypeChanged) {
+      return;
+    }
+
+    if (questionSelectionModeRef.current === 'free_text') {
+      setSelectedQuestionKey(null);
+      return;
+    }
+
+    const defaultQuestionSelection = buildDefaultCoachQuestionSelection(
+      selectedPromptType,
+      locale,
+      questionRankingContext,
+    );
+    questionSelectionModeRef.current = 'auto';
+    setSelectedQuestionKey(defaultQuestionSelection.questionKey);
+    setQuestionDraft(defaultQuestionSelection.questionText);
+  }, [locale, questionRankingContext, selectedPromptType]);
+
+  useEffect(() => {
+    const localeChanged = previousLocaleRef.current !== locale;
+    previousLocaleRef.current = locale;
+
+    if (!localeChanged || !selectedQuestionKey) {
+      return;
+    }
+
+    if (questionSelectionModeRef.current === 'free_text') {
+      return;
+    }
+
+    setQuestionDraft(resolveCoachQuestionText(selectedQuestionKey, locale));
+  }, [locale, selectedQuestionKey]);
+
+  useEffect(() => {
+    if (hasGenerationGuidance && !scanResultRouteRequest) {
       setDisplayMode('result');
     }
-  }, [hasGenerationGuidance]);
+  }, [hasGenerationGuidance, scanResultRouteRequest]);
 
   useEffect(() => {
     if (isGenerationAwaitingResult) {
@@ -882,14 +1338,9 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     }
 
     trackedEntryTerminalInvalidationRef.current = invalidationKey;
-    void Promise.all([
-      queryClient.invalidateQueries({
-        queryKey: COACH_LATEST_READY_ENTRY_QUERY_KEY,
-      }),
-      queryClient.invalidateQueries({
-        queryKey: COACH_HISTORY_SUMMARY_QUERY_KEY,
-      }),
-    ]);
+    void queryClient.invalidateQueries({
+      queryKey: COACH_SCREEN_SNAPSHOT_QUERY_KEY,
+    });
   }, [effectiveTrackedEntryId, queryClient, trackedCoachEntry?.status]);
 
   useEffect(() => {
@@ -922,6 +1373,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
         trackedCoachEntry?.status ??
         (!effectiveTrackedEntryId ? null : 'missing'),
       tracked_error_code: trackedCoachEntry?.error_code ?? null,
+      tracked_pending_stale: isTrackedEntryStaleFailure,
       is_mutation_pending: coachGeneration.isPending,
       is_entries_fetching: isEntriesFetching,
       ui_state: uiState,
@@ -956,6 +1408,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     hasEntriesError,
     hasGenerationGuidance,
     isEntriesFetching,
+    isTrackedEntryStaleFailure,
     hasLatestReadyEntryData,
     hasLatestReadyError,
     hasRecentScansData,
@@ -997,6 +1450,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
           trackedCoachEntry?.status ??
           (!effectiveTrackedEntryId ? null : 'missing'),
         tracked_error_code: trackedCoachEntry?.error_code ?? null,
+        tracked_pending_stale: isTrackedEntryStaleFailure,
         exit_reason: exitReason,
         generation_error_kind: showGenerationErrorState
           ? generationFailureKind
@@ -1011,6 +1465,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     effectiveTrackedEntryId,
     generationErrorDebugInfo,
     generationFailureKind,
+    isTrackedEntryStaleFailure,
     showEmptyState,
     showGenerationErrorState,
     showGenerationLoadingState,
@@ -1093,26 +1548,38 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     }
   };
 
-  const handleGenerate = async () => {
-    const promptType = selectedPromptType;
+  async function handleGenerate() {
+    const visiblePromptType = selectedPromptType;
+    const promptType =
+      scanResultContext?.generationPromptType ?? visiblePromptType;
+    const scanId = scanResultContext?.scanId ?? null;
+    const questionSelection = resolvedQuestionSelection;
+    const submissionTrigger = pendingAutoSubmitRef.current
+      ? 'auto_from_scan_result'
+      : 'manual';
+    pendingAutoSubmitRef.current = false;
+
+    if (!canSubmitSelectedQuestion) {
+      return;
+    }
 
     if (activePersonaLocked) {
       trackEvent('coach_generation_locked_persona_blocked', {
-        prompt_type: promptType,
+        prompt_type: visiblePromptType,
         persona_key: activePersonaKey,
       });
       handleOpenPremiumUpgrade('generation', {
-        prompt_type: promptType,
+        prompt_type: visiblePromptType,
         persona_key: activePersonaKey,
       });
       return;
     }
 
-    if (hasConfirmedNoUsableCoachScans) {
+    if (!hasScanResultSelectedScan && hasConfirmedNoUsableCoachScans) {
       setTrackedEntryId(null);
       setDisplayMode('settings');
       trackEvent('coach_prompt_blocked_no_scans', {
-        prompt_type: promptType,
+        prompt_type: visiblePromptType,
         persona_key: activePersonaKey,
         account_tier: userProfile?.account_tier ?? 'unknown',
       });
@@ -1130,7 +1597,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
       setTrackedEntryId(null);
       setDisplayMode('settings');
       trackEvent('coach_prompt_blocked_quota_unavailable', {
-        prompt_type: promptType,
+        prompt_type: visiblePromptType,
         persona_key: activePersonaKey,
         account_tier: userProfile?.account_tier ?? 'unknown',
       });
@@ -1149,7 +1616,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
       setTrackedEntryId(null);
       setDisplayMode('settings');
       trackEvent('coach_prompt_blocked_quota_exhausted', {
-        prompt_type: promptType,
+        prompt_type: visiblePromptType,
         persona_key: activePersonaKey,
         account_tier: coachQuota.account_tier,
         next_recharge_at: coachQuota.next_recharge_at,
@@ -1168,19 +1635,33 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
       return;
     }
 
-    setSubmittingPromptType(promptType);
+    setSubmittingPromptType(visiblePromptType);
     setTrackedEntryId(null);
     setDisplayMode('result');
     trackEvent('coach_prompt_submitted', {
       prompt_type: promptType,
+      visible_prompt_type: visiblePromptType,
       persona_key: activePersonaKey,
+      question_key: questionSelection.questionKey,
+      question_text: questionSelection.questionText,
       has_recent_scans: hasUsableCoachScans,
+      source: scanResultContext?.source ?? 'coach',
+      scan_id: scanId,
+      scan_type: scanResultContext?.scanType ?? null,
+      has_scan_intent: !!scanResultContext?.scanIntent,
+      submission_trigger: submissionTrigger,
     });
 
     try {
       const response = await coachGeneration.mutateAsync({
         promptType,
         personaKey: activePersonaKey,
+        questionKey: questionSelection.questionKey,
+        questionText: questionSelection.questionText,
+        ...(scanId ? { selectedScanId: scanId } : {}),
+        ...(scanResultContext?.scanIntent
+          ? { scanIntent: scanResultContext.scanIntent }
+          : {}),
       });
       const shouldTrackResponse =
         response.entry_id.length > 0 && !hasRenderableCoachContent(response);
@@ -1196,16 +1677,21 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
 
       setTrackedEntryId(shouldTrackResponse ? response.entry_id : null);
       trackEvent('coach_response_received', {
-        prompt_type: promptType,
+        prompt_type: response.prompt_type ?? promptType,
+        visible_prompt_type: visiblePromptType,
         persona_key: response.persona_key,
+        question_key: response.question_key ?? null,
+        question_text: response.question_text ?? null,
         cached: response.cached,
         fallback: response.fallback,
         status: response.status,
+        submission_trigger: submissionTrigger,
       });
     } catch (error) {
       if (shouldDebugCoachScreen()) {
         console.log('[CoachScreen] generation request failed', {
           prompt_type: promptType,
+          visible_prompt_type: visiblePromptType,
           persona_key: activePersonaKey,
           locale,
           ...getCoachServiceErrorDebugInfo(error),
@@ -1214,9 +1700,15 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
 
       const quotaFromError = getCoachQuotaFromError(error);
       if (quotaFromError) {
-        queryClient.setQueryData(
-          getCoachQuotaQueryKey(user?.id),
-          quotaFromError,
+        queryClient.setQueriesData(
+          { queryKey: COACH_SCREEN_SNAPSHOT_QUERY_KEY },
+          (previousSnapshot: any) =>
+            previousSnapshot
+              ? {
+                  ...previousSnapshot,
+                  quota: quotaFromError,
+                }
+              : previousSnapshot,
         );
       }
 
@@ -1226,9 +1718,11 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
         coachGeneration.reset();
         trackEvent('coach_prompt_blocked_quota_exhausted', {
           prompt_type: promptType,
+          visible_prompt_type: visiblePromptType,
           persona_key: activePersonaKey,
           account_tier: quotaFromError?.account_tier ?? 'unknown',
           next_recharge_at: quotaFromError?.next_recharge_at ?? null,
+          submission_trigger: submissionTrigger,
         });
         const remainingLabel = formatCoachQuotaRemainingFromIso(
           quotaFromError?.next_recharge_at,
@@ -1267,13 +1761,69 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
       setTrackedEntryId(null);
       trackEvent('coach_generation_failed', {
         prompt_type: promptType,
+        visible_prompt_type: visiblePromptType,
         persona_key: activePersonaKey,
+        question_key: questionSelection.questionKey,
+        question_text: questionSelection.questionText,
         message: error instanceof Error ? error.message : 'unknown',
+        submission_trigger: submissionTrigger,
       });
     } finally {
       setSubmittingPromptType(null);
     }
-  };
+  }
+
+  useEffect(() => {
+    if (!scanResultRouteRequest?.autoSubmit || !scanResultContext?.autoSubmit) {
+      return;
+    }
+
+    if (scanResultContext.routeSignature !== scanResultRouteRequest.signature) {
+      return;
+    }
+
+    if (
+      autoSubmitAttemptedRouteSignatureRef.current ===
+      scanResultRouteRequest.signature
+    ) {
+      return;
+    }
+
+    if (
+      showLoadingState ||
+      showQueryErrorState ||
+      showProviderUnavailableState ||
+      showGenerationErrorState ||
+      displayMode !== 'settings' ||
+      isGenerationAwaitingResult ||
+      submittingPromptType ||
+      !canSubmitSelectedQuestion
+    ) {
+      return;
+    }
+
+    autoSubmitAttemptedRouteSignatureRef.current = scanResultRouteRequest.signature;
+    pendingAutoSubmitRef.current = true;
+    trackEvent('coach_scan_result_auto_submit_started', {
+      prompt_type: scanResultContext.generationPromptType ?? selectedPromptType,
+      scan_id: scanResultContext.scanId,
+      scan_type: scanResultContext.scanType,
+      has_scan_intent: !!scanResultContext.scanIntent,
+    });
+    void handleGenerate();
+  }, [
+    canSubmitSelectedQuestion,
+    displayMode,
+    isGenerationAwaitingResult,
+    scanResultContext,
+    scanResultRouteRequest,
+    selectedPromptType,
+    showGenerationErrorState,
+    showLoadingState,
+    showProviderUnavailableState,
+    showQueryErrorState,
+    submittingPromptType,
+  ]);
 
   const handleClose = () => {
     if (router.canDismiss()) {
@@ -1285,11 +1835,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
   };
 
   const handleRetryQueries = () => {
-    void refetchEntries();
-    void refetchScans();
-    void refetchCoachQuota();
-    void refetchLatestReadyEntry();
-    void refetchHistorySummary();
+    void refetchCoachSnapshot();
   };
 
   const handleViewHistory = () => {
@@ -1316,14 +1862,24 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
   const shouldRoutePrimaryToScanner =
     !isResultDisplay &&
     !isGenerationAwaitingResult &&
+    !hasScanResultSelectedScan &&
     hasConfirmedNoUsableCoachScans;
+  const activePersonaTitle = t(activePersona.titleTranslationKey);
+  const selectedPromptTitle = selectedQuestionLabel;
+  const actionComposerStatusLabel = shouldRoutePrimaryToScanner
+    ? t('coach.action_bar.status_scan_required')
+    : isResultDisplay
+      ? t('coach.action_bar.status_result')
+      : !canSubmitSelectedQuestion
+        ? t('coach.action_bar.status_question_required')
+        : coachQuotaStatusLabel;
   const actionPrimaryLabel = isGenerationAwaitingResult
-    ? t('coach.action_bar.primary')
+    ? t('coach.action_bar.cta_generating')
     : shouldRoutePrimaryToScanner
-      ? t('coach.action_bar.scan_required')
+      ? t('coach.action_bar.cta_scan')
       : isResultDisplay
         ? t('coach.action_bar.primary')
-        : coachQuotaPrimaryLabel;
+        : t('coach.action_bar.cta_request');
 
   const actionPrimaryA11yLabel = actionPrimaryLabel;
 
@@ -1335,20 +1891,11 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
         ? false
         : isCoachQuotaUnknown || isCoachQuotaUnavailable
           ? true
-          : arePromptCardsDisabled;
+          : arePromptCardsDisabled || !canSubmitSelectedQuestion;
   const isActionPrimaryMuted =
     shouldRoutePrimaryToScanner ||
     (!isGenerationAwaitingResult && !isResultDisplay && isCoachQuotaExhausted) ||
     (!isGenerationAwaitingResult && isActionPrimaryDisabled);
-  const actionPrimaryForegroundColor = isActionPrimaryMuted
-    ? colors.primaryText
-    : colors.white;
-  const actionPrimaryTextLines =
-    shouldRoutePrimaryToScanner ||
-    (!isGenerationAwaitingResult && !isResultDisplay && isCoachQuotaExhausted)
-      ? 2
-      : 1;
-
   const handleActionPrimaryPress = () => {
     if (shouldRoutePrimaryToScanner) {
       handleOpenScanner();
@@ -1363,34 +1910,43 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <AppScreen bottomInset={false} style={styles.safeArea}>
       {alertElement}
       <View style={styles.container}>
-        <View style={styles.header}>
-          {showBackButton ? (
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel={t('common.back')}
-              onPress={handleClose}
-              style={styles.backButton}
-              testID="coach-back-button"
-            >
-              <ChevronLeft color={colors.primaryText} size={20} />
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.headerSpacer} />
-          )}
-          <Text style={styles.headerTitle}>{t('coach.title')}</Text>
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel={t('coach.history_button_a11y')}
-            onPress={handleViewHistory}
-            style={styles.headerIconButton}
-            testID="coach-history-icon-button"
-          >
-            <History color={colors.primaryText} size={20} strokeWidth={2.2} />
-          </TouchableOpacity>
-        </View>
+        <LinearGradient
+          colors={shellGradientColors}
+          end={{ x: 1, y: 1 }}
+          pointerEvents="none"
+          start={{ x: 0, y: 0 }}
+          style={styles.shellBackdrop}
+        />
+        <LinearGradient
+          colors={[
+            withAlpha(activePersonaVisual.haloTint, isDark ? 0.06 : 0.025),
+            withAlpha(colors.background, 0),
+          ]}
+          end={{ x: 0.85, y: 0.5 }}
+          pointerEvents="none"
+          start={{ x: 0.05, y: 0 }}
+          style={styles.shellTopGlow}
+        />
+        <ScreenHeader
+          title={t('coach.title')}
+          variant={variant === 'tab' ? 'inline' : 'bar'}
+          onBack={showBackButton ? handleClose : undefined}
+          topInset={false}
+          centered={variant !== 'tab'}
+          backTestID="coach-back-button"
+          right={
+            <HeaderIconButton
+              accessibilityLabel={t('coach.history_button_a11y')}
+              icon={<History color={colors.primaryText} size={20} strokeWidth={2.2} />}
+              onPress={handleViewHistory}
+              testID="coach-history-icon-button"
+            />
+          }
+          testID="coach-screen-header"
+        />
 
         <ScrollView
           style={styles.scrollView}
@@ -1412,14 +1968,41 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
                 activePersonaKey={activePersonaKey}
                 selectedPromptType={selectedPromptType}
                 personaOptions={inlinePersonaOptions}
+                questionOptions={questionOptions}
+                selectedQuestionKey={selectedQuestionKey}
+                isCustomQuestionSelected={selectedQuestionKey === null}
+                questionText={questionDraft}
+                questionSectionLabel={t('coach.questions.section_label')}
+                customQuestionLabel={t('coach.questions.custom_label')}
+                customQuestionPlaceholder={t('coach.questions.custom_placeholder')}
+                questionCounterLabel={(count, max) =>
+                  t('coach.questions.counter', { count, max })
+                }
+                questionMaxLength={COACH_QUESTION_MAX_LENGTH}
                 promptTitle={promptTitleResolver}
                 promptSubtitle={promptSubtitleResolver}
+                promptCategoryLabel={promptCategoryTitleResolver}
                 title={t('coach.settings.title')}
                 subtitle={t('coach.settings.subtitle')}
+                accentColor={activePersonaVisual.haloTint}
                 personaSectionLabel={t('coach.options_sheet.persona_label')}
                 modeSectionLabel={t('coach.options_sheet.mode_label')}
                 lockedBadgeLabel={t('coach.locked_badge')}
                 lockedHint={t('coach.locked_tap_hint')}
+                onSelectQuestion={(questionKey) => {
+                  questionSelectionModeRef.current = 'preset';
+                  setSelectedQuestionKey(questionKey);
+                  setQuestionDraft(resolveCoachQuestionText(questionKey, locale));
+                }}
+                onSelectCustomQuestion={() => {
+                  questionSelectionModeRef.current = 'free_text';
+                  setSelectedQuestionKey(null);
+                }}
+                onChangeQuestionText={(value) => {
+                  questionSelectionModeRef.current = 'free_text';
+                  setSelectedQuestionKey(null);
+                  setQuestionDraft(value);
+                }}
                 onSelectPromptType={(promptType) => {
                   if (isPromptLockedForUser(promptType)) {
                     handleOpenPremiumUpgrade('mode', {
@@ -1427,133 +2010,83 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
                     });
                     return;
                   }
+                  setScanResultContext(null);
                   setSelectedPromptType(promptType);
                 }}
                 onPreviewPersona={(personaKey) => {
                   handlePersonaPress(personaKey as CoachPersonaKey);
                 }}
                 isPromptLocked={isPromptLockedForUser}
+                busyPromptType={submittingPromptType}
                 busy={isGenerationAwaitingResult || isPersonaSaving}
                 disabled={arePromptCardsDisabled}
               />
             ) : null}
 
             {showLoadingState ? (
-              <View
-                style={[styles.stateCard, styles.stateCardCentered]}
+              <ScreenState
+                tone="loading"
+                layout="inline"
+                surfaceVariant="raised"
                 testID="coach-loading-state"
-              >
-                <ActivityIndicator color={colors.primary} />
-              </View>
+              />
             ) : null}
 
             {showGenerationLoadingState ? (
-              <View
-                style={[
-                  styles.stateCard,
-                  shouldUseCompactGenerationState
-                    ? styles.stateCardInline
-                    : styles.stateCardEmphasis,
-                ]}
+              <ScreenState
+                tone="loading"
+                layout="inline"
+                title={t('coach.loading_title')}
+                message={t('coach.loading_body')}
+                surfaceVariant={shouldUseCompactGenerationState ? 'inset' : 'raised'}
                 testID="coach-generation-loading-state"
-              >
-                {shouldUseCompactGenerationState ? (
-                  <>
-                    <View style={styles.inlineLoadingIndicatorWrap}>
-                      <ActivityIndicator color={colors.primary} size="small" />
-                    </View>
-                    <View style={styles.inlineStateCopy}>
-                      <Text style={styles.inlineStateTitle}>
-                        {t('coach.loading_title')}
-                      </Text>
-                      <Text style={styles.inlineStateHint}>
-                        {t('coach.loading_body')}
-                      </Text>
-                    </View>
-                  </>
-                ) : (
-                  <>
-                    <View style={styles.loadingIndicatorWrap}>
-                      <ActivityIndicator color={colors.primary} size="large" />
-                    </View>
-                    <Text style={[styles.stateTitle, styles.stateTextCentered]}>
-                      {t('coach.loading_title')}
-                    </Text>
-                    <Text style={[styles.stateBody, styles.stateTextCentered]}>
-                      {t('coach.loading_body')}
-                    </Text>
-                  </>
-                )}
-              </View>
+              />
             ) : null}
 
             {showQueryErrorState ? (
-              <View style={styles.stateCard} testID="coach-query-error-state">
-                <Text style={styles.stateTitle}>{t('coach.error_title')}</Text>
-                <Text style={styles.stateBody}>{queryErrorBody}</Text>
-                <View style={styles.stateAction}>
-                  <Button
-                    title={t('common.retry')}
-                    onPress={handleRetryQueries}
-                  />
-                </View>
-              </View>
+              <ScreenState
+                tone="error"
+                title={t('coach.error_title')}
+                message={queryErrorBody}
+                actionLabel={t('common.retry')}
+                onAction={handleRetryQueries}
+                testID="coach-query-error-state"
+              />
             ) : null}
 
             {showProviderUnavailableState ? (
-              <View style={styles.stateCard} testID="coach-unavailable-state">
-                <Text style={styles.stateTitle}>
-                  {t('coach.unavailable_title')}
-                </Text>
-                <Text style={styles.stateBody}>
-                  {t('coach.unavailable_body')}
-                </Text>
-              </View>
+              <ScreenState
+                tone="unavailable"
+                title={t('coach.unavailable_title')}
+                message={t('coach.unavailable_body')}
+                testID="coach-unavailable-state"
+              />
             ) : null}
 
             {displayMode === 'result' && showGenerationErrorState ? (
-              <View style={styles.stateCard} testID="coach-error-state">
-                <Text style={styles.stateTitle}>{t('coach.error_title')}</Text>
-                <Text style={styles.stateBody}>{generationErrorBody}</Text>
-                <View style={styles.stateAction}>
-                  <Button
-                    title={t('common.retry')}
-                    onPress={() => {
-                      void handleGenerate();
-                    }}
-                  />
-                </View>
-              </View>
+              <ScreenState
+                tone="error"
+                title={t('coach.error_title')}
+                message={generationErrorBody}
+                actionLabel={t('common.retry')}
+                onAction={() => {
+                  void handleGenerate();
+                }}
+                testID="coach-error-state"
+              />
             ) : null}
 
             {showEmptyState ? (
-              <View style={styles.emptyCard} testID="coach-empty-state">
-                <View style={styles.emptyIconShell}>
-                  <ScanLine
-                    color={colors.primary}
-                    size={22}
-                    strokeWidth={2.3}
-                  />
-                </View>
-                <View style={styles.emptyCopy}>
-                  <Text style={styles.emptyTitle}>
-                    {t('coach.no_scan_title')}
-                  </Text>
-                  <Text style={styles.emptyBody}>
-                    {t('coach.no_scan_body')}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  onPress={handleOpenScanner}
-                  style={styles.emptyScanCta}
-                  testID="coach-empty-scan-cta"
-                >
-                  <Text style={styles.emptyScanCtaText}>
-                    {t('coach.first_scan_required_cta')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+              <ScreenState
+                tone="empty"
+                title={t('coach.no_scan_title')}
+                message={t('coach.no_scan_body')}
+                icon={<ScanLine />}
+                actionLabel={t('coach.first_scan_required_cta')}
+                onAction={handleOpenScanner}
+                testID="coach-empty-state"
+                actionTestID="coach-empty-scan-cta"
+              />
             ) : null}
 
             {displayMode === 'result' && displayedGuidance ? (
@@ -1600,6 +2133,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
                       ? () => router.push(displayedGuidanceCtaRoute)
                       : null
                   }
+                  defaultExpanded
                 />
               </View>
             ) : null}
@@ -1609,42 +2143,19 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
         </ScrollView>
 
         <View style={styles.actionBar} testID="coach-action-bar">
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel={actionPrimaryA11yLabel}
-            accessibilityState={{ disabled: isActionPrimaryDisabled }}
+          <CoachActionComposer
+            personaTitle={activePersonaTitle}
+            promptTitle={selectedPromptTitle}
+            statusLabel={actionComposerStatusLabel}
+            actionLabel={actionPrimaryLabel}
+            actionA11yLabel={actionPrimaryA11yLabel}
+            personaVisual={activePersonaVisual}
+            busy={isGenerationAwaitingResult}
             disabled={isActionPrimaryDisabled}
+            muted={isActionPrimaryMuted}
             onPress={handleActionPrimaryPress}
-            style={[
-              styles.actionPrimary,
-              isActionPrimaryMuted ? styles.actionMuted : null,
-            ]}
-            testID="coach-action-primary"
-          >
-            {isGenerationAwaitingResult ? (
-              <ActivityIndicator
-                color={actionPrimaryForegroundColor}
-                size="small"
-              />
-            ) : (
-              <CoachFeatureIcon
-                color={actionPrimaryForegroundColor}
-                size={18}
-                strokeWidth={2.4}
-              />
-            )}
-            <Text
-              adjustsFontSizeToFit
-              minimumFontScale={0.84}
-              style={[
-                styles.actionPrimaryLabel,
-                isActionPrimaryMuted ? styles.actionBlockedLabel : null,
-              ]}
-              numberOfLines={actionPrimaryTextLines}
-            >
-              {actionPrimaryLabel}
-            </Text>
-          </TouchableOpacity>
+            actionTestID="coach-action-primary"
+          />
         </View>
 
         <CoachPersonaDetailsModal
@@ -1660,28 +2171,56 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
           onUnlock={handleUnlockPreviewedPersona}
         />
       </View>
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 
 const createStyles = (
   colors: any,
+  isDark: boolean,
   insets: { bottom: number },
   variant: NonNullable<CoachScreenProps['variant']>,
+  accentColor: string,
 ) => {
+  const chrome = getMainPageChrome(colors, isDark, 'coach');
+  const tabBarMetrics = getMainTabBarMetrics(insets.bottom);
+  const dockSurface = getVisualMoodSurface(colors, isDark, {
+    mood: 'obsidian',
+    accentColor,
+    intensity: 'subtle',
+    shadow: false,
+  });
+  const {
+    backgroundColor: _dockBackgroundColor,
+    borderColor: _dockBorderColor,
+    ...dockShadowStyle
+  } = dockSurface;
   const actionBarBottomPadding =
     variant === 'tab'
       ? Math.max(SPACING.sm, Math.round(insets.bottom / 2) + SPACING.xs)
       : insets.bottom + SPACING.sm + 2;
+  const actionBarBottomMargin =
+    variant === 'tab' ? tabBarMetrics.topOffsetFromBottom + SPACING.xs : 0;
 
   return StyleSheet.create({
     safeArea: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: chrome.canvas,
     },
     container: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: chrome.canvas,
+      overflow: 'hidden',
+    },
+    shellBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    shellTopGlow: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      height: 260,
     },
     header: {
       flexDirection: 'row',
@@ -1693,11 +2232,12 @@ const createStyles = (
       paddingBottom: SPACING.sm,
       borderBottomWidth: 1,
       borderBottomColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.06),
+      backgroundColor: chrome.headerBackground,
     },
     backButton: {
       width: 40,
       height: 40,
-      borderRadius: 20,
+      borderRadius: BORDER_RADIUS.full,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: colors.surfaceMuted ?? colors.cardBackground,
@@ -1718,7 +2258,7 @@ const createStyles = (
     headerIconButton: {
       width: 40,
       height: 40,
-      borderRadius: 20,
+      borderRadius: BORDER_RADIUS.full,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: colors.surfaceMuted ?? colors.cardBackground,
@@ -1730,59 +2270,37 @@ const createStyles = (
     },
     content: {
       paddingHorizontal: SPACING.page,
-      paddingTop: SPACING.md,
-      paddingBottom: SPACING.lg,
-      gap: SPACING.md,
+      paddingTop: SPACING.md + 4,
+      paddingBottom: SPACING.lg + 2,
+      gap: SPACING.lg,
     },
     primarySection: {
-      gap: SPACING.sm + 2,
+      gap: SPACING.md,
     },
     actionBar: {
-      flexDirection: 'column',
-      gap: SPACING.sm + 2,
       paddingHorizontal: SPACING.page,
       paddingTop: SPACING.sm + 2,
       paddingBottom: actionBarBottomPadding,
+      marginBottom: actionBarBottomMargin,
       borderTopWidth: 1,
-      borderTopColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.06),
-      backgroundColor: colors.cardBackground,
-    },
-    actionPrimary: {
-      alignSelf: 'stretch',
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: SPACING.xs + 2,
-      minHeight: 52,
-      paddingHorizontal: SPACING.md,
-      borderRadius: BORDER_RADIUS.full,
-      backgroundColor: colors.primary,
-    },
-    actionMuted: {
-      borderWidth: 1,
-      borderColor: colors.borderStrong ?? withAlpha(colors.primaryText, 0.08),
-      backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.1),
-    },
-    actionPrimaryLabel: {
-      flexShrink: 1,
-      fontSize: SIZES.text14,
-      lineHeight: 18,
-      fontWeight: FONT_WEIGHTS.bold,
-      color: colors.white,
-      textAlign: 'center',
-    },
-    actionBlockedLabel: {
-      color: colors.primaryText,
-    },
-    actionDisabled: {
-      opacity: 0.55,
+      borderTopColor: dockSurface.borderColor || chrome.divider,
+      backgroundColor: withAlpha(
+        chrome.elevatedSurface.backgroundColor,
+        isDark ? 0.96 : 0.98,
+      ),
+      ...dockShadowStyle,
     },
     stateCard: {
       padding: SPACING.md + 2,
       borderRadius: BORDER_RADIUS.xl,
-      backgroundColor: colors.cardBackground,
+      backgroundColor: chrome.surface.backgroundColor,
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.07),
+      borderColor: chrome.surface.borderColor,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.16,
+      shadowRadius: 18,
+      elevation: 2,
       gap: SPACING.sm,
       alignItems: 'flex-start',
       justifyContent: 'flex-start',
@@ -1801,7 +2319,7 @@ const createStyles = (
       justifyContent: 'flex-start',
     },
     stateCardSubtle: {
-      backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.02),
+      backgroundColor: chrome.mutedSurface.backgroundColor,
     },
     stateTitle: {
       fontSize: SIZES.text16,
@@ -1823,15 +2341,11 @@ const createStyles = (
       alignItems: 'flex-start',
       gap: SPACING.sm + 2,
       padding: SPACING.md + 2,
-      borderRadius: BORDER_RADIUS.xl + 6,
-      backgroundColor: withAlpha(colors.cardBackground, 0.96),
+      borderRadius: BORDER_RADIUS.hero,
+      backgroundColor: chrome.heroSurface.backgroundColor,
       borderWidth: 1,
-      borderColor: withAlpha(colors.primary, 0.14),
-      shadowColor: colors.primary,
-      shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.08,
-      shadowRadius: 18,
-      elevation: 2,
+      borderColor: chrome.heroSurface.borderColor,
+      ...chrome.heroSurface.shadowStyle,
     },
     emptyIconShell: {
       width: 44,

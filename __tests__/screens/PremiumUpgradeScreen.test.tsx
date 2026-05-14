@@ -231,8 +231,8 @@ describe('PremiumUpgradeScreen', () => {
     });
 
     const annualSurface = getAndroidLightSurface(LIGHT_COLORS, {
-      accentColor: LIGHT_COLORS.primary,
-      shadowColor: LIGHT_COLORS.primary,
+      accentColor: LIGHT_COLORS.gold,
+      shadowColor: LIGHT_COLORS.gold,
       backgroundAlpha: 0.07,
       borderAlpha: 0.22,
       overlayAlpha: 0.1,
@@ -264,7 +264,7 @@ describe('PremiumUpgradeScreen', () => {
         expect.objectContaining({
           backgroundColor: annualSurface.backgroundColor,
           borderColor: annualSurface.borderColor,
-          borderWidth: 2.5,
+          borderWidth: 1.5,
         }),
       ]),
     );

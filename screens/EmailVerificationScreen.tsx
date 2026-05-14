@@ -30,7 +30,6 @@ import {
   loadPreAuthOnboardingDraft,
 } from '@/utils/preAuthOnboarding';
 import {
-  markPostSignupOnboardingAvatarHandled,
   markPostSignupOnboardingPending,
 } from '@/utils/postSignupOnboarding';
 
@@ -238,7 +237,6 @@ export default function EmailVerificationScreen() {
       }
 
       await markPostSignupOnboardingPending(userId);
-      await markPostSignupOnboardingAvatarHandled(userId);
       await clearPreAuthOnboardingDraft();
       await refreshUserProfile();
 
@@ -391,6 +389,7 @@ export default function EmailVerificationScreen() {
     >
       {alertElement}
       <AuthHero
+        brand="HEALTH SCAN"
         align="center"
         title={t('auth.verify_title')}
         subtitle={t('auth.verify_subtitle')}

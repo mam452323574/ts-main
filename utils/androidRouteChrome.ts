@@ -15,6 +15,26 @@ export const MAIN_TABS_ROUTES = new Set([
   '/(tabs)/social',
   '/(tabs)/scanner',
 ]);
+export const THEMED_ANDROID_UI_ROUTES = new Set([
+  '/admin-social-moderation',
+  '/analytics',
+  '/coach',
+  '/coach-history',
+  '/entry-offer',
+  '/exercises',
+  '/notifications',
+  '/notification-settings',
+  '/premium-upgrade',
+  '/privacy-policy',
+  '/recipes',
+  '/scan-result',
+  '/settings',
+  '/share-story',
+  '/social-comments',
+  '/social-compose',
+  '/social-post',
+  '/super-scan-result',
+]);
 
 type StatusBarStyle = 'light' | 'dark';
 
@@ -88,7 +108,7 @@ function isLightColor(color: string) {
 export function getAndroidMainTabsSurfaceColor(
   colors: Pick<ThemeColors, 'cardBackground' | 'background'>
 ) {
-  return colors.cardBackground;
+  return colors.background;
 }
 
 export function getAndroidRouteChrome(
@@ -102,13 +122,10 @@ export function getAndroidRouteChrome(
     normalizedPathname === '/scanner' || normalizedPathname === '/(tabs)/scanner';
   const isScanPreviewRoute = normalizedPathname === '/scan-preview';
   const isFridgeScanRoute = normalizedPathname === '/scan-frigo';
-  const isSocialRouteWithThemedBackground =
-    normalizedPathname === '/social-compose' ||
-    normalizedPathname === '/social-post' ||
-    normalizedPathname === '/social-comments';
+  const isThemedUiRoute = THEMED_ANDROID_UI_ROUTES.has(normalizedPathname);
   const systemBackgroundColor = isMainTabsRoute
     ? getAndroidMainTabsSurfaceColor(colors)
-    : isSocialRouteWithThemedBackground
+    : isThemedUiRoute
       ? colors.background
       : ANDROID_SECONDARY_BACKGROUND;
 

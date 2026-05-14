@@ -6,11 +6,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { FlashList } from '@shopify/flash-list';
 import { AlertCircle, ChevronLeft, ShieldAlert } from 'lucide-react-native';
 
+import { AppScreen } from '@/components/AppScreen';
+import { ScreenState } from '@/components/ScreenState';
 import AdminModerationCard from '@/components/social/admin/AdminModerationCard';
 import AdminModerationToolbar from '@/components/social/admin/AdminModerationToolbar';
 import AdminOverflowMenu from '@/components/social/admin/AdminOverflowMenu';
@@ -26,15 +27,16 @@ import {
   getFilterCount,
   getOverflowActionDefinitions,
   getSectionCopy,
+  isModerationItemApprovable,
   parseSignedIntegerInput,
   resolveDefaultSortMode,
   searchModerationItems,
   sortModerationItems,
 } from '@/components/social/admin/adminModerationUtils';
+import { buildAdminChromePalette } from '@/components/social/admin/adminModerationTheme';
 import {
   BORDER_RADIUS,
   FONT_WEIGHTS,
-  SHADOWS,
   SIZES,
   SPACING,
   withAlpha,
@@ -42,7 +44,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useSocialAdminModeration } from '@/hooks/queries';
+import { useSocialAdminModeration } from '@/hooks/queries/useSocialAdminModeration';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import {
   getSocialAdminServiceErrorDebugInfo,
@@ -94,14 +96,21 @@ export default function AdminSocialModerationScreen() {
   const { colors } = useTheme();
   const { t } = useLanguage();
   const { alertElement, showAlert } = useCustomAlert();
-  const styles = useMemo(() => createStyles(colors), [colors]);
   const [selectedFilter, setSelectedFilter] =
     useState<SocialAdminModerationFilter>('needs_review');
+  const chrome = useMemo(
+    () => buildAdminChromePalette(colors, selectedFilter),
+    [colors, selectedFilter],
+  );
+  const styles = useMemo(() => createStyles(chrome), [chrome]);
   const [sortMode, setSortMode] = useState<AdminModerationSortMode>(
     resolveDefaultSortMode('needs_review'),
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedItemIds, setExpandedItemIds] = useState<string[]>([]);
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [activeOverflowItemId, setActiveOverflowItemId] = useState<string | null>(null);
   const [pendingActionContext, setPendingActionContext] =
     useState<PendingActionContext | null>(null);
@@ -115,6 +124,7 @@ export default function AdminSocialModerationScreen() {
   const {
     moderationQueueQuery,
     moderateContentMutation,
+    bulkApproveContentMutation,
     reclassifyPostMutation,
     moderateUserMutation,
     eradicateUserMutation,
@@ -126,25 +136,6 @@ export default function AdminSocialModerationScreen() {
       router.replace('/(tabs)' as any);
     }
   }, [isAdmin, loading, router, userProfile]);
-
-  // S-02 — Defense en profondeur : ne pas rendre l'arbre admin tant que le
-  // tier n'est pas confirme. Le redirect du useEffect ci-dessus est async
-  // (un cycle de render se produit avant la navigation), un non-admin pouvait
-  // donc voir brievement la liste des actions sensibles. Le RLS Supabase et
-  // requireAdminUserProfile cote Edge Functions restent autoritaires.
-  if (loading || !userProfile || !isAdmin) {
-    return (
-      <SafeAreaView
-        style={styles.container}
-        edges={['top']}
-        testID="admin-social-guard-blocking"
-      >
-        <View style={styles.guardBlockingContainer}>
-          <ActivityIndicator color={colors.primary} size="large" />
-        </View>
-      </SafeAreaView>
-    );
-  }
 
   const moderationItems = moderationQueueQuery.data?.items ?? [];
   const sectionCopy = getSectionCopy(selectedFilter);
@@ -191,8 +182,10 @@ export default function AdminSocialModerationScreen() {
     : null;
   const showQueueLoadDebugInfo =
     shouldDebugAdminSocialScreen() && !!queueLoadErrorDebugInfo;
+  const isBulkApprovePending = bulkApproveContentMutation?.isPending ?? false;
   const actionDisabled =
     moderateContentMutation.isPending ||
+    isBulkApprovePending ||
     reclassifyPostMutation.isPending ||
     moderateUserMutation.isPending ||
     eradicateUserMutation.isPending ||
@@ -223,6 +216,24 @@ export default function AdminSocialModerationScreen() {
     [searchedItems, sortMode],
   );
   const renderedQueueItems = moderationQueueQuery.error ? [] : visibleItems;
+  const selectableVisibleItemIds = useMemo(
+    () =>
+      new Set(
+        renderedQueueItems
+          .filter((item) => isModerationItemApprovable(item))
+          .map((item) => item.content_id),
+      ),
+    [renderedQueueItems],
+  );
+  const selectedModerationItems = useMemo(
+    () =>
+      renderedQueueItems.filter(
+        (item) =>
+          selectedItemIds.has(item.content_id) &&
+          selectableVisibleItemIds.has(item.content_id),
+      ),
+    [renderedQueueItems, selectableVisibleItemIds, selectedItemIds],
+  );
   const selectedOverflowItem = useMemo(
     () =>
       moderationItems.find((item) => item.content_id === activeOverflowItemId) ?? null,
@@ -255,6 +266,20 @@ export default function AdminSocialModerationScreen() {
       setActiveOverflowItemId(null);
     }
   }, [activeOverflowItemId, moderationItems]);
+
+  useEffect(() => {
+    if (selectedItemIds.size === 0) {
+      return;
+    }
+
+    setSelectedItemIds((current) => {
+      const nextSelection = new Set(
+        [...current].filter((itemId) => selectableVisibleItemIds.has(itemId)),
+      );
+
+      return nextSelection.size === current.size ? current : nextSelection;
+    });
+  }, [selectableVisibleItemIds, selectedItemIds]);
 
   useEffect(() => {
     const newExpandedIds = moderationItems
@@ -309,6 +334,24 @@ export default function AdminSocialModerationScreen() {
     );
   };
 
+  const clearSelectedItems = () => {
+    setSelectedItemIds(new Set());
+  };
+
+  const toggleSelectedItem = (itemId: string) => {
+    setSelectedItemIds((current) => {
+      const nextSelection = new Set(current);
+
+      if (nextSelection.has(itemId)) {
+        nextSelection.delete(itemId);
+      } else {
+        nextSelection.add(itemId);
+      }
+
+      return nextSelection;
+    });
+  };
+
   const handleModerationAction = async (
     item: SocialAdminModerationItem,
     action: SocialModerationAction,
@@ -318,6 +361,15 @@ export default function AdminSocialModerationScreen() {
         moderateContentMutation.mutateAsync(buildModerationRequest(item, action)),
       );
       setActiveOverflowItemId(null);
+      setSelectedItemIds((current) => {
+        if (!current.has(item.content_id)) {
+          return current;
+        }
+
+        const nextSelection = new Set(current);
+        nextSelection.delete(item.content_id);
+        return nextSelection;
+      });
     } catch (error) {
       const message = error instanceof Error
         ? error.message
@@ -327,6 +379,87 @@ export default function AdminSocialModerationScreen() {
         { text: t('common.ok') },
       ]);
     }
+  };
+
+  const submitBulkApproval = async () => {
+    if (!bulkApproveContentMutation || selectedModerationItems.length === 0) {
+      return;
+    }
+
+    try {
+      const summary = await bulkApproveContentMutation.mutateAsync(
+        selectedModerationItems,
+      );
+
+      if (summary.approvedCount === summary.requestedCount) {
+        clearSelectedItems();
+        return;
+      }
+
+      setSelectedItemIds(new Set(summary.failedIds));
+
+      if (summary.approvedCount > 0) {
+        showAlert(
+          t('social.admin.bulk.partial_title'),
+          t('social.admin.bulk.partial_body', {
+            approved: summary.approvedCount,
+            total: summary.requestedCount,
+          }),
+          [{ text: t('common.ok') }],
+        );
+        return;
+      }
+
+      showAlert(
+        t('social.admin.bulk.failure_title'),
+        t('social.admin.bulk.failure_body', {
+          total: summary.requestedCount,
+        }),
+        [{ text: t('common.ok') }],
+      );
+    } catch (error) {
+      const message = error instanceof Error
+        ? error.message
+        : t('social.admin.bulk.failure_body', {
+          total: selectedModerationItems.length,
+        });
+
+      showAlert(t('social.admin.bulk.failure_title'), message, [
+        { text: t('common.ok') },
+      ]);
+    }
+  };
+
+  const handleBulkApprovePress = () => {
+    if (selectedModerationItems.length === 0) {
+      return;
+    }
+
+    showAlert(
+      t('social.admin.bulk.confirm_title'),
+      t('social.admin.bulk.confirm_body', {
+        count: selectedModerationItems.length,
+      }),
+      [
+        {
+          text: t('common.cancel'),
+          style: 'cancel',
+        },
+        {
+          text: t('social.admin.bulk.confirm_action'),
+          onPress: () => {
+            void submitBulkApproval();
+          },
+        },
+      ],
+      undefined,
+      {
+        variant: 'info',
+        buttonTones: {
+          cancel: 'ghost',
+        },
+      },
+    );
   };
 
   const handleReclassifyPost = async (
@@ -562,9 +695,11 @@ export default function AdminSocialModerationScreen() {
   const renderQueueHeader = () => (
     <View style={styles.summaryStack}>
       <View style={styles.summaryStrip} testID="admin-social-summary-strip">
+        <View style={styles.summaryGlowPrimary} />
+        <View style={styles.summaryGlowSecondary} />
         <View style={styles.summaryTopRow}>
           <View style={styles.summaryEyebrowRow}>
-            <ShieldAlert color={colors.primary} size={14} />
+            <ShieldAlert color={chrome.filterAccent} size={14} />
             <Text style={styles.summaryEyebrowLabel}>
               {t('social.admin.hero.active_queue')}
             </Text>
@@ -574,26 +709,58 @@ export default function AdminSocialModerationScreen() {
           </View>
         </View>
 
-        <Text style={styles.summaryTitle}>{t(sectionCopy.titleKey)}</Text>
-        <Text numberOfLines={2} style={styles.summaryBody}>
-          {t(sectionCopy.bodyKey)}
-        </Text>
-        <Text style={styles.summaryFootnote}>
-          {t('social.admin.hero.last_sync', {
-            date: lastSyncLabel ?? '--',
-          })}
-        </Text>
+        <View style={styles.summaryHeroRow}>
+          <View style={styles.summaryHeroCopy}>
+            <Text style={styles.summaryTitle}>{t(sectionCopy.titleKey)}</Text>
+            <Text numberOfLines={2} style={styles.summaryBody}>
+              {t(sectionCopy.bodyKey)}
+            </Text>
+            <Text style={styles.summaryFootnote}>
+              {t('social.admin.hero.last_sync', {
+                date: lastSyncLabel ?? '--',
+              })}
+            </Text>
+          </View>
+
+          <View style={styles.summarySpotlight}>
+            <Text style={styles.summarySpotlightValue}>{selectedFilterCount}</Text>
+            <Text style={styles.summarySpotlightLabel}>
+              {t(`social.admin.filters.${selectedFilter}`)}
+            </Text>
+          </View>
+        </View>
       </View>
 
       <View style={styles.summaryGrid} testID="admin-social-summary-grid">
-        {summaryCards.map((card) => (
-          <View key={card.key} style={styles.summaryMiniCard} testID={card.testID}>
+        {summaryCards.map((card) => {
+          const accent =
+            card.key === 'processed'
+              ? chrome.successAccent
+              : card.key === 'flagged'
+                ? chrome.dangerAccent
+                : card.key === 'reported'
+                  ? chrome.filterAccentSecondary
+                  : chrome.trustAccent;
+
+          return (
+            <View
+              key={card.key}
+              style={[
+                styles.summaryMiniCard,
+                {
+                  backgroundColor: withAlpha(accent, 0.08),
+                  borderColor: withAlpha(accent, 0.16),
+                },
+              ]}
+              testID={card.testID}
+            >
             <Text style={styles.summaryMiniValue}>{card.value}</Text>
             <Text style={styles.summaryMiniLabel}>
               {t(`social.admin.summary.${card.key}`)}
             </Text>
-          </View>
-        ))}
+            </View>
+          );
+        })}
       </View>
 
       <AdminModerationToolbar
@@ -609,6 +776,60 @@ export default function AdminSocialModerationScreen() {
         onSearchChange={setSearchQuery}
         onSortChange={setSortMode}
       />
+
+      {selectedModerationItems.length > 0 ? (
+        <View style={styles.bulkActionBar} testID="admin-social-bulk-bar">
+          <View style={styles.bulkHeaderRow}>
+            <View style={styles.bulkSelectionPill}>
+              <Text style={styles.bulkSelectionLabel}>
+                {t('social.admin.bulk.selected_count', {
+                  count: selectedModerationItems.length,
+                })}
+              </Text>
+            </View>
+
+            <Text style={styles.bulkStatusLabel}>
+              {t(`social.admin.sort.${sortMode}`)}
+            </Text>
+          </View>
+
+          <View style={styles.bulkActionButtons}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              disabled={actionDisabled}
+              onPress={clearSelectedItems}
+              style={[
+                styles.bulkSecondaryButton,
+                actionDisabled ? styles.bulkButtonDisabled : null,
+              ]}
+              testID="admin-social-bulk-clear"
+            >
+              <Text style={styles.bulkSecondaryButtonLabel}>
+                {t('social.admin.bulk.clear_selection')}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              accessibilityRole="button"
+              disabled={actionDisabled}
+              onPress={handleBulkApprovePress}
+              style={[
+                styles.bulkPrimaryButton,
+                actionDisabled ? styles.bulkButtonDisabled : null,
+              ]}
+              testID="admin-social-bulk-approve"
+            >
+              <Text style={styles.bulkPrimaryButtonLabel}>
+                {t(
+                  isBulkApprovePending
+                    ? 'social.admin.bulk.approving_selection'
+                    : 'social.admin.bulk.approve_selection',
+                )}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 
@@ -618,7 +839,7 @@ export default function AdminSocialModerationScreen() {
         <View style={styles.stateShell}>
           <View style={styles.loadingCard} testID="admin-social-loading-placeholder">
             <View style={styles.loadingHeader}>
-              <ActivityIndicator color={colors.primary} size="small" />
+              <ActivityIndicator color={chrome.trustAccent} size="small" />
               <Text style={styles.loadingTitle}>{t('social.admin.title')}</Text>
             </View>
 
@@ -639,7 +860,7 @@ export default function AdminSocialModerationScreen() {
         <View style={styles.stateShell}>
           <View style={styles.inlineErrorCard} testID="admin-social-error-state">
             <View style={styles.inlineMessageRow}>
-              <AlertCircle color={colors.error} size={16} />
+              <AlertCircle color={chrome.dangerAccent} size={16} />
               <View style={styles.inlineMessageCopy}>
                 <Text style={styles.inlineMessageTitle}>
                   {t('social.admin.errors.load_title')}
@@ -713,22 +934,18 @@ export default function AdminSocialModerationScreen() {
 
   if (loading || !userProfile) {
     return (
-      <SafeAreaView style={styles.centeredState} testID="admin-social-loading">
-        <ActivityIndicator color={colors.primary} />
-      </SafeAreaView>
+      <ScreenState tone="loading" layout="full" testID="admin-social-loading" />
     );
   }
 
   if (!isAdmin) {
     return (
-      <SafeAreaView style={styles.centeredState} testID="admin-social-redirecting">
-        <ActivityIndicator color={colors.primary} />
-      </SafeAreaView>
+      <ScreenState tone="loading" layout="full" testID="admin-social-redirecting" />
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} testID="admin-social-screen">
+    <AppScreen topInset={false} bottomInset={false} style={styles.container} testID="admin-social-screen">
       {alertElement}
       <AdminReactionAdjustmentModal
         item={reactionAdjustmentTarget}
@@ -758,12 +975,19 @@ export default function AdminSocialModerationScreen() {
           style={styles.backButton}
           testID="admin-social-back"
         >
-          <ChevronLeft color={colors.primaryText} size={18} />
+          <ChevronLeft color={chrome.headerButtonIcon} size={18} />
         </TouchableOpacity>
+
         <View style={styles.headerText}>
           <Text style={styles.title}>{t('social.admin.title')}</Text>
           <Text numberOfLines={1} style={styles.subtitle}>
             {t('social.admin.subtitle')}
+          </Text>
+        </View>
+
+        <View style={styles.headerStatePill}>
+          <Text style={styles.headerStateLabel}>
+            {t(`social.admin.filters.${selectedFilter}`)}
           </Text>
         </View>
       </View>
@@ -775,12 +999,15 @@ export default function AdminSocialModerationScreen() {
             item={item}
             isExpanded={expandedItemIds.includes(item.content_id)}
             actionDisabled={actionDisabled}
+            isSelected={selectedItemIds.has(item.content_id)}
             pendingActionKey={
               pendingActionContext?.itemId === item.content_id
                 ? pendingActionContext.actionKey
                 : null
             }
+            selectionDisabled={actionDisabled}
             onToggleDetails={toggleExpandedItem}
+            onToggleSelection={toggleSelectedItem}
             onModerationActionPress={handleModerationAction}
             onOverflowPress={(targetItem) =>
               setActiveOverflowItemId(targetItem.content_id)
@@ -798,74 +1025,106 @@ export default function AdminSocialModerationScreen() {
         }}
         testID={`admin-social-section-${selectedFilter}`}
       />
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 
-const createStyles = (colors: any) =>
+const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background,
-    },
-    guardBlockingContainer: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    centeredState: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: SPACING.page,
+      backgroundColor: chrome.screenBackground,
     },
     header: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: SPACING.sm + 2,
       paddingHorizontal: SPACING.page,
-      paddingTop: SPACING.xs,
-      paddingBottom: SPACING.xs + 2,
+      paddingTop: SPACING.sm,
+      paddingBottom: SPACING.sm + 2,
+      backgroundColor: chrome.headerSurface,
+      borderBottomWidth: 1,
+      borderBottomColor: chrome.headerBorder,
     },
     backButton: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.surfaceMuted ?? colors.cardBackground,
+      backgroundColor: chrome.headerButtonBackground,
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderColor: chrome.headerButtonBorder,
     },
     headerText: {
       flex: 1,
-      gap: 1,
+      minWidth: 0,
+      gap: 2,
     },
     title: {
-      fontSize: 17,
+      fontSize: 18,
       fontWeight: FONT_WEIGHTS.bold,
-      color: colors.primaryText,
+      color: chrome.textPrimary,
     },
     subtitle: {
       fontSize: 12,
       lineHeight: 16,
-      color: colors.textMuted ?? colors.gray,
+      color: chrome.textMuted,
+    },
+    headerStatePill: {
+      minHeight: 34,
+      maxWidth: 120,
+      paddingHorizontal: SPACING.sm + 2,
+      borderRadius: BORDER_RADIUS.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: chrome.filterAccentSoft,
+      borderWidth: 1,
+      borderColor: chrome.filterAccentBorder,
+    },
+    headerStateLabel: {
+      fontSize: 11,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      color: chrome.textPrimary,
     },
     summaryStack: {
       gap: SPACING.sm,
       paddingHorizontal: SPACING.page,
-      paddingTop: SPACING.xs,
-      paddingBottom: SPACING.sm,
+      paddingTop: SPACING.sm,
+      paddingBottom: SPACING.md,
     },
     summaryStrip: {
-      borderRadius: BORDER_RADIUS.xl,
-      paddingHorizontal: SPACING.md + 2,
-      paddingVertical: SPACING.md,
-      gap: SPACING.xs + 2,
-      backgroundColor: withAlpha(colors.cardBackground, 0.96),
+      overflow: 'hidden',
+      borderRadius: BORDER_RADIUS.hero,
+      paddingHorizontal: SPACING.lg,
+      paddingVertical: SPACING.md + 2,
+      gap: SPACING.sm,
+      backgroundColor: chrome.surfaceGlass,
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
-      ...SHADOWS.card,
+      borderColor: chrome.filterAccentBorder,
+      shadowColor: chrome.shadowColor,
+      shadowOffset: { width: 0, height: 18 },
+      shadowOpacity: 0.34,
+      shadowRadius: 28,
+      elevation: 10,
+    },
+    summaryGlowPrimary: {
+      position: 'absolute',
+      top: -48,
+      right: -24,
+      width: 164,
+      height: 164,
+      borderRadius: 82,
+      backgroundColor: chrome.filterAccentHalo,
+    },
+    summaryGlowSecondary: {
+      position: 'absolute',
+      bottom: -52,
+      left: -28,
+      width: 150,
+      height: 150,
+      borderRadius: 75,
+      backgroundColor: chrome.trustAccentSoft,
     },
     summaryTopRow: {
       flexDirection: 'row',
@@ -881,7 +1140,7 @@ const createStyles = (colors: any) =>
     summaryEyebrowLabel: {
       fontSize: 11,
       fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.primary,
+      color: chrome.filterAccent,
     },
     summaryCountPill: {
       minWidth: 44,
@@ -890,28 +1149,62 @@ const createStyles = (colors: any) =>
       borderRadius: BORDER_RADIUS.full,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: withAlpha(colors.primary, 0.12),
+      backgroundColor: chrome.filterAccentSoft,
       borderWidth: 1,
-      borderColor: withAlpha(colors.primary, 0.18),
+      borderColor: chrome.filterAccentBorder,
     },
     summaryCountValue: {
       fontSize: 15,
       fontWeight: FONT_WEIGHTS.bold,
-      color: colors.primary,
+      color: chrome.textPrimary,
+    },
+    summaryHeroRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      gap: SPACING.md,
+    },
+    summaryHeroCopy: {
+      flex: 1,
+      gap: SPACING.xs + 2,
     },
     summaryTitle: {
-      fontSize: SIZES.text16,
+      fontSize: SIZES.text18,
       fontWeight: FONT_WEIGHTS.bold,
-      color: colors.primaryText,
+      color: chrome.textPrimary,
     },
     summaryBody: {
       fontSize: 13,
-      lineHeight: 18,
-      color: colors.textMuted ?? colors.gray,
+      lineHeight: 19,
+      color: chrome.textSecondary,
     },
     summaryFootnote: {
       fontSize: 11,
-      color: colors.textMuted ?? colors.gray,
+      color: chrome.textMuted,
+    },
+    summarySpotlight: {
+      minWidth: 96,
+      borderRadius: BORDER_RADIUS.xl,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.md,
+      alignItems: 'flex-start',
+      justifyContent: 'center',
+      backgroundColor: withAlpha(chrome.screenBackground, 0.34),
+      borderWidth: 1,
+      borderColor: chrome.filterAccentBorder,
+    },
+    summarySpotlightValue: {
+      fontSize: 30,
+      lineHeight: 34,
+      fontWeight: FONT_WEIGHTS.bold,
+      color: chrome.textPrimary,
+    },
+    summarySpotlightLabel: {
+      marginTop: 4,
+      fontSize: 11,
+      lineHeight: 14,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      color: chrome.textSecondary,
+      textTransform: 'uppercase',
     },
     summaryGrid: {
       flexDirection: 'row',
@@ -926,19 +1219,96 @@ const createStyles = (colors: any) =>
       paddingHorizontal: SPACING.sm + 2,
       paddingVertical: SPACING.sm,
       gap: 2,
-      backgroundColor: colors.surfaceMuted ?? colors.cardBackground,
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
     },
     summaryMiniValue: {
       fontSize: 16,
       fontWeight: FONT_WEIGHTS.bold,
-      color: colors.primaryText,
+      color: chrome.textPrimary,
     },
     summaryMiniLabel: {
       fontSize: 10,
       lineHeight: 14,
-      color: colors.textMuted ?? colors.gray,
+      color: chrome.textMuted,
+    },
+    bulkActionBar: {
+      gap: SPACING.sm,
+      borderRadius: BORDER_RADIUS.hero,
+      padding: SPACING.md + 2,
+      backgroundColor: chrome.surfaceGlass,
+      borderWidth: 1,
+      borderColor: chrome.filterAccentBorder,
+      shadowColor: chrome.shadowColor,
+      shadowOffset: { width: 0, height: 12 },
+      shadowOpacity: 0.24,
+      shadowRadius: 22,
+      elevation: 8,
+    },
+    bulkHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: SPACING.sm,
+    },
+    bulkSelectionPill: {
+      alignSelf: 'flex-start',
+      minHeight: 28,
+      paddingHorizontal: SPACING.sm + 2,
+      borderRadius: BORDER_RADIUS.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: chrome.filterAccentSoft,
+      borderWidth: 1,
+      borderColor: chrome.filterAccentBorder,
+    },
+    bulkSelectionLabel: {
+      fontSize: 12,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      color: chrome.textPrimary,
+    },
+    bulkStatusLabel: {
+      fontSize: 11,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      color: chrome.textMuted,
+      textTransform: 'uppercase',
+    },
+    bulkActionButtons: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: SPACING.xs + 2,
+    },
+    bulkPrimaryButton: {
+      minHeight: 38,
+      paddingHorizontal: SPACING.md,
+      borderRadius: BORDER_RADIUS.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: chrome.trustAccent,
+      borderWidth: 1,
+      borderColor: chrome.trustAccentBorder,
+    },
+    bulkPrimaryButtonLabel: {
+      fontSize: 12,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      color: chrome.textOnAccent,
+    },
+    bulkSecondaryButton: {
+      minHeight: 38,
+      paddingHorizontal: SPACING.md,
+      borderRadius: BORDER_RADIUS.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: chrome.surfaceMuted,
+      borderWidth: 1,
+      borderColor: chrome.borderSubtle,
+    },
+    bulkSecondaryButtonLabel: {
+      fontSize: 12,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      color: chrome.textSecondary,
+    },
+    bulkButtonDisabled: {
+      opacity: 0.5,
     },
     listContent: {
       paddingBottom: SPACING.xxxl,
@@ -946,15 +1316,15 @@ const createStyles = (colors: any) =>
     },
     stateShell: {
       paddingHorizontal: SPACING.page,
-      paddingTop: SPACING.sm,
+      paddingTop: SPACING.md,
     },
     loadingCard: {
-      borderRadius: BORDER_RADIUS.xl,
+      borderRadius: BORDER_RADIUS.hero,
       padding: SPACING.md + 2,
       gap: SPACING.sm,
-      backgroundColor: colors.cardBackground,
+      backgroundColor: chrome.surfaceGlass,
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderColor: chrome.borderSubtle,
     },
     loadingHeader: {
       flexDirection: 'row',
@@ -964,20 +1334,20 @@ const createStyles = (colors: any) =>
     loadingTitle: {
       fontSize: 13,
       fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.primaryText,
+      color: chrome.textPrimary,
     },
     loadingPreviewCard: {
       borderRadius: BORDER_RADIUS.lg,
       padding: SPACING.sm + 2,
       gap: SPACING.xs + 2,
-      backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.03),
+      backgroundColor: chrome.surfaceMuted,
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.05),
+      borderColor: chrome.borderSubtle,
     },
     loadingBar: {
       height: 8,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: withAlpha(colors.primaryText, 0.08),
+      backgroundColor: withAlpha(chrome.textPrimary, 0.08),
     },
     loadingBarShort: {
       width: '34%',
@@ -989,12 +1359,12 @@ const createStyles = (colors: any) =>
       width: '84%',
     },
     inlineErrorCard: {
-      borderRadius: BORDER_RADIUS.xl,
+      borderRadius: BORDER_RADIUS.hero,
       padding: SPACING.md + 2,
       gap: SPACING.sm,
-      backgroundColor: colors.cardBackground,
+      backgroundColor: chrome.surfaceGlass,
       borderWidth: 1,
-      borderColor: withAlpha(colors.error, 0.18),
+      borderColor: chrome.dangerAccentBorder,
     },
     inlineMessageRow: {
       flexDirection: 'row',
@@ -1008,25 +1378,25 @@ const createStyles = (colors: any) =>
     inlineMessageTitle: {
       fontSize: 15,
       fontWeight: FONT_WEIGHTS.bold,
-      color: colors.primaryText,
+      color: chrome.textPrimary,
     },
     inlineMessageBody: {
       fontSize: 13,
       lineHeight: 18,
-      color: colors.textMuted ?? colors.gray,
+      color: chrome.textSecondary,
     },
     debugBlock: {
       borderRadius: BORDER_RADIUS.lg,
       padding: SPACING.sm,
       gap: 2,
-      backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.03),
+      backgroundColor: chrome.surfaceMuted,
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.05),
+      borderColor: chrome.borderSubtle,
     },
     debugLine: {
       fontSize: SIZES.text12,
       lineHeight: 18,
-      color: colors.textMuted ?? colors.gray,
+      color: chrome.textMuted,
     },
     retryButton: {
       alignSelf: 'flex-start',
@@ -1035,30 +1405,32 @@ const createStyles = (colors: any) =>
       borderRadius: BORDER_RADIUS.full,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: withAlpha(colors.primary, 0.12),
+      backgroundColor: chrome.trustAccentSoft,
+      borderWidth: 1,
+      borderColor: chrome.trustAccentBorder,
     },
     retryButtonLabel: {
       fontSize: 12,
       fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.primary,
+      color: chrome.trustAccent,
     },
     emptyCard: {
-      borderRadius: BORDER_RADIUS.xl,
+      borderRadius: BORDER_RADIUS.hero,
       padding: SPACING.md + 2,
       gap: SPACING.xs + 2,
-      backgroundColor: colors.cardBackground,
+      backgroundColor: chrome.surfaceGlass,
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderColor: chrome.borderSubtle,
     },
     emptyCardTitle: {
       fontSize: 15,
       fontWeight: FONT_WEIGHTS.bold,
-      color: colors.primaryText,
+      color: chrome.textPrimary,
     },
     emptyCardBody: {
       fontSize: 13,
       lineHeight: 18,
-      color: colors.textMuted ?? colors.gray,
+      color: chrome.textSecondary,
     },
     listFooterSpacer: {
       height: SPACING.lg,

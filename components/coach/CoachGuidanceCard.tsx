@@ -13,14 +13,22 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { Button } from '@/components/Button';
+import {
+  CoachStructuredContentSections,
+  getCoachStructuredTeaser,
+  hasRenderableCoachStructuredContent,
+  type CoachStructuredContentLabels,
+} from '@/components/coach/CoachStructuredContentSections';
 import { CoachPersonaAvatar } from '@/components/coach/CoachPersonaAvatar';
 import { useTheme } from '@/contexts/ThemeContext';
 import {
   BORDER_RADIUS,
   FONT_WEIGHTS,
-  SHADOWS,
   SIZES,
   SPACING,
+  getVisualMoodGradient,
+  getVisualMoodSurface,
+  getWellnessPremiumSurface,
   mixColors,
   withAlpha,
 } from '@/constants/theme';
@@ -30,13 +38,7 @@ import type { CoachPersonaVisual } from '@/shared/coachPersonaVisuals';
 
 export type CoachGuidanceCardVariant = 'compact' | 'fresh';
 
-export interface CoachGuidanceSectionLabels {
-  context_notes?: string;
-  priorities?: string;
-  action_steps?: string;
-  warnings?: string;
-  data_gaps?: string;
-}
+export type CoachGuidanceSectionLabels = CoachStructuredContentLabels;
 
 export interface CoachGuidanceMetricBadge {
   label: string;
@@ -71,6 +73,7 @@ interface CoachGuidanceCardProps {
   continuationHintLabel: string;
   ctaLabel?: string | null;
   onCtaPress?: (() => void) | null;
+  defaultExpanded?: boolean;
   testID?: string;
   disclaimerTestID?: string;
 }
@@ -106,40 +109,40 @@ const GUIDANCE_PREVIEW_CONFIG: Record<
 
 const COACH_RESPONSE_THEMES: Record<CoachPersonaKey, CoachResponseTheme> = {
   gentle_supportive: {
-    accent: '#6CA7FF',
-    accentAlt: '#58D7E8',
-    accentDeep: '#274A7D',
-    contrast: '#D7ECFF',
+    accent: '#7FA9D4',
+    accentAlt: '#78B9C7',
+    accentDeep: '#263E5A',
+    contrast: '#D5E5F4',
   },
   strict_tough: {
-    accent: '#D6A94A',
-    accentAlt: '#8F7A4E',
+    accent: '#B99B5E',
+    accentAlt: '#8A7B61',
     accentDeep: '#2B2C31',
-    contrast: '#FFE8A8',
+    contrast: '#E8D6A6',
   },
   motivational_energetic: {
-    accent: '#FF9F3E',
-    accentAlt: '#FFD166',
-    accentDeep: '#5B3218',
-    contrast: '#FFE0A6',
+    accent: '#C68D5A',
+    accentAlt: '#D0B06B',
+    accentDeep: '#4B3422',
+    contrast: '#EAD0A7',
   },
   patient_calm: {
-    accent: '#7BBF9D',
-    accentAlt: '#7BB8E8',
-    accentDeep: '#214D47',
-    contrast: '#DDF5EA',
+    accent: '#72AFA8',
+    accentAlt: '#7EA9C4',
+    accentDeep: '#244842',
+    contrast: '#D5ECE8',
   },
   analytical_precise: {
-    accent: '#9B8CFF',
-    accentAlt: '#5F7DFF',
-    accentDeep: '#312A68',
-    contrast: '#E2DEFF',
+    accent: '#8D9EC8',
+    accentAlt: '#738BC2',
+    accentDeep: '#30395D',
+    contrast: '#DEE5F6',
   },
   playful_light: {
-    accent: '#FF8F8B',
-    accentAlt: '#FFBF66',
-    accentDeep: '#623047',
-    contrast: '#FFE0DB',
+    accent: '#D98B86',
+    accentAlt: '#CBA16A',
+    accentDeep: '#52313D',
+    contrast: '#F0D8D5',
   },
 };
 
@@ -256,25 +259,39 @@ export function CoachGuidanceCard({
   continuationHintLabel,
   ctaLabel,
   onCtaPress,
+  defaultExpanded = false,
   testID = 'coach-guidance-card',
   disclaimerTestID = 'coach-guidance-disclaimer',
 }: CoachGuidanceCardProps) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const responseTheme = COACH_RESPONSE_THEMES[personaKey];
+  const cardSurface = useMemo(
+    () =>
+      getWellnessPremiumSurface(colors, isDark, {
+        accentColor: responseTheme.accent,
+        kind: variant === 'fresh' ? 'hero' : 'feature',
+      }),
+    [colors, isDark, responseTheme.accent, variant],
+  );
+  const insetSurface = useMemo(
+    () =>
+      getVisualMoodSurface(colors, isDark, {
+        mood: 'obsidian',
+        accentColor: responseTheme.accentAlt,
+        intensity: 'subtle',
+        shadow: false,
+      }),
+    [colors, isDark, responseTheme.accentAlt],
+  );
   const styles = useMemo(
-    () => createStyles(colors, responseTheme),
-    [colors, responseTheme],
+    () => createStyles(colors, responseTheme, cardSurface, insetSurface),
+    [cardSurface, colors, insetSurface, responseTheme],
   );
   const hasStructuredSections = useMemo(
     () =>
-      !!content &&
-      (content.summary.length > 0 ||
-        content.context_notes.length > 0 ||
-        content.priorities.length > 0 ||
-        content.action_steps.length > 0 ||
-        content.warnings.length > 0 ||
-        content.data_gaps.length > 0 ||
-        !!content.encouragement),
+      hasRenderableCoachStructuredContent(content, {
+        showSummary: true,
+      }),
     [content],
   );
   const paragraphs = useMemo(
@@ -285,11 +302,11 @@ export function CoachGuidanceCard({
     () => resolveCollapsedPreview(paragraphs, variant),
     [paragraphs, variant],
   );
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(defaultExpanded);
 
   useEffect(() => {
-    setExpanded(false);
-  }, [body, content, variant]);
+    setExpanded(defaultExpanded);
+  }, [body, content, defaultExpanded, variant]);
 
   const resolvedSectionLabels = useMemo(
     () => ({
@@ -312,9 +329,27 @@ export function CoachGuidanceCard({
   const collapsedLead = primaryAction ?? fallbackStructuredLead;
   const collapsedWarning = content?.warnings[0] ?? null;
   const collapsedDataGaps = content?.data_gaps.slice(0, 2) ?? [];
+  const structuredTeaser = useMemo(
+    () => getCoachStructuredTeaser(content, sectionLabels),
+    [content, sectionLabels],
+  );
   const expandedActionSteps = primaryAction
     ? (content?.action_steps.slice(1) ?? [])
     : (content?.action_steps ?? []);
+  const hasExtendedStructuredBlocks =
+    !!content &&
+    ((content.daily_schedule?.length ?? 0) > 0 ||
+      (content.micro_routine?.length ?? 0) > 0 ||
+      !!content.meal_template ||
+      (content.meal_swaps?.length ?? 0) > 0 ||
+      (content.shopping_list?.length ?? 0) > 0 ||
+      !!content.quick_recipe ||
+      !!content.knowledge_card ||
+      (content.habit_tracker?.length ?? 0) > 0 ||
+      (content.reminders?.length ?? 0) > 0 ||
+      !!content.next_scan_suggestion ||
+      (content.signal_watch?.length ?? 0) > 0 ||
+      !!content.streak_celebration);
   const structuredOverflowCount =
     (content?.context_notes.length ?? 0) +
     (content?.priorities.length ?? 0) +
@@ -324,7 +359,8 @@ export function CoachGuidanceCard({
       (content?.data_gaps.length ?? 0) - collapsedDataGaps.length,
       0,
     ) +
-    (content?.encouragement ? 1 : 0);
+    (content?.encouragement ? 1 : 0) +
+    (hasExtendedStructuredBlocks ? 1 : 0);
   const showStructuredExpansion =
     hasStructuredSections && !!content && structuredOverflowCount > 0;
   const showExpansionControl = hasStructuredSections
@@ -332,18 +368,12 @@ export function CoachGuidanceCard({
     : preview.hasOverflow;
   const renderFullBody = !showExpansionControl || expanded;
   const toggleLabel = expanded ? collapseLabel : expandLabel;
-  const gradientColors: readonly [string, string, string] =
-    variant === 'compact'
-      ? [
-          withAlpha(responseTheme.accent, 0.18),
-          withAlpha(responseTheme.accentAlt, 0.1),
-          withAlpha(colors.cardBackground, 0.98),
-        ]
-      : [
-          withAlpha(responseTheme.accent, 0.24),
-          withAlpha(responseTheme.accentAlt, 0.13),
-          withAlpha(colors.cardBackground, 0.98),
-        ];
+  const gradientColors: readonly [string, string, string] = getVisualMoodGradient(
+    colors,
+    isDark,
+    variant === 'fresh' ? 'premium' : 'obsidian',
+    responseTheme.accent,
+  );
   const metricColor = metricBadge
     ? resolveMetricColor(metricBadge, colors)
     : colors.gray;
@@ -354,83 +384,16 @@ export function CoachGuidanceCard({
     }
 
     return (
-      <View style={styles.structuredDetails} testID="coach-guidance-expanded-structured-content">
-        {content.context_notes.length > 0 ? (
-          <View style={styles.section} testID="coach-section-context_notes">
-            <Text style={styles.sectionLabel}>
-              {resolvedSectionLabels.context_notes}
-            </Text>
-            {content.context_notes.map((note, index) => (
-              <Text key={`context-${index}`} style={styles.sectionItem}>
-                {note}
-              </Text>
-            ))}
-          </View>
-        ) : null}
-
-        {content.priorities.length > 0 ? (
-          <View style={styles.section} testID="coach-section-priorities">
-            <Text style={styles.sectionLabel}>
-              {resolvedSectionLabels.priorities}
-            </Text>
-            {content.priorities.map((priority, index) => (
-              <Text key={`priority-${index}`} style={styles.sectionItem}>
-                {priority}
-              </Text>
-            ))}
-          </View>
-        ) : null}
-
-        {expandedActionSteps.length > 0 ? (
-          <View style={styles.section} testID="coach-section-action_steps">
-            <Text style={styles.sectionLabel}>
-              {resolvedSectionLabels.action_steps}
-            </Text>
-            {expandedActionSteps.map((step, index) => (
-              <Text key={`action-${index}`} style={styles.sectionItemAction}>
-                {step}
-              </Text>
-            ))}
-          </View>
-        ) : null}
-
-        {content.warnings.length > 0 ? (
-          <View
-            style={[styles.section, styles.warningSection]}
-            testID="coach-section-warnings"
-          >
-            <Text style={[styles.sectionLabel, styles.warningLabel]}>
-              {resolvedSectionLabels.warnings}
-            </Text>
-            {content.warnings.map((warning, index) => (
-              <Text key={`warning-${index}`} style={styles.warningItem}>
-                {warning}
-              </Text>
-            ))}
-          </View>
-        ) : null}
-
-        {content.encouragement ? (
-          <Text
-            style={styles.encouragement}
-            testID="coach-guidance-encouragement"
-          >
-            {content.encouragement}
-          </Text>
-        ) : null}
-
-        {content.data_gaps.length > 0 ? (
-          <View style={styles.dataGaps} testID="coach-section-data_gaps">
-            <Text style={styles.dataGapLabel}>
-              {resolvedSectionLabels.data_gaps}
-            </Text>
-            {content.data_gaps.map((gap, index) => (
-              <Text key={`gap-${index}`} style={styles.dataGapItem}>
-                {gap}
-              </Text>
-            ))}
-          </View>
-        ) : null}
+      <View
+        style={styles.structuredDetails}
+        testID="coach-guidance-expanded-structured-content"
+      >
+        <CoachStructuredContentSections
+          content={content}
+          labels={sectionLabels}
+          showSummary={false}
+          skipFirstActionStep={!!primaryAction}
+        />
       </View>
     );
   };
@@ -499,8 +462,18 @@ export function CoachGuidanceCard({
             ) : null}
 
             {!expanded &&
-            (collapsedWarning || collapsedDataGaps.length > 0) ? (
+            (collapsedWarning || collapsedDataGaps.length > 0 || structuredTeaser) ? (
               <View style={styles.compactSignals} testID="coach-guidance-compact-signals">
+                {structuredTeaser ? (
+                  <View
+                    style={styles.structuredTeaserPill}
+                    testID="coach-guidance-structured-teaser"
+                  >
+                    <Text numberOfLines={1} style={styles.structuredTeaserText}>
+                      {structuredTeaser}
+                    </Text>
+                  </View>
+                ) : null}
                 {collapsedWarning ? (
                   <View style={styles.signalLine} testID="coach-guidance-warning-signal">
                     <AlertTriangle
@@ -632,6 +605,13 @@ export function CoachGuidanceCard({
         start={{ x: 0, y: 0 }}
         style={styles.gradientBackdrop}
       />
+      <View
+        pointerEvents="none"
+        style={[
+          styles.topHighlight,
+          { backgroundColor: cardSurface.highlightColor },
+        ]}
+      />
 
       <View
         style={[
@@ -726,8 +706,8 @@ export function CoachGuidanceCard({
             style={[
               styles.metricPill,
               {
-                backgroundColor: withAlpha(metricColor, 0.1),
-                borderColor: withAlpha(metricColor, 0.26),
+                backgroundColor: withAlpha(metricColor, 0.065),
+                borderColor: withAlpha(metricColor, 0.16),
               },
             ]}
             testID="coach-guidance-metric-badge"
@@ -786,24 +766,33 @@ export function CoachGuidanceCard({
   );
 }
 
-const createStyles = (colors: any, responseTheme: CoachResponseTheme) =>
+const createStyles = (
+  colors: any,
+  responseTheme: CoachResponseTheme,
+  cardSurface: {
+    backgroundColor: string;
+    borderColor: string;
+    highlightColor: string;
+    shadowStyle: Record<string, unknown>;
+  },
+  insetSurface: {
+    backgroundColor: string;
+    borderColor: string;
+  },
+) =>
   StyleSheet.create({
     card: {
       position: 'relative',
       borderRadius: BORDER_RADIUS.xl + 8,
-      backgroundColor: mixColors(colors.surfaceMuted ?? colors.cardBackground, responseTheme.accentDeep, 0.08),
+      backgroundColor: cardSurface.backgroundColor,
       borderWidth: 1,
-      borderColor: mixColors(colors.borderSubtle ?? colors.lightGray, responseTheme.accent, 0.22),
+      borderColor: cardSurface.borderColor,
       overflow: 'hidden',
-      shadowColor: responseTheme.accent,
-      shadowOffset: { width: 0, height: 10 },
-      shadowOpacity: 0.1,
-      shadowRadius: 22,
-      elevation: SHADOWS.card.elevation ?? 2,
+      ...cardSurface.shadowStyle,
     },
     cardCompact: {
       gap: SPACING.sm + 2,
-      paddingHorizontal: SPACING.md,
+      paddingHorizontal: SPACING.lg,
       paddingVertical: SPACING.sm + 2,
     },
     cardFresh: {
@@ -820,7 +809,14 @@ const createStyles = (colors: any, responseTheme: CoachResponseTheme) =>
       top: 0,
       left: 0,
       right: 0,
-      height: 156,
+      height: 188,
+    },
+    topHighlight: {
+      position: 'absolute',
+      top: 0,
+      left: 22,
+      right: 22,
+      height: 1,
     },
     header: {
       flexDirection: 'row',
@@ -876,9 +872,9 @@ const createStyles = (colors: any, responseTheme: CoachResponseTheme) =>
       paddingHorizontal: SPACING.sm,
       paddingVertical: 5,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: withAlpha(responseTheme.accentDeep, 0.72),
+      backgroundColor: withAlpha(responseTheme.accentDeep, 0.54),
       borderWidth: 1,
-      borderColor: withAlpha(responseTheme.accent, 0.28),
+      borderColor: withAlpha(responseTheme.accent, 0.18),
     },
     disclaimerPillText: {
       flexShrink: 1,
@@ -913,9 +909,9 @@ const createStyles = (colors: any, responseTheme: CoachResponseTheme) =>
       paddingHorizontal: SPACING.sm + 1,
       paddingVertical: 5,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: withAlpha(responseTheme.accent, 0.14),
+      backgroundColor: withAlpha(responseTheme.accent, 0.085),
       borderWidth: 1,
-      borderColor: withAlpha(responseTheme.accent, 0.22),
+      borderColor: withAlpha(responseTheme.accent, 0.14),
     },
     primaryPillText: {
       fontSize: 11,
@@ -929,9 +925,9 @@ const createStyles = (colors: any, responseTheme: CoachResponseTheme) =>
       paddingHorizontal: SPACING.sm + 1,
       paddingVertical: 5,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: withAlpha(colors.warning, 0.1),
+      backgroundColor: withAlpha(colors.warning, 0.065),
       borderWidth: 1,
-      borderColor: withAlpha(colors.warning, 0.2),
+      borderColor: withAlpha(colors.warning, 0.14),
     },
     secondaryPillText: {
       fontSize: 11,
@@ -943,9 +939,9 @@ const createStyles = (colors: any, responseTheme: CoachResponseTheme) =>
       paddingHorizontal: SPACING.sm + 1,
       paddingVertical: 5,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.05),
+      backgroundColor: insetSurface.backgroundColor,
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderColor: insetSurface.borderColor,
       maxWidth: 170,
     },
     modePillText: {
@@ -977,14 +973,14 @@ const createStyles = (colors: any, responseTheme: CoachResponseTheme) =>
       gap: 2,
     },
     title: {
-      fontSize: SIZES.text18,
-      lineHeight: 24,
+      fontSize: SIZES.text20,
+      lineHeight: 26,
       fontWeight: FONT_WEIGHTS.bold,
       color: colors.primaryText,
     },
     titleCompact: {
       fontSize: SIZES.text16,
-      lineHeight: 20,
+      lineHeight: 22,
     },
     expandableArea: {
       gap: SPACING.sm + 2,
@@ -1007,9 +1003,9 @@ const createStyles = (colors: any, responseTheme: CoachResponseTheme) =>
       gap: SPACING.sm,
       padding: SPACING.sm + 2,
       borderRadius: BORDER_RADIUS.lg,
-      backgroundColor: withAlpha(responseTheme.accent, 0.11),
+      backgroundColor: insetSurface.backgroundColor,
       borderWidth: 1,
-      borderColor: withAlpha(responseTheme.accent, 0.2),
+      borderColor: insetSurface.borderColor,
     },
     primaryActionIcon: {
       width: 26,
@@ -1017,7 +1013,7 @@ const createStyles = (colors: any, responseTheme: CoachResponseTheme) =>
       borderRadius: 13,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: withAlpha(responseTheme.accentDeep, 0.7),
+      backgroundColor: withAlpha(responseTheme.accentDeep, 0.48),
       flexShrink: 0,
     },
     primaryActionCopy: {
@@ -1057,9 +1053,9 @@ const createStyles = (colors: any, responseTheme: CoachResponseTheme) =>
       paddingHorizontal: SPACING.sm,
       paddingVertical: 5,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: withAlpha(colors.warning, 0.08),
+      backgroundColor: withAlpha(colors.warning, 0.055),
       borderWidth: 1,
-      borderColor: withAlpha(colors.warning, 0.18),
+      borderColor: withAlpha(colors.warning, 0.12),
     },
     signalText: {
       flexShrink: 1,
@@ -1074,14 +1070,29 @@ const createStyles = (colors: any, responseTheme: CoachResponseTheme) =>
       paddingHorizontal: SPACING.sm,
       paddingVertical: 5,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.045),
+      backgroundColor: insetSurface.backgroundColor,
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderColor: insetSurface.borderColor,
     },
     dataGapPillText: {
       fontSize: 11,
       lineHeight: 14,
       color: colors.textMuted ?? withAlpha(colors.gray, 0.96),
+    },
+    structuredTeaserPill: {
+      maxWidth: '100%',
+      paddingHorizontal: SPACING.sm,
+      paddingVertical: 5,
+      borderRadius: BORDER_RADIUS.full,
+      backgroundColor: withAlpha(responseTheme.accent, 0.065),
+      borderWidth: 1,
+      borderColor: withAlpha(responseTheme.accent, 0.14),
+    },
+    structuredTeaserText: {
+      fontSize: 11,
+      lineHeight: 14,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      color: responseTheme.contrast,
     },
     structuredDetails: {
       gap: SPACING.sm,
@@ -1111,11 +1122,11 @@ const createStyles = (colors: any, responseTheme: CoachResponseTheme) =>
       fontWeight: FONT_WEIGHTS.semiBold,
     },
     warningSection: {
-      backgroundColor: withAlpha(colors.warning, 0.07),
+      backgroundColor: withAlpha(colors.warning, 0.05),
       borderRadius: BORDER_RADIUS.md,
       padding: SPACING.sm + 2,
       borderWidth: 1,
-      borderColor: withAlpha(colors.warning, 0.18),
+      borderColor: withAlpha(colors.warning, 0.12),
     },
     warningLabel: {
       color: colors.warning,
@@ -1203,9 +1214,9 @@ const createStyles = (colors: any, responseTheme: CoachResponseTheme) =>
       paddingHorizontal: SPACING.sm + 2,
       paddingVertical: SPACING.xs + 2,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: withAlpha(responseTheme.accent, 0.1),
+      backgroundColor: insetSurface.backgroundColor,
       borderWidth: 1,
-      borderColor: withAlpha(responseTheme.accent, 0.24),
+      borderColor: insetSurface.borderColor,
     },
     toggleLabel: {
       fontSize: SIZES.text14,
@@ -1215,7 +1226,7 @@ const createStyles = (colors: any, responseTheme: CoachResponseTheme) =>
     footer: {
       paddingTop: SPACING.sm,
       borderTopWidth: 1,
-      borderTopColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.07),
+      borderTopColor: withAlpha(responseTheme.accent, 0.09),
     },
     footerCompact: {
       paddingTop: SPACING.xs,

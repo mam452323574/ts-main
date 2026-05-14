@@ -12,11 +12,15 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
-import { ChevronLeft, Ellipsis, Flag, Heart, Send } from 'lucide-react-native';
+import { Ellipsis, Flag, Heart } from 'lucide-react-native';
 
+import { AppScreen } from '@/components/AppScreen';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { ProfileAvatar } from '@/components/ProfileAvatar';
+import { SocialPostActionSheet } from '@/components/social/SocialPostActionSheet';
 import { SocialPostCard } from '@/components/social/SocialPostCard';
 import { SocialProfilePreviewModal } from '@/components/social/SocialProfilePreviewModal';
 import { SocialIdentityRow } from '@/components/social/SocialIdentityRow';
@@ -33,11 +37,9 @@ import {
   SPACING,
   withAlpha,
 } from '@/constants/theme';
-import {
-  useSocialComments,
-  useSocialMutations,
-  useSocialPostDetail,
-} from '@/hooks/queries';
+import { useSocialComments } from '@/hooks/queries/useSocialComments';
+import { useSocialMutations } from '@/hooks/queries/useSocialMutations';
+import { useSocialPostDetail } from '@/hooks/queries/useSocialPostDetail';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import {
   buildSocialAlertMessageWithDiagnostics,
@@ -66,6 +68,7 @@ const FOOTER_COMPACT_TOP_PADDING = SPACING.sm;
 const FOOTER_DEFAULT_TOP_PADDING = SPACING.md;
 const FOOTER_BOTTOM_PADDING = SPACING.sm;
 const SCROLL_CONTENT_FOOTER_SPACING = SPACING.sm;
+const COMMENT_REACTION_EMOJIS = ['❤️', '🙌', '🔥', '👏', '🥲', '😍', '😮', '😂'];
 
 function getSingleParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
@@ -183,6 +186,7 @@ export default function SocialCommentsScreen() {
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
+  const [postActionSheetVisible, setPostActionSheetVisible] = useState(false);
   const [profilePreviewTarget, setProfilePreviewTarget] = useState<{
     userId: string;
     username?: string | null;
@@ -574,6 +578,13 @@ export default function SocialCommentsScreen() {
     setIsInputFocused(false);
   }, [cancelScheduledCommentsScroll]);
 
+  const handleQuickEmojiPress = useCallback((emoji: string) => {
+    setDraft((currentDraft) => `${currentDraft}${emoji}`);
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+  }, []);
+
   const handleFooterLayout = useCallback(
     ({ nativeEvent: { layout } }: LayoutChangeEvent) => {
       const nextFooterHeight = Math.ceil(layout.height);
@@ -894,7 +905,7 @@ export default function SocialCommentsScreen() {
   );
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={styles.container}>
+    <AppScreen bottomInset={false} style={styles.container}>
       {alertElement}
       <KeyboardAvoidingView
         behavior={getKeyboardAvoidingViewBehavior()}
@@ -902,20 +913,14 @@ export default function SocialCommentsScreen() {
         style={styles.container}
         testID="social-comments-keyboard-shell"
       >
-        <View style={styles.header}>
-          <TouchableOpacity
-            accessibilityRole="button"
-            onPress={() => router.back()}
-            style={styles.backButton}
-            testID="social-comments-back-button"
-          >
-            <ChevronLeft color={colors.primaryText} size={20} />
-          </TouchableOpacity>
-          <View style={styles.headerText}>
-            <Text style={styles.title}>{t('social.post_detail.title')}</Text>
-            <Text style={styles.subtitle}>{t('social.post_detail.subtitle')}</Text>
-          </View>
-        </View>
+        <ScreenHeader
+          title={t('social.comments.title')}
+          variant="inline"
+          topInset={false}
+          centered
+          onBack={() => router.back()}
+          backTestID="social-comments-back-button"
+        />
 
         <View style={styles.contentArea}>
           {visibleCommentLikeError ? (
@@ -1018,6 +1023,7 @@ export default function SocialCommentsScreen() {
                       onSharePress={
                         postDetail.asset_url ? () => void handleSharePost() : null
                       }
+                      onMorePress={() => setPostActionSheetVisible(true)}
                     />
 
                     <View
@@ -1108,7 +1114,10 @@ export default function SocialCommentsScreen() {
                   isCommentLikePending(item.id);
 
                 return (
-                  <View style={styles.commentCard}>
+                  <View
+                    style={styles.commentCard}
+                    testID={`social-comment-card-${item.id}`}
+                  >
                     <SocialIdentityRow
                       username={item.author_username}
                       avatarUrl={item.author_avatar_url}
@@ -1244,7 +1253,39 @@ export default function SocialCommentsScreen() {
                 </View>
               ) : null}
 
+              {!isEditingComment ? (
+                <View style={styles.composerSocialPrompts}>
+                  <Text style={styles.guidelineText}>
+                    {t('social.comments.guideline')}
+                  </Text>
+                  <View style={styles.quickEmojiRow} testID="social-comments-emoji-row">
+                    {COMMENT_REACTION_EMOJIS.map((emoji, index) => (
+                      <TouchableOpacity
+                        key={emoji}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('social.comments.quick_reaction_label', {
+                          emoji,
+                        })}
+                        onPress={() => handleQuickEmojiPress(emoji)}
+                        style={styles.quickEmojiButton}
+                        testID={`social-comments-emoji-${index}`}
+                      >
+                        <Text style={styles.quickEmojiLabel}>{emoji}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+
               <View style={styles.composerRow} testID="social-comments-composer-row">
+                {!isEditingComment ? (
+                  <ProfileAvatar
+                    avatarUrl={userProfile?.avatar_url}
+                    username={userProfile?.username}
+                    size={34}
+                    testID="social-comments-composer-avatar"
+                  />
+                ) : null}
                 <TextInput
                   ref={inputRef}
                   multiline
@@ -1305,11 +1346,13 @@ export default function SocialCommentsScreen() {
                   testID="social-comments-submit"
                 >
                   {activeCommentMutationPending ? (
-                    <ActivityIndicator color={colors.white} size="small" />
+                    <ActivityIndicator color={colors.primary} size="small" />
                   ) : isEditingComment ? (
                     <Text style={styles.sendButtonLabel}>{t('common.save')}</Text>
                   ) : (
-                    <Send color={colors.white} size={18} />
+                    <Text style={styles.sendButtonLabel}>
+                      {t('social.comments.post_button')}
+                    </Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -1324,8 +1367,28 @@ export default function SocialCommentsScreen() {
           fallbackAvatarUrl={profilePreviewTarget?.avatarUrl}
           onClose={() => setProfilePreviewTarget(null)}
         />
+
+        <SocialPostActionSheet
+          visible={postActionSheetVisible}
+          post={postDetail}
+          currentUserId={userProfile?.id}
+          deleteDisabled={postDetail ? isDeletePending(postDetail.id) : false}
+          reactionsDisabled={postDetail ? isReactionPending(postDetail.id) : false}
+          onClose={() => setPostActionSheetVisible(false)}
+          onDeletePress={postDetail ? () => handleDeletePost() : null}
+          onReportPress={postDetail ? () => handleReportPost() : null}
+          onNotInterestedPress={
+            postDetail
+              ? () =>
+                  handleSetReaction(
+                    postDetail,
+                    postDetail.viewer_reaction === 'dislike' ? 'neutral' : 'dislike',
+                  )
+              : null
+          }
+        />
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 
@@ -1373,15 +1436,15 @@ const createStyles = (colors: any) =>
       flex: 1,
     },
     listContent: {
-      paddingHorizontal: SPACING.page,
       paddingTop: SPACING.sm,
     },
     postHeaderSection: {
-      gap: SPACING.lg,
-      paddingBottom: SPACING.lg,
+      gap: SPACING.md,
+      paddingBottom: SPACING.md,
     },
     commentsSectionHeader: {
-      gap: 2,
+      paddingHorizontal: SPACING.page,
+      gap: 4,
     },
     commentsSectionTitle: {
       fontSize: SIZES.text18,
@@ -1415,46 +1478,54 @@ const createStyles = (colors: any) =>
       height: SPACING.md,
     },
     commentCard: {
-      padding: SPACING.md,
+      marginHorizontal: SPACING.page,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.md,
       borderRadius: BORDER_RADIUS.lg,
-      backgroundColor: colors.cardBackground,
       borderWidth: 1,
       borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      backgroundColor: colors.surfaceElevated ?? colors.cardBackground,
       gap: SPACING.sm,
+      shadowColor: withAlpha(colors.primaryText, 1),
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.06,
+      shadowRadius: 14,
+      elevation: 1,
     },
     commentBody: {
       fontSize: SIZES.text14,
-      lineHeight: 22,
+      lineHeight: 21,
       color: colors.primaryText,
     },
     commentActionsRow: {
       flexDirection: 'row',
+      flexWrap: 'wrap',
       alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: SPACING.sm,
+      justifyContent: 'flex-start',
+      gap: SPACING.md,
     },
     commentActionButton: {
       flexDirection: 'row',
       alignItems: 'center',
       alignSelf: 'flex-start',
       gap: SPACING.xs,
-      minHeight: 34,
-      paddingHorizontal: SPACING.sm,
+      minHeight: 30,
+      paddingHorizontal: SPACING.xs,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.06),
-      borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      backgroundColor: 'transparent',
     },
     commentActionButtonActive: {
-      backgroundColor: withAlpha(colors.primary, 0.14),
+      backgroundColor: withAlpha(colors.primary, 0.1),
+      borderWidth: 1,
+      borderColor: withAlpha(colors.primary, 0.18),
     },
     commentActionButtonDisabled: {
       opacity: 0.5,
     },
     commentActionLabel: {
       fontSize: SIZES.text12,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.primaryText,
+      fontWeight: FONT_WEIGHTS.medium,
+      color: colors.textMuted ?? colors.gray,
     },
     commentActionLabelActive: {
       color: colors.primary,
@@ -1548,15 +1619,48 @@ const createStyles = (colors: any) =>
       paddingHorizontal: SPACING.page,
       borderTopWidth: 1,
       borderTopColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
-      backgroundColor: colors.cardBackground,
+      backgroundColor: colors.surfaceGlass ?? colors.background,
     },
     composerContent: {
       gap: SPACING.sm,
       width: '100%',
+      padding: SPACING.md,
+      borderRadius: BORDER_RADIUS.card,
+      backgroundColor: colors.surfaceElevated ?? colors.cardBackground,
+      borderWidth: 1,
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+    },
+    composerSocialPrompts: {
+      gap: SPACING.sm,
+    },
+    guidelineText: {
+      fontSize: SIZES.text12,
+      lineHeight: 17,
+      color: colors.textMuted ?? colors.gray,
+      textAlign: 'center',
+    },
+    quickEmojiRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: SPACING.xs,
+    },
+    quickEmojiButton: {
+      minWidth: 36,
+      minHeight: 36,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 18,
+      backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.05),
+      borderWidth: 1,
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+    },
+    quickEmojiLabel: {
+      fontSize: SIZES.text20,
     },
     composerRow: {
       flexDirection: 'row',
-      alignItems: 'flex-end',
+      alignItems: 'center',
       gap: SPACING.sm,
       width: '100%',
     },
@@ -1566,7 +1670,7 @@ const createStyles = (colors: any) =>
       paddingHorizontal: SPACING.md,
       paddingVertical: SPACING.md,
       borderRadius: BORDER_RADIUS.lg,
-      backgroundColor: colors.cardBackground,
+      backgroundColor: colors.surfaceElevated ?? colors.cardBackground,
       borderWidth: 1,
       borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
     },
@@ -1591,7 +1695,9 @@ const createStyles = (colors: any) =>
       paddingHorizontal: SPACING.md,
       paddingVertical: SPACING.sm,
       borderRadius: BORDER_RADIUS.lg,
-      backgroundColor: withAlpha(colors.primary, 0.1),
+      backgroundColor: withAlpha(colors.primary, 0.08),
+      borderWidth: 1,
+      borderColor: withAlpha(colors.primary, 0.14),
     },
     editingBannerCopy: {
       flex: 1,
@@ -1614,8 +1720,8 @@ const createStyles = (colors: any) =>
       maxHeight: 120,
       paddingHorizontal: SPACING.md,
       paddingVertical: SPACING.sm,
-      borderRadius: BORDER_RADIUS.lg,
-      backgroundColor: colors.cardBackground,
+      borderRadius: BORDER_RADIUS.full,
+      backgroundColor: colors.surfaceMuted ?? colors.cardBackground,
       borderWidth: 1,
       borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
       color: colors.primaryText,
@@ -1638,12 +1744,14 @@ const createStyles = (colors: any) =>
       color: colors.primaryText,
     },
     sendButton: {
-      width: 48,
+      minWidth: 58,
       height: 48,
       borderRadius: 24,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.primary,
+      backgroundColor: withAlpha(colors.primary, 0.12),
+      borderWidth: 1,
+      borderColor: withAlpha(colors.primary, 0.18),
     },
     sendButtonWide: {
       width: 'auto',
@@ -1652,8 +1760,8 @@ const createStyles = (colors: any) =>
     },
     sendButtonLabel: {
       fontSize: SIZES.text14,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.white,
+      fontWeight: FONT_WEIGHTS.bold,
+      color: colors.primary,
     },
     sendButtonDisabled: {
       opacity: 0.5,

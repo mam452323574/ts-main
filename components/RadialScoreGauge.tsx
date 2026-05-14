@@ -70,7 +70,8 @@ export const RadialScoreGauge: React.FC<RadialScoreGaugeProps> = ({
           {...RESULT_TEXT_PROPS}
           testID="radial-score-label"
           adjustsFontSizeToFit
-          minimumFontScale={0.84}
+          ellipsizeMode="tail"
+          minimumFontScale={0.86}
           numberOfLines={labelMaxLines}
           style={[styles.label, { color: colors.gray }]}
         >
@@ -138,9 +139,11 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       paddingHorizontal: layout.blockPadding,
       paddingVertical: layout.blockPadding,
       alignItems: 'center',
+      minWidth: 0,
     },
     labelWrap: {
       width: '100%',
+      minWidth: layout.scoreGaugeSize,
       minHeight: layout.isCompact ? 42 : 40,
       alignItems: 'center',
       justifyContent: 'center',
@@ -151,6 +154,9 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       lineHeight: layout.bodyTextLineHeight,
       fontWeight: FONT_WEIGHTS.medium,
       textAlign: 'center',
+      alignSelf: 'stretch',
+      flexShrink: 1,
+      minWidth: 0,
       includeFontPadding: false,
     },
     gaugeContainer: {

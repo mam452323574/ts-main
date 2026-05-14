@@ -1,13 +1,16 @@
 import {
   mixColors,
+  softenAccentColor,
   ThemeColors,
   withAlpha,
 } from '@/constants/theme';
 import { normalizeContractToken } from '@/constants/resultCatalogContract';
+import { resolveScanFlowAccentTheme } from '@/utils/scanFlowVisualTheme';
 import type {
   ResultMetricIconToken,
   ResultScanIconToken,
 } from '@/utils/resultIconCatalog';
+import type { ScanType } from '@/types';
 
 export const RESULT_TONE_KEYS = [
   'neutral',
@@ -29,6 +32,7 @@ export const RESULT_SURFACE_VARIANTS = [
   'neutral',
   'soft',
   'emphasis',
+  'wellnessPremium',
 ] as const;
 
 export type ResultSurfaceVariant = (typeof RESULT_SURFACE_VARIANTS)[number];
@@ -59,6 +63,15 @@ export interface ResolvedScanTypeTheme {
   accentColor: string;
   iconColor: string;
   chipColor: string;
+  chipBackground: string;
+  chipBorder: string;
+  chipText: string;
+  neutralChipBackground: string;
+  neutralChipBorder: string;
+  neutralChipText: string;
+  heroBackdropTint: string;
+  heroBackdropBorder: string;
+  heroBackdropGlow: string;
 }
 
 const createThemeSpec = (
@@ -89,23 +102,36 @@ const SCAN_TYPE_THEME_TONES: Record<ResultScanIconToken, ResultToneKey> = {
 const RESULT_ITEM_THEME_BY_TOKEN: Record<ResultMetricIconToken, ResultItemThemeSpec> =
   {
     perceived_age: createThemeSpec('slate', 'soft', 'soft', 'soft'),
-    face_shape: createThemeSpec('teal', 'neutral', 'none', 'soft'),
-    symmetry: createThemeSpec('teal', 'soft', 'soft', 'strong'),
-    fatigue: createThemeSpec('indigo', 'soft', 'soft', 'strong'),
-    hydration: createThemeSpec('blue', 'soft', 'strong', 'strong'),
-    photogenic: createThemeSpec('violet', 'soft', 'soft', 'strong'),
-    skin_quality: createThemeSpec('teal', 'soft', 'soft', 'strong'),
+    face_shape: createThemeSpec('blue', 'soft', 'none', 'soft'),
+    symmetry: createThemeSpec('blue', 'soft', 'soft', 'strong'),
+    fatigue: createThemeSpec('slate', 'soft', 'soft', 'soft'),
+    hydration: createThemeSpec('blue', 'emphasis', 'strong', 'strong'),
+    photogenic: createThemeSpec('gold', 'soft', 'soft', 'strong'),
+    skin_quality: createThemeSpec('blue', 'emphasis', 'strong', 'strong'),
+    skin_clarity: createThemeSpec('teal', 'soft', 'soft', 'strong'),
+    under_eye_shadow: createThemeSpec('indigo', 'soft', 'soft', 'strong'),
+    under_eye_volume: createThemeSpec('blue', 'soft', 'soft', 'strong'),
+    eye_openness: createThemeSpec('blue', 'soft', 'soft', 'strong'),
+    complexion_redness: createThemeSpec('rose', 'soft', 'soft', 'strong'),
+    pore_visibility: createThemeSpec('slate', 'soft', 'soft', 'soft'),
+    skin_evenness: createThemeSpec('emerald', 'soft', 'soft', 'strong'),
+    skin_radiance: createThemeSpec('gold', 'emphasis', 'strong', 'strong'),
+    lip_dryness: createThemeSpec('amber', 'soft', 'soft', 'strong'),
+    forehead_smoothness: createThemeSpec('teal', 'soft', 'soft', 'strong'),
+    t_zone_oiliness: createThemeSpec('blue', 'soft', 'soft', 'strong'),
+    stress_level: createThemeSpec('violet', 'soft', 'soft', 'strong'),
+    sleep_quality: createThemeSpec('indigo', 'emphasis', 'strong', 'strong'),
     glow: createThemeSpec('gold', 'emphasis', 'strong', 'strong'),
-    collagen: createThemeSpec('rose', 'soft', 'soft', 'strong'),
-    body_type: createThemeSpec('teal', 'soft', 'soft', 'strong'),
-    muscle_mass: createThemeSpec('emerald', 'soft', 'soft', 'strong'),
-    waist: createThemeSpec('blue', 'soft', 'none', 'soft'),
-    strength: createThemeSpec('emerald', 'soft', 'strong', 'strong'),
+    collagen: createThemeSpec('blue', 'soft', 'soft', 'strong'),
+    body_type: createThemeSpec('emerald', 'soft', 'soft', 'strong'),
+    muscle_mass: createThemeSpec('emerald', 'emphasis', 'strong', 'strong'),
+    waist: createThemeSpec('slate', 'soft', 'none', 'soft'),
+    strength: createThemeSpec('emerald', 'emphasis', 'strong', 'strong'),
     bmi: createThemeSpec('amber', 'soft', 'soft', 'strong'),
-    metabolic_age: createThemeSpec('indigo', 'soft', 'soft', 'soft'),
-    body_fat: createThemeSpec('coral', 'emphasis', 'strong', 'strong'),
+    metabolic_age: createThemeSpec('slate', 'soft', 'soft', 'soft'),
+    body_fat: createThemeSpec('amber', 'emphasis', 'strong', 'strong'),
     posture: createThemeSpec('blue', 'soft', 'soft', 'strong'),
-    body_symmetry: createThemeSpec('teal', 'soft', 'soft', 'strong'),
+    body_symmetry: createThemeSpec('emerald', 'soft', 'soft', 'strong'),
     calories: createThemeSpec('amber', 'emphasis', 'strong', 'strong'),
     verdict: createThemeSpec('emerald', 'emphasis', 'strong', 'strong'),
     satiety: createThemeSpec('emerald', 'soft', 'soft', 'strong'),
@@ -210,22 +236,35 @@ function resolveSurfaceTint(
     };
   }
 
+  if (surfaceVariant === 'wellnessPremium') {
+    const premiumAccent = mixColors(accentColor, colors.gold, isDark ? 0.18 : 0.14);
+
+    return {
+      backgroundColor: mixColors(
+        colors.cardBackground,
+        premiumAccent,
+        isDark ? 0.085 : 0.05,
+      ),
+      borderColor: withAlpha(premiumAccent, isDark ? 0.16 : 0.1),
+    };
+  }
+
   const backgroundAlpha =
     surfaceVariant === 'emphasis'
       ? isDark
-        ? 0.18
-        : 0.1
+        ? 0.075
+        : 0.04
       : isDark
-        ? 0.11
-        : 0.05;
+        ? 0.045
+        : 0.022;
   const borderAlpha =
     surfaceVariant === 'emphasis'
       ? isDark
-        ? 0.32
-        : 0.18
+        ? 0.16
+        : 0.1
       : isDark
-        ? 0.22
-        : 0.12;
+        ? 0.1
+        : 0.06;
 
   return {
     backgroundColor: mixColors(colors.cardBackground, accentColor, backgroundAlpha),
@@ -241,9 +280,9 @@ function resolveAccentSurfaceColor(
 ) {
   switch (accentLevel) {
     case 'strong':
-      return withAlpha(accentColor, isDark ? 0.24 : 0.13);
+      return withAlpha(accentColor, isDark ? 0.14 : 0.08);
     case 'soft':
-      return withAlpha(accentColor, isDark ? 0.16 : 0.09);
+      return withAlpha(accentColor, isDark ? 0.1 : 0.055);
     case 'none':
     default:
       return isDark
@@ -260,9 +299,9 @@ function resolveAccentBorderColor(
 ) {
   switch (accentLevel) {
     case 'strong':
-      return withAlpha(accentColor, isDark ? 0.42 : 0.18);
+      return withAlpha(accentColor, isDark ? 0.28 : 0.13);
     case 'soft':
-      return withAlpha(accentColor, isDark ? 0.28 : 0.14);
+      return withAlpha(accentColor, isDark ? 0.18 : 0.1);
     case 'none':
     default:
       return isDark
@@ -293,7 +332,7 @@ function resolveValueColor(
     case 'strong':
       return accentColor;
     case 'soft':
-      return mixColors(colors.primaryText, accentColor, isDark ? 0.32 : 0.26);
+      return mixColors(colors.primaryText, accentColor, isDark ? 0.24 : 0.2);
     case 'none':
     default:
       return colors.primaryText;
@@ -350,7 +389,15 @@ export function resolveResultItemTheme(options: {
 }): ResolvedResultItemTheme {
   const { colors, isDark, theme } = options;
   const resolvedSpec = theme ?? DEFAULT_RESULT_ITEM_THEME_SPEC;
-  const accentColor = resolveToneColor(resolvedSpec.tone, colors, isDark);
+  const rawAccentColor = resolveToneColor(resolvedSpec.tone, colors, isDark);
+  const accentColor = softenAccentColor(
+    colors,
+    isDark,
+    rawAccentColor,
+    resolvedSpec.iconAccent === 'strong' || resolvedSpec.valueAccent === 'strong'
+      ? 'selected'
+      : 'standard',
+  );
   const cardSurface = resolveSurfaceTint(
     resolvedSpec.surfaceVariant,
     accentColor,
@@ -391,12 +438,32 @@ export function resolveScanTypeTheme(
   isDark: boolean,
 ): ResolvedScanTypeTheme {
   const tone = SCAN_TYPE_THEME_TONES[scanType];
-  const accentColor = resolveToneColor(tone, colors, isDark);
+  const scanFlowType: ScanType =
+    scanType === 'face' ? 'health' : scanType;
+  const flowTheme = resolveScanFlowAccentTheme(colors, isDark, scanFlowType);
+  const accentColor = flowTheme.accentColor;
 
   return {
     tone,
     accentColor,
     chipColor: accentColor,
     iconColor: colors.white,
+    chipBackground: flowTheme.accentSoftBackground,
+    chipBorder: flowTheme.chipBorder,
+    chipText: isDark
+      ? flowTheme.chipText
+      : mixColors(accentColor, colors.primaryText, 0.28),
+    neutralChipBackground: isDark
+      ? withAlpha(colors.white, 0.05)
+      : withAlpha(colors.primaryText, 0.04),
+    neutralChipBorder: isDark
+      ? withAlpha(colors.white, 0.09)
+      : withAlpha(colors.primaryText, 0.07),
+    neutralChipText: isDark
+      ? withAlpha(colors.white, 0.82)
+      : mixColors(colors.primaryText, colors.gray, 0.22),
+    heroBackdropTint: withAlpha(flowTheme.accentStrongColor, isDark ? 0.1 : 0.06),
+    heroBackdropBorder: withAlpha(flowTheme.accentStrongColor, isDark ? 0.17 : 0.1),
+    heroBackdropGlow: withAlpha(flowTheme.accentColor, isDark ? 0.14 : 0.07),
   };
 }

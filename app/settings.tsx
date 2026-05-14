@@ -3,19 +3,23 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { Crown, ChevronRight, Shield, ShieldAlert, LogOut, Bell, ChevronLeft, AlertTriangle, Settings, Globe, Check } from 'lucide-react-native';
+import { Crown, ChevronRight, Shield, ShieldAlert, LogOut, Bell, Settings, Globe, Check } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
+import { AppScreen } from '@/components/AppScreen';
 import { AvatarPicker } from '@/components/AvatarPicker';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useNotificationContext } from '@/contexts/NotificationContext';
 import { AccountBadge } from '@/components/AccountBadge';
 import { ModalHandle } from '@/components/ModalHandle';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { ScreenSection } from '@/components/ScreenSection';
+import { SettingRow } from '@/components/SettingRow';
 import { navigationService } from '@/services/navigation';
-import { SIZES, SPACING, BORDER_RADIUS, FONT_WEIGHTS } from '@/constants/theme';
+import { SIZES, SPACING, BORDER_RADIUS, FONT_WEIGHTS, withAlpha } from '@/constants/theme';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { LOCALE_OPTIONS } from '@/i18n/config';
-import { useAllScanEligibility } from '@/hooks/queries';
+import { useAllScanEligibility } from '@/hooks/queries/useScanEligibility';
 import { SCAN_TYPE_LABELS } from '@/constants/scan';
 import { ScanType } from '@/types';
 import {
@@ -197,20 +201,10 @@ export default function SettingsScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <AppScreen topInset={false} bottomInset={false} style={styles.container}>
       {alertElement}
       <ModalHandle />
-      <View style={styles.headerBar}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-          activeOpacity={0.8}
-        >
-          <ChevronLeft color={colors.primaryText} size={24} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('settings.title')}</Text>
-        <View style={styles.headerPlaceholder} />
-      </View>
+      <ScreenHeader title={t('settings.title')} onBack={() => router.back()} centered />
       <ScrollView
         style={styles.scrollContent}
         contentContainerStyle={styles.scrollContentContainer}
@@ -233,9 +227,13 @@ export default function SettingsScreen() {
           <Text style={styles.email}>{userProfile.email}</Text>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('settings.section_subscription')}</Text>
-          <View style={styles.subscriptionCard}>
+        <ScreenSection
+          title={t('settings.section_subscription')}
+          variant="raised"
+          padded
+          style={styles.section}
+          contentStyle={styles.subscriptionCard}
+        >
             <AccountBadge tier={userProfile.account_tier} size="large" />
             <View style={styles.quotaSummary} testID="settings-quota-summary">
               <Text style={styles.quotaSummaryTitle}>{t('home.items_available')}</Text>
@@ -274,132 +272,83 @@ export default function SettingsScreen() {
                 onPress={() => router.push('/premium-upgrade')}
                 activeOpacity={0.8}
               >
-                <Crown color="#FFD700" size={28} fill="#FFD700" />
+                <Crown color={colors.gold} size={28} fill={withAlpha(colors.gold, 0.22)} />
                 <View style={styles.upgradeCardText}>
                   <Text style={styles.upgradeCardTitle}>{t('settings.upgrade_premium')}</Text>
                   <Text style={styles.upgradeCardSubtitle}>{t('settings.upgrade_subtitle')}</Text>
                 </View>
-                <ChevronRight color={colors.primary} size={24} />
+                <ChevronRight color={colors.gold} size={24} />
               </TouchableOpacity>
             )}
-          </View>
-        </View>
+        </ScreenSection>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('settings.section_preferences')}</Text>
-          <TouchableOpacity
-            style={styles.menuItem}
+        <ScreenSection title={t('settings.section_preferences')} style={styles.section}>
+          <SettingRow
+            title={t('settings.language')}
+            description={LOCALE_OPTIONS.find((item) => item.code === locale)?.label ?? locale.toUpperCase()}
+            icon={<Globe color={colors.primaryText} size={20} />}
             onPress={() => setShowLanguageModal(true)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.menuItemLeft}>
-              <Globe color={colors.primaryText} size={20} />
-              <View>
-                <Text style={styles.menuItemText}>{t('settings.language')}</Text>
-                <Text style={styles.menuItemSubtext}>
-                  {LOCALE_OPTIONS.find((item) => item.code === locale)?.label ?? locale.toUpperCase()}
-                </Text>
-              </View>
-            </View>
-            <ChevronRight color={colors.gray} size={20} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.menuItem}
+          />
+          <SettingRow
+            title={t('settings.notifications')}
+            description={notificationCount > 0 ? `${notificationCount} ${t('settings.new_notifications')}` : null}
+            icon={<Bell color={colors.primaryText} size={20} />}
             onPress={handleNotificationsPress}
-            activeOpacity={0.7}
-          >
-            <View style={styles.menuItemLeft}>
-              <Bell color={colors.primaryText} size={20} />
-              <View>
-                <Text style={styles.menuItemText}>{t('settings.notifications')}</Text>
-                {notificationCount > 0 && (
-                  <Text style={styles.menuItemSubtext}>
-                    {notificationCount} {t('settings.new_notifications')}
-                  </Text>
-                )}
+            right={
+              <View style={styles.menuItemRight}>
+                {notificationCount > 0 ? (
+                  <View style={styles.notificationBadge}>
+                    <Text style={styles.notificationBadgeText}>{notificationCount}</Text>
+                  </View>
+                ) : null}
+                <ChevronRight color={colors.gray} size={20} />
               </View>
-            </View>
-            <View style={styles.menuItemRight}>
-              {notificationCount > 0 && (
-                <View style={styles.notificationBadge}>
-                  <Text style={styles.notificationBadgeText}>{notificationCount}</Text>
-                </View>
-              )}
-              <ChevronRight color={colors.gray} size={20} />
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.menuItem}
+            }
+          />
+          <SettingRow
+            title={t('settings.notifications_preferences')}
+            icon={<Settings color={colors.primaryText} size={20} />}
             onPress={handleNotificationSettingsPress}
-            activeOpacity={0.7}
-          >
-            <View style={styles.menuItemLeft}>
-              <Settings color={colors.primaryText} size={20} />
-              <Text style={styles.menuItemText}>{t('settings.notifications_preferences')}</Text>
-            </View>
-            <ChevronRight color={colors.gray} size={20} />
-          </TouchableOpacity>
-        </View>
+          />
+        </ScreenSection>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('settings.section_app')}</Text>
-          {userProfile.account_tier === 'admin' && (
-            <TouchableOpacity
-              style={styles.menuItem}
+        <ScreenSection title={t('settings.section_app')} style={styles.section}>
+          {userProfile.account_tier === 'admin' ? (
+            <SettingRow
+              title={t('settings.admin_moderation')}
+              description={t('settings.admin_moderation_subtitle')}
+              icon={<ShieldAlert color={colors.primary} size={20} />}
               onPress={handleAdminModerationPress}
-              activeOpacity={0.7}
               testID="settings-admin-moderation"
-            >
-              <View style={styles.menuItemLeft}>
-                <ShieldAlert color={colors.primary} size={20} />
-                <View>
-                  <Text style={styles.menuItemText}>{t('settings.admin_moderation')}</Text>
-                  <Text style={styles.menuItemSubtext}>{t('settings.admin_moderation_subtitle')}</Text>
-                </View>
-              </View>
-              <ChevronRight color={colors.gray} size={20} />
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity
-            style={styles.menuItem}
+            />
+          ) : null}
+          <SettingRow
+            title={t('settings.privacy_policy')}
+            icon={<Shield color={colors.primaryText} size={20} />}
             onPress={() => router.push('/privacy-policy')}
-            activeOpacity={0.8}
-          >
-            <View style={styles.menuItemLeft}>
-              <Shield color={colors.primaryText} size={20} />
-              <Text style={styles.menuItemText}>{t('settings.privacy_policy')}</Text>
-            </View>
-            <ChevronRight color={colors.gray} size={20} />
-          </TouchableOpacity>
-        </View>
+          />
+        </ScreenSection>
 
-        <View style={styles.dangerZone}>
-          <View style={styles.dangerZoneHeader}>
-            <AlertTriangle color={colors.error} size={20} />
-            <Text style={styles.dangerZoneTitle}>{t('settings.danger_zone_title')}</Text>
-          </View>
-          <Text style={styles.dangerZoneDescription}>
-            {t('settings.danger_zone_desc')}
-          </Text>
-          <TouchableOpacity
-            style={[styles.signOutButton, isSigningOut && styles.signOutButtonDisabled]}
-            onPress={handleSignOut}
-            activeOpacity={0.7}
-            disabled={isSigningOut}
-          >
-            <View style={styles.signOutButtonContent}>
-              {isSigningOut ? (
+        <ScreenSection
+          title={t('settings.danger_zone_title')}
+          subtitle={t('settings.danger_zone_desc')}
+          variant="danger"
+          style={styles.dangerSection}
+        >
+          <SettingRow
+            title={isSigningOut ? t('settings.sign_out_loading') : t('settings.sign_out_button')}
+            icon={
+              isSigningOut ? (
                 <ActivityIndicator color={colors.error} size="small" />
               ) : (
                 <LogOut color={colors.error} size={22} strokeWidth={2.5} />
-              )}
-              <Text style={styles.signOutText}>
-                {isSigningOut ? t('settings.sign_out_loading') : t('settings.sign_out_button')}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        </View>
+              )
+            }
+            onPress={handleSignOut}
+            disabled={isSigningOut}
+            destructive
+          />
+        </ScreenSection>
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>{t('settings.footer_version')}</Text>
@@ -460,7 +409,7 @@ export default function SettingsScreen() {
         </TouchableOpacity>
       </Modal>
 
-    </View>
+    </AppScreen>
   );
 }
 
@@ -468,29 +417,6 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => StyleSheet.c
   container: {
     flex: 1,
     backgroundColor: colors.background,
-  },
-  headerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: insets.top + SPACING.sm,
-    paddingBottom: SPACING.md,
-    paddingHorizontal: SPACING.page,
-    backgroundColor: colors.cardBackground,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.lightGray,
-  },
-  backButton: {
-    padding: SPACING.xs,
-    width: 40,
-  },
-  headerTitle: {
-    fontSize: SIZES.text18,
-    fontWeight: FONT_WEIGHTS.bold,
-    color: colors.primaryText,
-  },
-  headerPlaceholder: {
-    width: 40,
   },
   scrollContent: {
     flex: 1,
@@ -502,7 +428,11 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => StyleSheet.c
     alignItems: 'center',
     paddingTop: SPACING.xxl,
     paddingBottom: SPACING.xl,
-    backgroundColor: colors.cardBackground,
+    backgroundColor: isDark
+      ? withAlpha(colors.cardBackground, 0.42)
+      : colors.cardBackground,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
   },
   avatarContainer: {
     marginBottom: SPACING.md,
@@ -525,24 +455,19 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => StyleSheet.c
     marginTop: SPACING.lg,
     paddingHorizontal: SPACING.page,
   },
-  sectionTitle: {
-    fontSize: SIZES.text16,
-    fontWeight: FONT_WEIGHTS.bold,
-    color: colors.primaryText,
-    marginBottom: SPACING.md,
+  dangerSection: {
+    marginTop: SPACING.xxl,
   },
   subscriptionCard: {
-    backgroundColor: colors.cardBackground,
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.lg,
     alignItems: 'center',
     gap: SPACING.md,
   },
   quotaSummary: {
     width: '100%',
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: BORDER_RADIUS.xl,
     borderWidth: 1,
-    borderColor: colors.lightGray,
+    borderColor: colors.borderSubtle ?? colors.lightGray,
+    backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.04),
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     gap: SPACING.xs,
@@ -585,11 +510,16 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => StyleSheet.c
     alignItems: 'center',
     gap: SPACING.md,
     padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: BORDER_RADIUS.xl,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 215, 0, 0.4)',
-    backgroundColor: 'rgba(255, 215, 0, 0.08)',
+    borderColor: withAlpha(colors.gold, 0.34),
+    backgroundColor: withAlpha(colors.gold, isDark ? 0.1 : 0.14),
     marginTop: SPACING.sm,
+    shadowColor: colors.gold,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: isDark ? 0.16 : 0.1,
+    shadowRadius: 22,
+    elevation: 3,
   },
   upgradeCardText: {
     flex: 1,
@@ -603,31 +533,6 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => StyleSheet.c
     fontSize: SIZES.text12,
     color: colors.gray,
     marginTop: 2,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.cardBackground,
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.md,
-    marginBottom: SPACING.sm,
-  },
-  menuItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-  },
-  menuItemText: {
-    fontSize: SIZES.text16,
-    color: colors.primaryText,
-    fontWeight: FONT_WEIGHTS.regular,
-  },
-  menuItemSubtext: {
-    fontSize: SIZES.text12,
-    color: colors.primary,
-    marginTop: 2,
-    fontWeight: FONT_WEIGHTS.medium,
   },
   menuItemRight: {
     flexDirection: 'row',
@@ -648,62 +553,6 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => StyleSheet.c
     fontWeight: FONT_WEIGHTS.bold,
     color: colors.white,
   },
-  dangerZone: {
-    marginTop: SPACING.xxl,
-    marginBottom: SPACING.xl,
-    marginHorizontal: SPACING.page,
-    paddingVertical: SPACING.lg,
-    paddingHorizontal: SPACING.md,
-    backgroundColor: 'rgba(255, 69, 58, 0.1)', // Use opacity for dark mode compatibility
-    borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 69, 58, 0.3)',
-  },
-  dangerZoneHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-    marginBottom: SPACING.xs,
-  },
-  dangerZoneTitle: {
-    fontSize: SIZES.text16,
-    fontWeight: FONT_WEIGHTS.bold,
-    color: colors.error,
-  },
-  dangerZoneDescription: {
-    fontSize: SIZES.text14,
-    color: colors.gray,
-    marginBottom: SPACING.lg,
-    lineHeight: 20,
-  },
-  signOutButton: {
-    backgroundColor: colors.cardBackground,
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.lg,
-    borderWidth: 2,
-    borderColor: colors.error,
-    shadowColor: colors.error,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    zIndex: 10,
-    position: 'relative',
-  },
-  signOutButtonDisabled: {
-    opacity: 0.6,
-  },
-  signOutButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  signOutText: {
-    fontSize: SIZES.text16,
-    fontWeight: FONT_WEIGHTS.semiBold,
-    color: colors.error,
-    marginLeft: SPACING.sm,
-  },
   footer: {
     alignItems: 'center',
     paddingVertical: SPACING.xl,
@@ -714,7 +563,9 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => StyleSheet.c
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: isDark ? 'rgba(3,8,16,0.7)' : 'rgba(10,16,32,0.42)',
+    backgroundColor: isDark
+      ? withAlpha(colors.background, 0.7)
+      : withAlpha(colors.primaryText, 0.42),
     justifyContent: 'center',
     alignItems: 'center',
     paddingTop: insets.top + SPACING.lg,
@@ -722,14 +573,14 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => StyleSheet.c
     paddingHorizontal: SPACING.lg,
   },
   modalContent: {
-    backgroundColor: colors.cardBackground,
-    borderRadius: 28,
+    backgroundColor: colors.surfaceElevated ?? colors.cardBackground,
+    borderRadius: BORDER_RADIUS.hero,
     padding: SPACING.xl,
     width: '100%',
     maxWidth: 400,
     borderWidth: 1,
-    borderColor: 'rgba(153, 166, 193, 0.22)',
-    shadowColor: '#0D1428',
+    borderColor: colors.borderStrong ?? withAlpha(colors.gray, 0.22),
+    shadowColor: colors.primaryText,
     shadowOffset: {
       width: 0,
       height: 14,
@@ -746,11 +597,11 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => StyleSheet.c
     width: 58,
     height: 58,
     borderRadius: 29,
-    backgroundColor: 'rgba(0,122,255,0.14)',
+    backgroundColor: withAlpha(colors.primary, 0.14),
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(0,122,255,0.26)',
+    borderColor: withAlpha(colors.primary, 0.26),
   },
   modalEmoji: {
     marginTop: SPACING.xs,
@@ -772,11 +623,11 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => StyleSheet.c
     borderRadius: 16,
     marginBottom: SPACING.xs,
     borderWidth: 1,
-    borderColor: 'rgba(153, 166, 193, 0.18)',
+    borderColor: withAlpha(colors.gray, 0.18),
   },
   languageOptionSelected: {
-    backgroundColor: 'rgba(0,122,255,0.12)',
-    borderColor: 'rgba(0,122,255,0.34)',
+    backgroundColor: withAlpha(colors.primary, 0.12),
+    borderColor: withAlpha(colors.primary, 0.34),
   },
   languageText: {
     fontSize: SIZES.text16,
@@ -791,7 +642,7 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => StyleSheet.c
     alignItems: 'center',
     paddingVertical: SPACING.md,
     borderRadius: 14,
-    backgroundColor: 'rgba(153, 166, 193, 0.14)',
+    backgroundColor: withAlpha(colors.gray, 0.14),
   },
   closeButtonText: {
     fontSize: SIZES.text16,

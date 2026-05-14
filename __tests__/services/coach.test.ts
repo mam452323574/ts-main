@@ -3,6 +3,7 @@ import {
   fetchCoachEntries,
   fetchCoachHistoryPage,
   fetchCoachHistorySummary,
+  fetchCoachScreenSnapshot,
   fetchLatestReadyCoachEntry,
   fetchRecentCoachScans,
   generateCoachGuidance,
@@ -592,6 +593,168 @@ describe('coach service', () => {
     }
   });
 
+  it('adds persisted coach profile memory as a separate payload field', async () => {
+    supabase.from.mockReturnValue(
+      createScansSelectMock([
+        createFaceScanRow('scan-face', '2026-04-07T10:00:00.000Z'),
+      ]),
+    );
+    const scans = await fetchRecentCoachScans();
+    const payload = buildCoachPayload('latest_scan', scans, {
+      coachProfileMemory: {
+        detected_diet_signals: ['protein_focus'],
+        detected_strong_focus: 'nutrition',
+        suggested_goals: ['Hydration'],
+        suggested_persona_key: 'patient_calm',
+        last_updated_at: '2026-05-12T08:00:00.000Z',
+        update_count: 2,
+      },
+    });
+
+    expect(payload.inferred_persona).toBeTruthy();
+    expect(payload.coach_profile_memory).toEqual({
+      detected_diet_signals: ['protein_focus'],
+      detected_strong_focus: 'nutrition',
+      suggested_goals: ['Hydration'],
+      suggested_persona_key: 'patient_calm',
+      last_updated_at: '2026-05-12T08:00:00.000Z',
+      update_count: 2,
+    });
+  });
+
+  it('resolves preset and free-text coach questions into the payload', async () => {
+    supabase.from.mockReturnValue(
+      createScansSelectMock([
+        createFaceScanRow('scan-face', '2026-04-07T10:00:00.000Z'),
+      ]),
+    );
+    const scans = await fetchRecentCoachScans();
+    const presetPayload = buildCoachPayload('latest_scan', scans, {
+      locale: 'fr',
+      questionKey: 'latest_scan__three_simple_actions',
+      questionText:
+        "Quelles 3 actions simples auront le plus d'impact d'ici ce soir ?",
+    });
+    const freeTextPayload = buildCoachPayload('latest_scan', scans, {
+      locale: 'fr',
+      questionKey: 'latest_scan__three_simple_actions',
+      questionText: 'Sur quoi je dois me concentrer avant ma seance ce soir ?',
+    });
+
+    expect(presetPayload.question_key).toBe(
+      'latest_scan__three_simple_actions',
+    );
+    expect(presetPayload.question_text).toBe(
+      "Quelles 3 actions simples auront le plus d'impact d'ici ce soir ?",
+    );
+    expect(presetPayload.question_hints).toEqual(
+      expect.objectContaining({
+        intent_key: 'latest_scan_three_actions',
+        preferred_artifacts: expect.arrayContaining([
+          'action_steps',
+          'reminders',
+        ]),
+      }),
+    );
+    expect(freeTextPayload.question_key).toBeNull();
+    expect(freeTextPayload.question_text).toBe(
+      'Sur quoi je dois me concentrer avant ma seance ce soir ?',
+    );
+    expect(freeTextPayload.question_hints).toEqual(
+      expect.objectContaining({
+        intent_key: 'latest_scan_priority_today',
+      }),
+    );
+  });
+
+  it('keeps trend_review canonical while tolerating legacy trend aliases on provider responses', async () => {
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'scans') {
+        return createScansSelectMock([
+          createFaceScanRow('scan-face', '2026-04-07T10:00:00.000Z'),
+        ]);
+      }
+
+      return createLatestEntrySelectMock(null);
+    });
+
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            success: true,
+            applied_count: 0,
+            profile_memory: null,
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            success: true,
+            cached: false,
+            entry_id: 'entry-trend-legacy',
+            persona_key: 'patient_calm',
+            prompt_type: 'trend_comparison',
+            question_key: 'trend_comparison__week_progress_review',
+            question_text: null,
+            status: 'ready',
+            title: 'Lecture de tendance',
+            body: 'On observe une progression avec un point a surveiller.',
+            disclaimer:
+              'Wellness guidance only. This is not a diagnosis or medical advice.',
+            cta_label: null,
+            cta_route: null,
+            source: 'n8n',
+            expires_at: null,
+            response_payload_json: {},
+          }),
+      }) as typeof global.fetch;
+
+    const result = await generateCoachGuidance({
+      promptType: 'trend_review',
+      locale: 'fr',
+      personaKey: 'patient_calm',
+      questionKey: 'trend_review__week_progress_review',
+    });
+
+    expect(result.prompt_type).toBe('trend_review');
+    expect(result.question_key).toBe('trend_review__week_progress_review');
+    expect(result.question_text).toBe(
+      "Dis-moi ce qui s'ameliore, ce qui bloque et quoi continuer cette semaine.",
+    );
+  });
+
+  it('classifies nutrition free text into intent-aware question hints', async () => {
+    supabase.from.mockReturnValue(
+      createScansSelectMock([
+        createNutritionScanRow('scan-food', '2026-04-07T10:00:00.000Z'),
+      ]),
+    );
+    const scans = await fetchRecentCoachScans();
+    const payload = buildCoachPayload('nutrition_focus', scans, {
+      locale: 'fr',
+      questionKey: 'nutrition_focus__breakfast_no_crash',
+      questionText: 'Fais-moi une liste de courses simple pour 3 jours.',
+    });
+
+    expect(payload.question_key).toBeNull();
+    expect(payload.question_text).toBe(
+      'Fais-moi une liste de courses simple pour 3 jours.',
+    );
+    expect(payload.question_hints).toEqual(
+      expect.objectContaining({
+        intent_key: 'nutrition_shopping_list',
+        preferred_artifacts: expect.arrayContaining([
+          'shopping_list',
+          'quick_recipe',
+        ]),
+      }),
+    );
+  });
+
   it('preserves legacy coach payload fields while adding payload v2 rich context', async () => {
     const dateNowSpy = jest
       .spyOn(Date, 'now')
@@ -620,6 +783,112 @@ describe('coach service', () => {
     } finally {
       dateNowSpy.mockRestore();
     }
+  });
+
+  it('uses an explicit selected scan id for selected and latest context', async () => {
+    supabase.from.mockReturnValue(
+      createScansSelectMock([
+        createNutritionScanRow('scan-food', '2026-04-06T10:00:00.000Z'),
+        createBodyScanRow('scan-body', '2026-04-06T09:00:00.000Z'),
+      ]),
+    );
+
+    const scans = await fetchRecentCoachScans();
+    const payload = buildCoachPayload('nutrition_focus', scans, {
+      selectedScanId: 'scan-body',
+    });
+
+    expect(payload.prompt_type).toBe('nutrition_focus');
+    expect(payload.selected_scan?.scan_id).toBe('scan-body');
+    expect(payload.latest_scan?.scan_id).toBe('scan-body');
+    expect(payload.latest_by_type.nutrition?.scan_id).toBe('scan-food');
+    expect(payload.latest_by_type.body?.scan_id).toBe('scan-body');
+    expect(payload.selected_scan_id).toBe('scan-body');
+    expect(payload).not.toHaveProperty('scan_intent');
+  });
+
+  it('exposes hidden selected scan context in the backend payload fields', async () => {
+    supabase.from.mockReturnValue(
+      createScansSelectMock([
+        createNutritionScanRow('scan-food', '2026-04-06T10:00:00.000Z'),
+        createBodyScanRow('scan-body', '2026-04-06T09:00:00.000Z'),
+      ]),
+    );
+
+    const scans = await fetchRecentCoachScans();
+    const payload = buildCoachPayload('latest_scan', scans, {
+      selectedScanId: 'scan-body',
+    });
+
+    expect(payload.prompt_type).toBe('latest_scan');
+    expect(payload.selected_scan?.scan_id).toBe('scan-body');
+    expect(payload.latest_scan?.scan_id).toBe('scan-body');
+    expect(payload.recent_scans[0]?.scan_id).toBe('scan-body');
+    expect(payload.selected_scan_id).toBe('scan-body');
+    expect(payload).not.toHaveProperty('scan_intent');
+  });
+
+  it('falls back to prompt selection when selected scan id is invalid', async () => {
+    supabase.from.mockReturnValue(
+      createScansSelectMock([
+        createNutritionScanRow('scan-food', '2026-04-06T10:00:00.000Z'),
+        createBodyScanRow('scan-body', '2026-04-06T09:00:00.000Z'),
+      ]),
+    );
+
+    const scans = await fetchRecentCoachScans();
+    const payload = buildCoachPayload('nutrition_focus', scans, {
+      selectedScanId: 'missing-scan',
+    });
+
+    expect(payload.selected_scan_id).toBe('missing-scan');
+    expect(payload).not.toHaveProperty('scan_intent');
+    expect(payload.selected_scan?.scan_id).toBe('scan-food');
+    expect(payload.latest_scan?.scan_id).toBe('scan-food');
+  });
+
+  it('serializes scan intent as the slim coach payload contract', async () => {
+    supabase.from.mockReturnValue(
+      createScansSelectMock([
+        createBodyScanRow('scan-body', '2026-04-06T09:00:00.000Z'),
+      ]),
+    );
+
+    const scans = await fetchRecentCoachScans();
+    const payload = buildCoachPayload('latest_scan_issue_resolution', scans, {
+      selectedScanId: 'scan-body',
+      scanIntent: {
+        scan_id: 'scan-body',
+        scan_type: 'body',
+        has_actionable_issue: true,
+        priority_metric: 'posture_score',
+        priority_label: 'Posture',
+        severity: 'high',
+        reason: 'Le scan indique une posture perfectible.',
+        user_facing_summary:
+          'Ta posture semble être le point le plus intéressant à améliorer après ce scan.',
+        prompt_type: 'latest_scan_issue_resolution',
+        question_key: 'improve_posture_from_scan',
+        question_text:
+          'Comment améliorer ma posture à partir de mon dernier scan ?',
+        fallback_prompt_type: 'latest_scan',
+        premium_required: true,
+      },
+    });
+
+    expect(payload.prompt_type).toBe('latest_scan_issue_resolution');
+    expect(payload.selected_scan_id).toBe('scan-body');
+    expect(payload.selected_scan?.scan_id).toBe('scan-body');
+    expect(payload.scan_intent).toEqual({
+      has_actionable_issue: true,
+      priority_metric: 'posture_score',
+      priority_label: 'Posture',
+      severity: 'high',
+      question_text:
+        'Comment améliorer ma posture à partir de mon dernier scan ?',
+      user_facing_summary:
+        'Ta posture semble être le point le plus intéressant à améliorer après ce scan.',
+    });
   });
 
   it('builds a rich latest_scan context for health scans', async () => {
@@ -743,19 +1012,37 @@ describe('coach service', () => {
     });
   });
 
-  it('bypasses fat_distribution_scan_v2 so Coach falls back to the latest supported scan', async () => {
+  it('builds a rich latest_scan context for fat_distribution_scan_v2 super scans', async () => {
     const payload = await buildPayloadFromRows('latest_scan', [
       createFatDistributionSuperScanRow('scan-super-fat', '2026-04-07T13:30:00.000Z'),
       createFaceScanRow('scan-face', '2026-04-07T12:00:00.000Z'),
     ]);
 
-    expect(payload.selected_scan?.scan_id).toBe('scan-face');
-    expect(payload.latest_scan?.scan_id).toBe('scan-face');
-    expect(payload.latest_by_type.super).toBeNull();
-    expect(payload.recent_scans.map((scan) => scan.scan_id)).toEqual(['scan-face']);
+    expect(payload.selected_scan).toMatchObject({
+      scan_id: 'scan-super-fat',
+      scan_type: 'super',
+      normalized_scan_type: 'fat_distribution_scan_v2',
+      metrics: expect.objectContaining({
+        global_water_retention_estimate_percent: expect.any(Number),
+      }),
+    });
+    expect(payload.latest_scan).toMatchObject({
+      scan_id: 'scan-super-fat',
+      scan_type: 'super',
+      normalized_scan_type: 'fat_distribution_scan_v2',
+      key_metrics: expect.objectContaining({
+        global_water_retention_estimate_percent: expect.any(Number),
+        priority_zones: expect.any(Array),
+      }),
+    });
+    expect(payload.latest_by_type.super?.scan_id).toBe('scan-super-fat');
+    expect(payload.recent_scans.map((scan) => scan.scan_id)).toEqual([
+      'scan-super-fat',
+      'scan-face',
+    ]);
   });
 
-  it('paginates beyond unusable rows until it finds a usable coach scan', async () => {
+  it('keeps fat_distribution_scan_v2 rows in the recent coach scan list', async () => {
     const unusableRows = Array.from({ length: 32 }, (_, index) =>
       createFatDistributionSuperScanRow(
         `scan-fat-${index}`,
@@ -773,13 +1060,14 @@ describe('coach service', () => {
     const scans = await fetchRecentCoachScans();
     const payload = buildCoachPayload('latest_scan', scans);
 
-    expect(payload.selected_scan?.scan_id).toBe('scan-old-but-usable');
-    expect(payload.recent_scans.map((scan) => scan.scan_id)).toEqual([
-      'scan-old-but-usable',
-    ]);
+    expect(payload.selected_scan?.scan_id).toBe('scan-fat-0');
+    expect(payload.recent_scans[0]).toMatchObject({
+      scan_id: 'scan-fat-0',
+      normalized_scan_type: 'fat_distribution_scan_v2',
+    });
   });
 
-  it('returns an empty recent scan list only after exhausting unusable scan rows', async () => {
+  it('returns fat_distribution_scan_v2 when it is the only recent scan row', async () => {
     supabase.from.mockReturnValue(
       createScansSelectMock([
         createFatDistributionSuperScanRow(
@@ -789,7 +1077,12 @@ describe('coach service', () => {
       ]),
     );
 
-    await expect(fetchRecentCoachScans()).resolves.toEqual([]);
+    const scans = await fetchRecentCoachScans();
+
+    expect(scans).toHaveLength(1);
+    expect(scans[0].digest.normalized_scan_type).toBe(
+      'fat_distribution_scan_v2',
+    );
   });
 
   it('builds comparison_to_previous when two comparable scans of the same type exist', async () => {
@@ -1024,36 +1317,54 @@ describe('coach service', () => {
       return createLatestEntrySelectMock(null);
     });
 
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      text: async () =>
-        JSON.stringify({
-          success: true,
-          cached: true,
-          entry_id: 'entry-1',
-          persona_key: 'patient_calm',
-          status: 'ready',
-          title: 'Coach guidance',
-          body: 'Stay hydrated and keep your current routine steady.',
-          disclaimer:
-            'Wellness guidance only. This is not a diagnosis or medical advice.',
-          cta_label: null,
-          cta_route: null,
-          source: 'n8n',
-          expires_at: '2026-04-06T12:00:00.000Z',
-          response_payload_json: { cached: true },
-          quota: {
-            account_tier: 'premium',
-            limit: 8,
-            used_count: 2,
-            available: 6,
-            next_recharge_at: '2026-04-07T10:00:00.000Z',
-            unlimited: false,
-            window_seconds: 86400,
-            as_of: '2026-04-06T10:00:00.000Z',
-          },
-        }),
-    }) as typeof global.fetch;
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            success: true,
+            applied_count: 1,
+            profile_memory: {
+              detected_diet_signals: ['protein_focus'],
+              detected_strong_focus: 'nutrition',
+              suggested_goals: ['Hydration'],
+              suggested_persona_key: 'patient_calm',
+              last_updated_at: '2026-05-12T08:00:00.000Z',
+              update_count: 3,
+            },
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            success: true,
+            cached: true,
+            entry_id: 'entry-1',
+            persona_key: 'patient_calm',
+            status: 'ready',
+            title: 'Coach guidance',
+            body: 'Stay hydrated and keep your current routine steady.',
+            disclaimer:
+              'Wellness guidance only. This is not a diagnosis or medical advice.',
+            cta_label: null,
+            cta_route: null,
+            source: 'n8n',
+            expires_at: '2026-04-06T12:00:00.000Z',
+            response_payload_json: { cached: true },
+            quota: {
+              account_tier: 'premium',
+              limit: 8,
+              used_count: 2,
+              available: 6,
+              next_recharge_at: '2026-04-07T10:00:00.000Z',
+              unlimited: false,
+              window_seconds: 86400,
+              as_of: '2026-04-06T10:00:00.000Z',
+            },
+          }),
+      }) as typeof global.fetch;
 
     const result = await generateCoachGuidance({
       promptType: 'latest_scan',
@@ -1081,15 +1392,180 @@ describe('coach service', () => {
         body: expect.any(String),
       }),
     );
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/functions/v1/coach-sync-profile-memory'),
+      expect.objectContaining({
+        method: 'POST',
+        body: '{}',
+      }),
+    );
 
     const requestBody = JSON.parse(
-      (global.fetch as jest.Mock).mock.calls[0][1].body as string,
+      (global.fetch as jest.Mock).mock.calls[1][1].body as string,
     );
     expect(requestBody.persona_key).toBe('patient_calm');
     expect(requestBody.locale).toBe('en');
     expect(requestBody.payload.payload_version).toBe(2);
     expect(requestBody.payload.selected_scan.scan_id).toBe('scan-face');
     expect(requestBody.payload.latest_scan.scan_id).toBe('scan-face');
+    expect(requestBody.payload.coach_profile_memory).toEqual({
+      detected_diet_signals: ['protein_focus'],
+      detected_strong_focus: 'nutrition',
+      suggested_goals: ['Hydration'],
+      suggested_persona_key: 'patient_calm',
+      last_updated_at: '2026-05-12T08:00:00.000Z',
+      update_count: 3,
+    });
+  });
+
+  it('propagates scanId through generation payload selection', async () => {
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'scans') {
+        return createScansSelectMock([
+          createNutritionScanRow('scan-food', '2026-04-06T10:00:00.000Z'),
+          createBodyScanRow('scan-body', '2026-04-06T09:00:00.000Z'),
+        ]);
+      }
+
+      return createLatestEntrySelectMock(null);
+    });
+
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            success: true,
+            applied_count: 0,
+            profile_memory: null,
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            success: true,
+            cached: false,
+            entry_id: 'entry-selected-scan',
+            persona_key: 'gentle_supportive',
+            prompt_type: 'nutrition_focus',
+            status: 'ready',
+            title: 'Coach guidance',
+            body: 'Keep the next step simple.',
+            disclaimer:
+              'Wellness guidance only. This is not a diagnosis or medical advice.',
+            cta_label: null,
+            cta_route: null,
+            source: 'n8n',
+            expires_at: '2026-04-06T12:00:00.000Z',
+            response_payload_json: {},
+            quota: null,
+          }),
+      }) as typeof global.fetch;
+
+    await generateCoachGuidance({
+      promptType: 'nutrition_focus',
+      personaKey: 'gentle_supportive',
+      scanId: 'scan-body',
+    });
+
+    const requestBody = JSON.parse(
+      (global.fetch as jest.Mock).mock.calls[1][1].body as string,
+    );
+    expect(requestBody.payload.selected_scan_id).toBe('scan-body');
+    expect(requestBody.payload.selected_scan.scan_id).toBe('scan-body');
+    expect(requestBody.payload.latest_scan.scan_id).toBe('scan-body');
+    expect(requestBody.payload.latest_by_type.nutrition.scan_id).toBe('scan-food');
+  });
+
+  it('loads the exact scan by id when it is missing from recent scans', async () => {
+    const exactScanRow = createBodyScanRow(
+      'scan-body',
+      '2026-04-06T09:00:00.000Z',
+    );
+    const selectedScanEq = jest.fn();
+    const selectedScanMaybeSingle = jest.fn().mockResolvedValue({
+      data: exactScanRow,
+      error: null,
+    });
+    const selectedScanQuery: any = {
+      eq: jest.fn((field: string, value: unknown) => {
+        selectedScanEq(field, value);
+        return selectedScanQuery;
+      }),
+      maybeSingle: selectedScanMaybeSingle,
+    };
+    let scansReadCount = 0;
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'scans') {
+        scansReadCount += 1;
+        return scansReadCount === 1
+          ? createScansSelectMock([
+              createNutritionScanRow('scan-food', '2026-04-06T10:00:00.000Z'),
+            ])
+          : {
+              select: jest.fn(() => selectedScanQuery),
+            };
+      }
+
+      return createLatestEntrySelectMock(null);
+    });
+
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            success: true,
+            applied_count: 0,
+            profile_memory: null,
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            success: true,
+            cached: false,
+            entry_id: 'entry-selected-scan',
+            persona_key: 'gentle_supportive',
+            prompt_type: 'nutrition_focus',
+            status: 'ready',
+            title: 'Coach guidance',
+            body: 'Keep the next step simple.',
+            disclaimer:
+              'Wellness guidance only. This is not a diagnosis or medical advice.',
+            cta_label: null,
+            cta_route: null,
+            source: 'n8n',
+            expires_at: '2026-04-06T12:00:00.000Z',
+            response_payload_json: {},
+            quota: null,
+          }),
+      }) as typeof global.fetch;
+
+    await generateCoachGuidance({
+      promptType: 'nutrition_focus',
+      personaKey: 'gentle_supportive',
+      scanId: 'scan-body',
+    });
+
+    const requestBody = JSON.parse(
+      (global.fetch as jest.Mock).mock.calls[1][1].body as string,
+    );
+    expect(selectedScanEq).toHaveBeenCalledWith('id', 'scan-body');
+    expect(selectedScanMaybeSingle).toHaveBeenCalled();
+    expect(requestBody.payload.selected_scan_id).toBe('scan-body');
+    expect(requestBody.payload.selected_scan.scan_id).toBe('scan-body');
+    expect(requestBody.payload.latest_scan.scan_id).toBe('scan-body');
+    expect(requestBody.payload.recent_scans).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ scan_id: 'scan-body' }),
+        expect.objectContaining({ scan_id: 'scan-food' }),
+      ]),
+    );
   });
 
   it('falls back to the default persona when no valid persona is selected', async () => {
@@ -1101,25 +1577,36 @@ describe('coach service', () => {
       return createLatestEntrySelectMock(null);
     });
 
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      text: async () =>
-        JSON.stringify({
-          success: true,
-          cached: false,
-          entry_id: 'entry-default',
-          status: 'ready',
-          title: 'Default coach guidance',
-          body: 'Keep the basics steady this week.',
-          disclaimer:
-            'Wellness guidance only. This is not a diagnosis or medical advice.',
-          cta_label: null,
-          cta_route: null,
-          source: 'n8n',
-          expires_at: null,
-          response_payload_json: {},
-        }),
-    }) as typeof global.fetch;
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            success: true,
+            applied_count: 0,
+            profile_memory: null,
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            success: true,
+            cached: false,
+            entry_id: 'entry-default',
+            status: 'ready',
+            title: 'Default coach guidance',
+            body: 'Keep the basics steady this week.',
+            disclaimer:
+              'Wellness guidance only. This is not a diagnosis or medical advice.',
+            cta_label: null,
+            cta_route: null,
+            source: 'n8n',
+            expires_at: null,
+            response_payload_json: {},
+          }),
+      }) as typeof global.fetch;
 
     const result = await generateCoachGuidance({
       promptType: 'latest_scan',
@@ -1128,11 +1615,443 @@ describe('coach service', () => {
     });
 
     const requestBody = JSON.parse(
-      (global.fetch as jest.Mock).mock.calls[0][1].body as string,
+      (global.fetch as jest.Mock).mock.calls[1][1].body as string,
     );
 
     expect(requestBody.persona_key).toBe(DEFAULT_COACH_PERSONA_KEY);
     expect(result.persona_key).toBe(DEFAULT_COACH_PERSONA_KEY);
+  });
+
+  it('sends coach question fields and keeps free-text questions distinct from presets', async () => {
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'scans') {
+        return createScansSelectMock(recentScans);
+      }
+
+      return createLatestEntrySelectMock(null);
+    });
+
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            success: true,
+            applied_count: 0,
+            profile_memory: null,
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            success: true,
+            cached: false,
+            entry_id: 'entry-question',
+            persona_key: 'patient_calm',
+            prompt_type: 'latest_scan',
+            question_key: null,
+            question_text:
+              'Sur quoi je dois me concentrer avant ma seance ce soir ?',
+            status: 'ready',
+            title: 'Question libre',
+            body: 'On priorise la recuperation et une action simple.',
+            disclaimer:
+              'Wellness guidance only. This is not a diagnosis or medical advice.',
+            cta_label: null,
+            cta_route: null,
+            source: 'n8n',
+            expires_at: null,
+            response_payload_json: {},
+          }),
+      }) as typeof global.fetch;
+
+    const result = await generateCoachGuidance({
+      promptType: 'latest_scan',
+      locale: 'fr',
+      personaKey: 'patient_calm',
+      questionKey: 'latest_scan__three_simple_actions',
+      questionText: 'Sur quoi je dois me concentrer avant ma seance ce soir ?',
+    });
+
+    const requestBody = JSON.parse(
+      (global.fetch as jest.Mock).mock.calls[1][1].body as string,
+    );
+
+    expect(requestBody.payload.question_key).toBeNull();
+    expect(requestBody.payload.question_text).toBe(
+      'Sur quoi je dois me concentrer avant ma seance ce soir ?',
+    );
+    expect(requestBody.payload.question_hints).toEqual(
+      expect.objectContaining({
+        intent_key: 'latest_scan_priority_today',
+      }),
+    );
+    expect(result.question_key).toBeNull();
+    expect(result.question_text).toBe(
+      'Sur quoi je dois me concentrer avant ma seance ce soir ?',
+    );
+  });
+
+  it('retries coach generation once with a legacy payload when the backend rejects new question fields', async () => {
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'scans') {
+        return createScansSelectMock(recentScans);
+      }
+
+      return createLatestEntrySelectMock(null);
+    });
+
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            success: true,
+            applied_count: 0,
+            profile_memory: null,
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        text: async () =>
+          JSON.stringify({
+            error: 'payload contains unsupported fields',
+            code: 'invalid_coach_payload',
+            status: 400,
+            request_id: 'req-coach-legacy',
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            success: true,
+            cached: false,
+            entry_id: 'entry-legacy-retry',
+            persona_key: 'patient_calm',
+            prompt_type: 'latest_scan',
+            status: 'ready',
+            title: 'Compat mode',
+            body: 'On garde les conseils, meme avec un backend en retard.',
+            disclaimer:
+              'Wellness guidance only. This is not a diagnosis or medical advice.',
+            cta_label: null,
+            cta_route: null,
+            source: 'n8n',
+            expires_at: null,
+            response_payload_json: {},
+          }),
+      }) as typeof global.fetch;
+
+    const result = await generateCoachGuidance({
+      promptType: 'latest_scan',
+      locale: 'fr',
+      personaKey: 'patient_calm',
+      questionKey: 'latest_scan__three_simple_actions',
+    });
+
+    expect(global.fetch).toHaveBeenCalledTimes(3);
+
+    const richRequestBody = JSON.parse(
+      (global.fetch as jest.Mock).mock.calls[1][1].body as string,
+    );
+    const legacyRequestBody = JSON.parse(
+      (global.fetch as jest.Mock).mock.calls[2][1].body as string,
+    );
+
+    expect(richRequestBody.payload.question_key).toBe(
+      'latest_scan__three_simple_actions',
+    );
+    expect(richRequestBody.payload.question_text).toEqual(expect.any(String));
+    expect(richRequestBody.payload.question_hints).toEqual(
+      expect.objectContaining({
+        intent_key: 'latest_scan_three_actions',
+      }),
+    );
+    expect(legacyRequestBody.payload).not.toHaveProperty('question_key');
+    expect(legacyRequestBody.payload).not.toHaveProperty('question_text');
+    expect(legacyRequestBody.payload).not.toHaveProperty('question_hints');
+    expect(legacyRequestBody.payload.latest_scan).toEqual(
+      richRequestBody.payload.latest_scan,
+    );
+    expect(legacyRequestBody.payload.latest_by_type).toEqual(
+      richRequestBody.payload.latest_by_type,
+    );
+
+    expect(result.question_key).toBe(richRequestBody.payload.question_key);
+    expect(result.question_text).toBe(richRequestBody.payload.question_text);
+    expect(result.payload.question_key).toBe(richRequestBody.payload.question_key);
+    expect(result.payload.question_text).toBe(
+      richRequestBody.payload.question_text,
+    );
+  });
+
+  it('falls back to latest_scan when an older backend rejects the hidden selected-scan prompt', async () => {
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'scans') {
+        return createScansSelectMock(recentScans);
+      }
+
+      return createLatestEntrySelectMock(null);
+    });
+
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            success: true,
+            applied_count: 0,
+            profile_memory: null,
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        text: async () =>
+          JSON.stringify({
+            error: 'payload contains unsupported fields',
+            code: 'invalid_coach_payload',
+            status: 400,
+            request_id: 'req-coach-rich-hidden',
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        text: async () =>
+          JSON.stringify({
+            error: 'payload.prompt_type is not supported',
+            code: 'invalid_coach_payload',
+            status: 400,
+            request_id: 'req-coach-hidden-prompt',
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            success: true,
+            cached: false,
+            entry_id: 'entry-hidden-compat',
+            persona_key: 'playful_light',
+            prompt_type: 'latest_scan',
+            status: 'ready',
+            title: 'Compat selected scan',
+            body: 'On traite le scan selectionne avec le mode compatible.',
+            disclaimer:
+              'Wellness guidance only. This is not a diagnosis or medical advice.',
+            cta_label: null,
+            cta_route: null,
+            source: 'n8n',
+            expires_at: null,
+            response_payload_json: {},
+          }),
+      }) as typeof global.fetch;
+
+    const result = await generateCoachGuidance({
+      promptType: 'latest_scan_issue_resolution',
+      locale: 'fr',
+      personaKey: 'playful_light',
+      selectedScanId: 'scan-face',
+      questionText: 'Que dois-je travailler apres ce scan ?',
+      scanIntent: {
+        has_actionable_issue: true,
+        priority_metric: 'hydration_level',
+        priority_label: 'Hydratation',
+        severity: 'medium',
+        question_text: 'Que dois-je travailler apres ce scan ?',
+        user_facing_summary:
+          'Un point du scan peut devenir une action simple.',
+      },
+    });
+
+    expect(global.fetch).toHaveBeenCalledTimes(4);
+
+    const richRequestBody = JSON.parse(
+      (global.fetch as jest.Mock).mock.calls[1][1].body as string,
+    );
+    const legacyHiddenRequestBody = JSON.parse(
+      (global.fetch as jest.Mock).mock.calls[2][1].body as string,
+    );
+    const latestScanCompatRequestBody = JSON.parse(
+      (global.fetch as jest.Mock).mock.calls[3][1].body as string,
+    );
+
+    expect(richRequestBody.payload.prompt_type).toBe(
+      'latest_scan_issue_resolution',
+    );
+    expect(richRequestBody.payload.selected_scan_id).toBe('scan-face');
+    expect(richRequestBody.payload.scan_intent).toEqual(
+      expect.objectContaining({
+        priority_metric: 'hydration_level',
+      }),
+    );
+    expect(legacyHiddenRequestBody.payload.prompt_type).toBe(
+      'latest_scan_issue_resolution',
+    );
+    expect(legacyHiddenRequestBody.payload).not.toHaveProperty(
+      'selected_scan_id',
+    );
+    expect(legacyHiddenRequestBody.payload).not.toHaveProperty('scan_intent');
+    expect(latestScanCompatRequestBody.payload.prompt_type).toBe('latest_scan');
+    expect(latestScanCompatRequestBody.payload).not.toHaveProperty(
+      'question_text',
+    );
+    expect(latestScanCompatRequestBody.payload).not.toHaveProperty(
+      'selected_scan_id',
+    );
+    expect(latestScanCompatRequestBody.payload.selected_scan).toEqual(
+      richRequestBody.payload.selected_scan,
+    );
+    expect(result.prompt_type).toBe('latest_scan');
+    expect(result.payload.prompt_type).toBe('latest_scan_issue_resolution');
+  });
+
+  it('does not retry coach generation for unrelated 400 invalid_coach_payload responses', async () => {
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'scans') {
+        return createScansSelectMock(recentScans);
+      }
+
+      return createLatestEntrySelectMock(null);
+    });
+
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            success: true,
+            applied_count: 0,
+            profile_memory: null,
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        text: async () =>
+          JSON.stringify({
+            error: 'payload.question_text is not supported',
+            code: 'invalid_coach_payload',
+            status: 400,
+            request_id: 'req-coach-400',
+          }),
+      }) as typeof global.fetch;
+
+    await expect(
+      generateCoachGuidance({
+        promptType: 'latest_scan',
+        locale: 'fr',
+        personaKey: 'patient_calm',
+        questionKey: 'latest_scan__three_simple_actions',
+      }),
+    ).rejects.toMatchObject({
+      message: 'payload.question_text is not supported',
+      code: 'invalid_coach_payload',
+      status: 400,
+      requestId: 'req-coach-400',
+      functionName: 'coach-generate-response',
+    });
+
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('completes missing weekly schedule fields from a rich response body', async () => {
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'scans') {
+        return createScansSelectMock(recentScans);
+      }
+
+      return createLatestEntrySelectMock(null);
+    });
+
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            success: true,
+            applied_count: 0,
+            profile_memory: null,
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            success: true,
+            cached: false,
+            entry_id: 'entry-weekly-body',
+            persona_key: 'patient_calm',
+            prompt_type: 'weekly_plan',
+            status: 'ready',
+            response_version: 2,
+            title: 'Cadre tranquille',
+            body: [
+              'Prenons un moment. Voici un cadre tranquille pour la semaine.',
+              '✓ Respire 4-6 chaque matin.',
+              '✓ Planifie tes repas autour de proteines et legumes.',
+              'Agenda de la semaine :',
+              'Lundi 08:00 - Respiration 4-6 + etirements doux (10 min) 12:30 - Dejeuner equilibre (30 min)',
+              'Mardi 08:00 - Respiration 4-6 18:00 - Marche lente (20 min)',
+            ].join('\n'),
+            disclaimer:
+              'Wellness guidance only. This is not a diagnosis or medical advice.',
+            cta_label: null,
+            cta_route: null,
+            source: 'n8n',
+            expires_at: null,
+            response_payload_json: {},
+            content: {
+              title: 'Cadre tranquille',
+              summary: 'Prenons un moment. Voici un cadre tranquille pour la semaine.',
+              context_notes: [],
+              priorities: [],
+              action_steps: [],
+              warnings: [],
+              encouragement: null,
+              primary_metric_delta: null,
+              data_gaps: [],
+              confidence: 'high',
+            },
+          }),
+      }) as typeof global.fetch;
+
+    const result = await generateCoachGuidance({
+      promptType: 'weekly_plan',
+      locale: 'fr',
+      personaKey: 'patient_calm',
+    });
+
+    expect(result.content?.action_steps).toEqual([
+      'Respire 4-6 chaque matin.',
+      'Planifie tes repas autour de proteines et legumes.',
+    ]);
+    expect(result.content?.daily_schedule?.[0]).toEqual({
+      day: 'Lundi',
+      slots: [
+        {
+          time: '08:00',
+          duration_min: 10,
+          action: 'Respiration 4-6 + etirements doux (10 min)',
+          tag: null,
+        },
+        {
+          time: '12:30',
+          duration_min: 30,
+          action: 'Dejeuner equilibre (30 min)',
+          tag: null,
+        },
+      ],
+    });
   });
 
   it('does not fall back to cached guidance when the server rejects Coach quota', async () => {
@@ -1367,6 +2286,64 @@ describe('coach service', () => {
     ]);
   });
 
+  it('completes missing routine fields from stored coach entries', async () => {
+    supabase.from.mockReturnValue(
+      createCoachEntriesSelectMock([
+        {
+          id: 'entry-routine-body',
+          title: 'Pauses eau',
+          body: [
+            'Prenons un moment.',
+            'Routine - Pauses eau (toute la journee) - 3 min 1. 7h30 - verre d eau + 3 respirations 2. 11h - verre d eau en silence 3. 16h - tisane chaude 4. 19h - verre d eau en pleine conscience',
+          ].join('\n'),
+          disclaimer:
+            'Wellness guidance only. This is not a diagnosis or medical advice.',
+          persona_key: 'patient_calm',
+          cta_label: null,
+          cta_route: null,
+          created_at: '2026-04-06T09:00:00.000Z',
+          generated_at: '2026-04-06T09:00:00.000Z',
+          source: 'n8n',
+          status: 'ready',
+          response_payload_json: {},
+          content_json: {
+            title: 'Pauses eau',
+            summary: 'Prenons un moment.',
+            context_notes: [],
+            priorities: [],
+            action_steps: [],
+            warnings: [],
+            encouragement: null,
+            primary_metric_delta: null,
+            data_gaps: [],
+            confidence: 'high',
+          },
+        },
+      ]),
+    );
+
+    await expect(fetchCoachEntries()).resolves.toEqual([
+      expect.objectContaining({
+        id: 'entry-routine-body',
+        content: expect.objectContaining({
+          micro_routine: [
+            {
+              name: 'Pauses eau',
+              when: 'toute la journee',
+              total_min: 3,
+              steps: [
+                '7h30 - verre d eau + 3 respirations',
+                '11h - verre d eau en silence',
+                '16h - tisane chaude',
+                '19h - verre d eau en pleine conscience',
+              ],
+            },
+          ],
+        }),
+      }),
+    ]);
+  });
+
   it('loads a first coach history batch without fetching the whole table', async () => {
     supabase.rpc.mockResolvedValue({
       data: [
@@ -1533,6 +2510,83 @@ describe('coach service', () => {
     });
   });
 
+  it('loads the coach screen snapshot in one authenticated edge call', async () => {
+    const latestEntry = createCoachHistoryRow('entry-ready', {
+      persona_key: 'analytical_precise',
+      locale: 'fr',
+    });
+
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: () =>
+        Promise.resolve(
+          JSON.stringify({
+            success: true,
+            entries: [
+              latestEntry,
+              createCoachHistoryRow('entry-pending', {
+                title: null,
+                body: null,
+                status: 'pending',
+              }),
+            ],
+            quota: {
+              account_tier: 'free',
+              limit: 3,
+              used_count: 1,
+              available: 2,
+              next_recharge_at: null,
+              unlimited: false,
+              window_seconds: 604800,
+              as_of: '2026-05-13T08:00:00.000Z',
+            },
+            recent_scans: [
+              createFaceScanRow('scan-face-1', '2026-05-13T07:00:00.000Z', {
+                face_score: 82,
+                skin_quality_score: 79,
+              }),
+            ],
+            latest_ready_entry: latestEntry,
+            history_summary: {
+              total_count: '4',
+              latest_entry_at: '2026-05-13T08:00:00.000Z',
+            },
+            request_id: 'coach-snapshot-1',
+          }),
+        ),
+    }) as typeof global.fetch;
+
+    const snapshot = await fetchCoachScreenSnapshot({
+      personaKey: 'analytical_precise',
+      locale: 'fr-FR',
+      excludeEntryId: 'entry-active',
+      entriesLimit: 10,
+    });
+
+    expect(snapshot.entries).toHaveLength(2);
+    expect(snapshot.quota.available).toBe(2);
+    expect(snapshot.recentScans).toHaveLength(1);
+    expect(snapshot.latestReadyEntry?.id).toBe('entry-ready');
+    expect(snapshot.historySummary).toEqual({
+      total_count: 4,
+      latest_entry_at: '2026-05-13T08:00:00.000Z',
+    });
+    expect(snapshot.requestId).toBe('coach-snapshot-1');
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://test.supabase.co/functions/v1/coach-screen-snapshot',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          persona_key: 'analytical_precise',
+          locale: 'fr',
+          exclude_entry_id: 'entry-active',
+          entries_limit: 10,
+        }),
+      }),
+    );
+  });
+
   it('loads the latest ready coach entry without filtering by persona', async () => {
     const eqCalls = jest.fn();
     const isCalls = jest.fn();
@@ -1662,6 +2716,10 @@ describe('coach service', () => {
       source: 'coach_generation',
       fallbackUsed: true,
       responseBodyPresent: true,
+      providerFailureKind: null,
+      providerFailureStage: null,
+      providerNodeType: null,
+      providerNodeName: null,
     });
     expect(resolveCoachFailureKindFromEntry({
       status: 'error',
@@ -1692,6 +2750,17 @@ describe('coach service', () => {
         }),
       ),
     ).toBe('invalid_provider_response');
+
+    expect(resolveCoachFailureKindFromEntry({
+      status: 'error',
+      error_code: 'invalid_coach_response',
+      response_payload_json: {
+        request_id: 'req-invalid-500',
+        webhook_status: 500,
+        provider_failure_kind: 'json_parse_failed',
+        provider_failure_stage: 'n8n_chain_llm',
+      },
+    })).toBe('invalid_provider_response');
   });
 
   it('surfaces a precise coach entries error instead of returning an empty state', async () => {
@@ -1788,12 +2857,7 @@ describe('coach service', () => {
   it('does not call the coach Edge Function when no usable scan exists', async () => {
     supabase.from.mockImplementation((table: string) => {
       if (table === 'scans') {
-        return createScansSelectMock([
-          createFatDistributionSuperScanRow(
-            'scan-fat-only',
-            '2026-04-07T13:30:00.000Z',
-          ),
-        ]);
+        return createScansSelectMock([]);
       }
 
       return createLatestEntrySelectMock(createCoachHistoryRow('entry-stale'));
@@ -1812,7 +2876,13 @@ describe('coach service', () => {
       status: 400,
     });
 
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/functions/v1/coach-sync-profile-memory'),
+      expect.objectContaining({
+        method: 'POST',
+      }),
+    );
     expect(supabase.from).toHaveBeenCalledTimes(1);
   });
 

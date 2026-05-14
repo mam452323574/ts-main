@@ -101,7 +101,7 @@ describe('ShareStoryCard', () => {
       scoreLabel: 'Risk',
       accentColor: '#1F4E79',
       accentColorSecondary: '#5B8DEF',
-      statusBadgeLabel: 'AI Report',
+      statusBadgeLabel: 'Report',
       statusTone: 'neutral',
       metrics: [
         { label: 'Risk', value: '70/100', valueVariant: 'fraction', labelMaxLines: 1, valueMaxLines: 1 },
@@ -253,7 +253,7 @@ describe('ShareStoryCard', () => {
       scoreLabel: 'Risk',
       accentColor: '#1F4E79',
       accentColorSecondary: '#5B8DEF',
-      statusBadgeLabel: 'AI Report',
+      statusBadgeLabel: 'Report',
       statusTone: 'neutral',
       metrics: [
         { label: 'Risk', value: '70/100', valueVariant: 'fraction', labelMaxLines: 1, valueMaxLines: 1 },
@@ -296,8 +296,8 @@ describe('ShareStoryCard', () => {
       getByTestId('share-story-hero-image-frame').props.style,
     );
 
-    expect(cardStyle.borderRadius).toBe(28);
-    expect(metricsStyle.borderRadius).toBe(22);
+    expect(cardStyle.borderRadius).toBe(32);
+    expect(metricsStyle.borderRadius).toBe(24);
     expect(ringContainerStyle.maxWidth).toBeGreaterThan(metricsStyle.minHeight * 2);
     expect(heroFrameStyle.minWidth).toBeGreaterThan(metricsStyle.minHeight);
   });

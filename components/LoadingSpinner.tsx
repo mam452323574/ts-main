@@ -1,20 +1,5 @@
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
-import { useTheme } from '@/contexts/ThemeContext';
+import { ScreenState } from '@/components/ScreenState';
 
 export function LoadingSpinner() {
-  const { colors } = useTheme();
-
-  return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ActivityIndicator size="large" color={colors.primary} />
-    </View>
-  );
+  return <ScreenState tone="loading" layout="full" testID="loading-spinner-state" />;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});

@@ -51,6 +51,11 @@ interface BuildInvalidCoachResponseEntryValuesOptions {
   usedFallback: boolean;
   requestId?: string | null;
   webhookStatus?: number | null;
+  responseBodyPresent?: boolean | null;
+  providerFailureKind?: string | null;
+  providerFailureStage?: string | null;
+  providerNodeType?: string | null;
+  providerNodeName?: string | null;
 }
 
 type CoachPayloadWrapperSource = 'root' | 'data' | 'entry';
@@ -206,6 +211,11 @@ export function buildInvalidCoachResponseEntryValues(
       error_code: INVALID_COACH_RESPONSE_ERROR_CODE,
       request_id: options.requestId ?? undefined,
       webhook_status: options.webhookStatus ?? undefined,
+      response_body_present: options.responseBodyPresent ?? undefined,
+      provider_failure_kind: options.providerFailureKind ?? undefined,
+      provider_failure_stage: options.providerFailureStage ?? undefined,
+      provider_node_type: options.providerNodeType ?? undefined,
+      provider_node_name: options.providerNodeName ?? undefined,
       wrapper_source: payloadWrapperSource,
       title_present: Boolean(title),
       body_present: Boolean(body),

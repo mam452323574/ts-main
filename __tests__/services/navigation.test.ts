@@ -1,12 +1,14 @@
 import { navigationService } from '@/services/navigation';
 
 // Mock expo-router
+const mockCanDismiss = jest.fn();
 const mockDismissAll = jest.fn();
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
 
 jest.mock('expo-router', () => ({
   router: {
+    canDismiss: () => mockCanDismiss(),
     dismissAll: () => mockDismissAll(),
     replace: (path: string) => mockReplace(path),
     push: (path: string) => mockPush(path),
@@ -17,6 +19,7 @@ describe('navigationService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    mockCanDismiss.mockReturnValue(true);
     navigationService.clearQueue();
   });
 
@@ -42,6 +45,17 @@ describe('navigationService', () => {
       navigationService.navigateToNotifications();
       jest.advanceTimersByTime(100);
 
+      expect(mockDismissAll).toHaveBeenCalled();
+      expect(mockPush).toHaveBeenCalledWith('/notifications');
+    });
+
+    it('skips dismissAll when no dismissible stack exists', () => {
+      mockCanDismiss.mockReturnValue(false);
+
+      navigationService.navigateToNotifications();
+      jest.advanceTimersByTime(100);
+
+      expect(mockDismissAll).not.toHaveBeenCalled();
       expect(mockPush).toHaveBeenCalledWith('/notifications');
     });
 
@@ -64,6 +78,18 @@ describe('navigationService', () => {
       await promise;
 
       expect(mockDismissAll).toHaveBeenCalled();
+      expect(mockReplace).toHaveBeenCalledWith('/home');
+    });
+
+    it('skips dismissAll and still navigates when no dismissible stack exists', async () => {
+      mockCanDismiss.mockReturnValue(false);
+
+      const promise = navigationService.dismissAllModalsAndNavigate('/home', 100);
+      jest.advanceTimersByTime(100);
+
+      await promise;
+
+      expect(mockDismissAll).not.toHaveBeenCalled();
       expect(mockReplace).toHaveBeenCalledWith('/home');
     });
 

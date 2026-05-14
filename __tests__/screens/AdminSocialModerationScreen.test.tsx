@@ -85,6 +85,10 @@ jest.mock('@/hooks/queries', () => ({
   useSocialAdminModeration: (...args: unknown[]) =>
     mockUseSocialAdminModeration(...args),
 }));
+jest.mock('@/hooks/queries/useSocialAdminModeration', () => ({
+  useSocialAdminModeration: (...args: unknown[]) =>
+    mockUseSocialAdminModeration(...args),
+}));
 
 jest.mock('@/hooks/useCustomAlert', () => ({
   useCustomAlert: () => ({
@@ -338,6 +342,11 @@ describe('AdminSocialModerationScreen', () => {
     });
 
     const moderateMutateAsync = jest.fn().mockResolvedValue({ success: true });
+    const bulkApproveMutateAsync = jest.fn().mockResolvedValue({
+      requestedCount: 0,
+      approvedCount: 0,
+      failedIds: [],
+    });
     const reclassifyMutateAsync = jest.fn().mockResolvedValue({ success: true });
     const moderateUserMutateAsync = jest.fn().mockResolvedValue({ success: true });
     const eradicateMutateAsync = jest.fn().mockResolvedValue({ success: true });
@@ -354,6 +363,10 @@ describe('AdminSocialModerationScreen', () => {
       moderateContentMutation: {
         isPending: false,
         mutateAsync: moderateMutateAsync,
+      },
+      bulkApproveContentMutation: {
+        isPending: false,
+        mutateAsync: bulkApproveMutateAsync,
       },
       reclassifyPostMutation: {
         isPending: false,
@@ -622,6 +635,176 @@ describe('AdminSocialModerationScreen', () => {
 
     fireEvent.changeText(screen.getByTestId('admin-social-search-input'), 'flagged');
     expect(getRenderedModerationItemIds()).toEqual(['comment-flagged']);
+  });
+
+  it('shows checkboxes only for approvable items and toggles the bulk bar', async () => {
+    const screen = render(<AdminSocialModerationScreen />);
+
+    expect(screen.getByTestId('admin-social-select-post-pending')).toBeTruthy();
+    expect(screen.getByTestId('admin-social-select-comment-flagged')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('admin-social-select-post-pending'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('admin-social-bulk-bar')).toBeTruthy();
+      expect(screen.getByTestId('admin-social-bulk-clear')).toBeTruthy();
+      expect(screen.getByTestId('admin-social-bulk-approve')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByTestId('admin-social-bulk-clear'));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('admin-social-bulk-bar')).toBeNull();
+    });
+
+    fireEvent.press(screen.getByTestId('admin-social-filter-processed'));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('admin-social-select-post-approved')).toBeNull();
+      expect(screen.queryByTestId('admin-social-select-comment-removed')).toBeNull();
+    });
+  });
+
+  it('confirms bulk approval before submitting the selected moderation items', async () => {
+    const bulkApproveMutateAsync = jest.fn().mockResolvedValue({
+      requestedCount: 2,
+      approvedCount: 2,
+      failedIds: [],
+    });
+
+    mockUseSocialAdminModeration.mockImplementation((filter = 'needs_review') => ({
+      moderationQueueQuery: {
+        data: createQueueData(filter),
+        error: null,
+        isLoading: false,
+        isRefetching: false,
+        refetch: jest.fn(),
+      },
+      moderateContentMutation: {
+        isPending: false,
+        mutateAsync: jest.fn(),
+      },
+      bulkApproveContentMutation: {
+        isPending: false,
+        mutateAsync: bulkApproveMutateAsync,
+      },
+      reclassifyPostMutation: {
+        isPending: false,
+        mutateAsync: jest.fn(),
+      },
+      moderateUserMutation: {
+        isPending: false,
+        mutateAsync: jest.fn(),
+      },
+      eradicateUserMutation: {
+        isPending: false,
+        mutateAsync: jest.fn(),
+      },
+      adjustPostReactionsMutation: {
+        isPending: false,
+        mutateAsync: jest.fn(),
+      },
+    }));
+
+    const screen = render(<AdminSocialModerationScreen />);
+
+    fireEvent.press(screen.getByTestId('admin-social-select-post-pending'));
+    fireEvent.press(screen.getByTestId('admin-social-select-comment-flagged'));
+    fireEvent.press(screen.getByTestId('admin-social-bulk-approve'));
+
+    await waitFor(() => {
+      expect(mockShowAlert).toHaveBeenCalled();
+    });
+
+    const [, , buttons] = mockShowAlert.mock.calls.at(-1) as [string, string, Array<{
+      text: string;
+      onPress?: () => void;
+    }>];
+
+    expect(mockShowAlert.mock.calls.at(-1)?.[0]).toBe('social.admin.bulk.confirm_title');
+
+    await act(async () => {
+      buttons[1]?.onPress?.();
+    });
+
+    await waitFor(() => {
+      expect(bulkApproveMutateAsync).toHaveBeenCalledWith([
+        expect.objectContaining({ content_id: 'comment-flagged' }),
+        expect.objectContaining({ content_id: 'post-pending' }),
+      ]);
+      expect(screen.queryByTestId('admin-social-bulk-bar')).toBeNull();
+    });
+  });
+
+  it('keeps only failed ids selected after a partial bulk approval', async () => {
+    const bulkApproveMutateAsync = jest.fn().mockResolvedValue({
+      requestedCount: 2,
+      approvedCount: 1,
+      failedIds: ['comment-flagged'],
+    });
+
+    mockUseSocialAdminModeration.mockImplementation((filter = 'needs_review') => ({
+      moderationQueueQuery: {
+        data: createQueueData(filter),
+        error: null,
+        isLoading: false,
+        isRefetching: false,
+        refetch: jest.fn(),
+      },
+      moderateContentMutation: {
+        isPending: false,
+        mutateAsync: jest.fn(),
+      },
+      bulkApproveContentMutation: {
+        isPending: false,
+        mutateAsync: bulkApproveMutateAsync,
+      },
+      reclassifyPostMutation: {
+        isPending: false,
+        mutateAsync: jest.fn(),
+      },
+      moderateUserMutation: {
+        isPending: false,
+        mutateAsync: jest.fn(),
+      },
+      eradicateUserMutation: {
+        isPending: false,
+        mutateAsync: jest.fn(),
+      },
+      adjustPostReactionsMutation: {
+        isPending: false,
+        mutateAsync: jest.fn(),
+      },
+    }));
+
+    const screen = render(<AdminSocialModerationScreen />);
+
+    fireEvent.press(screen.getByTestId('admin-social-select-post-pending'));
+    fireEvent.press(screen.getByTestId('admin-social-select-comment-flagged'));
+    fireEvent.press(screen.getByTestId('admin-social-bulk-approve'));
+
+    const [, , buttons] = mockShowAlert.mock.calls.at(-1) as [string, string, Array<{
+      text: string;
+      onPress?: () => void;
+    }>];
+
+    await act(async () => {
+      buttons[1]?.onPress?.();
+    });
+
+    await waitFor(() => {
+      expect(mockShowAlert.mock.calls.at(-1)?.[0]).toBe(
+        'social.admin.bulk.partial_title',
+      );
+      expect(
+        screen.getByTestId('admin-social-select-post-pending').props.accessibilityState
+          ?.checked,
+      ).toBe(false);
+      expect(
+        screen.getByTestId('admin-social-select-comment-flagged').props.accessibilityState
+          ?.checked,
+      ).toBe(true);
+    });
   });
 
   it('keeps processed history as pure moderation items without any synthetic sticky row', async () => {

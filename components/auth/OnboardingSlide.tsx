@@ -2,7 +2,7 @@ import { ReactNode, useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { BORDER_RADIUS, SIZES, SPACING } from '@/constants/theme';
+import { BORDER_RADIUS, FONT_FAMILIES, SIZES, SPACING } from '@/constants/theme';
 import { useOnboardingPalette, type OnboardingPalette } from './tokens';
 
 interface OnboardingSlideProps {
@@ -114,9 +114,9 @@ const createStyles = (palette: OnboardingPalette) =>
     title: {
       fontSize: 28,
       lineHeight: 34,
-      fontWeight: '700',
+      fontFamily: FONT_FAMILIES.display,
       color: palette.textPrimary,
-      letterSpacing: 0,
+      letterSpacing: -0.3,
     },
     subtitle: {
       fontSize: SIZES.md,
@@ -137,9 +137,9 @@ const createStyles = (palette: OnboardingPalette) =>
       paddingHorizontal: SPACING.md,
       paddingVertical: SPACING.xs + 2,
       borderRadius: BORDER_RADIUS.pill,
-      backgroundColor: palette.accentSofter,
+      backgroundColor: palette.secondaryActionFill,
       borderWidth: 1,
-      borderColor: palette.border,
+      borderColor: palette.secondaryActionBorder,
     },
     bulletDot: {
       width: 5,

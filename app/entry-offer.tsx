@@ -3,7 +3,7 @@ import { Redirect } from 'expo-router';
 
 import EntryOfferScreen from '@/screens/EntryOfferScreen';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useFeatureFlags } from '@/hooks/queries';
+import { useFeatureFlags } from '@/hooks/queries/useFeatureFlags';
 
 export default function EntryOfferRoute() {
   const { colors } = useTheme();

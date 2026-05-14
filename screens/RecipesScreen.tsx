@@ -1,13 +1,16 @@
 import { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, TextInput } from 'react-native';
 import { Search } from 'lucide-react-native';
-import { useRecipes } from '@/hooks/queries';
+import { useRecipes } from '@/hooks/queries/useRecipes';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { AppScreen } from '@/components/AppScreen';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ErrorMessage } from '@/components/ErrorMessage';
 import { ModalHandle } from '@/components/ModalHandle';
-import { SIZES, SPACING, BORDER_RADIUS } from '@/constants/theme';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { ScreenState } from '@/components/ScreenState';
+import { SIZES, SPACING, BORDER_RADIUS, FONT_WEIGHTS, getMainPageChrome, withAlpha } from '@/constants/theme';
 
 export default function RecipesScreen() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -49,7 +52,7 @@ export default function RecipesScreen() {
               item.difficulty === 'hard' && styles.difficultyHard,
             ]}
           >
-            <Text style={[styles.difficultyText, { color: getDifficultyTextColor(item.difficulty, isDark) }]}>
+            <Text style={[styles.difficultyText, { color: getDifficultyTextColor(item.difficulty, colors) }]}>
               {t(`recipes.difficulty.${item.difficulty}`)}
             </Text>
           </View>
@@ -59,10 +62,16 @@ export default function RecipesScreen() {
   );
 
   return (
-    <View style={styles.container}>
+    <AppScreen style={styles.container}>
       <ModalHandle />
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>{t('recipes.title')}</Text>
+      <ScreenHeader
+        title={t('recipes.title')}
+        variant="inline"
+        topInset={false}
+        centered
+        testID="recipes-screen-header"
+      />
+      <View style={styles.searchSection}>
         <View style={styles.searchContainer}>
           <Search color={colors.gray} size={20} />
           <TextInput
@@ -77,7 +86,7 @@ export default function RecipesScreen() {
 
       {filteredRecipes.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>{t('recipes.no_results')}</Text>
+          <ScreenState tone="empty" title={t('recipes.no_results')} testID="recipes-empty-state" />
         </View>
       ) : (
         <FlatList
@@ -87,73 +96,90 @@ export default function RecipesScreen() {
           contentContainerStyle={styles.list}
         />
       )}
-    </View>
+    </AppScreen>
   );
 }
 
-const getDifficultyTextColor = (difficulty: string, isDark: boolean) => {
-  if (isDark) {
-    switch (difficulty) {
-      case 'easy': return '#4CAF50';
-      case 'medium': return '#FF9800';
-      case 'hard': return '#F44336';
-      default: return '#666';
-    }
+const getDifficultyTextColor = (difficulty: string, colors: any) => {
+  switch (difficulty) {
+    case 'easy':
+      return colors.success;
+    case 'medium':
+      return colors.warning;
+    case 'hard':
+      return colors.error;
+    default:
+      return colors.gray;
   }
-  return '#666';
 };
 
 const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  header: {
-    padding: SPACING.lg,
-    paddingTop: SPACING.xxl,
-    backgroundColor: colors.cardBackground,
-  },
-  headerTitle: {
-    fontSize: SIZES.xxl,
-    fontWeight: 'bold',
-    color: colors.primary,
-    marginBottom: SPACING.md,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.lightGray,
-    borderRadius: BORDER_RADIUS.md,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-  },
+  ...(() => {
+    const chrome = getMainPageChrome(colors, isDark, 'nutrition');
+
+    return {
+      container: {
+        flex: 1,
+        backgroundColor: chrome.canvas,
+      },
+      searchSection: {
+        paddingHorizontal: SPACING.page,
+        paddingBottom: SPACING.md,
+        backgroundColor: chrome.canvas,
+        borderBottomWidth: 1,
+        borderBottomColor: chrome.headerBorder,
+      },
+      searchContainer: {
+        flexDirection: 'row' as const,
+        alignItems: 'center' as const,
+        backgroundColor: chrome.mutedSurface.backgroundColor,
+        borderRadius: BORDER_RADIUS.full,
+        paddingHorizontal: SPACING.md,
+        paddingVertical: SPACING.sm,
+        borderWidth: 1,
+        borderColor: chrome.mutedSurface.borderColor,
+        ...chrome.mutedSurface.shadowStyle,
+      },
+      list: {
+        padding: SPACING.page,
+        paddingTop: SPACING.lg,
+      },
+      recipeCard: {
+        backgroundColor: chrome.surface.backgroundColor,
+        borderRadius: BORDER_RADIUS.hero,
+        marginBottom: SPACING.md,
+        overflow: 'hidden' as const,
+        borderWidth: 1,
+        borderColor: chrome.surface.borderColor,
+        ...chrome.surface.shadowStyle,
+      },
+      recipeImage: {
+        width: '100%' as const,
+        height: 200,
+        backgroundColor: chrome.chart.emptyBackground,
+      },
+      difficultyBadge: {
+        paddingHorizontal: SPACING.sm,
+        paddingVertical: SPACING.xs,
+        borderRadius: BORDER_RADIUS.full,
+        borderWidth: 1,
+        borderColor: chrome.chip.borderColor,
+      },
+    };
+  })(),
   searchInput: {
     flex: 1,
     marginLeft: SPACING.sm,
     fontSize: SIZES.md,
     color: colors.primaryText,
   },
-  list: {
-    padding: SPACING.lg,
-  },
-  recipeCard: {
-    backgroundColor: colors.cardBackground,
-    borderRadius: BORDER_RADIUS.lg,
-    marginBottom: SPACING.md,
-    overflow: 'hidden',
-  },
-  recipeImage: {
-    width: '100%',
-    height: 200,
-    backgroundColor: colors.lightGray,
-  },
   recipeContent: {
-    padding: SPACING.md,
+    padding: SPACING.lg,
   },
   recipeName: {
     fontSize: SIZES.lg,
-    fontWeight: '600',
-    color: colors.primary,
+    fontWeight: FONT_WEIGHTS.semiBold,
+    color: colors.primaryText,
     marginBottom: SPACING.sm,
   },
   recipeInfo: {
@@ -165,19 +191,14 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     fontSize: SIZES.sm,
     color: colors.gray,
   },
-  difficultyBadge: {
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs,
-    borderRadius: BORDER_RADIUS.sm,
-  },
   difficultyEasy: {
-    backgroundColor: isDark ? 'rgba(76, 175, 80, 0.2)' : '#E8F5E9',
+    backgroundColor: withAlpha(colors.success, isDark ? 0.2 : 0.12),
   },
   difficultyMedium: {
-    backgroundColor: isDark ? 'rgba(255, 152, 0, 0.2)' : '#FFF3E0',
+    backgroundColor: withAlpha(colors.warning, isDark ? 0.2 : 0.12),
   },
   difficultyHard: {
-    backgroundColor: isDark ? 'rgba(244, 67, 54, 0.2)' : '#FFEBEE',
+    backgroundColor: withAlpha(colors.error, isDark ? 0.2 : 0.12),
   },
   difficultyText: {
     fontSize: SIZES.xs,

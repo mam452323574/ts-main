@@ -4,6 +4,48 @@ import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 
 import ScanResultScreen from '@/screens/ScanResultScreen';
 import { i18n, loadLocalesForTests } from '@/i18n/translations';
+import { resolveFaceGlowScore } from '@/utils/faceGlow';
+import { getResultScreenGradient } from '@/utils/resultLayout';
+import { buildScanResultViewModel } from '@/utils/resultViewModels';
+import {
+  resolveResultItemTheme,
+  resolveScanTypeTheme,
+} from '@/utils/resultVisualTheme';
+
+const mockThemeColors = {
+  primary: '#007AFF',
+  accentGreen: '#34C759',
+  success: '#34C759',
+  warning: '#FF9500',
+  error: '#FF3B30',
+  gold: '#FFD700',
+  secondary: '#5856D6',
+  cardBackground: '#FFFFFF',
+  background: '#F2F2F7',
+  primaryText: '#1D1D1F',
+  gray: '#8E8E93',
+  grayLight: '#F8F8FA',
+  grayMedium: '#C7C7CC',
+  lightGray: '#E5E5EA',
+  darkGray: '#424242',
+  primaryLight: '#E3F2FF',
+  white: '#FFFFFF',
+};
+
+const expectTransparentResultHeader = (style: unknown) => {
+  expect(StyleSheet.flatten(style)).toEqual(
+    expect.objectContaining({
+      backgroundColor: 'transparent',
+      borderBottomColor: 'transparent',
+      borderBottomWidth: 0,
+    }),
+  );
+};
+
+type ResultSegmentIndex = {
+  source: 'quickStats' | 'metrics';
+  index: number;
+};
 
 const mockPush = jest.fn();
 const mockCanDismiss = jest.fn();
@@ -54,25 +96,7 @@ jest.mock('@/contexts/AuthContext', () => ({
 
 jest.mock('@/contexts/ThemeContext', () => ({
   useTheme: () => ({
-    colors: {
-      primary: '#007AFF',
-      accentGreen: '#34C759',
-      success: '#34C759',
-      warning: '#FF9500',
-      error: '#FF3B30',
-      gold: '#FFD700',
-      secondary: '#5856D6',
-      cardBackground: '#FFFFFF',
-      background: '#F2F2F7',
-      primaryText: '#1D1D1F',
-      gray: '#8E8E93',
-      grayLight: '#F8F8FA',
-      grayMedium: '#C7C7CC',
-      lightGray: '#E5E5EA',
-      darkGray: '#424242',
-      primaryLight: '#E3F2FF',
-      white: '#FFFFFF',
-    },
+    colors: mockThemeColors,
     isDark: false,
   }),
 }));
@@ -116,6 +140,12 @@ jest.mock('@/components/MetricCard', () => ({
 
 jest.mock('@/hooks/queries', () => ({
   usePremiumPotential: (...args: any[]) => mockUsePremiumPotential(...args),
+  useFeatureFlags: (...args: any[]) => mockUseFeatureFlags(...args),
+}));
+jest.mock('@/hooks/queries/usePremiumPotential', () => ({
+  usePremiumPotential: (...args: any[]) => mockUsePremiumPotential(...args),
+}));
+jest.mock('@/hooks/queries/useFeatureFlags', () => ({
   useFeatureFlags: (...args: any[]) => mockUseFeatureFlags(...args),
 }));
 
@@ -194,6 +224,21 @@ const makeFaceResult = () => ({
   collagen_level: 64,
 });
 
+const makeBodyResult = () => ({
+  schema_version: 3,
+  scan_type: 'body',
+  body_score: 77,
+  body_fat_percentage: 18,
+  muscle_mass_key: 'balanced',
+  body_type_key: 'athletic',
+  posture_score: 7,
+  waist_estimation_cm: 79,
+  strength_index: 73,
+  body_symmetry: 77,
+  bmi_estimate: 22.1,
+  metabolic_age: 28,
+});
+
 const makeNutritionResult = () => ({
   schema_version: 3,
   scan_type: 'nutrition',
@@ -220,6 +265,32 @@ const flattenText = (value: any): string => {
 
   return String(value);
 };
+
+const collectTestIds = (node: any, acc: string[] = []): string[] => {
+  if (!node) {
+    return acc;
+  }
+
+  if (Array.isArray(node)) {
+    node.forEach((child) => collectTestIds(child, acc));
+    return acc;
+  }
+
+  if (node.props?.testID) {
+    acc.push(node.props.testID);
+  }
+
+  if (Array.isArray(node.children)) {
+    node.children.forEach((child: any) => collectTestIds(child, acc));
+  }
+
+  return acc;
+};
+
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const getResultItemLabel = (item: { label?: string; title?: string }) =>
+  item.label ?? item.title ?? '';
 
 describe('ScanResultScreen', () => {
   beforeAll(async () => {
@@ -269,10 +340,31 @@ describe('ScanResultScreen', () => {
       }),
     });
 
-    const { getByText, queryByTestId } = render(<ScanResultScreen />);
+    const { getByText, getByTestId, queryByTestId } = render(<ScanResultScreen />);
 
     expect(getByText(i18n.t('common.results.no_data'))).toBeTruthy();
+    expect(getByTestId('scan-result-background-layer').props.colors).toEqual(
+      getResultScreenGradient({
+        colors: mockThemeColors as any,
+        isDark: false,
+      }),
+    );
+    expectTransparentResultHeader(
+      getByTestId('scan-result-screen-header').props.style,
+    );
     expect(queryByTestId('trajectory-preview-card')).toBeNull();
+  });
+
+  it('keeps the result header transparent over the result gradient', () => {
+    mockParams.mockReturnValue({
+      analysisData: JSON.stringify(makeFaceResult()),
+    });
+
+    const { getByTestId } = render(<ScanResultScreen />);
+
+    expectTransparentResultHeader(
+      getByTestId('scan-result-screen-header').props.style,
+    );
   });
 
   it('shows the locked trajectory card for free results', () => {
@@ -285,6 +377,54 @@ describe('ScanResultScreen', () => {
     expect(getByTestId('trajectory-preview-card')).toBeTruthy();
     expect(getByTestId('trajectory-premium-state')).toHaveTextContent('locked');
     expect(getAllByText(/:locked:/).length).toBeGreaterThan(0);
+  });
+
+  it('promotes the coach next-step CTA near the top and navigates with auto submit', () => {
+    mockParams.mockReturnValue({
+      analysisData: JSON.stringify({
+        ...makeBodyResult(),
+        posture_score: 3.2,
+      }),
+      scanId: 'scan-body-123',
+    });
+
+    const rendered = render(<ScanResultScreen />);
+    const testIds = collectTestIds(rendered.toJSON());
+
+    expect(rendered.getByTestId('scan-result-coach-cta-question-preview')).toBeTruthy();
+    expect(testIds).toContain('trajectory-preview-card');
+    expect(testIds.indexOf('scan-result-coach-cta')).toBeGreaterThan(
+      testIds.indexOf('result-hero-surface'),
+    );
+    expect(testIds.indexOf('scan-result-coach-cta')).toBeLessThan(
+      testIds.indexOf('trajectory-preview-card'),
+    );
+
+    fireEvent.press(rendered.getByTestId('scan-result-coach-cta-button'));
+
+    expect(mockPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/coach',
+        params: expect.objectContaining({
+          source: 'scan_result',
+          autoSubmit: '1',
+          scanId: 'scan-body-123',
+          scanType: 'body',
+          promptType: 'latest_scan_issue_resolution',
+          fallbackPromptType: 'latest_scan',
+          priorityMetric: 'posture_score',
+          scanIntent: expect.any(String),
+        }),
+      }),
+    );
+    const pushedParams = mockPush.mock.calls[0][0].params;
+    expect(JSON.parse(decodeURIComponent(pushedParams.scanIntent))).toMatchObject({
+      scan_id: 'scan-body-123',
+      scan_type: 'body',
+      priority_metric: 'posture_score',
+      prompt_type: 'latest_scan_issue_resolution',
+      fallback_prompt_type: 'latest_scan',
+    });
   });
 
   it('renders a discreet analysis quality badge when scan confidence is limited', () => {
@@ -363,24 +503,63 @@ describe('ScanResultScreen', () => {
     expect(getByText(new RegExp(`^${i18n.t('common.metrics.skin_quality')}:loading:`))).toBeTruthy();
   });
 
-  it('keeps the face CTA on the scan accent while passing varied semantic accents to metrics', () => {
+  it('keeps the face CTA on the scan accent while passing the tightened semantic metric accents', () => {
     mockUserProfile = { account_tier: 'premium' };
+    const analysisData = makeFaceResult();
     mockParams.mockReturnValue({
-      analysisData: JSON.stringify(makeFaceResult()),
+      analysisData: JSON.stringify(analysisData),
     });
 
-    const { getByTestId, getByText } = render(<ScanResultScreen />);
+    const viewModel = buildScanResultViewModel({
+      analysisData: analysisData as any,
+      locale: i18n.locale,
+      premiumRenderState: 'unlocked',
+      resolveFaceGlowScore,
+      t: (key: string, options?: Record<string, unknown>) =>
+        String(i18n.t(key, options)),
+    });
+    const fatigueMetric = viewModel.metrics.find(
+      (item) => item.title === String(i18n.t('common.metrics.fatigue')),
+    );
+    const hydrationMetric = viewModel.metrics.find(
+      (item) => item.title === String(i18n.t('common.metrics.hydration')),
+    );
+
+    const fatigueTheme = resolveResultItemTheme({
+      colors: mockThemeColors as any,
+      isDark: false,
+      theme: fatigueMetric?.theme,
+    });
+    const hydrationTheme = resolveResultItemTheme({
+      colors: mockThemeColors as any,
+      isDark: false,
+      theme: hydrationMetric?.theme,
+    });
+    const faceTheme = resolveScanTypeTheme('face', mockThemeColors as any, false);
+
+    const { getByTestId } = render(<ScanResultScreen />);
     const shareButtonStyle = StyleSheet.flatten(
       getByTestId('scan-result-share-button').props.style,
     );
 
-    expect(shareButtonStyle.borderColor).toBe('#007AFF');
+    expect(shareButtonStyle.borderColor).toBe(faceTheme.accentColor);
+    expect(fatigueTheme.accentColor).not.toBe(hydrationTheme.accentColor);
     expect(
-      getByText(new RegExp(`^${i18n.t('common.metrics.fatigue')}:unlocked:#5856D6:`)),
-    ).toBeTruthy();
+      flattenText(
+        getByTestId(`metric-card-${String(i18n.t('common.metrics.fatigue'))}`).props
+          .children,
+      ),
+    ).toContain(
+      `${String(i18n.t('common.metrics.fatigue'))}:unlocked:${fatigueTheme.accentColor}:`,
+    );
     expect(
-      getByText(new RegExp(`^${i18n.t('common.metrics.hydration')}:unlocked:#007AFF:`)),
-    ).toBeTruthy();
+      flattenText(
+        getByTestId(`metric-card-${String(i18n.t('common.metrics.hydration'))}`).props
+          .children,
+      ),
+    ).toContain(
+      `${String(i18n.t('common.metrics.hydration'))}:unlocked:${hydrationTheme.accentColor}:`,
+    );
   });
 
   it('keeps the unlocked trajectory visible when premium potential data is unavailable', () => {
@@ -574,6 +753,137 @@ describe('ScanResultScreen', () => {
     expect(shareLabelStyle.flex).toBeUndefined();
   });
 
+  it.each([
+    {
+      name: 'face',
+      makeAnalysisData: makeFaceResult,
+      firstSegmentIndex: { source: 'quickStats', index: 0 },
+      secondSegmentIndex: { source: 'metrics', index: 2 },
+    },
+    {
+      name: 'body',
+      makeAnalysisData: makeBodyResult,
+      firstSegmentIndex: { source: 'quickStats', index: 1 },
+      secondSegmentIndex: { source: 'metrics', index: 1 },
+    },
+    {
+      name: 'nutrition',
+      makeAnalysisData: makeNutritionResult,
+      firstSegmentIndex: { source: 'quickStats', index: 1 },
+      secondSegmentIndex: { source: 'metrics', index: 0 },
+    },
+  ] as const)('does not render metric-only hero summaries for $name scans', ({
+    makeAnalysisData,
+    firstSegmentIndex,
+    secondSegmentIndex,
+  }) => {
+    const analysisData = makeAnalysisData();
+    mockParams.mockReturnValue({
+      analysisData: JSON.stringify(analysisData),
+    });
+
+    const viewModel = buildScanResultViewModel({
+      analysisData: analysisData as any,
+      locale: i18n.locale,
+      premiumRenderState: 'locked',
+      resolveFaceGlowScore,
+      t: (key: string, options?: Record<string, unknown>) =>
+        String(i18n.t(key, options)),
+    });
+    const firstIndex = firstSegmentIndex as ResultSegmentIndex;
+    const secondIndex = secondSegmentIndex as ResultSegmentIndex;
+    const firstSegment = (
+      firstIndex.source === 'quickStats'
+        ? viewModel.quickStats[firstIndex.index]
+        : viewModel.metrics[firstIndex.index]
+    )!;
+    const secondSegment = (
+      secondIndex.source === 'quickStats'
+        ? viewModel.quickStats[secondIndex.index]
+        : viewModel.metrics[secondIndex.index]
+    )!;
+    const firstSegmentLabel = getResultItemLabel(firstSegment);
+    const secondSegmentLabel = getResultItemLabel(secondSegment);
+    const redundantSummary = `${firstSegmentLabel}: ${firstSegment.value} · ${secondSegmentLabel}: ${secondSegment.value}`;
+
+    const { getByText, queryByText } = render(<ScanResultScreen />);
+
+    expect(queryByText(redundantSummary)).toBeNull();
+    expect(getByText(firstSegmentLabel)).toBeTruthy();
+    expect(getByText(firstSegment.value)).toBeTruthy();
+    expect(
+      getByText(new RegExp(`^${escapeRegExp(secondSegmentLabel)}:`)),
+    ).toBeTruthy();
+    expect(queryByText(String(i18n.t('common.results.key_insight_label')))).toBeNull();
+  });
+
+  it('keeps the hero quick stats ahead of trajectory, details, deep analysis, and actions', () => {
+    const analysisData = makeFaceResult();
+    mockParams.mockReturnValue({
+      analysisData: JSON.stringify(analysisData),
+    });
+
+    const viewModel = buildScanResultViewModel({
+      analysisData: analysisData as any,
+      locale: i18n.locale,
+      premiumRenderState: 'locked',
+      resolveFaceGlowScore,
+      t: (key: string, options?: Record<string, unknown>) =>
+        String(i18n.t(key, options)),
+    });
+
+    const { UNSAFE_getAllByType, queryByText } = render(<ScanResultScreen />);
+    const allTextValues = UNSAFE_getAllByType(Text).map((node) =>
+      flattenText(node.props.children),
+    );
+    const heroQuickStatIndex = allTextValues.indexOf(viewModel.quickStats[0]?.label ?? '');
+    const scoreLabelIndex = allTextValues.indexOf(viewModel.scoreLabel);
+    const trajectoryIndex = allTextValues.indexOf('locked');
+    const detailsIndex = allTextValues.indexOf(
+      String(i18n.t('common.results.details_title')),
+    );
+    const deepAnalysisIndex = allTextValues.indexOf(
+      String(i18n.t('common.results.deep_analysis_label')),
+    );
+    const backIndex = allTextValues.indexOf(String(i18n.t('common.home_back')));
+    const shareIndex = allTextValues.indexOf(
+      String(i18n.t('share_story.actions.share_score')),
+    );
+
+    expect(queryByText(String(i18n.t('common.results.quick_stats_label')))).toBeNull();
+    expect(queryByText(String(i18n.t('common.results.key_insight_label')))).toBeNull();
+    expect(scoreLabelIndex).toBeGreaterThan(-1);
+    expect(heroQuickStatIndex).toBeGreaterThan(scoreLabelIndex);
+    expect(trajectoryIndex).toBeGreaterThan(heroQuickStatIndex);
+    expect(detailsIndex).toBeGreaterThan(trajectoryIndex);
+    expect(deepAnalysisIndex).toBeGreaterThan(detailsIndex);
+    expect(backIndex).toBeGreaterThan(deepAnalysisIndex);
+    expect(shareIndex).toBeGreaterThan(backIndex);
+  });
+
+  it('uses the reusable abstract hero backdrop instead of the captured image', () => {
+    mockParams.mockReturnValue({
+      analysisData: JSON.stringify(makeFaceResult()),
+      imageUri: 'file:///scan.jpg',
+    });
+
+    const { getByTestId } = render(<ScanResultScreen />);
+
+    expect(getByTestId('result-hero-abstract-backdrop')).toBeTruthy();
+  });
+
+  it('keeps the back CTA wired to the existing close behavior', () => {
+    mockParams.mockReturnValue({
+      analysisData: JSON.stringify(makeFaceResult()),
+    });
+
+    const { getByTestId } = render(<ScanResultScreen />);
+
+    fireEvent.press(getByTestId('scan-result-back-button'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(tabs)');
+  });
+
   it('renders the trajectory teaser before the first premium metric', () => {
     mockParams.mockReturnValue({
       analysisData: JSON.stringify(makeFaceResult()),
@@ -603,5 +913,34 @@ describe('ScanResultScreen', () => {
     expect(getByTestId('scan-result-macro-icon-proteins')).toBeTruthy();
     expect(getByTestId('scan-result-macro-icon-carbs')).toBeTruthy();
     expect(getByTestId('scan-result-macro-icon-fats')).toBeTruthy();
+  });
+
+  it('renders long nutrition content in full-width expandable sections', () => {
+    mockUserProfile = { account_tier: 'premium' };
+    const longRecommendation =
+      'Add a larger vegetable portion, keep the protein source visible, and pair the starch with fiber. '.repeat(
+        4,
+      );
+    mockParams.mockReturnValue({
+      analysisData: JSON.stringify({
+        ...makeNutritionResult(),
+        main_vitamins_fallback_text:
+          'Vitamin A and vitamin C appear prominent, with minerals likely coming from colorful vegetables.',
+        recommendations: longRecommendation,
+      }),
+    });
+
+    const { getByTestId, queryByTestId } = render(<ScanResultScreen />);
+
+    expect(queryByTestId('scan-result-premium-metric-grid-item-vitamins')).toBeNull();
+    expect(getByTestId('nutrition-long-section-vitamins')).toBeTruthy();
+    expect(getByTestId('nutrition-long-section-recommendations')).toBeTruthy();
+    expect(getByTestId('nutrition-long-section-body-recommendations').props.numberOfLines).toBe(4);
+
+    fireEvent.press(getByTestId('nutrition-long-section-toggle-recommendations'));
+
+    expect(
+      getByTestId('nutrition-long-section-body-recommendations').props.numberOfLines,
+    ).toBeUndefined();
   });
 });

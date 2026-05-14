@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import {
   AlertCircle,
+  Check,
   ChevronDown,
   ChevronUp,
   Ellipsis,
@@ -20,34 +21,41 @@ import {
 
 import { SocialCategoryPill } from '@/components/social/SocialCategoryPill';
 import { SocialIdentityRow } from '@/components/social/SocialIdentityRow';
-import { SocialModerationBadge } from '@/components/social/SocialModerationBadge';
 import {
   BORDER_RADIUS,
   FONT_WEIGHTS,
-  SHADOWS,
   SIZES,
   SPACING,
-  withAlpha,
 } from '@/constants/theme';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import type {
   SocialAdminModerationItem,
   SocialModerationAction,
+  SocialAdminModerationFilter,
 } from '@/types';
 
 import {
   formatAdminTimestamp,
   getOverflowActionDefinitions,
   getPrimaryActionDefinitions,
+  isModerationItemApprovable,
 } from './adminModerationUtils';
+import {
+  buildAdminChromePalette,
+  resolveAdminActionSurface,
+  resolveAdminItemTone,
+} from './adminModerationTheme';
 
 interface AdminModerationCardProps {
   item: SocialAdminModerationItem;
   isExpanded: boolean;
   actionDisabled: boolean;
+  isSelected: boolean;
   pendingActionKey: string | null;
+  selectionDisabled: boolean;
   onToggleDetails: (itemId: string) => void;
+  onToggleSelection: (itemId: string) => void;
   onModerationActionPress: (
     item: SocialAdminModerationItem,
     action: SocialModerationAction,
@@ -55,31 +63,53 @@ interface AdminModerationCardProps {
   onOverflowPress: (item: SocialAdminModerationItem) => void;
 }
 
+function resolvePaletteFilter(item: SocialAdminModerationItem): SocialAdminModerationFilter {
+  if (item.moderation_state === 'approved') {
+    return 'processed';
+  }
+
+  if (
+    item.moderation_state === 'rejected' ||
+    item.moderation_state === 'removed'
+  ) {
+    return 'reported';
+  }
+
+  return 'needs_review';
+}
+
 function TypeChip({
   label,
+  backgroundColor,
+  borderColor,
+  textColor,
 }: {
   label: string;
+  backgroundColor: string;
+  borderColor: string;
+  textColor: string;
 }) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-
   return (
-    <View style={styles.typeChip}>
-      <Text style={styles.typeChipLabel}>{label}</Text>
+    <View style={[styles.typeChip, { backgroundColor, borderColor }]}>
+      <Text style={[styles.typeChipLabel, { color: textColor }]}>{label}</Text>
     </View>
   );
 }
 
-function ApprovedBadge() {
-  const { colors } = useTheme();
-  const { t } = useLanguage();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-
+function StateBadge({
+  label,
+  backgroundColor,
+  borderColor,
+  textColor,
+}: {
+  label: string;
+  backgroundColor: string;
+  borderColor: string;
+  textColor: string;
+}) {
   return (
-    <View style={styles.approvedBadge}>
-      <Text style={styles.approvedBadgeLabel}>
-        {t('social.moderation.approved')}
-      </Text>
+    <View style={[styles.stateBadge, { backgroundColor, borderColor }]}>
+      <Text style={[styles.stateBadgeLabel, { color: textColor }]}>{label}</Text>
     </View>
   );
 }
@@ -87,23 +117,34 @@ function ApprovedBadge() {
 function SignalChip({
   icon,
   label,
+  chrome,
+  iconColor,
 }: {
   icon: 'flag' | 'users' | 'eye';
   label: string;
+  chrome: ReturnType<typeof buildAdminChromePalette>;
+  iconColor: string;
 }) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-
   return (
-    <View style={styles.signalChip}>
+    <View
+      style={[
+        styles.signalChip,
+        {
+          backgroundColor: chrome.surfaceMuted,
+          borderColor: chrome.borderSubtle,
+        },
+      ]}
+    >
       {icon === 'flag' ? (
-        <Flag color={colors.warning} size={14} />
+        <Flag color={iconColor} size={14} />
       ) : icon === 'users' ? (
-        <Users color={colors.primary} size={14} />
+        <Users color={iconColor} size={14} />
       ) : (
-        <Eye color={colors.gray} size={14} />
+        <Eye color={iconColor} size={14} />
       )}
-      <Text style={styles.signalChipLabel}>{label}</Text>
+      <Text style={[styles.signalChipLabel, { color: chrome.textSecondary }]}>
+        {label}
+      </Text>
     </View>
   );
 }
@@ -112,14 +153,25 @@ export function AdminModerationCard({
   item,
   isExpanded,
   actionDisabled,
+  isSelected,
   pendingActionKey,
+  selectionDisabled,
   onToggleDetails,
+  onToggleSelection,
   onModerationActionPress,
   onOverflowPress,
 }: AdminModerationCardProps) {
   const { colors } = useTheme();
   const { t } = useLanguage();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const chrome = useMemo(
+    () => buildAdminChromePalette(colors, resolvePaletteFilter(item)),
+    [colors, item],
+  );
+  const tone = useMemo(() => resolveAdminItemTone(item), [item]);
+  const stylesMemo = useMemo(
+    () => createStyles(chrome, tone),
+    [chrome, tone],
+  );
   const primaryActions = getPrimaryActionDefinitions(item);
   const overflowActions = getOverflowActionDefinitions(item);
   const createdLabel = formatAdminTimestamp(item.created_at);
@@ -135,333 +187,467 @@ export function AdminModerationCard({
     hour: '2-digit',
     minute: '2-digit',
   });
+  const isSelectionAvailable = isModerationItemApprovable(item);
   const isPendingTarget = Boolean(actionDisabled && pendingActionKey);
-  const showExpandedDetails = isExpanded;
+  const stateLabel = t(
+    item.moderation_state === 'approved'
+      ? 'social.moderation.approved'
+      : `social.moderation.${item.moderation_state}`,
+  );
 
   return (
-    <View style={styles.cardShell} testID={`admin-social-item-${item.content_id}`}>
-      <View style={styles.card}>
-        {item.moderation_last_error ? (
-          <View style={styles.errorBanner}>
-            <AlertCircle color={colors.error} size={16} />
-            <Text style={styles.errorBannerText} numberOfLines={2}>
-              {item.moderation_last_error}
-            </Text>
-          </View>
-        ) : null}
+    <View style={stylesMemo.cardShell} testID={`admin-social-item-${item.content_id}`}>
+      <View
+        style={[
+          stylesMemo.cardHalo,
+          { backgroundColor: tone.accentHalo },
+        ]}
+      />
 
-        <View style={styles.topRow}>
-          <SocialIdentityRow
-            username={item.author_username}
-            meta={createdLabel}
-            avatarSize={36}
-            trailing={
-              item.moderation_state === 'approved' ? (
-                <ApprovedBadge />
-              ) : (
-                <SocialModerationBadge moderationState={item.moderation_state} />
-              )
-            }
-            testID={`admin-social-identity-${item.content_id}`}
-          />
-        </View>
+      <View style={stylesMemo.cardFrame}>
+        <View
+          style={[
+            stylesMemo.cardRail,
+            { backgroundColor: tone.accent },
+          ]}
+        />
 
-        <View style={styles.badgesRow}>
-          <TypeChip label={t(`social.admin.types.${item.content_type}`)} />
-          {item.category ? <SocialCategoryPill category={item.category} compact /> : null}
-          {item.author_active_bans.map((ban, index) => (
-            <View key={`${ban.scope}-${index}`} style={styles.banBadge}>
-              <ShieldAlert color={colors.error} size={12} />
-              <Text style={styles.banBadgeLabel}>{ban.scope}</Text>
+        <View style={stylesMemo.card}>
+          {item.moderation_last_error ? (
+            <View style={stylesMemo.errorBanner}>
+              <AlertCircle color={chrome.dangerAccent} size={16} />
+              <Text style={stylesMemo.errorBannerText} numberOfLines={2}>
+                {item.moderation_last_error}
+              </Text>
             </View>
-          ))}
-        </View>
-
-        {item.content_text ? (
-          <Text
-            style={styles.bodyText}
-            numberOfLines={showExpandedDetails ? undefined : 3}
-          >
-            {item.content_text}
-          </Text>
-        ) : null}
-
-        {item.asset_url ? (
-          <Image
-            source={{ uri: item.asset_url }}
-            resizeMode="cover"
-            style={styles.previewImage}
-            testID={`admin-social-image-${item.content_id}`}
-          />
-        ) : null}
-
-        <View style={styles.signalsRow}>
-          <SignalChip
-            icon="flag"
-            label={t('social.admin.meta.reports_compact', { count: item.open_reports })}
-          />
-          <SignalChip
-            icon="users"
-            label={t('social.admin.meta.unique_reporters_compact', {
-              count: item.unique_reporters_24h,
-            })}
-          />
-          {item.content_type === 'post' ? (
-            <SignalChip
-              icon="eye"
-              label={t('social.admin.meta.unique_views_compact', {
-                count: item.unique_viewer_count,
-              })}
-            />
           ) : null}
-        </View>
 
-        {item.reason_codes.length > 0 ? (
-          <View style={styles.reasonWrap}>
-            {item.reason_codes.map((reasonCode) => (
-              <View key={`${item.content_id}-${reasonCode}`} style={styles.reasonChip}>
-                <Text style={styles.reasonChipLabel}>
-                  {t(`social.report.reasons.${reasonCode}`)}
+          <View style={stylesMemo.decisionZone}>
+            <SocialIdentityRow
+              username={item.author_username}
+              meta={createdLabel}
+              avatarSize={38}
+              trailing={(
+                <StateBadge
+                  label={stateLabel}
+                  backgroundColor={tone.summarySurface}
+                  borderColor={tone.summaryBorder}
+                  textColor={tone.accentSoft}
+                />
+              )}
+              testID={`admin-social-identity-${item.content_id}`}
+            />
+
+            <View style={stylesMemo.badgesRow}>
+              <TypeChip
+                label={t(`social.admin.types.${item.content_type}`)}
+                backgroundColor={tone.accentSurface}
+                borderColor={tone.accentBorder}
+                textColor={tone.accentSoft}
+              />
+              {item.category ? <SocialCategoryPill category={item.category} compact /> : null}
+              {item.author_active_bans.map((ban, index) => (
+                <View key={`${ban.scope}-${index}`} style={stylesMemo.banBadge}>
+                  <ShieldAlert color={chrome.dangerAccent} size={12} />
+                  <Text style={stylesMemo.banBadgeLabel}>{ban.scope}</Text>
+                </View>
+              ))}
+            </View>
+
+            <View style={stylesMemo.actionsRow}>
+              {primaryActions.map((actionDefinition) => {
+                const actionPalette = resolveAdminActionSurface(
+                  actionDefinition.tone,
+                  tone,
+                  chrome,
+                );
+
+                return (
+                  <View
+                    key={`${item.content_id}-${actionDefinition.action}`}
+                    style={
+                      actionDefinition.action === 'approve' && isSelectionAvailable
+                        ? stylesMemo.approvalGroup
+                        : null
+                    }
+                  >
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      disabled={actionDisabled}
+                      onPress={() =>
+                        onModerationActionPress(item, actionDefinition.action)
+                      }
+                      style={[
+                        stylesMemo.actionButton,
+                        {
+                          backgroundColor: actionPalette.backgroundColor,
+                          borderColor: actionPalette.borderColor,
+                        },
+                        actionDisabled ? stylesMemo.actionButtonDisabled : null,
+                      ]}
+                      testID={`admin-social-action-${actionDefinition.action}-${item.content_id}`}
+                    >
+                      <Text
+                        style={[
+                          styles.actionButtonLabel,
+                          { color: actionPalette.textColor },
+                        ]}
+                      >
+                        {t(actionDefinition.labelKey)}
+                      </Text>
+                    </TouchableOpacity>
+
+                    {actionDefinition.action === 'approve' && isSelectionAvailable ? (
+                      <TouchableOpacity
+                        accessibilityRole="checkbox"
+                        accessibilityState={{
+                          checked: isSelected,
+                          disabled: selectionDisabled,
+                        }}
+                        accessibilityLabel={t('social.admin.bulk.selected_count', {
+                          count: isSelected ? 1 : 0,
+                        })}
+                        disabled={selectionDisabled}
+                        onPress={() => onToggleSelection(item.content_id)}
+                        style={[
+                          stylesMemo.selectionCheckbox,
+                          isSelected ? stylesMemo.selectionCheckboxSelected : null,
+                          selectionDisabled ? stylesMemo.actionButtonDisabled : null,
+                        ]}
+                        testID={`admin-social-select-${item.content_id}`}
+                      >
+                        {isSelected ? (
+                          <Check color={chrome.textOnAccent} size={16} strokeWidth={2.6} />
+                        ) : null}
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                );
+              })}
+
+              {overflowActions.length > 0 ? (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={t('social.admin.actions.more')}
+                  disabled={actionDisabled}
+                  onPress={() => onOverflowPress(item)}
+                  style={[
+                    stylesMemo.moreButton,
+                    actionDisabled ? stylesMemo.actionButtonDisabled : null,
+                  ]}
+                  testID={`admin-social-overflow-${item.content_id}`}
+                >
+                  <Ellipsis color={chrome.textSecondary} size={18} />
+                  <Text style={stylesMemo.moreButtonLabel}>
+                    {t('social.admin.actions.more')}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            {isPendingTarget && pendingActionKey ? (
+              <View
+                style={stylesMemo.pendingCard}
+                testID={`admin-social-pending-${item.content_id}`}
+              >
+                <ActivityIndicator color={chrome.trustAccent} size="small" />
+                <Text style={stylesMemo.pendingCardLabel}>
+                  {t('social.admin.pending_action', {
+                    action: t(`social.admin.actions.${pendingActionKey}`),
+                  })}
                 </Text>
               </View>
-            ))}
+            ) : null}
           </View>
-        ) : null}
 
-        {isPendingTarget && pendingActionKey ? (
-          <View
-            style={styles.pendingCard}
-            testID={`admin-social-pending-${item.content_id}`}
-          >
-            <ActivityIndicator color={colors.primary} size="small" />
-            <Text style={styles.pendingCardLabel}>
-              {t('social.admin.pending_action', {
-                action: t(`social.admin.actions.${pendingActionKey}`),
-              })}
-            </Text>
-          </View>
-        ) : null}
-
-        <View style={styles.actionsRow}>
-          {primaryActions.map((actionDefinition) => (
-            <TouchableOpacity
-              key={`${item.content_id}-${actionDefinition.action}`}
-              accessibilityRole="button"
-              disabled={actionDisabled}
-              onPress={() => onModerationActionPress(item, actionDefinition.action)}
-              style={[
-                styles.actionButton,
-                actionDefinition.tone === 'primary'
-                  ? styles.actionButtonPrimary
-                  : actionDefinition.tone === 'danger'
-                    ? styles.actionButtonDanger
-                    : styles.actionButtonNeutral,
-                actionDisabled ? styles.actionButtonDisabled : null,
-              ]}
-              testID={`admin-social-action-${actionDefinition.action}-${item.content_id}`}
-            >
+          <View style={stylesMemo.proofSection}>
+            {item.content_text ? (
               <Text
-                style={[
-                  styles.actionButtonLabel,
-                  actionDefinition.tone === 'primary'
-                    ? styles.actionButtonLabelPrimary
-                    : actionDefinition.tone === 'danger'
-                      ? styles.actionButtonLabelDanger
-                      : styles.actionButtonLabelNeutral,
-                ]}
+                style={stylesMemo.bodyText}
+                numberOfLines={isExpanded ? undefined : 4}
               >
-                {t(actionDefinition.labelKey)}
+                {item.content_text}
               </Text>
-            </TouchableOpacity>
-          ))}
+            ) : null}
 
-          {overflowActions.length > 0 ? (
+            {item.asset_url ? (
+              <Image
+                source={{ uri: item.asset_url }}
+                resizeMode="cover"
+                style={stylesMemo.previewImage}
+                testID={`admin-social-image-${item.content_id}`}
+              />
+            ) : null}
+
+            {item.reason_codes.length > 0 ? (
+              <View style={stylesMemo.reasonWrap}>
+                {item.reason_codes.map((reasonCode) => (
+                  <View
+                    key={`${item.content_id}-${reasonCode}`}
+                    style={stylesMemo.reasonChip}
+                  >
+                    <Text style={stylesMemo.reasonChipLabel}>
+                      {t(`social.report.reasons.${reasonCode}`)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+          </View>
+
+          <View style={stylesMemo.contextZone}>
+            <View style={stylesMemo.signalsRow}>
+              <SignalChip
+                icon="flag"
+                label={t('social.admin.meta.reports_compact', {
+                  count: item.open_reports,
+                })}
+                chrome={chrome}
+                iconColor={tone.accentSoft}
+              />
+              <SignalChip
+                icon="users"
+                label={t('social.admin.meta.unique_reporters_compact', {
+                  count: item.unique_reporters_24h,
+                })}
+                chrome={chrome}
+                iconColor={chrome.trustAccent}
+              />
+              {item.content_type === 'post' ? (
+                <SignalChip
+                  icon="eye"
+                  label={t('social.admin.meta.unique_views_compact', {
+                    count: item.unique_viewer_count,
+                  })}
+                  chrome={chrome}
+                  iconColor={chrome.textMuted}
+                />
+              ) : null}
+            </View>
+
             <TouchableOpacity
               accessibilityRole="button"
-              disabled={actionDisabled}
-              onPress={() => onOverflowPress(item)}
-              style={[
-                styles.moreButton,
-                actionDisabled ? styles.actionButtonDisabled : null,
-              ]}
-              testID={`admin-social-overflow-${item.content_id}`}
+              onPress={() => onToggleDetails(item.content_id)}
+              style={stylesMemo.detailsToggle}
+              testID={`admin-social-details-toggle-${item.content_id}`}
             >
-              <Ellipsis color={colors.primaryText} size={18} />
-              <Text style={styles.moreButtonLabel}>
-                {t('social.admin.actions.more')}
+              <Text style={stylesMemo.detailsToggleLabel}>
+                {t(
+                  isExpanded
+                    ? 'social.admin.details.hide'
+                    : 'social.admin.details.show',
+                )}
               </Text>
+              {isExpanded ? (
+                <ChevronUp color={chrome.textMuted} size={16} />
+              ) : (
+                <ChevronDown color={chrome.textMuted} size={16} />
+              )}
             </TouchableOpacity>
+          </View>
+
+          {isExpanded ? (
+            <View
+              style={stylesMemo.detailsCard}
+              testID={`admin-social-details-${item.content_id}`}
+            >
+              <Text style={stylesMemo.detailLine}>
+                {t('social.admin.meta.created_at')}: {createdLabel ?? '-'}
+              </Text>
+              <Text style={stylesMemo.detailLine}>
+                {t('social.admin.meta.reported_24h', {
+                  count: item.total_reports_24h,
+                })}
+              </Text>
+              <Text style={stylesMemo.detailLine}>
+                {t('social.admin.meta.unique_reporters', {
+                  count: item.unique_reporters_24h,
+                })}
+              </Text>
+              {item.content_type === 'post' ? (
+                <Text style={stylesMemo.detailLine}>
+                  {t('social.admin.meta.unique_views', {
+                    count: item.unique_viewer_count,
+                  })}
+                </Text>
+              ) : null}
+              {item.content_type === 'post' ? (
+                <Text style={stylesMemo.detailLine}>
+                  {t('social.admin.meta.likes_snapshot', {
+                    raw: item.raw_like_count,
+                    effective: item.effective_like_count,
+                  })}
+                </Text>
+              ) : null}
+              {item.content_type === 'post' ? (
+                <Text style={stylesMemo.detailLine}>
+                  {t('social.admin.meta.dislikes_snapshot', {
+                    raw: item.raw_dislike_count,
+                    effective: item.effective_dislike_count,
+                  })}
+                </Text>
+              ) : null}
+              {item.content_type === 'post' ? (
+                <Text style={stylesMemo.detailLine}>
+                  {t('social.admin.meta.admin_adjustments', {
+                    likes: item.admin_like_adjustment,
+                    dislikes: item.admin_dislike_adjustment,
+                  })}
+                </Text>
+              ) : null}
+              {reportedAtLabel ? (
+                <Text style={stylesMemo.detailLine}>
+                  {t('social.admin.meta.last_reported_at')}: {reportedAtLabel}
+                </Text>
+              ) : null}
+              {completedAtLabel ? (
+                <Text style={stylesMemo.detailLine}>
+                  {t('social.admin.meta.completed_at')}: {completedAtLabel}
+                </Text>
+              ) : null}
+              {item.moderation_reason ? (
+                <Text style={stylesMemo.detailLine}>
+                  {t('social.admin.meta.reason')}: {item.moderation_reason}
+                </Text>
+              ) : null}
+              {item.moderation_provider ? (
+                <Text style={stylesMemo.detailLine}>
+                  {t('social.admin.meta.provider')}: {item.moderation_provider}
+                </Text>
+              ) : null}
+              {item.moderation_last_error ? (
+                <Text style={stylesMemo.detailLineError}>
+                  {t('social.admin.meta.last_error')}: {item.moderation_last_error}
+                </Text>
+              ) : null}
+            </View>
           ) : null}
         </View>
-
-        <TouchableOpacity
-          accessibilityRole="button"
-          onPress={() => onToggleDetails(item.content_id)}
-          style={styles.detailsToggle}
-          testID={`admin-social-details-toggle-${item.content_id}`}
-        >
-          <Text style={styles.detailsToggleLabel}>
-            {t(
-              showExpandedDetails
-                ? 'social.admin.details.hide'
-                : 'social.admin.details.show',
-            )}
-          </Text>
-          {showExpandedDetails ? (
-            <ChevronUp color={colors.gray} size={16} />
-          ) : (
-            <ChevronDown color={colors.gray} size={16} />
-          )}
-        </TouchableOpacity>
-
-        {showExpandedDetails ? (
-          <View
-            style={styles.detailsCard}
-            testID={`admin-social-details-${item.content_id}`}
-          >
-            <Text style={styles.detailLine}>
-              {t('social.admin.meta.created_at')}: {createdLabel ?? '-'}
-            </Text>
-            <Text style={styles.detailLine}>
-              {t('social.admin.meta.reported_24h', {
-                count: item.total_reports_24h,
-              })}
-            </Text>
-            <Text style={styles.detailLine}>
-              {t('social.admin.meta.unique_reporters', {
-                count: item.unique_reporters_24h,
-              })}
-            </Text>
-            {item.content_type === 'post' ? (
-              <Text style={styles.detailLine}>
-                {t('social.admin.meta.unique_views', {
-                  count: item.unique_viewer_count,
-                })}
-              </Text>
-            ) : null}
-            {item.content_type === 'post' ? (
-              <Text style={styles.detailLine}>
-                {t('social.admin.meta.likes_snapshot', {
-                  raw: item.raw_like_count,
-                  effective: item.effective_like_count,
-                })}
-              </Text>
-            ) : null}
-            {item.content_type === 'post' ? (
-              <Text style={styles.detailLine}>
-                {t('social.admin.meta.dislikes_snapshot', {
-                  raw: item.raw_dislike_count,
-                  effective: item.effective_dislike_count,
-                })}
-              </Text>
-            ) : null}
-            {item.content_type === 'post' ? (
-              <Text style={styles.detailLine}>
-                {t('social.admin.meta.admin_adjustments', {
-                  likes: item.admin_like_adjustment,
-                  dislikes: item.admin_dislike_adjustment,
-                })}
-              </Text>
-            ) : null}
-            {reportedAtLabel ? (
-              <Text style={styles.detailLine}>
-                {t('social.admin.meta.last_reported_at')}: {reportedAtLabel}
-              </Text>
-            ) : null}
-            {completedAtLabel ? (
-              <Text style={styles.detailLine}>
-                {t('social.admin.meta.completed_at')}: {completedAtLabel}
-              </Text>
-            ) : null}
-            {item.moderation_reason ? (
-              <Text style={styles.detailLine}>
-                {t('social.admin.meta.reason')}: {item.moderation_reason}
-              </Text>
-            ) : null}
-            {item.moderation_provider ? (
-              <Text style={styles.detailLine}>
-                {t('social.admin.meta.provider')}: {item.moderation_provider}
-              </Text>
-            ) : null}
-            {item.moderation_last_error ? (
-              <Text style={styles.detailLineError}>
-                {t('social.admin.meta.last_error')}: {item.moderation_last_error}
-              </Text>
-            ) : null}
-          </View>
-        ) : null}
       </View>
     </View>
   );
 }
 
-const createStyles = (colors: any) =>
+const styles = StyleSheet.create({
+  typeChip: {
+    minHeight: 28,
+    paddingHorizontal: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  typeChipLabel: {
+    fontSize: 11,
+    fontWeight: FONT_WEIGHTS.semiBold,
+  },
+  stateBadge: {
+    minHeight: 28,
+    paddingHorizontal: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  stateBadgeLabel: {
+    fontSize: 11,
+    fontWeight: FONT_WEIGHTS.semiBold,
+  },
+  signalChip: {
+    minHeight: 30,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs - 1,
+    paddingHorizontal: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full,
+    borderWidth: 1,
+  },
+  signalChipLabel: {
+    fontSize: 11,
+    fontWeight: FONT_WEIGHTS.medium,
+  },
+  actionButtonLabel: {
+    fontSize: 12,
+    fontWeight: FONT_WEIGHTS.semiBold,
+  },
+  detailLine: {
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  detailLineError: {
+    fontSize: 11,
+    lineHeight: 16,
+  },
+});
+
+const createStyles = (
+  chrome: ReturnType<typeof buildAdminChromePalette>,
+  tone: ReturnType<typeof resolveAdminItemTone>,
+) =>
   StyleSheet.create({
     cardShell: {
       paddingHorizontal: SPACING.page,
       paddingVertical: SPACING.xs + 2,
     },
-    card: {
-      borderRadius: BORDER_RADIUS.xl,
-      padding: SPACING.md + 2,
-      gap: SPACING.sm + 2,
-      backgroundColor: colors.cardBackground,
+    cardHalo: {
+      position: 'absolute',
+      top: 4,
+      left: SPACING.page + 28,
+      width: 140,
+      height: 140,
+      borderRadius: 70,
+      opacity: 0.85,
+    },
+    cardFrame: {
+      overflow: 'hidden',
+      borderRadius: BORDER_RADIUS.hero,
+      backgroundColor: chrome.surface,
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
-      ...SHADOWS.card,
+      borderColor: tone.accentBorder,
+      shadowColor: chrome.shadowColor,
+      shadowOffset: { width: 0, height: 14 },
+      shadowOpacity: 0.3,
+      shadowRadius: 28,
+      elevation: 8,
+    },
+    cardRail: {
+      position: 'absolute',
+      top: 18,
+      bottom: 18,
+      left: 0,
+      width: 3,
+      borderTopRightRadius: BORDER_RADIUS.full,
+      borderBottomRightRadius: BORDER_RADIUS.full,
+    },
+    card: {
+      gap: SPACING.md,
+      padding: SPACING.md + 2,
+      backgroundColor: chrome.surface,
     },
     errorBanner: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: SPACING.xs + 2,
-      borderRadius: BORDER_RADIUS.md,
-      paddingHorizontal: SPACING.sm,
+      borderRadius: BORDER_RADIUS.lg,
+      paddingHorizontal: SPACING.sm + 2,
       paddingVertical: SPACING.xs + 2,
-      backgroundColor: withAlpha(colors.error, 0.08),
+      backgroundColor: chrome.dangerAccentSoft,
       borderWidth: 1,
-      borderColor: withAlpha(colors.error, 0.18),
+      borderColor: chrome.dangerAccentBorder,
     },
     errorBannerText: {
       flex: 1,
       fontSize: 11,
       lineHeight: 16,
-      color: colors.error,
+      color: chrome.dangerAccent,
     },
-    topRow: {
-      gap: SPACING.xs,
+    decisionZone: {
+      gap: SPACING.sm,
     },
     badgesRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: SPACING.xs,
-    },
-    typeChip: {
-      minHeight: 28,
-      paddingHorizontal: SPACING.sm,
-      borderRadius: BORDER_RADIUS.full,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: withAlpha(colors.primary, 0.12),
-    },
-    typeChipLabel: {
-      fontSize: 11,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.primary,
-    },
-    approvedBadge: {
-      minHeight: 26,
-      paddingHorizontal: SPACING.sm,
-      borderRadius: BORDER_RADIUS.full,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 1,
-      borderColor: withAlpha(colors.success, 0.24),
-      backgroundColor: withAlpha(colors.success, 0.1),
-    },
-    approvedBadgeLabel: {
-      fontSize: 11,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.success,
     },
     banBadge: {
       minHeight: 28,
@@ -470,46 +656,105 @@ const createStyles = (colors: any) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: SPACING.xs - 1,
-      backgroundColor: withAlpha(colors.error, 0.08),
+      backgroundColor: chrome.dangerAccentSoft,
       borderWidth: 1,
-      borderColor: withAlpha(colors.error, 0.18),
+      borderColor: chrome.dangerAccentBorder,
     },
     banBadgeLabel: {
       fontSize: 10,
       fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.error,
+      color: chrome.dangerAccent,
       textTransform: 'uppercase',
     },
-    bodyText: {
-      fontSize: SIZES.text14,
-      lineHeight: 20,
-      color: colors.primaryText,
-    },
-    previewImage: {
-      width: '100%',
-      height: 112,
-      borderRadius: BORDER_RADIUS.lg,
-      backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.04),
-      borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
-    },
-    signalsRow: {
+    actionsRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
+      alignItems: 'center',
+      gap: SPACING.xs + 2,
+    },
+    approvalGroup: {
+      flexDirection: 'row',
+      alignItems: 'center',
       gap: SPACING.xs,
     },
-    signalChip: {
-      minHeight: 28,
+    actionButton: {
+      minHeight: 38,
+      paddingHorizontal: SPACING.md,
+      borderRadius: BORDER_RADIUS.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+    },
+    actionButtonDisabled: {
+      opacity: 0.52,
+    },
+    selectionCheckbox: {
+      width: 38,
+      height: 38,
+      borderRadius: BORDER_RADIUS.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: tone.accentBorder,
+      backgroundColor: chrome.surfaceMuted,
+    },
+    selectionCheckboxSelected: {
+      backgroundColor: tone.accent,
+      borderColor: tone.accent,
+    },
+    moreButton: {
+      minHeight: 38,
       flexDirection: 'row',
       alignItems: 'center',
       gap: SPACING.xs - 1,
-      paddingHorizontal: SPACING.sm,
+      paddingHorizontal: SPACING.sm + 2,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: withAlpha(colors.primaryText, 0.04),
+      borderWidth: 1,
+      borderColor: chrome.borderSubtle,
+      backgroundColor: chrome.surfaceMuted,
     },
-    signalChipLabel: {
+    moreButtonLabel: {
       fontSize: 11,
-      color: colors.primaryText,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      color: chrome.textMuted,
+    },
+    pendingCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.xs + 2,
+      borderRadius: BORDER_RADIUS.lg,
+      paddingHorizontal: SPACING.sm + 2,
+      paddingVertical: SPACING.xs + 2,
+      backgroundColor: chrome.trustAccentSoft,
+      borderWidth: 1,
+      borderColor: chrome.trustAccentBorder,
+    },
+    pendingCardLabel: {
+      flex: 1,
+      fontSize: 11,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      color: chrome.trustAccent,
+    },
+    proofSection: {
+      gap: SPACING.sm,
+      borderRadius: BORDER_RADIUS.xl,
+      padding: SPACING.sm + 2,
+      backgroundColor: tone.proofSurface,
+      borderWidth: 1,
+      borderColor: tone.proofBorder,
+    },
+    bodyText: {
+      fontSize: SIZES.text14,
+      lineHeight: 21,
+      color: chrome.textPrimary,
+    },
+    previewImage: {
+      width: '100%',
+      height: 146,
+      borderRadius: BORDER_RADIUS.xl,
+      backgroundColor: chrome.surfaceStrong,
+      borderWidth: 1,
+      borderColor: chrome.borderSubtle,
     },
     reasonWrap: {
       flexDirection: 'row',
@@ -518,118 +763,54 @@ const createStyles = (colors: any) =>
     },
     reasonChip: {
       paddingHorizontal: SPACING.sm,
-      paddingVertical: 3,
+      paddingVertical: 4,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: withAlpha(colors.warning, 0.14),
+      backgroundColor: tone.summarySurface,
+      borderWidth: 1,
+      borderColor: tone.summaryBorder,
     },
     reasonChipLabel: {
       fontSize: 10,
       fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.warning,
+      color: tone.accentSoft,
     },
-    pendingCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: SPACING.xs + 2,
-      borderRadius: BORDER_RADIUS.md,
-      paddingHorizontal: SPACING.sm,
-      paddingVertical: SPACING.xs + 2,
-      backgroundColor: withAlpha(colors.primary, 0.08),
-      borderWidth: 1,
-      borderColor: withAlpha(colors.primary, 0.18),
+    contextZone: {
+      gap: SPACING.sm,
     },
-    pendingCardLabel: {
-      flex: 1,
-      fontSize: 11,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.primary,
-    },
-    actionsRow: {
+    signalsRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: SPACING.xs + 2,
-    },
-    actionButton: {
-      minHeight: 36,
-      paddingHorizontal: SPACING.sm + 2,
-      borderRadius: BORDER_RADIUS.full,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 1,
-    },
-    actionButtonPrimary: {
-      backgroundColor: withAlpha(colors.primary, 0.12),
-      borderColor: withAlpha(colors.primary, 0.22),
-    },
-    actionButtonDanger: {
-      backgroundColor: withAlpha(colors.error, 0.08),
-      borderColor: withAlpha(colors.error, 0.18),
-    },
-    actionButtonNeutral: {
-      backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.04),
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
-    },
-    actionButtonDisabled: {
-      opacity: 0.5,
-    },
-    actionButtonLabel: {
-      fontSize: 12,
-      fontWeight: FONT_WEIGHTS.semiBold,
-    },
-    actionButtonLabelPrimary: {
-      color: colors.primary,
-    },
-    actionButtonLabelDanger: {
-      color: colors.error,
-    },
-    actionButtonLabelNeutral: {
-      color: colors.primaryText,
-    },
-    moreButton: {
-      minHeight: 36,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: SPACING.xs - 1,
-      paddingHorizontal: SPACING.sm + 2,
-      borderRadius: BORDER_RADIUS.full,
-      borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
-      backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.03),
-    },
-    moreButtonLabel: {
-      fontSize: 12,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.primaryText,
+      gap: SPACING.xs,
     },
     detailsToggle: {
-      minHeight: 34,
+      minHeight: 36,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       paddingHorizontal: SPACING.xs,
+      borderRadius: BORDER_RADIUS.full,
+      backgroundColor: tone.subtleSurface,
+      borderWidth: 1,
+      borderColor: tone.subtleBorder,
     },
     detailsToggleLabel: {
       fontSize: 11,
       fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.textMuted ?? colors.gray,
+      color: chrome.textSecondary,
     },
     detailsCard: {
-      borderRadius: BORDER_RADIUS.md,
+      borderRadius: BORDER_RADIUS.lg,
       padding: SPACING.sm + 2,
       gap: SPACING.xs,
-      backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.03),
+      backgroundColor: chrome.surfaceMuted,
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.06),
+      borderColor: chrome.borderSubtle,
     },
     detailLine: {
-      fontSize: 11,
-      lineHeight: 16,
-      color: colors.textMuted ?? colors.gray,
+      color: chrome.textSecondary,
     },
     detailLineError: {
-      fontSize: 11,
-      lineHeight: 16,
-      color: colors.error,
+      color: chrome.dangerAccent,
     },
   });
 

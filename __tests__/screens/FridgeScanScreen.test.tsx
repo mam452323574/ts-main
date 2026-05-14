@@ -58,6 +58,27 @@ let mockTheme = {
   isDark: false,
 };
 
+function createFridgeScanApiError(options: {
+  message: string;
+  type: ConstructorParameters<typeof ApiError>[1];
+  code?: string;
+  status?: number;
+  requestId?: string;
+  context?: Record<string, unknown>;
+  originalError?: unknown;
+}) {
+  const error = new ApiError(
+    options.message,
+    options.type,
+    options.originalError,
+    options.context,
+  );
+  error.code = options.code;
+  error.status = options.status;
+  error.requestId = options.requestId;
+  return error;
+}
+
 jest.mock('expo-camera', () => ({
   CameraView: (() => {
     const ReactLocal = require('react');
@@ -87,6 +108,9 @@ jest.mock('expo-camera', () => ({
 }));
 
 jest.mock('expo-image-picker', () => ({
+  UIImagePickerPreferredAssetRepresentationMode: {
+    Compatible: 'compatible',
+  },
   launchImageLibraryAsync: (...args: any[]) => mockLaunchImageLibraryAsync(...args),
 }));
 
@@ -175,6 +199,14 @@ const translations: Record<string, string> = {
   'fridge_scan.paywall_bullet_limit': 'Up to 5 Chef requests per day',
   'fridge_scan.limit_reached_title': 'Chef quota reached',
   'fridge_scan.limit_reached_fallback': 'Your Chef quota is reached for now.',
+  'fridge_scan.submission_auth_error':
+    'Your session expired before Chef could send the request. Sign in again and retry.',
+  'fridge_scan.submission_network_error':
+    'Chef could not reach the server. Check your connection and try again.',
+  'fridge_scan.submission_image_error':
+    'Chef could not prepare this photo. Retake it and try again.',
+  'fridge_scan.submission_service_error':
+    'Chef could not accept the request right now. Try again in a moment.',
   'fridge_scan.submission_error': 'The Chef request could not be sent right now.',
   'fridge_scan.capture_error': 'The photo could not be captured right now.',
   'fridge_scan.gallery_error': 'The gallery image could not be loaded right now.',
@@ -278,6 +310,8 @@ const useWindowDimensionsSpy = jest.spyOn(
 );
 
 describe('FridgeScanScreen', () => {
+  let consoleErrorSpy: jest.SpyInstance;
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockTheme = {
@@ -314,10 +348,38 @@ describe('FridgeScanScreen', () => {
     mockUseCameraPermissions.mockReturnValue([{ granted: true, canAskAgain: true }, jest.fn()]);
     mockLaunchImageLibraryAsync.mockResolvedValue({
       canceled: false,
-      assets: [{ uri: 'file:///gallery-fridge.jpg' }],
+      assets: [
+        {
+          uri: 'file:///gallery-fridge.jpg',
+          base64: 'GALLERY_FALLBACK_BASE64',
+          width: 1000,
+          height: 800,
+        },
+      ],
     });
     mockCanGoBack.mockReturnValue(true);
+    consoleErrorSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
   });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
+  });
+
+  async function captureToReview() {
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('fridge-scan-capture-button'));
+      await Promise.resolve();
+    });
+  }
+
+  async function submitReview() {
+    await act(async () => {
+      fireEvent.press(screen.getByText('Ask the chef'));
+      await Promise.resolve();
+    });
+  }
 
   it('shows the loading spinner while the camera permission state is unresolved', () => {
     mockUseCameraPermissions.mockReturnValue([undefined, jest.fn()]);
@@ -465,7 +527,13 @@ describe('FridgeScanScreen', () => {
     });
 
     await waitFor(() => {
-      expect(mockLaunchImageLibraryAsync).toHaveBeenCalledTimes(1);
+      expect(mockLaunchImageLibraryAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mediaTypes: ['images'],
+          quality: 0.85,
+          base64: true,
+        }),
+      );
     });
 
     expect(screen.getByTestId('fridge-scan-feedback-card')).toBeTruthy();
@@ -474,6 +542,28 @@ describe('FridgeScanScreen', () => {
     expect(screen.getByText('Gallery import')).toBeTruthy();
     expect(mockPush).not.toHaveBeenCalled();
     expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('requests the iOS compatible gallery representation when available', async () => {
+    Object.defineProperty(Platform, 'OS', {
+      value: 'ios',
+      configurable: true,
+    });
+
+    render(<FridgeScanScreen />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('fridge-scan-gallery-button'));
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(mockLaunchImageLibraryAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          preferredAssetRepresentationMode: 'compatible',
+        }),
+      );
+    });
   });
 
   it('renders the review sheet with light chef surfaces in light mode', async () => {
@@ -597,6 +687,36 @@ describe('FridgeScanScreen', () => {
           imageUri: 'file:///captured-fridge.jpg',
           source: 'camera',
           selectedMode: 'muscle_gain',
+        }),
+      );
+    });
+  });
+
+  it('passes the gallery pre-encoded fallback to the fridge scan service', async () => {
+    render(<FridgeScanScreen />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('fridge-scan-gallery-button'));
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      fireEvent.press(screen.getByText('Ask the chef'));
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(mockSubmitFridgeScanCapture).toHaveBeenCalledWith(
+        expect.objectContaining({
+          imageUri: 'file:///gallery-fridge.jpg',
+          source: 'gallery',
+          selectedMode: 'diet',
+          preEncodedJpeg: {
+            base64: 'GALLERY_FALLBACK_BASE64',
+            width: 1000,
+            height: 800,
+            source: 'gallery',
+          },
         }),
       );
     });
@@ -751,6 +871,157 @@ describe('FridgeScanScreen', () => {
     } finally {
       dateNowSpy.mockRestore();
     }
+  });
+
+  it('shows a dedicated alert when local image normalization fails before the function call', async () => {
+    mockSubmitFridgeScanCapture.mockRejectedValueOnce(
+      createFridgeScanApiError({
+        message: 'Unable to normalize fridge scan image',
+        type: 'VALIDATION',
+        code: 'fridge_scan_image_normalization_failed',
+        context: {
+          stage: 'image_normalization',
+        },
+      }),
+    );
+
+    render(<FridgeScanScreen />);
+
+    await captureToReview();
+    await submitReview();
+
+    await waitFor(() => {
+      expect(mockShowAlert).toHaveBeenCalledWith(
+        'Error',
+        'Chef could not prepare this photo. Retake it and try again.',
+        undefined,
+        undefined,
+        { variant: 'warning' },
+      );
+    });
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[FridgeScanScreen] Fridge scan image processing failed',
+      expect.objectContaining({
+        failure_bucket: 'image_normalization',
+        code: 'fridge_scan_image_normalization_failed',
+      }),
+    );
+  });
+
+  it('shows a dedicated alert when the Chef request is blocked by an expired session', async () => {
+    mockSubmitFridgeScanCapture.mockRejectedValueOnce(
+      createFridgeScanApiError({
+        message: 'api_errors.unauthorized',
+        type: 'AUTH',
+        code: 'auth_session_missing',
+        status: 401,
+        context: {
+          functionName: 'fridge-scan-submit',
+        },
+      }),
+    );
+
+    render(<FridgeScanScreen />);
+
+    await captureToReview();
+    await submitReview();
+
+    await waitFor(() => {
+      expect(mockShowAlert).toHaveBeenCalledWith(
+        'Error',
+        'Your session expired before Chef could send the request. Sign in again and retry.',
+        undefined,
+        undefined,
+        { variant: 'warning' },
+      );
+    });
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[FridgeScanScreen] Fridge scan submission blocked by auth',
+      expect.objectContaining({
+        failure_bucket: 'auth',
+        code: 'auth_session_missing',
+        status: 401,
+      }),
+    );
+  });
+
+  it('shows a network-specific alert when Chef cannot reach the submit function', async () => {
+    mockSubmitFridgeScanCapture.mockRejectedValueOnce(
+      createFridgeScanApiError({
+        message: 'Network request failed',
+        type: 'NETWORK',
+        code: 'edge_function_network_error',
+        context: {
+          functionName: 'fridge-scan-submit',
+        },
+        originalError: new TypeError('fetch failed'),
+      }),
+    );
+
+    render(<FridgeScanScreen />);
+
+    await captureToReview();
+    await submitReview();
+
+    await waitFor(() => {
+      expect(mockShowAlert).toHaveBeenCalledWith(
+        'Error',
+        'Chef could not reach the server. Check your connection and try again.',
+        undefined,
+        undefined,
+        { variant: 'warning' },
+      );
+    });
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[FridgeScanScreen] Fridge scan submission network failure',
+      expect.objectContaining({
+        failure_bucket: 'network',
+        code: 'edge_function_network_error',
+      }),
+    );
+  });
+
+  it('shows a server-specific alert when the submit edge function rejects the request', async () => {
+    mockSubmitFridgeScanCapture.mockRejectedValueOnce(
+      createFridgeScanApiError({
+        message: 'fridge-scan-submit failed',
+        type: 'EDGE_FUNCTION',
+        code: 'edge_function_route_missing',
+        status: 404,
+        requestId: 'req-404',
+        context: {
+          functionName: 'fridge-scan-submit',
+        },
+      }),
+    );
+
+    render(<FridgeScanScreen />);
+
+    await captureToReview();
+    await submitReview();
+
+    await waitFor(() => {
+      expect(mockShowAlert).toHaveBeenCalledWith(
+        'Error',
+        'Chef could not accept the request right now. Try again in a moment.',
+        undefined,
+        undefined,
+        { variant: 'warning' },
+      );
+    });
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[FridgeScanScreen] Fridge scan submission server failure',
+      expect.objectContaining({
+        failure_bucket: 'edge_function',
+        code: 'edge_function_route_missing',
+        request_id: 'req-404',
+        status: 404,
+      }),
+    );
   });
 
   it('uses router.back when history is available', () => {

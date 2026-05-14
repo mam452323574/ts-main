@@ -11,7 +11,6 @@ import {
 import {
   BORDER_RADIUS,
   FONT_WEIGHTS,
-  SHADOWS,
   SIZES,
   SPACING,
   withAlpha,
@@ -21,6 +20,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import type { SocialAdminModerationItem } from '@/types';
 
 import type { AdminOverflowActionDefinition } from './adminModerationUtils';
+import { buildAdminChromePalette } from './adminModerationTheme';
 
 interface AdminOverflowMenuProps {
   item: SocialAdminModerationItem | null;
@@ -37,7 +37,11 @@ export function AdminOverflowMenu({
 }: AdminOverflowMenuProps) {
   const { colors } = useTheme();
   const { t } = useLanguage();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const chrome = useMemo(
+    () => buildAdminChromePalette(colors, 'needs_review'),
+    [colors],
+  );
+  const styles = useMemo(() => createStyles(chrome), [chrome]);
 
   return (
     <Modal
@@ -53,12 +57,14 @@ export function AdminOverflowMenu({
           testID="admin-social-overflow-modal"
         >
           <View style={styles.handle} />
-          <Text style={styles.title}>{t('social.admin.menu.title')}</Text>
-          {item ? (
-            <Text style={styles.subtitle}>
-              {item.author_username ?? t('common.unknown_user')}
-            </Text>
-          ) : null}
+          <View style={styles.headerCopy}>
+            <Text style={styles.eyebrow}>{t('social.admin.menu.title')}</Text>
+            {item ? (
+              <Text style={styles.subtitle}>
+                {item.author_username ?? t('common.unknown_user')}
+              </Text>
+            ) : null}
+          </View>
 
           <View style={styles.actions}>
             {item
@@ -67,7 +73,10 @@ export function AdminOverflowMenu({
                     key={`${item.content_id}-${action.key}`}
                     accessibilityRole="button"
                     onPress={() => onActionPress(action)}
-                    style={styles.actionRow}
+                    style={[
+                      styles.actionRow,
+                      action.tone === 'danger' ? styles.actionRowDanger : null,
+                    ]}
                     testID={`admin-social-overflow-action-${action.key}-${item.content_id}`}
                   >
                     <Text
@@ -97,70 +106,90 @@ export function AdminOverflowMenu({
   );
 }
 
-const createStyles = (colors: any) =>
+const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
   StyleSheet.create({
     backdrop: {
       flex: 1,
       justifyContent: 'flex-end',
-      backgroundColor: withAlpha(colors.primaryText, 0.32),
+      backgroundColor: withAlpha(chrome.screenBackground, 0.72),
     },
     sheet: {
-      borderTopLeftRadius: BORDER_RADIUS.xl,
-      borderTopRightRadius: BORDER_RADIUS.xl,
-      backgroundColor: colors.cardBackground,
+      borderTopLeftRadius: BORDER_RADIUS.hero,
+      borderTopRightRadius: BORDER_RADIUS.hero,
+      backgroundColor: chrome.surfaceRaised,
+      borderWidth: 1,
+      borderColor: chrome.borderSubtle,
       paddingHorizontal: SPACING.lg,
       paddingTop: SPACING.sm,
-      paddingBottom: SPACING.xl,
+      paddingBottom: SPACING.xl + 2,
       gap: SPACING.md,
-      ...SHADOWS.card,
+      shadowColor: chrome.shadowColor,
+      shadowOffset: { width: 0, height: -10 },
+      shadowOpacity: 0.34,
+      shadowRadius: 22,
+      elevation: 10,
     },
     handle: {
       alignSelf: 'center',
       width: 44,
       height: 5,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: withAlpha(colors.primaryText, 0.12),
+      backgroundColor: chrome.handle,
     },
-    title: {
-      fontSize: SIZES.text16,
+    headerCopy: {
+      gap: SPACING.xs,
+    },
+    eyebrow: {
+      fontSize: SIZES.text12,
       fontWeight: FONT_WEIGHTS.bold,
-      color: colors.primaryText,
+      letterSpacing: 1.2,
+      textTransform: 'uppercase',
+      color: chrome.trustAccent,
       textAlign: 'center',
     },
     subtitle: {
-      fontSize: SIZES.text12,
-      color: colors.gray,
+      fontSize: SIZES.text16,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      color: chrome.textPrimary,
       textAlign: 'center',
     },
     actions: {
-      gap: SPACING.xs,
+      gap: SPACING.xs + 2,
     },
     actionRow: {
-      minHeight: 52,
-      borderRadius: BORDER_RADIUS.lg,
+      minHeight: 54,
+      borderRadius: BORDER_RADIUS.xl,
       paddingHorizontal: SPACING.md,
       justifyContent: 'center',
-      backgroundColor: withAlpha(colors.primaryText, 0.03),
+      backgroundColor: chrome.surfaceMuted,
+      borderWidth: 1,
+      borderColor: chrome.borderSubtle,
+    },
+    actionRowDanger: {
+      backgroundColor: chrome.dangerAccentSoft,
+      borderColor: chrome.dangerAccentBorder,
     },
     actionLabel: {
       fontSize: SIZES.text14,
       fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.primaryText,
+      color: chrome.textPrimary,
     },
     actionLabelDanger: {
-      color: colors.error,
+      color: chrome.dangerAccent,
     },
     cancelButton: {
-      minHeight: 48,
+      minHeight: 50,
       borderRadius: BORDER_RADIUS.full,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: withAlpha(colors.primaryText, 0.06),
+      backgroundColor: withAlpha(chrome.textPrimary, 0.05),
+      borderWidth: 1,
+      borderColor: chrome.borderSubtle,
     },
     cancelLabel: {
       fontSize: SIZES.text14,
       fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.primaryText,
+      color: chrome.textSecondary,
     },
   });
 

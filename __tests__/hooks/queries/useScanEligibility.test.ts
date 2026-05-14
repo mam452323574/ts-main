@@ -14,6 +14,7 @@ jest.mock('@/services/api', () => {
     ...actual,
     ApiService: {
       checkScanEligibilityOnly: jest.fn(),
+      checkScanEligibilityBatch: jest.fn(),
     },
   };
 });
@@ -123,7 +124,15 @@ describe('useAllScanEligibility', () => {
       limit: 3,
       message: 'Scan allowed',
     };
-    (ApiService.checkScanEligibilityOnly as jest.Mock).mockResolvedValue(mockData);
+    (ApiService.checkScanEligibilityBatch as jest.Mock).mockResolvedValue({
+      data: {
+        body: mockData,
+        health: mockData,
+        nutrition: mockData,
+        super: mockData,
+      },
+      errors: {},
+    });
 
     const { result } = renderHook(() => useAllScanEligibility(), {
       wrapper: createWrapper(),
@@ -133,7 +142,13 @@ describe('useAllScanEligibility', () => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    expect(ApiService.checkScanEligibilityOnly).toHaveBeenCalledTimes(4);
+    expect(ApiService.checkScanEligibilityBatch).toHaveBeenCalledWith([
+      'body',
+      'health',
+      'nutrition',
+      'super',
+    ]);
+    expect(ApiService.checkScanEligibilityOnly).not.toHaveBeenCalled();
     expect(result.current.data.health).toEqual(mockData);
     expect(result.current.hasConnectivityError).toBe(false);
     expect(result.current.hasBlockingEligibilityError).toBe(false);
@@ -147,7 +162,15 @@ describe('useAllScanEligibility', () => {
       limit: 3,
       message: 'Scan allowed',
     };
-    (ApiService.checkScanEligibilityOnly as jest.Mock).mockResolvedValue(mockData);
+    (ApiService.checkScanEligibilityBatch as jest.Mock).mockResolvedValue({
+      data: {
+        body: mockData,
+        health: mockData,
+        nutrition: mockData,
+        super: mockData,
+      },
+      errors: {},
+    });
 
     const { result, rerender } = renderHook(() => useAllScanEligibility(), {
       wrapper: createWrapper(),
@@ -173,21 +196,34 @@ describe('useAllScanEligibility', () => {
   });
 
   it('keeps successful scan types populated when one query fails', async () => {
-    (ApiService.checkScanEligibilityOnly as jest.Mock).mockImplementation(
-      async (scanType: string) => {
-        if (scanType === 'nutrition') {
-          throw new ApiError('schema mismatch', 'DATABASE');
-        }
-
-        return {
+    (ApiService.checkScanEligibilityBatch as jest.Mock).mockResolvedValue({
+      data: {
+        body: {
           success: true,
           allowed: true,
           remaining: 1,
           limit: 1,
-          message: `${scanType} allowed`,
-        };
+          message: 'body allowed',
+        },
+        health: {
+          success: true,
+          allowed: true,
+          remaining: 1,
+          limit: 1,
+          message: 'health allowed',
+        },
+        super: {
+          success: true,
+          allowed: true,
+          remaining: 1,
+          limit: 1,
+          message: 'super allowed',
+        },
       },
-    );
+      errors: {
+        nutrition: new ApiError('schema mismatch', 'DATABASE'),
+      },
+    });
 
     const { result } = renderHook(() => useAllScanEligibility(), {
       wrapper: createWrapper(),
@@ -227,6 +263,7 @@ describe('useAllScanEligibility', () => {
 
     expect(result.current.isAuthReady).toBe(false);
     expect(result.current.hasConnectivityError).toBe(false);
+    expect(ApiService.checkScanEligibilityBatch).not.toHaveBeenCalled();
     expect(ApiService.checkScanEligibilityOnly).not.toHaveBeenCalled();
 
     mockUseAuth.mockReturnValue({
@@ -242,25 +279,39 @@ describe('useAllScanEligibility', () => {
 
     expect(result.current.hasConnectivityError).toBe(false);
     expect(result.current.hasBlockingEligibilityError).toBe(false);
+    expect(ApiService.checkScanEligibilityBatch).not.toHaveBeenCalled();
     expect(ApiService.checkScanEligibilityOnly).not.toHaveBeenCalled();
   });
 
   it('flags only real network-classified errors as connectivity issues', async () => {
-    (ApiService.checkScanEligibilityOnly as jest.Mock).mockImplementation(
-      async (scanType: string) => {
-        if (scanType === 'health') {
-          throw new ApiError('Network request failed', 'NETWORK');
-        }
-
-        return {
+    (ApiService.checkScanEligibilityBatch as jest.Mock).mockResolvedValue({
+      data: {
+        body: {
           success: true,
           allowed: true,
           remaining: 1,
           limit: 1,
-          message: `${scanType} allowed`,
-        };
+          message: 'body allowed',
+        },
+        nutrition: {
+          success: true,
+          allowed: true,
+          remaining: 1,
+          limit: 1,
+          message: 'nutrition allowed',
+        },
+        super: {
+          success: true,
+          allowed: true,
+          remaining: 1,
+          limit: 1,
+          message: 'super allowed',
+        },
       },
-    );
+      errors: {
+        health: new ApiError('Network request failed', 'NETWORK'),
+      },
+    });
 
     const { result } = renderHook(() => useAllScanEligibility(), {
       wrapper: createWrapper(),

@@ -40,7 +40,7 @@ describe('SuperScanIndicator', () => {
       />
     );
 
-    expect(getByText('components.super_scan.title')).toBeTruthy();
+    expect(getByText('Super Scan')).toBeTruthy();
 
     const gradients = UNSAFE_getAllByType('LinearGradient' as any);
     expect(gradients[0].props.colors).toEqual(expectedLockedGradient);

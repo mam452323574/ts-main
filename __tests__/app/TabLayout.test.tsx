@@ -1,6 +1,11 @@
 import React from 'react';
+import { StyleSheet } from 'react-native';
 
-import { getAndroidMainTabsSurfaceColor } from '@/utils/androidRouteChrome';
+import { BORDER_RADIUS, SPACING, getThemeTokens } from '@/constants/theme';
+import {
+  MAIN_TAB_BAR_CONTENT_HEIGHT,
+  getMainTabBarMetrics,
+} from '@/utils/mainTabBarMetrics';
 
 const mockUseSafeAreaInsets = jest.fn(() => ({
   top: 0,
@@ -42,6 +47,7 @@ const mockUseBadges = jest.fn(() => ({
 }));
 
 const mockUseTheme = jest.fn(() => ({
+  isDark: false,
   colors: {
     background: '#F2F2F7',
     cardBackground: '#FFFFFF',
@@ -88,6 +94,14 @@ jest.mock('react-native-safe-area-context', () => ({
   SafeAreaView: ({ children }: { children: React.ReactNode }) => children,
 }));
 
+jest.mock('expo-blur', () => ({
+  BlurView: ({ children, ...props }: any) => {
+    const React = require('react');
+    const { View: RNView } = require('react-native');
+    return React.createElement('BlurView', props, children);
+  },
+}));
+
 jest.mock('expo-router', () => ({
   withLayoutContext: () => (Navigator: React.ComponentType<any>) => {
     const React = require('react');
@@ -103,13 +117,15 @@ jest.mock('@react-navigation/material-top-tabs', () => ({
     const Navigator = (props: any) => React.createElement('MaterialTopTabs', props, props.children);
     return { Navigator };
   },
+  MaterialTopTabBar: (props: any) => {
+    const React = require('react');
+    return React.createElement('MaterialTopTabBar', props);
+  },
 }));
 
 import TabLayout from '@/app/(tabs)/_layout';
 
 describe('TabLayout', () => {
-  const TAB_BAR_CONTENT_HEIGHT = 60;
-
   const resolveElement = (
     input: React.ReactElement<any, any>
   ): React.ReactElement<any, any> => {
@@ -136,7 +152,7 @@ describe('TabLayout', () => {
     });
   });
 
-  it('keeps the original tab bar layout and always includes the social tab', () => {
+  it('keeps the premium floating tab bar layout and always includes the social tab', () => {
     const element = TabLayout();
     const screenOptions = element.props.screenOptions;
     const screenElements = React.Children.toArray(
@@ -150,9 +166,8 @@ describe('TabLayout', () => {
         };
       }
     >[];
-    const expectedTabBarSurfaceColor = getAndroidMainTabsSurfaceColor(mockUseTheme().colors);
-    const expectedSafeBottomPadding = Math.max(mockUseSafeAreaInsets().bottom, 6);
-    const expectedTabBarHeight = TAB_BAR_CONTENT_HEIGHT + expectedSafeBottomPadding;
+    const expectedTokens = getThemeTokens(mockUseTheme().isDark);
+    const expectedTabBarMetrics = getMainTabBarMetrics(mockUseSafeAreaInsets().bottom);
     const expectedLabelStyle = {
       fontSize: 12,
       textTransform: 'none',
@@ -177,23 +192,84 @@ describe('TabLayout', () => {
     const socialChildren = React.Children.toArray(
       socialIcon.props.children
     ) as React.ReactElement<any, any>[];
+    const tabBarElement = resolveElement(element.props.tabBar({} as any));
+    const tabBarHostStyle = StyleSheet.flatten(tabBarElement.props.style);
+    const tabBarShadow = React.Children.toArray(
+      tabBarElement.props.children
+    )[0] as React.ReactElement<any, any>;
+    const tabBarShadowStyle = StyleSheet.flatten(tabBarShadow.props.style);
+    const tabBarSurface = React.Children.toArray(
+      tabBarShadow.props.children
+    )[0] as React.ReactElement<any, any>;
+    const tabBarSurfaceStyle = StyleSheet.flatten(tabBarSurface.props.style);
+    const tabBarSurfaceChildren = React.Children.toArray(
+      tabBarSurface.props.children
+    ) as React.ReactElement<any, any>[];
+    const tabBarBlur = tabBarSurfaceChildren.find(
+      (child) => child.props.testID === 'main-tab-bar-blur'
+    );
+    const tabBarTint = tabBarSurfaceChildren.find(
+      (child) => child.props.testID === 'main-tab-bar-tint'
+    );
+    const innerMaterialTabBar = tabBarSurfaceChildren.find(
+      (child) =>
+        typeof child.type === 'function' &&
+        child.type.name === 'MaterialTopTabBar'
+    );
 
     expect(screenOptions.tabBarStyle).toEqual(
       expect.objectContaining({
-        backgroundColor: expectedTabBarSurfaceColor,
-        paddingBottom: expectedSafeBottomPadding,
-        height: expectedTabBarHeight,
-        borderTopWidth: 0,
-        borderTopColor: 'transparent',
+        backgroundColor: 'transparent',
+        height: MAIN_TAB_BAR_CONTENT_HEIGHT,
         elevation: 0,
         shadowOpacity: 0,
+        borderTopWidth: 0,
+        borderTopColor: 'transparent',
       })
     );
+    expect(typeof element.props.tabBar).toBe('function');
+    expect(tabBarElement.props.testID).toBe('main-tab-bar-host');
+    expect(tabBarHostStyle).toEqual(
+      expect.objectContaining({
+        position: 'absolute',
+        left: SPACING.page,
+        right: SPACING.page,
+        bottom: expectedTabBarMetrics.bottomOffset,
+      })
+    );
+    expect(tabBarShadow.props.testID).toBe('main-tab-bar-shadow');
+    expect(tabBarShadowStyle).toEqual(
+      expect.objectContaining({
+        height: MAIN_TAB_BAR_CONTENT_HEIGHT,
+        borderRadius: BORDER_RADIUS.full,
+        shadowOpacity: 0.26,
+        shadowRadius: 24,
+        elevation: 8,
+      })
+    );
+    expect(tabBarSurface.props.testID).toBe('main-tab-bar-surface');
+    expect(tabBarSurfaceStyle).toEqual(
+      expect.objectContaining({
+        borderRadius: BORDER_RADIUS.full,
+        borderWidth: 1,
+        borderColor: expectedTokens.tabBar.border,
+        overflow: 'hidden',
+        backgroundColor: 'transparent',
+      })
+    );
+    expect(tabBarBlur?.props).toEqual(
+      expect.objectContaining({
+        tint: 'light',
+        intensity: 78,
+      })
+    );
+    expect(tabBarTint).toBeDefined();
+    expect(innerMaterialTabBar).toBeDefined();
     expect(screenOptions).not.toHaveProperty('tabBarContentContainerStyle');
     expect(screenOptions).not.toHaveProperty('tabBarIndicatorContainerStyle');
     expect(screenOptions.sceneStyle).toEqual(expectedSceneStyle);
-    expect(screenOptions.tabBarActiveTintColor).toBe('#007AFF');
-    expect(screenOptions.tabBarInactiveTintColor).toBe('#8E8E93');
+    expect(screenOptions.tabBarActiveTintColor).toBe(expectedTokens.tabBar.active);
+    expect(screenOptions.tabBarInactiveTintColor).toBe(expectedTokens.tabBar.inactive);
     expect(screenOptions.tabBarLabelStyle).toEqual(expectedLabelStyle);
     expect(screenElements).toHaveLength(4);
     expect(screenElements[1].props.name).toBe('coach');

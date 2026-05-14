@@ -8,7 +8,7 @@ import { useNotificationContext } from '@/contexts/NotificationContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { navigationService } from '@/services/navigation';
-import { NOTIFICATIONS_QUERY_KEY, fetchNotifications } from '@/hooks/queries';
+import { NOTIFICATIONS_QUERY_KEY, fetchNotifications } from '@/hooks/queries/useNotifications';
 import { SIZES, FONT_WEIGHTS } from '@/constants/theme';
 
 

@@ -15,11 +15,13 @@ import type {
   FridgeScanSubmission,
   SubmitFridgeScanCaptureInput,
 } from '@/types/fridgeScan';
-import { logOperationalInfo } from '@/utils/observability';
+import { logOperationalError, logOperationalInfo } from '@/utils/observability';
 
 const FRIDGE_SCAN_FUNCTION_NAME = 'fridge-scan-submit';
 const FRIDGE_SCAN_MAX_DIMENSION = 1600;
 const FRIDGE_SCAN_JPEG_QUALITY = 0.78;
+const FRIDGE_SCAN_MAX_IMAGE_BYTES = 6 * 1024 * 1024;
+const FRIDGE_SCAN_MAX_IMAGE_PIXELS = 16_000_000;
 
 type FridgeScanFunctionErrorPayload = {
   success?: boolean;
@@ -35,7 +37,27 @@ type NormalizedFridgeImage = {
   base64: string;
   width: number;
   height: number;
+  usedPreEncodedFallback?: boolean;
+  fallbackSource?: SubmitFridgeScanCaptureInput['source'];
 };
+
+type PreEncodedFridgeScanImage = NonNullable<
+  SubmitFridgeScanCaptureInput['preEncodedJpeg']
+>;
+
+type PreEncodedFallbackResult =
+  | {
+      ok: true;
+      image: NormalizedFridgeImage;
+      byteLength: number;
+    }
+  | {
+      ok: false;
+      reason: string;
+      byteLength?: number;
+      width?: number;
+      height?: number;
+    };
 
 function summarizeFridgeScanFunctionRequest(payload: Record<string, unknown>) {
   return {
@@ -101,13 +123,57 @@ function readFridgeScanFunctionErrorPayload(
   };
 }
 
+function createFridgeScanAuthError() {
+  const apiError = new ApiError(
+    'api_errors.unauthorized',
+    'AUTH',
+    undefined,
+    {
+      functionName: FRIDGE_SCAN_FUNCTION_NAME,
+      stage: 'authentication',
+    },
+  );
+  apiError.code = 'auth_session_missing';
+  apiError.status = 401;
+  return apiError;
+}
+
+function normalizeFridgeScanImageError(
+  error: unknown,
+  context: Record<string, unknown> = {},
+) {
+  if (error instanceof ApiError) {
+    error.context = {
+      ...(error.context ?? {}),
+      ...context,
+      stage: 'image_normalization',
+    };
+    error.code = error.code ?? 'fridge_scan_image_normalization_failed';
+    return error;
+  }
+
+  const apiError = new ApiError(
+    error instanceof Error
+      ? error.message
+      : 'Unable to normalize fridge scan image',
+    'VALIDATION',
+    error,
+    {
+      ...context,
+      stage: 'image_normalization',
+    },
+  );
+  apiError.code = 'fridge_scan_image_normalization_failed';
+  return apiError;
+}
+
 async function getAuthenticatedSessionOrThrow() {
   const {
     data: { session },
   } = await supabase.auth.getSession();
 
   if (!session) {
-    throw new ApiError('api_errors.unauthorized', 'AUTH');
+    throw createFridgeScanAuthError();
   }
 
   return session;
@@ -150,7 +216,16 @@ function createFridgeScanApiError(
 async function invokeAuthedFridgeScanFunction<TResponse>(
   payload: Record<string, unknown>,
 ): Promise<TResponse> {
-  const session = await getAuthenticatedSessionOrThrow();
+  const session = await getAuthenticatedSessionOrThrow().catch((error) => {
+    logOperationalError(
+      '[FridgeScanService] Fridge scan authentication unavailable',
+      error,
+      {
+        function_name: FRIDGE_SCAN_FUNCTION_NAME,
+      },
+    );
+    throw error;
+  });
   let response: Response;
 
   logOperationalInfo(
@@ -169,12 +244,21 @@ async function invokeAuthedFridgeScanFunction<TResponse>(
       body: JSON.stringify(payload),
     });
   } catch (error) {
-    throw new ApiError(
+    const apiError = new ApiError(
       error instanceof Error ? error.message : 'Network request failed',
       'NETWORK',
       error,
       { functionName: FRIDGE_SCAN_FUNCTION_NAME },
     );
+    apiError.code = 'edge_function_network_error';
+    logOperationalError(
+      '[FridgeScanService] Fridge scan function network failure',
+      apiError,
+      {
+        function_name: FRIDGE_SCAN_FUNCTION_NAME,
+      },
+    );
+    throw apiError;
   }
 
   const rawResponseBody = await response.json().catch(() => ({}));
@@ -193,7 +277,7 @@ async function invokeAuthedFridgeScanFunction<TResponse>(
   });
 
   if (!response.ok) {
-    throw createFridgeScanApiError(
+    const apiError = createFridgeScanApiError(
       errorPayload.error ||
         errorPayload.message ||
         `${FRIDGE_SCAN_FUNCTION_NAME} failed`,
@@ -202,6 +286,15 @@ async function invokeAuthedFridgeScanFunction<TResponse>(
       requestId,
       rawResponseBody,
     );
+    logOperationalError(
+      '[FridgeScanService] Fridge scan function returned error',
+      apiError,
+      {
+        function_name: FRIDGE_SCAN_FUNCTION_NAME,
+        http_status: response.status,
+      },
+    );
+    throw apiError;
   }
 
   return rawResponseBody as TResponse;
@@ -229,6 +322,111 @@ function getImageDimensions(uri: string) {
   return new Promise<{ width: number; height: number }>((resolve, reject) => {
     RNImage.getSize(uri, (width, height) => resolve({ width, height }), reject);
   });
+}
+
+function readErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    const originalMessage =
+      error.originalError instanceof Error ? error.originalError.message : '';
+    return `${error.message}\n${originalMessage}`;
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return typeof error === 'string' ? error : '';
+}
+
+function isImageContextLostError(error: unknown) {
+  const message = readErrorMessage(error).toLowerCase();
+  return (
+    message.includes('image context has been lost') ||
+    (message.includes('renderasync') && message.includes('context'))
+  );
+}
+
+function normalizeBase64Payload(value: unknown) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const trimmedValue = value.trim();
+  const payload = trimmedValue.startsWith('data:')
+    ? trimmedValue.split(',')[1]?.trim()
+    : trimmedValue;
+
+  return payload ? payload.replace(/\s/g, '') : null;
+}
+
+function estimateBase64ByteLength(base64: string) {
+  return Math.floor((base64.length * 3) / 4);
+}
+
+function readPositiveDimension(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? value
+    : null;
+}
+
+function readPreEncodedJpegFallback(
+  fallback?: PreEncodedFridgeScanImage,
+): PreEncodedFallbackResult {
+  const base64 = normalizeBase64Payload(fallback?.base64);
+  const width = readPositiveDimension(fallback?.width);
+  const height = readPositiveDimension(fallback?.height);
+
+  if (!base64) {
+    return {
+      ok: false,
+      reason: 'missing_base64',
+      width: width ?? undefined,
+      height: height ?? undefined,
+    };
+  }
+
+  const byteLength = estimateBase64ByteLength(base64);
+  if (byteLength > FRIDGE_SCAN_MAX_IMAGE_BYTES) {
+    return {
+      ok: false,
+      reason: 'payload_too_large',
+      byteLength,
+      width: width ?? undefined,
+      height: height ?? undefined,
+    };
+  }
+
+  if (!width || !height) {
+    return {
+      ok: false,
+      reason: 'missing_dimensions',
+      byteLength,
+      width: width ?? undefined,
+      height: height ?? undefined,
+    };
+  }
+
+  if (width * height > FRIDGE_SCAN_MAX_IMAGE_PIXELS) {
+    return {
+      ok: false,
+      reason: 'pixel_budget_exceeded',
+      byteLength,
+      width,
+      height,
+    };
+  }
+
+  return {
+    ok: true,
+    byteLength,
+    image: {
+      base64,
+      width,
+      height,
+      usedPreEncodedFallback: true,
+      fallbackSource: fallback?.source,
+    },
+  };
 }
 
 async function normalizeNativeImageToJpeg(
@@ -349,12 +547,53 @@ async function normalizeWebImageToJpeg(
 
 async function normalizeImageForFridgeScan(
   imageUri: string,
+  preEncodedJpeg?: PreEncodedFridgeScanImage,
 ): Promise<NormalizedFridgeImage> {
-  if (Platform.OS === 'web') {
-    return normalizeWebImageToJpeg(imageUri);
-  }
+  try {
+    if (Platform.OS === 'web') {
+      return await normalizeWebImageToJpeg(imageUri);
+    }
 
-  return normalizeNativeImageToJpeg(imageUri);
+    try {
+      return await normalizeNativeImageToJpeg(imageUri);
+    } catch (error) {
+      if (!isImageContextLostError(error)) {
+        throw error;
+      }
+
+      const fallbackResult = readPreEncodedJpegFallback(preEncodedJpeg);
+      if (fallbackResult.ok) {
+        logOperationalInfo(
+          '[FridgeScanService] Fridge scan pre-encoded fallback used',
+          {
+            source: preEncodedJpeg?.source,
+            fallback_width: fallbackResult.image.width,
+            fallback_height: fallbackResult.image.height,
+            fallback_byte_length: fallbackResult.byteLength,
+          },
+        );
+        return fallbackResult.image;
+      }
+
+      logOperationalInfo(
+        '[FridgeScanService] Fridge scan pre-encoded fallback rejected',
+        {
+          source: preEncodedJpeg?.source,
+          reason: fallbackResult.reason,
+          fallback_width: fallbackResult.width,
+          fallback_height: fallbackResult.height,
+          fallback_byte_length: fallbackResult.byteLength,
+          max_image_bytes: FRIDGE_SCAN_MAX_IMAGE_BYTES,
+          max_image_pixels: FRIDGE_SCAN_MAX_IMAGE_PIXELS,
+        },
+      );
+      throw error;
+    }
+  } catch (error) {
+    throw normalizeFridgeScanImageError(error, {
+      platform: Platform.OS,
+    });
+  }
 }
 
 function mapEligibilityFailureToApiError(
@@ -389,12 +628,37 @@ export async function submitFridgeScanCapture(
     selected_mode: input.selectedMode,
     locale: input.locale,
   });
-  const normalizedImage = await normalizeImageForFridgeScan(input.imageUri);
+  logOperationalInfo('[FridgeScanService] Fridge scan image normalization started', {
+    source: input.source,
+    selected_mode: input.selectedMode,
+    locale: input.locale,
+    platform: Platform.OS,
+  });
+
+  const normalizedImage = await normalizeImageForFridgeScan(
+    input.imageUri,
+    input.preEncodedJpeg,
+  ).catch((error) => {
+    logOperationalError(
+      '[FridgeScanService] Fridge scan image normalization failed',
+      error,
+      {
+        source: input.source,
+        selected_mode: input.selectedMode,
+        locale: input.locale,
+        stage: 'image_normalization',
+      },
+    );
+    throw error;
+  });
   logOperationalInfo('[FridgeScanService] Fridge scan image normalized', {
     source: input.source,
     selected_mode: input.selectedMode,
     normalized_width: normalizedImage.width,
     normalized_height: normalizedImage.height,
+    normalization_fallback: normalizedImage.usedPreEncodedFallback
+      ? 'pre_encoded_jpeg'
+      : undefined,
   });
   const response =
     await invokeAuthedFridgeScanFunction<FridgeScanSubmissionResponse>(
@@ -406,6 +670,13 @@ export async function submitFridgeScanCapture(
         clientMetadata: {
           normalized_width: normalizedImage.width,
           normalized_height: normalizedImage.height,
+          ...(normalizedImage.usedPreEncodedFallback
+            ? {
+                normalization_fallback: 'pre_encoded_jpeg',
+                normalization_fallback_source:
+                  normalizedImage.fallbackSource ?? input.source,
+              }
+            : {}),
           ...input.clientMetadata,
         },
       }),

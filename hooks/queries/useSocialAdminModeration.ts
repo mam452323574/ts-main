@@ -11,6 +11,7 @@ import {
 import type {
   SocialAdminAdjustPostReactionsRequest,
   SocialAdminModerationFilter,
+  SocialAdminModerationItem,
   SocialAdminModerationQueueResponse,
   SocialAdminEradicateUserRequest,
   SocialModerateContentRequest,
@@ -18,9 +19,70 @@ import type {
   SocialReclassifyPostRequest,
 } from '@/types';
 
+const BULK_APPROVAL_CONCURRENCY = 10;
+
+export interface BulkApproveSocialContentSummary {
+  requestedCount: number;
+  approvedCount: number;
+  failedIds: string[];
+}
+
 export const SOCIAL_ADMIN_MODERATION_QUERY_KEY = (
   filter: SocialAdminModerationFilter = 'needs_review',
 ) => ['socialAdminModeration', filter] as const;
+
+function buildApproveRequest(
+  item: SocialAdminModerationItem,
+): SocialModerateContentRequest {
+  return item.content_type === 'post'
+    ? {
+        target_type: 'post',
+        target_post_id: item.content_id,
+        action: 'approve',
+      }
+    : {
+        target_type: 'comment',
+        target_comment_id: item.content_id,
+        action: 'approve',
+      };
+}
+
+async function bulkApproveModerationItems(
+  items: SocialAdminModerationItem[],
+): Promise<BulkApproveSocialContentSummary> {
+  if (items.length === 0) {
+    return {
+      requestedCount: 0,
+      approvedCount: 0,
+      failedIds: [],
+    };
+  }
+
+  const failedIds: string[] = [];
+  let approvedCount = 0;
+
+  for (let index = 0; index < items.length; index += BULK_APPROVAL_CONCURRENCY) {
+    const chunk = items.slice(index, index + BULK_APPROVAL_CONCURRENCY);
+    const results = await Promise.allSettled(
+      chunk.map((item) => moderateSocialContent(buildApproveRequest(item))),
+    );
+
+    results.forEach((result, chunkIndex) => {
+      if (result.status === 'fulfilled') {
+        approvedCount += 1;
+        return;
+      }
+
+      failedIds.push(chunk[chunkIndex].content_id);
+    });
+  }
+
+  return {
+    requestedCount: items.length,
+    approvedCount,
+    failedIds,
+  };
+}
 
 export const useSocialAdminModeration = (
   filter: SocialAdminModerationFilter = 'needs_review',
@@ -51,6 +113,16 @@ export const useSocialAdminModeration = (
     onSuccess: invalidateAdminSocialQueries,
   });
 
+  const bulkApproveContentMutation = useMutation({
+    mutationFn: (items: SocialAdminModerationItem[]) =>
+      bulkApproveModerationItems(items),
+    onSuccess: async (summary) => {
+      if (summary.approvedCount > 0) {
+        await invalidateAdminSocialQueries();
+      }
+    },
+  });
+
   const reclassifyPostMutation = useMutation({
     mutationFn: (request: SocialReclassifyPostRequest) =>
       reclassifySocialPost(request),
@@ -78,6 +150,7 @@ export const useSocialAdminModeration = (
   return {
     moderationQueueQuery,
     moderateContentMutation,
+    bulkApproveContentMutation,
     reclassifyPostMutation,
     moderateUserMutation,
     eradicateUserMutation,

@@ -21,7 +21,7 @@ import {
 } from '@/constants/theme';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useSocialPublicProfile } from '@/hooks/queries';
+import { useSocialPublicProfile } from '@/hooks/queries/useSocialPublicProfile';
 import {
   formatSocialAbsoluteDate,
   formatSocialMemberSinceLabel,
@@ -55,9 +55,6 @@ export function SocialProfilePreviewModal({
   const createdAtValue = profile?.account_created_at ?? profile?.created_at ?? null;
   const absoluteCreatedAtLabel = formatSocialAbsoluteDate(createdAtValue, locale);
   const memberSinceLabel = formatSocialMemberSinceLabel(createdAtValue, t);
-  const createdOnLabel = absoluteCreatedAtLabel
-    ? t('social.profile.created_on', { date: absoluteCreatedAtLabel })
-    : null;
   const scanCount = profile?.scan_count ?? 0;
   const isBusy = isLoading || isFetching;
   const hasProfile = !!profile;
@@ -82,31 +79,22 @@ export function SocialProfilePreviewModal({
           <ModalHandle />
 
           <View style={styles.content}>
-            <Text style={styles.eyebrow}>{t('social.profile.title')}</Text>
-
-            <View style={styles.heroRow}>
+            <View style={styles.hero}>
               <ProfileAvatar
                 avatarUrl={effectiveAvatarUrl}
                 username={effectiveUsername}
-                size={72}
+                size={88}
                 testID="social-profile-preview-avatar"
               />
 
-              <View style={styles.heroCopy}>
-                <Text
-                  numberOfLines={1}
-                  style={styles.username}
-                  testID="social-profile-preview-username"
-                >
-                  {effectiveUsername}
-                </Text>
-                {createdOnLabel ? (
-                  <Text style={styles.heroMeta}>{createdOnLabel}</Text>
-                ) : null}
-                {memberSinceLabel ? (
-                  <Text style={styles.heroMeta}>{memberSinceLabel}</Text>
-                ) : null}
-              </View>
+              <Text
+                numberOfLines={1}
+                style={styles.username}
+                testID="social-profile-preview-username"
+              >
+                {effectiveUsername}
+              </Text>
+              <Text style={styles.heroMeta}>{t('social.profile.title')}</Text>
             </View>
 
             {isBusy ? (
@@ -120,24 +108,26 @@ export function SocialProfilePreviewModal({
                 <Text style={styles.stateText}>{t('social.profile.missing_body')}</Text>
               </View>
             ) : (
-              <View style={styles.stats}>
-                <View style={styles.statCard}>
-                  <Text style={styles.statLabel}>{t('social.profile.created_label')}</Text>
-                  <Text style={styles.statValue}>
-                    {createdOnLabel ?? t('social.profile.loading')}
-                  </Text>
+              <View style={styles.stats} testID="social-profile-preview-stats">
+                <View style={styles.statCell}>
+                  <Text style={styles.statValue}>{scanCount}</Text>
+                  <Text style={styles.statLabel}>{t('social.profile.scans_label')}</Text>
                 </View>
-                <View style={styles.statCard}>
-                  <Text style={styles.statLabel}>{t('social.profile.member_since_label')}</Text>
-                  <Text style={styles.statValue}>
+                <View style={styles.statDivider} />
+                <View style={styles.statCell}>
+                  <Text numberOfLines={1} style={styles.statValue}>
                     {memberSinceLabel ?? t('social.profile.loading')}
                   </Text>
-                </View>
-                <View style={styles.statCard}>
-                  <Text style={styles.statLabel}>{t('social.profile.scans_label')}</Text>
-                  <Text style={styles.statValue}>
-                    {t('social.profile.scans_completed', { count: scanCount })}
+                  <Text style={styles.statLabel}>
+                    {t('social.profile.member_since_label')}
                   </Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statCell}>
+                  <Text numberOfLines={1} style={styles.statValue}>
+                    {absoluteCreatedAtLabel ?? t('social.profile.loading')}
+                  </Text>
+                  <Text style={styles.statLabel}>{t('social.profile.created_label')}</Text>
                 </View>
               </View>
             )}
@@ -169,55 +159,60 @@ const createStyles = (colors: any) =>
       paddingBottom: SPACING.xl,
       gap: SPACING.lg,
     },
-    eyebrow: {
-      fontSize: SIZES.text12,
-      lineHeight: 16,
-      fontWeight: FONT_WEIGHTS.bold,
-      color: colors.primary,
-      letterSpacing: 0.5,
-      textTransform: 'uppercase',
-    },
-    heroRow: {
-      flexDirection: 'row',
+    hero: {
       alignItems: 'center',
-      gap: SPACING.md,
-    },
-    heroCopy: {
-      flex: 1,
-      gap: SPACING.xs,
+      gap: SPACING.sm,
     },
     username: {
-      fontSize: SIZES.text20,
-      lineHeight: 24,
+      fontSize: SIZES.xl,
+      lineHeight: 30,
       fontWeight: FONT_WEIGHTS.bold,
       color: colors.primaryText,
+      textAlign: 'center',
     },
     heroMeta: {
       fontSize: SIZES.text14,
       lineHeight: 18,
       color: colors.textMuted ?? colors.gray,
+      textAlign: 'center',
     },
     stats: {
-      gap: SPACING.sm,
-    },
-    statCard: {
-      gap: 2,
-      padding: SPACING.md,
+      flexDirection: 'row',
+      alignItems: 'stretch',
+      justifyContent: 'space-between',
+      paddingVertical: SPACING.md,
+      paddingHorizontal: SPACING.sm,
       borderRadius: BORDER_RADIUS.lg,
       backgroundColor: colors.surfaceMuted ?? withAlpha(colors.white, 0.04),
       borderWidth: 1,
       borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.06),
+    },
+    statCell: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: SPACING.xs,
+      minWidth: 0,
+      paddingHorizontal: SPACING.xs,
+    },
+    statDivider: {
+      width: 1,
+      alignSelf: 'stretch',
+      backgroundColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
     },
     statLabel: {
       fontSize: SIZES.text12,
       lineHeight: 16,
       fontWeight: FONT_WEIGHTS.semiBold,
       color: colors.textMuted ?? colors.gray,
+      textAlign: 'center',
     },
     statValue: {
-      fontSize: SIZES.text14,
-      lineHeight: 20,
+      fontSize: SIZES.text16,
+      lineHeight: 21,
+      fontWeight: FONT_WEIGHTS.bold,
       color: colors.primaryText,
+      textAlign: 'center',
     },
     stateCard: {
       alignItems: 'center',

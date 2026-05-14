@@ -1,5 +1,8 @@
 import { DEFAULT_LOCALE } from '@/i18n/config';
 import { i18n, loadLocalesForTests } from '@/i18n/translations';
+import { PRIVACY_POLICY_CONTENT } from '@/constants/privacyPolicy';
+
+const appConfig = require('../../app.json');
 
 const CP1252_FOLLOWER_CLASS =
   '[\\u0080-\\u00FF\\u20AC\\u201A\\u0192\\u201E\\u2026\\u2020\\u2021\\u02C6\\u2030\\u0160\\u2039\\u0152\\u017D\\u2018\\u2019\\u201C\\u201D\\u2022\\u2013\\u2014\\u02DC\\u2122\\u0161\\u203A\\u0153\\u017E\\u0178]';
@@ -22,6 +25,29 @@ function collectStringEntries(
 
   return Object.entries(value).flatMap(([key, nestedValue]) =>
     collectStringEntries(nestedValue, [...path, key]),
+  );
+}
+
+const EXPLICIT_AI_PHRASES = [
+  'intelligence artificielle',
+  'artificial intelligence',
+  'inteligencia artificial',
+  'inteligência artificial',
+  'intelligenza artificiale',
+  'künstliche intelligenz',
+  'künstlichen intelligenz',
+  'ki-gestutzte',
+  'ki-gestuetzte',
+  'ki-gestützte',
+];
+
+function containsExplicitAiWording(value: string) {
+  const containsAcronym = /\b(?:IA|AI|KI)\b/u.test(value);
+  const lowerValue = value.toLocaleLowerCase();
+
+  return (
+    containsAcronym ||
+    EXPLICIT_AI_PHRASES.some((phrase) => lowerValue.includes(phrase))
   );
 }
 
@@ -50,11 +76,25 @@ describe('translations encoding', () => {
     expect(i18n.t('settings.title')).toBe('Paramètres');
     expect(i18n.t('languages.fr')).toBe('Français');
     expect(i18n.t('privacy.title')).toBe('Politique de Confidentialité');
-    expect(i18n.t('settings.danger_zone_desc')).toContain('supprimé');
-    expect(i18n.t('settings.danger_zone_desc')).toContain('arrière');
+    expect(i18n.t('settings.sign_out_button')).toBe('Se déconnecter');
+    expect(i18n.t('settings.danger_zone_desc')).toContain('reconnecter');
     expect(i18n.t('analytics.health_score')).toBe('Score Santé');
     expect(i18n.t('analytics.health_score_subtitle')).toBe('Évolution de votre score global');
     expect(i18n.t('analytics.physical_evolution')).toBe('Évolution Physique');
     expect(i18n.t('analytics.face_score_subtitle')).toBe('Évolution de votre score visage');
+  });
+
+  it('contains no explicit AI wording in visible app copy', () => {
+    const visibleCopyEntries = [
+      ...collectStringEntries(i18n.translations, ['i18n']),
+      ...collectStringEntries(PRIVACY_POLICY_CONTENT, ['privacyPolicy']),
+      ...collectStringEntries(appConfig, ['appConfig']),
+    ];
+    const suspiciousEntries = visibleCopyEntries
+      .filter((entry) => containsExplicitAiWording(entry.value))
+      .map((entry) => `${entry.path}: ${entry.value}`)
+      .slice(0, 20);
+
+    expect(suspiciousEntries).toEqual([]);
   });
 });

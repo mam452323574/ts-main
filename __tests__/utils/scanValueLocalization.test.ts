@@ -1,4 +1,7 @@
 import {
+  localizeDisplayNutritionVitaminKeys,
+  localizeDisplayQualitativeLevel,
+  localizeDisplayVerdict,
   localizeNutritionVitaminKeys,
   localizeQualitativeLevel,
   localizeSuperScanAdviceKey,
@@ -93,6 +96,46 @@ describe('result localization', () => {
       'Unknown'
     );
     expect(localizeVerdict('chef_special', frenchTranslator)).toBe('Inconnu');
+  });
+
+  it('prefers preserved fallback text over user-facing unknown placeholders for display values', () => {
+    expect(
+      localizeDisplayQualitativeLevel(
+        'ingredient_quality',
+        'unknown',
+        'Farm fresh',
+        englishTranslator,
+        '-'
+      )
+    ).toBe('Farm fresh');
+    expect(
+      localizeDisplayVerdict('chef_special', 'Chef special', frenchTranslator, '-')
+    ).toBe('Chef special');
+    expect(
+      localizeDisplayNutritionVitaminKeys(['unknown'], 'Vitamin P', englishTranslator, {
+        locale: 'en',
+        emptyFallback: '-',
+      })
+    ).toBe('Vitamin P');
+  });
+
+  it('falls back to a dash when display values have no recognized key or preserved raw text', () => {
+    expect(
+      localizeDisplayQualitativeLevel(
+        'glycemic_index',
+        'slow_release',
+        null,
+        frenchMissingSentinelTranslator,
+        '-'
+      )
+    ).toBe('-');
+    expect(localizeDisplayVerdict('unknown', null, frenchTranslator, '-')).toBe('-');
+    expect(
+      localizeDisplayNutritionVitaminKeys(['unknown'], null, frenchTranslator, {
+        locale: 'fr',
+        emptyFallback: '-',
+      })
+    ).toBe('-');
   });
 
   it('treats i18n-js [missing ...] sentinels as missing translations at helper level', () => {

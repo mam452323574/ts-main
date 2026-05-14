@@ -134,23 +134,41 @@ describe('MetricCard', () => {
       getByTestId('metric-card-value').props.style,
     );
 
-    expect(rootStyle.paddingHorizontal).toBe(14);
-    expect(rootStyle.paddingVertical).toBe(7);
-    expect(rootStyle.minHeight).toBe(74);
+    expect(rootStyle.paddingHorizontal).toBe(15);
+    expect(rootStyle.paddingVertical).toBe(9);
+    expect(rootStyle.minHeight).toBe(84);
     expect(rootStyle.alignItems).toBe('center');
-    expect(rootStyle.gap).toBe(10);
+    expect(rootStyle.gap).toBe(11);
     expect(rootStyle.marginBottom).toBeUndefined();
-    expect(iconWrapStyle.width).toBe(56);
-    expect(iconWrapStyle.height).toBe(56);
-    expect(titleStyle.fontSize).toBe(14);
-    expect(titleStyle.lineHeight).toBe(17);
+    expect(iconWrapStyle.width).toBe(60);
+    expect(iconWrapStyle.height).toBe(60);
+    expect(titleStyle.fontSize).toBe(13);
+    expect(titleStyle.lineHeight).toBe(16);
     expect(titleStyle.fontWeight).toBe('500');
-    expect(valueStyle.fontSize).toBe(18);
-    expect(valueStyle.lineHeight).toBe(22);
+    expect(getByTestId('metric-card-title').props.minimumFontScale).toBe(0.82);
+    expect(valueStyle.fontSize).toBe(20);
+    expect(valueStyle.lineHeight).toBe(24);
     expect(valueStyle.fontWeight).toBe('700');
     expect(getByTestId('metric-card-custom-icon')).toHaveTextContent(
-      'size:30|stroke:2.15'
+      'size:32|stroke:2.15'
     );
+  });
+
+  it('fits short text metric values on one line to avoid broken words', () => {
+    const { getByTestId } = render(
+      <MetricCard
+        title="Face shape"
+        value="Oval"
+        icon="face"
+        valueMaxLines={2}
+        valueVariant="text"
+      />,
+    );
+
+    expect(getByTestId('metric-card-value').props.numberOfLines).toBe(1);
+    expect(getByTestId('metric-card-value').props.adjustsFontSizeToFit).toBe(true);
+    expect(getByTestId('metric-card-value').props.minimumFontScale).toBe(0.82);
+    expect(getByTestId('metric-card-value').props.ellipsizeMode).toBe('tail');
   });
 
   it('renders locked state without exposing the premium value', () => {
@@ -183,7 +201,7 @@ describe('MetricCard', () => {
     expect(getByText('PREMIUM')).toBeTruthy();
     expect(getByText('LockIcon')).toBeTruthy();
     expect(queryByText('Secret')).toBeNull();
-    expect(rootStyle.minHeight).toBe(74);
+    expect(rootStyle.minHeight).toBe(84);
     expect(blurOverlayStyle.paddingVertical).toBe(3);
     expect(lockedPlaceholderStyle.height).toBe(11);
     expect(premiumTagStyle.paddingVertical).toBe(3);
@@ -282,7 +300,7 @@ describe('MetricCard', () => {
     expect(getByTestId('metric-card-loading-overlay')).toBeTruthy();
     expect(getByTestId('metric-card-loading-tag')).toBeTruthy();
     expect(queryByText('Secret')).toBeNull();
-    expect(rootStyle.minHeight).toBe(74);
+    expect(rootStyle.minHeight).toBe(84);
     expect(blurOverlayStyle.paddingVertical).toBe(3);
     expect(loadingPlaceholderStyle.height).toBe(11);
     expect(loadingTagStyle.paddingVertical).toBe(3);
@@ -344,13 +362,13 @@ describe('MetricCard', () => {
       getByTestId('metric-card-value').props.style,
     );
 
-    expect(rootStyle.minHeight).toBe(68);
-    expect(rootStyle.paddingVertical).toBe(6);
+    expect(rootStyle.minHeight).toBe(72);
+    expect(rootStyle.paddingVertical).toBe(7);
     expect(title.props.numberOfLines).toBe(2);
     expect(value.props.numberOfLines).toBe(3);
     expect(value.props.adjustsFontSizeToFit).toBeUndefined();
-    expect(valueStyle.fontSize).toBe(17);
-    expect(valueStyle.lineHeight).toBe(21);
+    expect(valueStyle.fontSize).toBe(18);
+    expect(valueStyle.lineHeight).toBe(22);
     expect(valueStyle.fontWeight).toBe('600');
   });
 
@@ -380,16 +398,16 @@ describe('MetricCard', () => {
       getByTestId('metric-card-value').props.style,
     );
 
-    expect(rootStyle.paddingHorizontal).toBe(12);
-    expect(rootStyle.paddingVertical).toBe(7);
-    expect(rootStyle.minHeight).toBe(72);
+    expect(rootStyle.paddingHorizontal).toBe(13);
+    expect(rootStyle.paddingVertical).toBe(8);
+    expect(rootStyle.minHeight).toBe(78);
     expect(rootStyle.gap).toBe(9);
-    expect(iconWrapStyle.width).toBe(54);
-    expect(iconWrapStyle.height).toBe(54);
-    expect(valueStyle.fontSize).toBe(17);
-    expect(valueStyle.lineHeight).toBe(21);
+    expect(iconWrapStyle.width).toBe(56);
+    expect(iconWrapStyle.height).toBe(56);
+    expect(valueStyle.fontSize).toBe(18);
+    expect(valueStyle.lineHeight).toBe(22);
     expect(getByTestId('metric-card-custom-icon')).toHaveTextContent(
-      'size:28|stroke:2.15'
+      'size:29|stroke:2.15'
     );
   });
 
@@ -422,17 +440,17 @@ describe('MetricCard', () => {
       getByTestId('metric-card-value').props.style,
     );
 
-    expect(rootStyle.paddingHorizontal).toBe(12);
-    expect(rootStyle.paddingVertical).toBe(6);
-    expect(rootStyle.minHeight).toBe(68);
+    expect(rootStyle.paddingHorizontal).toBe(13);
+    expect(rootStyle.paddingVertical).toBe(7);
+    expect(rootStyle.minHeight).toBe(72);
     expect(rootStyle.alignItems).toBe('center');
     expect(rootStyle.gap).toBe(8);
     expect(iconWrapStyle.width).toBe(52);
     expect(iconWrapStyle.height).toBe(52);
-    expect(titleStyle.fontSize).toBe(14);
-    expect(titleStyle.lineHeight).toBe(17);
-    expect(valueStyle.fontSize).toBe(17);
-    expect(valueStyle.lineHeight).toBe(21);
+    expect(titleStyle.fontSize).toBe(13);
+    expect(titleStyle.lineHeight).toBe(16);
+    expect(valueStyle.fontSize).toBe(18);
+    expect(valueStyle.lineHeight).toBe(22);
     expect(valueStyle.fontWeight).toBe('600');
     expect(getByTestId('metric-card-custom-icon')).toHaveTextContent(
       'size:27|stroke:2.15'
@@ -470,7 +488,7 @@ describe('MetricCard', () => {
       getByText('PREMIUM').props.style,
     );
 
-    expect(rootStyle.minHeight).toBe(68);
+    expect(rootStyle.minHeight).toBe(72);
     expect(lockedBlurStyle.paddingVertical).toBe(2);
     expect(lockedPlaceholderStyle.height).toBe(10);
     expect(lockedTagStyle.paddingVertical).toBe(2);
@@ -498,7 +516,7 @@ describe('MetricCard', () => {
       getByText('Loading').props.style,
     );
 
-    expect(StyleSheet.flatten(getByTestId('metric-card-root').props.style).minHeight).toBe(68);
+    expect(StyleSheet.flatten(getByTestId('metric-card-root').props.style).minHeight).toBe(72);
     expect(loadingBlurStyle.paddingVertical).toBe(2);
     expect(loadingPlaceholderStyle.height).toBe(10);
     expect(loadingTagStyle.paddingVertical).toBe(2);

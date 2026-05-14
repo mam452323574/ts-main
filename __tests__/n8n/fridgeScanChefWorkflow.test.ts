@@ -51,62 +51,117 @@ describe('fridge scan n8n workflow', () => {
     const workflow = readWorkflow();
     const normalizeNode = getNode(workflow, 'Normalize inbound fridge scan');
 
-    expect(normalizeNode.parameters?.jsCode).toContain('const root = $json');
-    expect(normalizeNode.parameters?.jsCode).toContain('const body = root.body');
-    expect(normalizeNode.parameters?.jsCode).toContain('const input = body ?? root');
+    expect(normalizeNode.parameters?.jsCode).toContain('const root=$json');
+    expect(normalizeNode.parameters?.jsCode).toContain('const body=root.body');
+    expect(normalizeNode.parameters?.jsCode).toContain('const input=body??root');
     expect(normalizeNode.parameters?.jsCode).toContain('callback_nonce');
-    expect(normalizeNode.parameters?.jsCode).toContain('image_path');
+    expect(normalizeNode.parameters?.jsCode).toContain('image_base64');
   });
 
-  it('downloads and normalizes the image into the binary data field expected by OpenAI', () => {
+  it('converts the normalized base64 image into the binary field expected by OpenAI', () => {
     const workflow = readWorkflow();
-    const downloadNode = getNode(workflow, 'Download image');
-    const normalizeDownloadNode = getNode(workflow, 'Normalize download result');
-    const detectNode = getNode(workflow, 'Detect ingredients');
+    const convertNode = getNode(workflow, 'Convert to File');
+    const llmNodes = [
+      getNode(workflow, 'Analyze Diet Chef Image'),
+      getNode(workflow, 'Analyze Muscle Chef Image'),
+      getNode(workflow, 'Analyze Gourmand Chef Image'),
+    ];
 
-    expect(downloadNode.parameters?.options).toMatchObject({
-      response: {
-        response: {
-          responseFormat: 'file',
-          outputPropertyName: 'data',
-          neverError: true,
-        },
-      },
+    expect(convertNode.parameters).toMatchObject({
+      operation: 'toBinary',
+      sourceProperty: 'image_base64',
     });
-    expect(normalizeDownloadNode.parameters?.jsCode).toContain(
-      '$input.item.binary ?? {}',
-    );
-    expect(normalizeDownloadNode.parameters?.jsCode).toContain(
-      'binary.data ??',
-    );
-    expect(normalizeDownloadNode.parameters?.jsCode).toContain(
-      'binary_field_name',
-    );
-    expect(detectNode.parameters).toMatchObject({
-      inputType: 'base64',
-      binaryPropertyName: 'data',
-    });
+    for (const llmNode of llmNodes) {
+      expect(JSON.stringify(llmNode.parameters)).toContain('imageBinary');
+      expect(JSON.stringify(llmNode.parameters)).toContain('binaryImageDataKey');
+      expect(JSON.stringify(llmNode.parameters)).toContain('data');
+    }
   });
 
-  it('guards OpenAI analysis behind a binary download check without the legacy merge', () => {
+  it('guards OpenAI analysis behind the normalized payload branch and routes through chef-specific branches', () => {
     const workflow = readWorkflow();
 
-    expect(workflow.connections['Normalize download result'].main[0][0].node).toBe(
-      'If image downloaded',
+    expect(workflow.connections['If normalized payload'].main[0]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          node: 'Convert to File',
+          type: 'main',
+          index: 0,
+        }),
+        expect.objectContaining({
+          node: 'Snapshot callback context',
+          type: 'main',
+          index: 0,
+        }),
+      ]),
     );
-    expect(workflow.connections['If image downloaded'].main[0][0]).toEqual(
-      expect.objectContaining({
-        node: 'Detect ingredients',
-        type: 'main',
-        index: 0,
-      }),
+    expect(workflow.connections['Convert to File'].main[0][0].node).toBe(
+      'Merge LLM Input + Context',
     );
-    expect(workflow.connections['If image downloaded'].main[1][0]).toEqual(
-      expect.objectContaining({
-        node: 'Build fallback completion',
-        type: 'main',
-        index: 0,
-      }),
+    expect(workflow.connections['Snapshot callback context'].main[0]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          node: 'Merge LLM Input + Context',
+          type: 'main',
+          index: 1,
+        }),
+        expect.objectContaining({
+          node: 'Merge Diet Chef + Context',
+          type: 'main',
+          index: 1,
+        }),
+        expect.objectContaining({
+          node: 'Merge Muscle Chef + Context',
+          type: 'main',
+          index: 1,
+        }),
+        expect.objectContaining({
+          node: 'Merge Gourmand Chef + Context',
+          type: 'main',
+          index: 1,
+        }),
+      ]),
+    );
+    expect(workflow.connections['Merge LLM Input + Context'].main[0][0].node).toBe(
+      'Switch chef_mode',
+    );
+    expect(workflow.connections['Switch chef_mode'].main[0][0].node).toBe(
+      'Analyze Diet Chef Image',
+    );
+    expect(workflow.connections['Switch chef_mode'].main[1][0].node).toBe(
+      'Analyze Muscle Chef Image',
+    );
+    expect(workflow.connections['Switch chef_mode'].main[2][0].node).toBe(
+      'Analyze Gourmand Chef Image',
+    );
+    expect(workflow.connections['Analyze Diet Chef Image'].main[0][0].node).toBe(
+      'Merge Diet Chef + Context',
+    );
+    expect(workflow.connections['Analyze Muscle Chef Image'].main[0][0].node).toBe(
+      'Merge Muscle Chef + Context',
+    );
+    expect(workflow.connections['Analyze Gourmand Chef Image'].main[0][0].node).toBe(
+      'Merge Gourmand Chef + Context',
+    );
+    expect(workflow.connections['Merge Diet Chef + Context'].main[0][0].node).toBe(
+      'Validate completion',
+    );
+    expect(workflow.connections['Merge Muscle Chef + Context'].main[0][0].node).toBe(
+      'Validate completion',
+    );
+    expect(
+      workflow.connections['Merge Gourmand Chef + Context'].main[0][0].node,
+    ).toBe('Validate completion');
+    expect(
+      workflow.connections['OpenAI Chat Model'].ai_languageModel[0].map(
+        (connection: { node: string }) => connection.node,
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        'Analyze Diet Chef Image',
+        'Analyze Muscle Chef Image',
+        'Analyze Gourmand Chef Image',
+      ]),
     );
     expect(workflow.nodes.map((node) => node.name)).not.toContain(
       'Merge Download + Meta1',
@@ -116,6 +171,36 @@ describe('fridge scan n8n workflow', () => {
     );
   });
 
+  it('defines distinct prompts for each chef branch while keeping the same wrapper contract', () => {
+    const workflow = readWorkflow();
+    const dietNode = getNode(workflow, 'Analyze Diet Chef Image');
+    const muscleNode = getNode(workflow, 'Analyze Muscle Chef Image');
+    const gourmandNode = getNode(workflow, 'Analyze Gourmand Chef Image');
+
+    expect(dietNode.parameters?.text).toContain('result_type');
+    expect(dietNode.parameters?.text).toContain('payload');
+    expect(dietNode.parameters?.text).toContain('payload.mode_selected must be exactly "diet"');
+    expect(dietNode.parameters?.text).toContain('balance');
+    expect(dietNode.parameters?.text).toContain('lightness');
+
+    expect(muscleNode.parameters?.text).toContain('result_type');
+    expect(muscleNode.parameters?.text).toContain('payload');
+    expect(muscleNode.parameters?.text).toContain(
+      'payload.mode_selected must be exactly "muscle_gain"',
+    );
+    expect(muscleNode.parameters?.text).toContain('protein density');
+    expect(muscleNode.parameters?.text).toContain('recovery');
+
+    expect(gourmandNode.parameters?.text).toContain('result_type');
+    expect(gourmandNode.parameters?.text).toContain('payload');
+    expect(gourmandNode.parameters?.text).toContain(
+      'payload.mode_selected must be exactly "gourmand"',
+    );
+    expect(gourmandNode.parameters?.text).toContain('flavor');
+    expect(gourmandNode.parameters?.text).toContain('comfort');
+    expect(gourmandNode.parameters?.text).toContain('pleasure');
+  });
+
   it('signs a compact HMAC callback for the Supabase completion function', () => {
     const workflow = readWorkflow();
     const signNode = getNode(workflow, 'Build signed callback');
@@ -123,7 +208,7 @@ describe('fridge scan n8n workflow', () => {
 
     expect(signNode.parameters?.jsCode).toContain('createHmac');
     expect(signNode.parameters?.jsCode).toContain('PHASE2_WEBHOOK_HMAC_SECRET');
-    expect(signNode.parameters?.jsCode).toContain('slice(0, 1200)');
+    expect(signNode.parameters?.jsCode).toContain('slice(0,1200)');
     expect(completeNode.parameters?.url).toContain('/functions/v1/fridge-scan-complete');
     expect(JSON.stringify(completeNode.parameters)).toContain('x-webhook-timestamp');
     expect(JSON.stringify(completeNode.parameters)).toContain('x-webhook-signature');

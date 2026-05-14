@@ -1,6 +1,6 @@
 import { Redirect, useLocalSearchParams } from 'expo-router';
 
-import { useFeatureFlags } from '@/hooks/queries';
+import { useFeatureFlags } from '@/hooks/queries/useFeatureFlags';
 import {
   resolveSocialCommentsGate,
   shouldEnableSocialComments,

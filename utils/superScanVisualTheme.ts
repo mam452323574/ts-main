@@ -1,8 +1,10 @@
 import {
   ThemeColors,
   mixColors,
+  softenAccentColor,
   withAlpha,
 } from '@/constants/theme';
+import { getResultScreenGradient } from '@/utils/resultLayout';
 import { parseSafeNumber } from '@/utils/scanFormatters';
 import type {
   ResultItemThemeSpec,
@@ -33,7 +35,7 @@ export interface ResolvedSuperScanPalette {
   accentColor: string;
   accentColorSecondary: string;
   premiumWarmAccentColor: string;
-  backgroundGradient: [string, string];
+  backgroundGradient: [string, string, string];
   heroGradient: [string, string];
   heroBorderColor: string;
   heroBadgeBackgroundColor: string;
@@ -124,8 +126,8 @@ const PREMIUM_NEUTRAL_DARK_EDGE = '#212A38';
 const PREMIUM_NEUTRAL_LIGHT_BASE = '#EEF1F6';
 const PREMIUM_NEUTRAL_LIGHT_ELEVATED = '#F7F8FB';
 const PREMIUM_NEUTRAL_LIGHT_EDGE = '#D7DEE8';
-const PREMIUM_WARM_CHAMPAGNE = '#C9A46A';
-const PREMIUM_WARM_BRONZE = '#8C6742';
+const PREMIUM_WARM_CHAMPAGNE = '#B8955D';
+const PREMIUM_WARM_BRONZE = '#7A6547';
 
 function resolveAccentGreen(colors: ThemeColors) {
   return colors.accentGreen ?? colors.success;
@@ -238,103 +240,98 @@ function buildScreenPalette(
     colors,
     isDark,
   );
-  const premiumWarmAccentColor = resolvePremiumWarmAccent(isDark);
+  const softenedAccentColor = softenAccentColor(colors, isDark, accentColor, 'standard');
+  const softenedAccentSecondary = softenAccentColor(colors, isDark, accentColorSecondary, 'selected');
+  const premiumWarmAccentColor = softenAccentColor(colors, isDark, resolvePremiumWarmAccent(isDark), 'selected');
   const baseSurfaces = resolvePremiumBaseSurfaces(colors, isDark);
-  const blendedAccentBorder = mixColors(accentColor, premiumWarmAccentColor, 0.18);
+  const blendedAccentBorder = mixColors(softenedAccentColor, premiumWarmAccentColor, 0.12);
   const tonedAccentText = mixColors(
-    accentColorSecondary,
+    softenedAccentSecondary,
     premiumWarmAccentColor,
-    isDark ? 0.18 : 0.12,
+    isDark ? 0.12 : 0.08,
   );
 
   return {
     key,
-    accentColor,
-    accentColorSecondary,
+    accentColor: softenedAccentColor,
+    accentColorSecondary: softenedAccentSecondary,
     premiumWarmAccentColor,
-    backgroundGradient: [
-      mixColors(
-        baseSurfaces.backgroundStart,
-        accentColorSecondary,
-        isDark ? 0.08 : 0.035,
-      ),
-      mixColors(
-        baseSurfaces.backgroundEnd,
-        premiumWarmAccentColor,
-        isDark ? 0.025 : 0.018,
-      ),
-    ],
+    backgroundGradient: getResultScreenGradient({
+      colors,
+      isDark,
+      accentColor: softenedAccentColor,
+    }),
     heroGradient: [
       mixColors(
         baseSurfaces.heroStart,
         premiumWarmAccentColor,
-        isDark ? 0.06 : 0.025,
+        isDark ? 0.035 : 0.016,
       ),
       mixColors(
         baseSurfaces.heroEnd,
-        accentColor,
-        isDark ? 0.12 : 0.05,
+        softenedAccentColor,
+        isDark ? 0.07 : 0.03,
       ),
     ],
-    heroBorderColor: withAlpha(blendedAccentBorder, isDark ? 0.22 : 0.16),
+    heroBorderColor: withAlpha(blendedAccentBorder, isDark ? 0.16 : 0.1),
     heroBadgeBackgroundColor: mixColors(
       baseSurfaces.secondaryBackground,
       premiumWarmAccentColor,
-      isDark ? 0.18 : 0.08,
+      isDark ? 0.1 : 0.045,
     ),
-    heroBadgeBorderColor: withAlpha(blendedAccentBorder, isDark ? 0.3 : 0.18),
+    heroBadgeBorderColor: withAlpha(blendedAccentBorder, isDark ? 0.2 : 0.12),
     heroBadgeTextColor: tonedAccentText,
     heroIconBackgroundColor: baseSurfaces.heroIconBackground,
-    heroIconBorderColor: withAlpha(blendedAccentBorder, isDark ? 0.24 : 0.18),
+    heroIconBorderColor: withAlpha(blendedAccentBorder, isDark ? 0.16 : 0.1),
     heroIconColor: premiumWarmAccentColor,
-    scoreColor: mixColors(accentColorSecondary, colors.primaryText, isDark ? 0.08 : 0.04),
-    sectionAccentColor: accentColor,
+    scoreColor: mixColors(softenedAccentSecondary, colors.primaryText, isDark ? 0.08 : 0.04),
+    sectionAccentColor: softenedAccentColor,
     sectionSurfaceVariant: 'neutral',
     sectionBackgroundColor: baseSurfaces.sectionBackground,
     sectionBorderColor: withAlpha(
-      mixColors(colors.gray, blendedAccentBorder, isDark ? 0.26 : 0.18),
-      isDark ? 0.2 : 0.12,
+      mixColors(colors.gray, blendedAccentBorder, isDark ? 0.18 : 0.12),
+      isDark ? 0.14 : 0.08,
     ),
     chipBackgroundColor: mixColors(
       baseSurfaces.secondaryBackground,
-      accentColor,
-      isDark ? 0.12 : 0.08,
+      softenedAccentColor,
+      isDark ? 0.07 : 0.04,
     ),
-    chipBorderColor: withAlpha(blendedAccentBorder, isDark ? 0.18 : 0.12),
+    chipBorderColor: withAlpha(blendedAccentBorder, isDark ? 0.12 : 0.08),
     chipTextColor: tonedAccentText,
     secondarySurfaceBackgroundColor: baseSurfaces.secondaryBackground,
     secondarySurfaceBorderColor: withAlpha(
-      mixColors(colors.gray, premiumWarmAccentColor, isDark ? 0.16 : 0.12),
-      isDark ? 0.16 : 0.1,
+      mixColors(colors.gray, premiumWarmAccentColor, isDark ? 0.1 : 0.08),
+      isDark ? 0.1 : 0.07,
     ),
     subtleBackgroundColor: baseSurfaces.subtleBackground,
     subtleBorderColor: withAlpha(
-      mixColors(colors.gray, accentColor, isDark ? 0.2 : 0.12),
-      isDark ? 0.14 : 0.1,
+      mixColors(colors.gray, softenedAccentColor, isDark ? 0.12 : 0.08),
+      isDark ? 0.09 : 0.065,
     ),
-    subtleTextColor: mixColors(colors.gray, accentColorSecondary, isDark ? 0.16 : 0.12),
+    subtleTextColor: mixColors(colors.gray, softenedAccentSecondary, isDark ? 0.1 : 0.08),
     countBadgeBackgroundColor: mixColors(
       baseSurfaces.secondaryBackground,
       premiumWarmAccentColor,
-      isDark ? 0.08 : 0.045,
+      isDark ? 0.045 : 0.025,
     ),
     countBadgeTextColor: mixColors(colors.primaryText, tonedAccentText, isDark ? 0.12 : 0.06),
     shareBackgroundColor: mixColors(
       baseSurfaces.secondaryBackground,
       premiumWarmAccentColor,
-      isDark ? 0.06 : 0.03,
+      isDark ? 0.035 : 0.018,
     ),
-    shareBorderColor: withAlpha(blendedAccentBorder, isDark ? 0.18 : 0.12),
-    shareIconColor: mixColors(premiumWarmAccentColor, accentColorSecondary, isDark ? 0.16 : 0.22),
+    shareBorderColor: withAlpha(blendedAccentBorder, isDark ? 0.12 : 0.08),
+    shareIconColor: mixColors(premiumWarmAccentColor, softenedAccentSecondary, isDark ? 0.12 : 0.16),
     shareTextColor: mixColors(colors.primaryText, premiumWarmAccentColor, isDark ? 0.12 : 0.08),
     disclaimerBackgroundColor: mixColors(
       baseSurfaces.secondaryBackground,
-      accentColor,
-      isDark ? 0.05 : 0.025,
+      softenedAccentColor,
+      isDark ? 0.03 : 0.016,
     ),
     disclaimerBorderColor: withAlpha(
-      mixColors(colors.gray, accentColor, isDark ? 0.18 : 0.12),
-      isDark ? 0.14 : 0.1,
+      mixColors(colors.gray, softenedAccentColor, isDark ? 0.11 : 0.08),
+      isDark ? 0.09 : 0.065,
     ),
     disclaimerTextColor: mixColors(
       colors.gray,
@@ -412,34 +409,41 @@ function buildAreaMetricTheme(options: {
     options.colors,
     options.isDark,
   );
+  const accentColor = softenAccentColor(options.colors, options.isDark, accents.accentColor, 'standard');
+  const accentColorSecondary = softenAccentColor(
+    options.colors,
+    options.isDark,
+    accents.accentColorSecondary,
+    'selected',
+  );
 
   return {
     backgroundColor: withAlpha(
-      accents.accentColor,
+      accentColor,
       options.highlighted
         ? options.isDark
-          ? 0.16
-          : 0.08
+          ? 0.075
+          : 0.038
         : options.isDark
-          ? 0.08
-          : 0.04,
+          ? 0.032
+          : 0.016,
     ),
     borderColor: withAlpha(
-      accents.accentColor,
+      accentColor,
       options.highlighted
         ? options.isDark
-          ? 0.28
-          : 0.16
+          ? 0.13
+          : 0.075
         : options.isDark
-          ? 0.16
-          : 0.08,
+          ? 0.065
+          : 0.038,
     ),
     valueColor: options.highlighted
-      ? accents.accentColorSecondary
+      ? accentColorSecondary
       : mixColors(
           options.colors.primaryText,
-          accents.accentColorSecondary,
-          options.isDark ? 0.2 : 0.14,
+          accentColorSecondary,
+          options.isDark ? 0.14 : 0.1,
         ),
   };
 }
@@ -605,50 +609,57 @@ export function resolveSuperScanAreaTheme(options: {
     options.colors,
     options.isDark,
   );
+  const accentColor = softenAccentColor(options.colors, options.isDark, accents.accentColor, 'standard');
+  const accentColorSecondary = softenAccentColor(
+    options.colors,
+    options.isDark,
+    accents.accentColorSecondary,
+    'selected',
+  );
 
   return {
     key: paletteKey,
-    accentColor: accents.accentColor,
+    accentColor,
     cardBackgroundColor: mixColors(
-      options.colors.cardBackground,
-      accents.accentColor,
-      options.isDark ? 0.08 : 0.04,
+      options.colors.surfaceElevated ?? options.colors.cardBackground,
+      accentColor,
+      options.isDark ? 0.026 : 0.012,
     ),
     cardBorderColor: withAlpha(
-      accents.accentColor,
-      options.isDark ? 0.16 : 0.1,
+      accentColor,
+      options.isDark ? 0.075 : 0.045,
     ),
     dominantBadgeBackgroundColor: withAlpha(
-      accents.accentColor,
-      options.isDark ? 0.18 : 0.1,
+      accentColor,
+      options.isDark ? 0.1 : 0.06,
     ),
     dominantBadgeBorderColor: withAlpha(
-      accents.accentColor,
-      options.isDark ? 0.28 : 0.16,
+      accentColor,
+      options.isDark ? 0.18 : 0.1,
     ),
-    dominantBadgeValueColor: accents.accentColorSecondary,
+    dominantBadgeValueColor: accentColorSecondary,
     chipBackgroundColor: withAlpha(
-      accents.accentColor,
-      options.isDark ? 0.12 : 0.08,
+      accentColor,
+      options.isDark ? 0.075 : 0.045,
     ),
     chipBorderColor: withAlpha(
-      accents.accentColor,
-      options.isDark ? 0.2 : 0.12,
+      accentColor,
+      options.isDark ? 0.13 : 0.08,
     ),
-    chipTextColor: accents.accentColorSecondary,
+    chipTextColor: accentColorSecondary,
     sectionBackgroundColor: mixColors(
-      options.colors.cardBackground,
-      accents.accentColor,
-      options.isDark ? 0.08 : 0.04,
+      options.colors.surfaceMuted ?? options.colors.cardBackground,
+      accentColor,
+      options.isDark ? 0.022 : 0.01,
     ),
     sectionBorderColor: withAlpha(
-      accents.accentColor,
-      options.isDark ? 0.16 : 0.1,
+      accentColor,
+      options.isDark ? 0.07 : 0.042,
     ),
     sectionLabelColor: mixColors(
       options.colors.gray,
-      accents.accentColorSecondary,
-      options.isDark ? 0.16 : 0.12,
+      accentColorSecondary,
+      options.isDark ? 0.1 : 0.08,
     ),
     highlightMetricKey,
     metricThemes: {

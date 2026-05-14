@@ -56,10 +56,18 @@ export interface FridgeScanSubmission {
   selectedMode: FridgeMealMode;
 }
 
+export interface PreEncodedFridgeScanImage {
+  base64?: string | null;
+  width?: number | null;
+  height?: number | null;
+  source?: FridgeScanCaptureSource;
+}
+
 export interface SubmitFridgeScanCaptureInput {
   imageUri: string;
   source: FridgeScanCaptureSource;
   selectedMode: FridgeMealMode;
   locale?: string;
   clientMetadata?: Record<string, unknown>;
+  preEncodedJpeg?: PreEncodedFridgeScanImage;
 }
