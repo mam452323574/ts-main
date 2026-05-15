@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import {
   ActivityIndicator,
-  Image,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -19,6 +18,7 @@ import {
   Users,
 } from 'lucide-react-native';
 
+import { OptimizedImage } from '@/components/OptimizedImage';
 import { SocialCategoryPill } from '@/components/social/SocialCategoryPill';
 import { SocialIdentityRow } from '@/components/social/SocialIdentityRow';
 import {
@@ -371,9 +371,10 @@ export function AdminModerationCard({
             ) : null}
 
             {item.asset_url ? (
-              <Image
+              <OptimizedImage
                 source={{ uri: item.asset_url }}
-                resizeMode="cover"
+                contentFit="cover"
+                recyclingKey={item.content_id}
                 style={stylesMemo.previewImage}
                 testID={`admin-social-image-${item.content_id}`}
               />

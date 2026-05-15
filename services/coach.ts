@@ -17,6 +17,7 @@ import {
   resolveCoachQuestionSelection,
 } from '@/shared/coachQuestions';
 import {
+  FREE_QUESTION_PROMPT_TYPE,
   getCoachPromptScanQuota,
   LATEST_SCAN_ISSUE_RESOLUTION_PROMPT_TYPE,
   normalizeCoachGenerationPromptType,
@@ -3015,6 +3016,7 @@ function resolveSelectedScanForPrompt(
       );
     case 'risk_watch':
       return findLatestScanByType(scans, 'super') ?? scans[0] ?? null;
+    case 'free_question':
     case 'recovery_plan':
     case 'trend_review':
     case 'weekly_plan':
@@ -4392,7 +4394,10 @@ export function buildCoachPayload(
   const visiblePromptType = resolveVisibleCoachPromptType(promptType);
   const requestedSelectedScanId =
     normalizeSelectedCoachScanId(options.selectedScanId);
-  const scanIntentPayload = normalizeCoachScanIntentPayload(options.scanIntent);
+  const scanIntentPayload =
+    promptType === FREE_QUESTION_PROMPT_TYPE
+      ? null
+      : normalizeCoachScanIntentPayload(options.scanIntent);
   const selectedScan = resolveSelectedScanForPrompt(
     promptType,
     scans,
@@ -4545,7 +4550,14 @@ function buildLatestScanCompatibleCoachGenerateRequestPayload(
   };
 }
 
-function shouldRetryCoachGenerationWithLegacyPayload(error: unknown) {
+function shouldRetryCoachGenerationWithLegacyPayload(
+  error: unknown,
+  requestPayload: ReturnType<typeof buildCoachGenerateRequestPayload>,
+) {
+  if (requestPayload.payload.prompt_type === FREE_QUESTION_PROMPT_TYPE) {
+    return false;
+  }
+
   return (
     error instanceof CoachServiceError &&
     error.functionName === COACH_FUNCTION_NAME &&
@@ -4602,7 +4614,14 @@ function buildCoachGuidanceResult(
   };
 }
 
-function shouldFallbackToCachedCoachEntry(error: unknown) {
+function shouldFallbackToCachedCoachEntry(
+  error: unknown,
+  promptType?: CoachGenerationPromptType | null,
+) {
+  if (promptType === FREE_QUESTION_PROMPT_TYPE) {
+    return false;
+  }
+
   if (!(error instanceof CoachServiceError)) {
     return true;
   }
@@ -5137,7 +5156,7 @@ export async function generateCoachGuidance(options: {
           buildLatestScanCompatibleCoachGenerateRequestPayload(requestPayload),
         );
       } else {
-        if (!shouldRetryCoachGenerationWithLegacyPayload(error)) {
+        if (!shouldRetryCoachGenerationWithLegacyPayload(error, requestPayload)) {
           throw error;
         }
 
@@ -5204,7 +5223,10 @@ export async function generateCoachGuidance(options: {
         selectedScanId: requestedSelectedScanId,
         scanIntent: options.scanIntent,
       });
-    const shouldUseFallback = shouldFallbackToCachedCoachEntry(error);
+    const shouldUseFallback = shouldFallbackToCachedCoachEntry(
+      error,
+      options.promptType,
+    );
     if (shouldDebugCoachService()) {
       const errorDebugInfo = getCoachServiceErrorDebugInfo(error);
 

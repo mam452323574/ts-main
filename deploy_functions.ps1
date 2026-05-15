@@ -44,7 +44,7 @@ function Invoke-SupabaseFunctionsList {
     [string]$ResolvedProjectRef
   )
 
-  $listOutput = & npx.cmd supabase functions list --project-ref $ResolvedProjectRef 2>&1
+  $listOutput = & npx.cmd supabase functions list --project-ref $ResolvedProjectRef 2>$null
 
   if ($LASTEXITCODE -ne 0) {
     throw "Failed to list deployed functions on project $ResolvedProjectRef"
@@ -314,6 +314,16 @@ function Invoke-FunctionBundleVerification {
     return
   }
 
+  $additionalFunctionFileChecks = @()
+  if ($rule.PSObject.Properties.Name -contains 'AdditionalFunctionFileChecks') {
+    $additionalFunctionFileChecks = @($rule.AdditionalFunctionFileChecks)
+  }
+
+  $sharedFileChecks = @()
+  if ($rule.PSObject.Properties.Name -contains 'SharedFileChecks') {
+    $sharedFileChecks = @($rule.SharedFileChecks)
+  }
+
   $verificationRoot = Join-Path (
     [System.IO.Path]::GetTempPath()
   ) ("supabase-edge-verify-{0}-{1}" -f $FunctionName, [guid]::NewGuid().ToString('N'))
@@ -336,7 +346,7 @@ function Invoke-FunctionBundleVerification {
       -DownloadedPath $downloadedFunctionPath `
       -Label "$FunctionName index.ts"
 
-    foreach ($additionalFunctionFilePath in @($rule.AdditionalFunctionFileChecks)) {
+    foreach ($additionalFunctionFilePath in $additionalFunctionFileChecks) {
       $localAdditionalFunctionPath = Join-Path $ScriptRoot "supabase\functions\$FunctionName\$additionalFunctionFilePath"
       $downloadedAdditionalFunctionPath = Join-Path $verificationRoot "supabase\functions\$FunctionName\$additionalFunctionFilePath"
 
@@ -346,7 +356,7 @@ function Invoke-FunctionBundleVerification {
         -Label "$FunctionName $additionalFunctionFilePath"
     }
 
-    foreach ($sharedFileCheck in @($rule.SharedFileChecks)) {
+    foreach ($sharedFileCheck in $sharedFileChecks) {
       $localSharedPath = Join-Path $ScriptRoot $sharedFileCheck.SharedFileRelativePath
       $downloadedSharedPath = Join-Path $verificationRoot $sharedFileCheck.SharedFileRelativePath
       $sharedBundleLabel = "$FunctionName shared bundle: $($sharedFileCheck.SharedFileRelativePath)"

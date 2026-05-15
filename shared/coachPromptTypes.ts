@@ -15,8 +15,10 @@ export type CoachPromptType = (typeof COACH_PROMPT_TYPES)[number];
 
 export const LATEST_SCAN_ISSUE_RESOLUTION_PROMPT_TYPE =
   'latest_scan_issue_resolution' as const;
+export const FREE_QUESTION_PROMPT_TYPE = 'free_question' as const;
 
 export const COACH_HIDDEN_GENERATION_PROMPT_TYPES = [
+  FREE_QUESTION_PROMPT_TYPE,
   LATEST_SCAN_ISSUE_RESOLUTION_PROMPT_TYPE,
 ] as const;
 
@@ -130,6 +132,10 @@ export function normalizeCoachGenerationPromptType(
 export function resolveVisibleCoachPromptType(
   promptType: CoachGenerationPromptType,
 ): CoachPromptType {
+  if (promptType === FREE_QUESTION_PROMPT_TYPE) {
+    return DEFAULT_COACH_PROMPT_TYPE;
+  }
+
   if (promptType === LATEST_SCAN_ISSUE_RESOLUTION_PROMPT_TYPE) {
     return 'latest_scan';
   }
@@ -235,6 +241,10 @@ const COACH_PROMPT_SCAN_QUOTAS: Record<
   latest_scan_issue_resolution: {
     recentLimit: 5,
     priorLimit: 4,
+  },
+  free_question: {
+    recentLimit: 5,
+    priorLimit: 6,
   },
   weekly_plan: {
     recentLimit: 10,

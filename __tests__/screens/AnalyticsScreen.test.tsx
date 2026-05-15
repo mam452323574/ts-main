@@ -282,7 +282,7 @@ describe('AnalyticsScreen', () => {
     expect(screen.getAllByTestId('mock-line-chart')).toHaveLength(3);
   });
 
-  it('uses one neutral analytics line color instead of the old nutrition green', () => {
+  it('uses distinct metric accent colors for default charts', () => {
     mockUseAnalytics.mockImplementation((period: string) => makeQueryState(period));
 
     render(<AnalyticsScreen />);
@@ -291,12 +291,30 @@ describe('AnalyticsScreen', () => {
     const lineColors = latestCharts.map((chartProps) =>
       chartProps.data.datasets[0].color(1),
     );
+    const configColors = latestCharts.map((chartProps) =>
+      chartProps.chartConfig.color(1),
+    );
 
-    expect(new Set(lineColors).size).toBe(1);
-    expect(lineColors).not.toContain('rgba(52, 199, 89, 1)');
+    expect(new Set(lineColors).size).toBe(3);
+    expect(configColors).toEqual(lineColors);
     lineColors.forEach((lineColor) => {
-      expect(lineColor).not.toContain('52, 199, 89');
+      expect(lineColor).toMatch(/^rgba\(/);
     });
+  });
+
+  it('changes the rendered chart color when a metric tab is selected', () => {
+    mockUseAnalytics.mockImplementation((period: string) => makeQueryState(period));
+
+    render(<AnalyticsScreen />);
+
+    const initialHealthColor = getLatestLineCharts()[0].data.datasets[0].color(1);
+
+    fireEvent.press(screen.getByTestId('analytics-health-metric-collagen'));
+
+    const updatedHealthColor = getLatestLineCharts()[0].data.datasets[0].color(1);
+
+    expect(updatedHealthColor).not.toBe(initialHealthColor);
+    expect(updatedHealthColor).toBe(getLatestLineCharts()[0].chartConfig.color(1));
   });
 
   it('changes period when free period button is pressed', () => {
@@ -307,6 +325,26 @@ describe('AnalyticsScreen', () => {
     fireEvent.press(screen.getByText(PERIOD_LABELS.days30));
 
     expect(mockUseAnalytics).toHaveBeenCalledWith('30days');
+  });
+
+  it('aggregates 30days into roughly one point every two days', async () => {
+    mockUseAnalytics.mockImplementation((period: string) => makeQueryState(period));
+
+    render(<AnalyticsScreen />);
+
+    fireEvent.press(screen.getByText(PERIOD_LABELS.days30));
+
+    await waitFor(() => {
+      expect(mockUseAnalytics).toHaveBeenLastCalledWith('30days');
+    });
+
+    const latestCharts = getLatestLineCharts();
+    expect(latestCharts).toHaveLength(3);
+
+    latestCharts.forEach((chartProps) => {
+      expect(chartProps.data.datasets[0].data).toHaveLength(15);
+      expect(chartProps.data.labels).toHaveLength(15);
+    });
   });
 
   it('shows the premium analytics paywall through i18n keys for locked long periods', () => {
@@ -364,6 +402,8 @@ describe('AnalyticsScreen', () => {
       const visibleLabels = labels.filter(Boolean);
       const flattenedStyle = StyleSheet.flatten(chartProps.style);
 
+      expect(chartProps.data.datasets[0].data).toHaveLength(13);
+      expect(labels).toHaveLength(13);
       expect(visibleLabels).toEqual(['Janvier', 'Février', 'Mars']);
       expect(labels.indexOf('Février') - labels.indexOf('Janvier')).toBeGreaterThan(1);
       expect(chartProps.verticalLabelRotation).toBe(45);

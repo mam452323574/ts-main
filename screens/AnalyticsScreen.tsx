@@ -25,7 +25,18 @@ import {
 } from '@/types';
 import { ErrorMessage } from '@/components/ErrorMessage';
 import { AppScreen } from '@/components/AppScreen';
-import { SIZES, SPACING, BORDER_RADIUS, FONT_WEIGHTS, getMainPageChrome, getObsidianSurface, withAlpha } from '@/constants/theme';
+import {
+  SIZES,
+  SPACING,
+  BORDER_RADIUS,
+  FONT_WEIGHTS,
+  getMainPageChrome,
+  getObsidianSurface,
+  mixColors,
+  softenAccentColor,
+  withAlpha,
+  type ThemeColors,
+} from '@/constants/theme';
 import { ContextualPaywall } from '@/components/ContextualPaywall';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ScreenState } from '@/components/ScreenState';
@@ -57,11 +68,20 @@ type DenseMonthEntry = {
 };
 
 type ChartScaleKind = 'score100' | 'score10' | 'percentage' | 'age' | 'dynamic';
+type AnalyticsMetricAccentKey =
+  | 'blue'
+  | 'green'
+  | 'nutrition'
+  | 'orange'
+  | 'gold'
+  | 'violet'
+  | 'red';
 
 type MetricSelectorOption<T> = {
   id: string;
   labelKey: string;
   scale: ChartScaleKind;
+  accentKey: AnalyticsMetricAccentKey;
   valueExtractor: (item: T) => number;
 };
 
@@ -74,42 +94,49 @@ const DENSE_LABEL_MAX_PADDING = 72;
 const DENSE_LABEL_STANDARD_ROTATION = 45;
 const DENSE_LABEL_COMPACT_ROTATION = 60;
 const EMPTY_ANALYTICS_HISTORY: never[] = [];
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 const HEALTH_CHART_METRICS: ReadonlyArray<MetricSelectorOption<FaceScoreHistoryItem>> = [
   {
     id: 'score',
     labelKey: 'analytics.metric_tabs.score',
     scale: 'score100',
+    accentKey: 'blue',
     valueExtractor: (item) => item.faceScore,
   },
   {
     id: 'skin_quality',
     labelKey: 'analytics.metric_tabs.skin_quality',
     scale: 'score100',
+    accentKey: 'violet',
     valueExtractor: (item) => item.skinQualityScore,
   },
   {
     id: 'symmetry',
     labelKey: 'analytics.metric_tabs.symmetry',
     scale: 'percentage',
+    accentKey: 'blue',
     valueExtractor: (item) => item.symmetryPercentage,
   },
   {
     id: 'energy',
     labelKey: 'analytics.metric_tabs.energy',
     scale: 'score10',
+    accentKey: 'gold',
     valueExtractor: (item) => item.energyScore,
   },
   {
     id: 'hydration',
     labelKey: 'analytics.metric_tabs.hydration',
     scale: 'score100',
+    accentKey: 'blue',
     valueExtractor: (item) => item.hydrationLevel,
   },
   {
     id: 'collagen',
     labelKey: 'analytics.metric_tabs.collagen',
     scale: 'score100',
+    accentKey: 'violet',
     valueExtractor: (item) => item.collagenLevel,
   },
 ];
@@ -119,36 +146,42 @@ const BODY_CHART_METRICS: ReadonlyArray<MetricSelectorOption<BodyScoreHistoryIte
     id: 'score',
     labelKey: 'analytics.metric_tabs.score',
     scale: 'score100',
+    accentKey: 'green',
     valueExtractor: (item) => item.bodyScore,
   },
   {
     id: 'body_fat',
     labelKey: 'analytics.metric_tabs.body_fat',
     scale: 'percentage',
+    accentKey: 'orange',
     valueExtractor: (item) => item.bodyFatPercentage,
   },
   {
     id: 'strength',
     labelKey: 'analytics.metric_tabs.strength',
     scale: 'score100',
+    accentKey: 'green',
     valueExtractor: (item) => item.strengthIndex,
   },
   {
     id: 'posture',
     labelKey: 'analytics.metric_tabs.posture',
     scale: 'score10',
+    accentKey: 'green',
     valueExtractor: (item) => item.postureScore,
   },
   {
     id: 'symmetry',
     labelKey: 'analytics.metric_tabs.symmetry',
     scale: 'percentage',
+    accentKey: 'blue',
     valueExtractor: (item) => item.bodySymmetry,
   },
   {
     id: 'metabolic_age',
     labelKey: 'analytics.metric_tabs.metabolic_age',
     scale: 'age',
+    accentKey: 'orange',
     valueExtractor: (item) => item.metabolicAge,
   },
 ];
@@ -158,39 +191,87 @@ const NUTRITION_CHART_METRICS: ReadonlyArray<MetricSelectorOption<NutritionHisto
     id: 'score',
     labelKey: 'analytics.metric_tabs.score',
     scale: 'score100',
+    accentKey: 'nutrition',
     valueExtractor: (item) => item.nutritionScore,
   },
   {
     id: 'calories',
     labelKey: 'analytics.metric_tabs.calories',
     scale: 'dynamic',
+    accentKey: 'orange',
     valueExtractor: (item) => item.caloriesEstimate,
   },
   {
     id: 'protein',
     labelKey: 'analytics.metric_tabs.protein',
     scale: 'dynamic',
+    accentKey: 'green',
     valueExtractor: (item) => item.proteinGrams,
   },
   {
     id: 'carbs',
     labelKey: 'analytics.metric_tabs.carbs',
     scale: 'dynamic',
+    accentKey: 'blue',
     valueExtractor: (item) => item.carbsGrams,
   },
   {
     id: 'fats',
     labelKey: 'analytics.metric_tabs.fats',
     scale: 'dynamic',
+    accentKey: 'orange',
     valueExtractor: (item) => item.fatGrams,
   },
   {
     id: 'satiety',
     labelKey: 'analytics.metric_tabs.satiety',
     scale: 'score10',
+    accentKey: 'green',
     valueExtractor: (item) => item.satietyIndex,
   },
 ];
+
+const ANALYTICS_METRIC_ACCENT_ALIASES: Record<string, AnalyticsMetricAccentKey> = {
+  fatigue: 'orange',
+  fatigue_level: 'orange',
+  inflammation: 'red',
+  inflammation_index: 'red',
+  inflammation_index_score: 'red',
+};
+
+const resolveAnalyticsMetricAccent = (
+  colors: ThemeColors,
+  isDark: boolean,
+  accentKey: AnalyticsMetricAccentKey | string,
+) => {
+  const resolvedKey = ANALYTICS_METRIC_ACCENT_ALIASES[accentKey] ?? accentKey;
+  const accentBaseByKey: Record<AnalyticsMetricAccentKey, string> = {
+    blue: colors.primary,
+    green: colors.success,
+    nutrition: mixColors(colors.success, colors.warning, isDark ? 0.16 : 0.12),
+    orange: colors.warning,
+    gold: colors.gold,
+    violet: isDark ? '#BFA1FF' : '#7D61C8',
+    red: colors.error,
+  };
+  const baseColor = accentBaseByKey[resolvedKey as AnalyticsMetricAccentKey] ?? colors.primary;
+  const lineColor = softenAccentColor(colors, isDark, baseColor, 'selected');
+  const titleColor = isDark
+    ? mixColors(lineColor, colors.white, 0.18)
+    : mixColors(lineColor, colors.primaryText, 0.18);
+  const chipTextColor = isDark
+    ? mixColors(lineColor, colors.white, 0.24)
+    : mixColors(lineColor, colors.primaryText, 0.34);
+
+  return {
+    lineColor,
+    titleColor,
+    chipTextColor,
+    chipActiveBackgroundColor: withAlpha(lineColor, isDark ? 0.16 : 0.095),
+    chipActiveBorderColor: withAlpha(lineColor, isDark ? 0.34 : 0.22),
+    chipActiveTextColor: titleColor,
+  };
+};
 
 const clamp = (value: number, min: number, max: number): number => {
   return Math.min(max, Math.max(min, value));
@@ -198,41 +279,57 @@ const clamp = (value: number, min: number, max: number): number => {
 
 const aggregateData = <T extends { date: string }>(
   data: T[],
-  bucketSize: number,
+  bucketSpanDays: number,
   valueExtractor: (item: T) => number
 ): AggregatedChartPoint[] => {
-  if (bucketSize <= 1) {
-    return data.map((item) => ({
+  if (data.length === 0) return [];
+
+  const sortedData = [...data].sort(
+    (a, b) => parseLocalDate(a.date).getTime() - parseLocalDate(b.date).getTime(),
+  );
+
+  if (bucketSpanDays <= 1) {
+    return sortedData.map((item) => ({
       date: item.date,
       value: valueExtractor(item),
     }));
   }
 
-  const result: AggregatedChartPoint[] = [];
+  const buckets = new Map<number, T[]>();
+  const anchorDate = parseLocalDate(sortedData[0].date);
 
-  for (let i = 0; i < data.length; i += bucketSize) {
-    const bucket = data.slice(i, i + bucketSize);
-    if (bucket.length === 0) continue;
+  sortedData.forEach((item) => {
+    const itemDate = parseLocalDate(item.date);
+    const dayOffset = Math.max(
+      0,
+      Math.floor((itemDate.getTime() - anchorDate.getTime()) / MS_PER_DAY),
+    );
+    const bucketIndex = Math.floor(dayOffset / bucketSpanDays);
+    const bucket = buckets.get(bucketIndex) ?? [];
+    bucket.push(item);
+    buckets.set(bucketIndex, bucket);
+  });
 
-    const averageValue = bucket.reduce((sum, item) => sum + valueExtractor(item), 0) / bucket.length;
-    const startDate = bucket[0].date;
-    const endDate = bucket[bucket.length - 1].date;
+  return Array.from(buckets.entries())
+    .sort(([bucketIndexA], [bucketIndexB]) => bucketIndexA - bucketIndexB)
+    .map(([, bucket]) => {
+      const averageValue = bucket.reduce((sum, item) => sum + valueExtractor(item), 0) / bucket.length;
+      const startDate = bucket[0].date;
+      const endDate = bucket[bucket.length - 1].date;
 
-    result.push({
-      date: bucket.length > 1 ? `${startDate}|${endDate}` : startDate,
-      value: Math.round(averageValue),
+      return {
+        date: bucket.length > 1 ? `${startDate}|${endDate}` : startDate,
+        value: Math.round(averageValue),
+      };
     });
-  }
-
-  return result;
 };
 
-const getBucketSize = (selectedPeriod: AnalyticsPeriod): number => {
+const getBucketSpanDays = (selectedPeriod: AnalyticsPeriod): number => {
   switch (selectedPeriod) {
     case '7days':
       return 1;
     case '30days':
-      return 3;
+      return 2;
     case '3months':
       return 7;
     case '1year':
@@ -540,35 +637,64 @@ export default function AnalyticsScreen() {
     healthScoreHistory.length > 0 ||
     bodyScoreHistory.length > 0 ||
     nutritionHistory.length > 0;
-  const analyticsChartLineColor = mainPageChrome.chart.line;
-  const analyticsIconColor = mainPageChrome.accentColor;
+  const getMetricAccent = useCallback(
+    (accentKey: AnalyticsMetricAccentKey) =>
+      resolveAnalyticsMetricAccent(colors, isDark, accentKey),
+    [colors, isDark],
+  );
+  const selectedHealthAccent = useMemo(
+    () => getMetricAccent(selectedHealthMetric.accentKey),
+    [getMetricAccent, selectedHealthMetric.accentKey],
+  );
+  const selectedBodyAccent = useMemo(
+    () => getMetricAccent(selectedBodyMetric.accentKey),
+    [getMetricAccent, selectedBodyMetric.accentKey],
+  );
+  const selectedNutritionAccent = useMemo(
+    () => getMetricAccent(selectedNutritionMetric.accentKey),
+    [getMetricAccent, selectedNutritionMetric.accentKey],
+  );
 
-  const chartConfig = useMemo(() => createAnalyticsLikeLineChartConfig({
+  const createMetricChartConfig = useCallback((lineColor: string) => createAnalyticsLikeLineChartConfig({
     backgroundColor: mainPageChrome.elevatedSurface.backgroundColor,
-    lineColor: analyticsChartLineColor,
+    lineColor,
     labelColor: colors.gray,
-    fillShadowGradientFrom: withAlpha(colors.primaryText, isDark ? 0.12 : 0.08),
-    fillShadowGradientTo: mainPageChrome.surface.backgroundColor,
-    fillShadowGradientOpacity: 0.08,
+    fillShadowGradientFrom: lineColor,
+    fillShadowGradientTo: mainPageChrome.elevatedSurface.backgroundColor,
+    fillShadowGradientFromOpacity: isDark ? 0.2 : 0.15,
+    fillShadowGradientToOpacity: 0.02,
     backgroundLineColor: withAlpha(colors.primaryText, 0.14),
     dotStrokeColor: mainPageChrome.elevatedSurface.backgroundColor,
     borderRadius: BORDER_RADIUS.lg,
-  }), [analyticsChartLineColor, colors.gray, colors.primaryText, isDark, mainPageChrome]);
+  }), [colors.gray, colors.primaryText, isDark, mainPageChrome.elevatedSurface.backgroundColor]);
 
-  const bucketSize = getBucketSize(period);
+  const healthChartConfig = useMemo(
+    () => createMetricChartConfig(selectedHealthAccent.lineColor),
+    [createMetricChartConfig, selectedHealthAccent.lineColor],
+  );
+  const bodyChartConfig = useMemo(
+    () => createMetricChartConfig(selectedBodyAccent.lineColor),
+    [createMetricChartConfig, selectedBodyAccent.lineColor],
+  );
+  const nutritionChartConfig = useMemo(
+    () => createMetricChartConfig(selectedNutritionAccent.lineColor),
+    [createMetricChartConfig, selectedNutritionAccent.lineColor],
+  );
+
+  const bucketSpanDays = getBucketSpanDays(period);
   const maxLabels = getMaxLabels(period);
   const isDensePeriod = period === '3months' || period === '1year';
   const chartWidth = Math.max(screenWidth - SPACING.page * 2 - SPACING.lg * 2, 0);
 
   const aggregatedHistory = useMemo(() => {
     return {
-      healthAgg: aggregateData(faceScoreHistory, bucketSize, (item) =>
+      healthAgg: aggregateData(faceScoreHistory, bucketSpanDays, (item) =>
         selectedHealthMetric.valueExtractor(item),
       ),
-      bodyAgg: aggregateData(bodyScoreHistory, bucketSize, (item) =>
+      bodyAgg: aggregateData(bodyScoreHistory, bucketSpanDays, (item) =>
         selectedBodyMetric.valueExtractor(item),
       ),
-      nutritionAgg: aggregateData(nutritionHistory, bucketSize, (item) =>
+      nutritionAgg: aggregateData(nutritionHistory, bucketSpanDays, (item) =>
         selectedNutritionMetric.valueExtractor(item),
       ),
     };
@@ -576,7 +702,7 @@ export default function AnalyticsScreen() {
     faceScoreHistory,
     bodyScoreHistory,
     nutritionHistory,
-    bucketSize,
+    bucketSpanDays,
     selectedHealthMetric,
     selectedBodyMetric,
     selectedNutritionMetric,
@@ -688,24 +814,26 @@ export default function AnalyticsScreen() {
     return {
       healthScoreData: buildChartData(
         aggregatedHistory.healthAgg,
-        analyticsChartLineColor,
+        selectedHealthAccent.lineColor,
         selectedHealthMetric.scale,
       ),
       physicalEvolutionData: buildChartData(
         aggregatedHistory.bodyAgg,
-        analyticsChartLineColor,
+        selectedBodyAccent.lineColor,
         selectedBodyMetric.scale,
       ),
       nutritionScoreData: buildChartData(
         aggregatedHistory.nutritionAgg,
-        analyticsChartLineColor,
+        selectedNutritionAccent.lineColor,
         selectedNutritionMetric.scale,
       ),
     };
   }, [
     aggregatedHistory,
-    analyticsChartLineColor,
     buildChartData,
+    selectedHealthAccent.lineColor,
+    selectedBodyAccent.lineColor,
+    selectedNutritionAccent.lineColor,
     selectedHealthMetric.scale,
     selectedBodyMetric.scale,
     selectedNutritionMetric.scale,
@@ -814,8 +942,10 @@ export default function AnalyticsScreen() {
           }
         >
           <View style={styles.chartHeaderWithIcon}>
-            <Heart color={analyticsIconColor} size={20} />
-            <Text style={styles.chartTitle}>{t('analytics.health_score')}</Text>
+            <Heart color={selectedHealthAccent.lineColor} size={20} />
+            <Text style={[styles.chartTitle, { color: selectedHealthAccent.titleColor }]}>
+              {t('analytics.health_score')}
+            </Text>
           </View>
           <Text style={styles.chartSubtitle}>{t('analytics.health_score_subtitle')}</Text>
           <ScrollView
@@ -826,6 +956,7 @@ export default function AnalyticsScreen() {
           >
             {HEALTH_CHART_METRICS.map((metric) => {
               const isSelected = selectedHealthMetric.id === metric.id;
+              const metricAccent = getMetricAccent(metric.accentKey);
 
               return (
                 <TouchableOpacity
@@ -835,7 +966,12 @@ export default function AnalyticsScreen() {
                   accessibilityState={{ selected: isSelected }}
                   style={[
                     styles.metricButton,
+                    { borderColor: withAlpha(metricAccent.lineColor, isDark ? 0.16 : 0.11) },
                     isSelected && styles.metricButtonActive,
+                    isSelected && {
+                      backgroundColor: metricAccent.chipActiveBackgroundColor,
+                      borderColor: metricAccent.chipActiveBorderColor,
+                    },
                   ]}
                   testID={`analytics-health-metric-${metric.id}`}
                   onPress={() => setHealthMetricId(metric.id)}
@@ -843,7 +979,9 @@ export default function AnalyticsScreen() {
                   <Text
                     style={[
                       styles.metricButtonText,
+                      { color: metricAccent.chipTextColor },
                       isSelected && styles.metricButtonTextActive,
+                      isSelected && { color: metricAccent.chipActiveTextColor },
                     ]}
                   >
                     {t(metric.labelKey)}
@@ -857,11 +995,7 @@ export default function AnalyticsScreen() {
               data={healthScoreData}
               width={chartWidth}
               height={220}
-              chartConfig={{
-                ...chartConfig,
-                fillShadowGradientFrom: withAlpha(colors.primaryText, isDark ? 0.12 : 0.08),
-                fillShadowGradientTo: mainPageChrome.elevatedSurface.backgroundColor,
-              }}
+              chartConfig={healthChartConfig}
               {...ANALYTICS_LIKE_LINE_CHART_PROPS}
               style={chartStyle}
               yAxisInterval={selectedHealthMetric.scale === 'score10' ? 1 : 10}
@@ -885,8 +1019,10 @@ export default function AnalyticsScreen() {
           }
         >
           <View style={styles.chartHeaderWithIcon}>
-            <Activity color={analyticsIconColor} size={20} />
-            <Text style={styles.chartTitle}>{t('analytics.physical_evolution')}</Text>
+            <Activity color={selectedBodyAccent.lineColor} size={20} />
+            <Text style={[styles.chartTitle, { color: selectedBodyAccent.titleColor }]}>
+              {t('analytics.physical_evolution')}
+            </Text>
           </View>
           <Text style={styles.chartSubtitle}>{t('analytics.physical_evolution_subtitle')}</Text>
           <ScrollView
@@ -897,6 +1033,7 @@ export default function AnalyticsScreen() {
           >
             {BODY_CHART_METRICS.map((metric) => {
               const isSelected = selectedBodyMetric.id === metric.id;
+              const metricAccent = getMetricAccent(metric.accentKey);
 
               return (
                 <TouchableOpacity
@@ -906,7 +1043,12 @@ export default function AnalyticsScreen() {
                   accessibilityState={{ selected: isSelected }}
                   style={[
                     styles.metricButton,
+                    { borderColor: withAlpha(metricAccent.lineColor, isDark ? 0.16 : 0.11) },
                     isSelected && styles.metricButtonActive,
+                    isSelected && {
+                      backgroundColor: metricAccent.chipActiveBackgroundColor,
+                      borderColor: metricAccent.chipActiveBorderColor,
+                    },
                   ]}
                   testID={`analytics-body-metric-${metric.id}`}
                   onPress={() => setBodyMetricId(metric.id)}
@@ -914,7 +1056,9 @@ export default function AnalyticsScreen() {
                   <Text
                     style={[
                       styles.metricButtonText,
+                      { color: metricAccent.chipTextColor },
                       isSelected && styles.metricButtonTextActive,
+                      isSelected && { color: metricAccent.chipActiveTextColor },
                     ]}
                   >
                     {t(metric.labelKey)}
@@ -928,11 +1072,7 @@ export default function AnalyticsScreen() {
               data={physicalEvolutionData}
               width={chartWidth}
               height={220}
-              chartConfig={{
-                ...chartConfig,
-                fillShadowGradientFrom: withAlpha(colors.primaryText, isDark ? 0.12 : 0.08),
-                fillShadowGradientTo: mainPageChrome.elevatedSurface.backgroundColor,
-              }}
+              chartConfig={bodyChartConfig}
               {...ANALYTICS_LIKE_LINE_CHART_PROPS}
               style={chartStyle}
               verticalLabelRotation={denseXAxisLayout.labelRotation}
@@ -955,8 +1095,10 @@ export default function AnalyticsScreen() {
           }
         >
           <View style={styles.chartHeaderWithIcon}>
-            <Utensils color={analyticsIconColor} size={20} />
-            <Text style={styles.chartTitle}>{t('analytics.nutrition_score')}</Text>
+            <Utensils color={selectedNutritionAccent.lineColor} size={20} />
+            <Text style={[styles.chartTitle, { color: selectedNutritionAccent.titleColor }]}>
+              {t('analytics.nutrition_score')}
+            </Text>
           </View>
           <Text style={styles.chartSubtitle}>{t('analytics.nutrition_score_subtitle')}</Text>
           <ScrollView
@@ -967,6 +1109,7 @@ export default function AnalyticsScreen() {
           >
             {NUTRITION_CHART_METRICS.map((metric) => {
               const isSelected = selectedNutritionMetric.id === metric.id;
+              const metricAccent = getMetricAccent(metric.accentKey);
 
               return (
                 <TouchableOpacity
@@ -976,7 +1119,12 @@ export default function AnalyticsScreen() {
                   accessibilityState={{ selected: isSelected }}
                   style={[
                     styles.metricButton,
+                    { borderColor: withAlpha(metricAccent.lineColor, isDark ? 0.16 : 0.11) },
                     isSelected && styles.metricButtonActive,
+                    isSelected && {
+                      backgroundColor: metricAccent.chipActiveBackgroundColor,
+                      borderColor: metricAccent.chipActiveBorderColor,
+                    },
                   ]}
                   testID={`analytics-nutrition-metric-${metric.id}`}
                   onPress={() => setNutritionMetricId(metric.id)}
@@ -984,7 +1132,9 @@ export default function AnalyticsScreen() {
                   <Text
                     style={[
                       styles.metricButtonText,
+                      { color: metricAccent.chipTextColor },
                       isSelected && styles.metricButtonTextActive,
+                      isSelected && { color: metricAccent.chipActiveTextColor },
                     ]}
                   >
                     {t(metric.labelKey)}
@@ -998,11 +1148,7 @@ export default function AnalyticsScreen() {
               data={nutritionScoreData}
               width={chartWidth}
               height={220}
-              chartConfig={{
-                ...chartConfig,
-                fillShadowGradientFrom: withAlpha(colors.primaryText, isDark ? 0.12 : 0.08),
-                fillShadowGradientTo: mainPageChrome.elevatedSurface.backgroundColor,
-              }}
+              chartConfig={nutritionChartConfig}
               {...ANALYTICS_LIKE_LINE_CHART_PROPS}
               style={chartStyle}
               verticalLabelRotation={denseXAxisLayout.labelRotation}

@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
-  Image,
   Platform,
   ScrollView,
   StyleSheet,
@@ -33,6 +32,7 @@ import { CameraFlipIcon } from '@/components/CameraFlipIcon';
 import { ContextualPaywall } from '@/components/ContextualPaywall';
 import { FridgeChefPersonaCard } from '@/components/fridge/FridgeChefPersonaCard';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { OptimizedImage } from '@/components/OptimizedImage';
 import { PUBLIC_PRIVACY_POLICY_URL } from '@/constants/privacyPolicy';
 import {
   BORDER_RADIUS,
@@ -831,9 +831,10 @@ export default function FridgeScanScreen() {
                   style={styles.feedbackImageBorder}
                 >
                   <View style={styles.feedbackImageFrame}>
-                    <Image
+                    <OptimizedImage
                       source={{ uri: review.imageUri }}
-                      resizeMode="cover"
+                      contentFit="cover"
+                      recyclingKey={review.imageUri}
                       style={[styles.feedbackImage, { height: feedbackImageHeight }]}
                       testID="fridge-scan-feedback-image"
                     />

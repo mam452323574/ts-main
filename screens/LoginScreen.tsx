@@ -13,11 +13,9 @@ import { useStartupDiagnostics } from '@/contexts/StartupDiagnosticsContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { LoginCredentialsSchema } from '@/utils/authSchemas';
 
-const SHOW_OAUTH_BUTTONS = false;
-
 export default function LoginScreen() {
   const router = useRouter();
-  const { signIn, signInWithOAuth, sendVerificationEmail } = useAuth();
+  const { signIn, signInWithGoogle, sendVerificationEmail } = useAuth();
   const { colors } = useTheme();
   const { t } = useLanguage();
   const { markStartup, settleStartup } = useStartupDiagnostics();
@@ -27,7 +25,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -94,15 +92,19 @@ export default function LoginScreen() {
     }
   };
 
-  const handleOAuthLogin = async (provider: 'google' | 'apple') => {
+  const handleGoogleLogin = async () => {
     try {
-      setOauthLoading(provider);
+      setGoogleLoading(true);
       setError(null);
-      await signInWithOAuth(provider);
+      await signInWithGoogle();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('auth.errors.oauth_login', { provider }));
+      setError(
+        err instanceof Error
+          ? err.message
+          : t('auth.errors.oauth_login', { provider: 'google' }),
+      );
     } finally {
-      setOauthLoading(null);
+      setGoogleLoading(false);
     }
   };
 
@@ -114,31 +116,20 @@ export default function LoginScreen() {
         subtitle={t('auth.login_subtitle')}
       />
 
-      {SHOW_OAUTH_BUTTONS && (
-        <>
-          <View style={styles.oauthSection}>
-            <OAuthButton
-              provider="google"
-              onPress={() => handleOAuthLogin('google')}
-              loading={oauthLoading === 'google'}
-              disabled={oauthLoading !== null || loading}
-            />
-            <View style={{ height: SPACING.md }} />
-            <OAuthButton
-              provider="apple"
-              onPress={() => handleOAuthLogin('apple')}
-              loading={oauthLoading === 'apple'}
-              disabled={oauthLoading !== null || loading}
-            />
-          </View>
+      <View style={styles.oauthSection}>
+        <OAuthButton
+          provider="google"
+          onPress={handleGoogleLogin}
+          loading={googleLoading}
+          disabled={googleLoading || loading}
+        />
+      </View>
 
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>{t('auth.or_divider')}</Text>
-            <View style={styles.dividerLine} />
-          </View>
-        </>
-      )}
+      <View style={styles.divider}>
+        <View style={styles.dividerLine} />
+        <Text style={styles.dividerText}>{t('auth.or_divider')}</Text>
+        <View style={styles.dividerLine} />
+      </View>
 
       <View style={styles.form}>
         <AuthInput

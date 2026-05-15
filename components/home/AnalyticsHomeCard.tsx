@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import {
-  Image,
   Platform,
   StyleSheet,
   Text,
@@ -21,6 +20,7 @@ import {
   buildPremiumHealthModulePalette,
   getPremiumHealthResponsiveCardMetrics,
 } from '@/constants/premiumHealth';
+import { OptimizedImage } from '@/components/OptimizedImage';
 import {
   BORDER_RADIUS,
   FONT_FAMILIES,
@@ -107,10 +107,11 @@ export function AnalyticsHomeCard({
             end={{ x: 0.92, y: 0.92 }}
             style={styles.visualGlow}
           />
-          <Image
+          <OptimizedImage
             source={ANALYST_COACH_IMAGE}
             style={styles.coachImage}
-            resizeMode="contain"
+            contentFit="contain"
+            showPlaceholder={false}
             testID="home-analytics-coach-image"
           />
         </View>

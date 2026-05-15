@@ -376,6 +376,28 @@ describe('PostSignupOnboardingScreen', () => {
     expect(screen.queryByTestId('post-signup-avatar-step')).toBeNull();
   });
 
+  it('keeps only the visible native pager slide image mounted as the user advances', async () => {
+    render(<PostSignupOnboardingScreen />);
+
+    expect(
+      await screen.findByTestId('post-signup-promo-hero-image-scanner'),
+    ).toBeTruthy();
+    expect(
+      screen.queryByTestId('post-signup-promo-hero-image-coach'),
+    ).toBeNull();
+
+    fireEvent.press(screen.getByText('Suivant'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('post-signup-promo-hero-image-coach'),
+      ).toBeTruthy();
+    });
+    expect(
+      screen.queryByTestId('post-signup-promo-hero-image-scanner'),
+    ).toBeNull();
+  });
+
   it('compacts onboarding content padding on short Android devices', async () => {
     Object.defineProperty(mockReactNative.Platform, 'OS', {
       value: 'android',

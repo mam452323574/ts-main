@@ -1,5 +1,11 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
+import {
+  act,
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+} from '@testing-library/react-native';
 import * as mockReactNative from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
@@ -26,6 +32,22 @@ jest.mock('@/components/Button', () => ({
     return (
       <TouchableOpacity onPress={onPress} disabled={disabled || loading}>
         <Text>{loading ? 'Loading...' : title}</Text>
+      </TouchableOpacity>
+    );
+  },
+}));
+
+jest.mock('@/components/OAuthButton', () => ({
+  OAuthButton: ({ provider, onPress, loading, disabled }: any) => {
+    const { TouchableOpacity, Text } = require('react-native');
+    return (
+      <TouchableOpacity
+        onPress={onPress}
+        disabled={disabled || loading}
+        accessibilityState={{ disabled: disabled || loading }}
+        testID={`oauth-${provider}-button`}
+      >
+        <Text>{loading ? 'Google loading' : 'Continuer avec Google'}</Text>
       </TouchableOpacity>
     );
   },
@@ -108,6 +130,7 @@ jest.mock('@/contexts/ThemeContext', () => ({
 }));
 
 const mockSignUp = jest.fn();
+const mockSignInWithGoogle = jest.fn();
 const mockSendVerificationEmail = jest.fn();
 const mockIsDisposableEmail = jest.fn();
 const mockCreatePreparedAvatarLocalUri = jest.fn();
@@ -115,9 +138,19 @@ const passwordPlaceholder = 'Mot de passe (8+ car., minuscule + chiffre)';
 const confirmPasswordPlaceholder = 'Confirmez le mot de passe';
 const signUpButtonLabel = "S'inscrire";
 
+function createDeferred<T = void>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+
+  return { promise, resolve };
+}
+
 jest.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
     signUp: mockSignUp,
+    signInWithGoogle: mockSignInWithGoogle,
     sendVerificationEmail: mockSendVerificationEmail,
     isDisposableEmail: mockIsDisposableEmail,
   }),
@@ -143,6 +176,7 @@ describe('SignUpScreen friendly flow', () => {
     });
     await AsyncStorage.clear();
     mockSignUp.mockResolvedValue({ userId: 'user-123', email: 'test@example.com' });
+    mockSignInWithGoogle.mockResolvedValue(undefined);
     mockSendVerificationEmail.mockResolvedValue(undefined);
     mockIsDisposableEmail.mockResolvedValue(false);
     mockCreatePreparedAvatarLocalUri.mockResolvedValue('file:///cropped-avatar.jpg');
@@ -216,6 +250,49 @@ describe('SignUpScreen friendly flow', () => {
     expect(await screen.findByText('Créez votre compte')).toBeTruthy();
     expect(screen.getByPlaceholderText('Votre email')).toBeTruthy();
     expect(screen.getByPlaceholderText(passwordPlaceholder)).toBeTruthy();
+  });
+
+  it('shows Google only on the account step and starts Google signup', async () => {
+    render(<SignUpScreen />);
+
+    expect(screen.queryByText('Continuer avec Google')).toBeNull();
+
+    fireEvent.press(await screen.findByText('Suivant'));
+    expect(await screen.findByText('Préparez votre profil de scan')).toBeTruthy();
+    expect(screen.queryByText('Continuer avec Google')).toBeNull();
+
+    fireEvent.changeText(screen.getByTestId('signup-username-input'), 'testuser');
+    fireEvent.press(screen.getByText('Suivant'));
+
+    expect(await screen.findByText('Continuer avec Google')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('oauth-google-button'));
+
+    await waitFor(() => {
+      expect(mockSignInWithGoogle).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('disables Google signup while it is loading', async () => {
+    const deferred = createDeferred<void>();
+    mockSignInWithGoogle.mockReturnValueOnce(deferred.promise);
+
+    render(<SignUpScreen />);
+
+    fireEvent.press(await screen.findByText('Suivant'));
+    fireEvent.changeText(screen.getByTestId('signup-username-input'), 'testuser');
+    fireEvent.press(screen.getByText('Suivant'));
+    fireEvent.press(await screen.findByTestId('oauth-google-button'));
+
+    expect(await screen.findByText('Google loading')).toBeTruthy();
+    expect(
+      screen.getByTestId('oauth-google-button').props.accessibilityState,
+    ).toEqual(expect.objectContaining({ disabled: true }));
+    expect(mockSignInWithGoogle).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      deferred.resolve();
+      await deferred.promise;
+    });
   });
 
   it('creates the account only on the account step and never stores the password', async () => {

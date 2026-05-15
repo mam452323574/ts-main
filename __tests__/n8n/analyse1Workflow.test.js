@@ -142,6 +142,54 @@ describe('analyse_1 n8n workflow export', () => {
     expect(incoming).toHaveLength(4);
   });
 
+  it('configures image analysis branches with Google Gemini 2.5 Flash Image', () => {
+    const workflow = readWorkflow();
+    const rawWorkflow = fs.readFileSync(workflowPath, 'utf8');
+    const forbiddenProviderMarkers = [
+      'gpt' + '-4o-mini',
+      'GPT' + '-4O',
+      'open' + 'Ai',
+      'Open' + 'Ai account',
+      '@n8n/n8n-nodes-langchain.' + 'open' + 'Ai',
+    ];
+
+    for (const marker of forbiddenProviderMarkers) {
+      expect(rawWorkflow).not.toContain(marker);
+    }
+
+    for (const nodeName of [
+      'Analyze Face Image',
+      'Analyze Body Image',
+      'Analyze Nutrition Image',
+      'Analyze Image Auto Detect Fallback',
+    ]) {
+      const node = getNode(workflow, nodeName);
+
+      expect(node.type).toBe('@n8n/n8n-nodes-langchain.googleGemini');
+      expect(node.typeVersion).toBe(1);
+      expect(node.parameters).toMatchObject({
+        resource: 'image',
+        operation: 'analyze',
+        inputType: 'binary',
+        binaryPropertyName: 'data',
+        simplify: true,
+        modelId: {
+          value: 'models/gemini-2.5-flash-image',
+          cachedResultName: 'Gemini 2.5 Flash Image',
+        },
+        options: {
+          maxOutputTokens: 8192,
+        },
+      });
+      expect(node.credentials).toEqual({
+        googlePalmApi: {
+          name: 'Google Gemini(PaLM) Api account',
+        },
+      });
+      expect(node.credentials.googlePalmApi).not.toHaveProperty('id');
+    }
+  });
+
   it('uses specialized prompts with the shared safety block and strict JSON output rules', () => {
     const workflow = readWorkflow();
     const facePrompt = getNode(workflow, 'Analyze Face Image').parameters.text;
@@ -451,6 +499,39 @@ describe('analyse_1 n8n workflow export', () => {
           metric_coverage_score: null,
           limitation_flags: [],
         },
+      });
+    });
+
+    it('unwraps Google Gemini content parts that contain scan JSON', () => {
+      const workflow = readWorkflow();
+      const result = runCodeNode(workflow, 'Code in JavaScript', {
+        language_code: 'en',
+        scan_route: 'face',
+        content: {
+          parts: [
+            {
+              text: JSON.stringify({
+                scan_type: 'face',
+                face_score: 74,
+                perceived_age: 31,
+                skin_quality_score: 68,
+                symmetry_percentage: 71,
+                fatigue_level: 22,
+                glow_index: 7,
+                face_shape: 'Oval',
+              }),
+            },
+          ],
+        },
+      })[0].json;
+
+      expect(result.success).toBe(true);
+      expect(result.data).toMatchObject({
+        schema_version: 4,
+        scan_type: 'face',
+        face_score: 74,
+        perceived_age: 31,
+        face_shape: 'Oval',
       });
     });
 

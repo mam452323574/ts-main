@@ -24,11 +24,13 @@ const CATEGORY_LABELS: Record<CoachPromptCategory, string> = {
 };
 
 describe('CoachModePicker', () => {
-  it('renders prompt rows grouped by category with the selected state', () => {
+  it('renders prompt rows grouped by category and keeps parent cards separate from child selection', () => {
     render(
       <CoachModePicker
         availablePrompts={['latest_scan', 'weekly_plan', 'nutrition_focus']}
-        selectedPromptType="weekly_plan"
+        selectedQuestionPromptType="weekly_plan"
+        selectedQuestionKey="weekly_plan__realistic_week"
+        questionSelectionMode="preset"
         onSelect={jest.fn()}
         promptTitle={(prompt) => `Title ${prompt}`}
         promptSubtitle={(prompt) => `Subtitle ${prompt}`}
@@ -43,9 +45,14 @@ describe('CoachModePicker', () => {
     expect(
       screen.getByTestId('coach-mode-picker-test-card-weekly_plan').props
         .accessibilityState?.selected,
-    ).toBe(true);
+    ).toBe(false);
     expect(
-      screen.getByTestId('coach-mode-picker-test-card-weekly_plan-selected-badge'),
+      screen.queryByTestId('coach-mode-picker-test-card-weekly_plan-selected-badge'),
+    ).toBeNull();
+    expect(
+      screen.getByTestId(
+        'coach-mode-picker-test-card-weekly_plan-contains-selection-indicator',
+      ),
     ).toBeTruthy();
     expect(
       screen.getByTestId('coach-mode-picker-test-card-weekly_plan-artwork'),
@@ -58,7 +65,7 @@ describe('CoachModePicker', () => {
     render(
       <CoachModePicker
         availablePrompts={['weekly_plan']}
-        selectedPromptType="latest_scan"
+        selectedQuestionPromptType={null}
         onSelect={onSelect}
         promptTitle={(prompt) => `Title ${prompt}`}
         promptSubtitle={(prompt) => `Subtitle ${prompt}`}
@@ -85,13 +92,123 @@ describe('CoachModePicker', () => {
     ).toBe(false);
   });
 
+  it('renders suggested questions inline under the expanded prompt only', () => {
+    const { rerender } = render(
+      <CoachModePicker
+        availablePrompts={['latest_scan', 'weekly_plan']}
+        selectedQuestionPromptType={null}
+        expandedPromptType="latest_scan"
+        questionOptionsByPromptType={{
+          latest_scan: [
+            {
+              key: 'latest_scan__three_simple_actions',
+              label: 'Three simple actions',
+            },
+          ],
+          weekly_plan: [
+            {
+              key: 'weekly_plan__realistic_week',
+              label: 'Realistic week',
+            },
+          ],
+        }}
+        selectedQuestionKey={null}
+        questionSelectionMode="free_text"
+        onSelect={jest.fn()}
+        onSelectQuestion={jest.fn()}
+        promptTitle={(prompt) => `Title ${prompt}`}
+        categoryTitle={(category) => CATEGORY_LABELS[category]}
+        questionSectionLabel="Suggestions"
+        testID="coach-mode-picker-test"
+      />,
+    );
+
+    expect(
+      screen.getByTestId('coach-mode-picker-test-suggestions-latest_scan'),
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId('coach-mode-picker-test-card-latest_scan').props
+        .accessibilityState?.expanded,
+    ).toBe(true);
+    expect(
+      screen.getByTestId('coach-mode-picker-test-card-latest_scan').props
+        .accessibilityState?.selected,
+    ).toBe(false);
+    expect(
+      screen.queryByTestId('coach-mode-picker-test-card-latest_scan-selected-badge'),
+    ).toBeNull();
+    expect(
+      screen.getByTestId(
+        'coach-mode-picker-test-question-latest_scan__three_simple_actions',
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.queryByTestId('coach-mode-picker-test-suggestions-weekly_plan'),
+    ).toBeNull();
+
+    rerender(
+      <CoachModePicker
+        availablePrompts={['latest_scan', 'weekly_plan']}
+        selectedQuestionPromptType="weekly_plan"
+        expandedPromptType="weekly_plan"
+        questionOptionsByPromptType={{
+          latest_scan: [
+            {
+              key: 'latest_scan__three_simple_actions',
+              label: 'Three simple actions',
+            },
+          ],
+          weekly_plan: [
+            {
+              key: 'weekly_plan__realistic_week',
+              label: 'Realistic week',
+            },
+          ],
+        }}
+        selectedQuestionKey="weekly_plan__realistic_week"
+        questionSelectionMode="preset"
+        onSelect={jest.fn()}
+        onSelectQuestion={jest.fn()}
+        promptTitle={(prompt) => `Title ${prompt}`}
+        categoryTitle={(category) => CATEGORY_LABELS[category]}
+        questionSectionLabel="Suggestions"
+        selectedBadgeLabel="Selected"
+        testID="coach-mode-picker-test"
+      />,
+    );
+
+    expect(
+      screen.queryByTestId('coach-mode-picker-test-suggestions-latest_scan'),
+    ).toBeNull();
+    expect(
+      screen.getByTestId('coach-mode-picker-test-suggestions-weekly_plan'),
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId('coach-mode-picker-test-card-weekly_plan').props
+        .accessibilityState?.selected,
+    ).toBe(false);
+    expect(
+      screen.queryByTestId('coach-mode-picker-test-card-weekly_plan-selected-badge'),
+    ).toBeNull();
+    expect(
+      screen.getByTestId(
+        'coach-mode-picker-test-card-weekly_plan-contains-selection-indicator',
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId(
+        'coach-mode-picker-test-question-weekly_plan__realistic_week-selected-badge',
+      ),
+    ).toBeTruthy();
+  });
+
   it('shows a spinner and blocks presses for the busy prompt row', () => {
     const onSelect = jest.fn();
 
     render(
       <CoachModePicker
         availablePrompts={['latest_scan']}
-        selectedPromptType="latest_scan"
+        selectedQuestionPromptType={null}
         busyPromptType="latest_scan"
         onSelect={onSelect}
         promptTitle={(prompt) => `Title ${prompt}`}
@@ -110,5 +227,55 @@ describe('CoachModePicker', () => {
       screen.getByTestId('coach-mode-picker-test-card-latest_scan').props
         .accessibilityState?.busy,
     ).toBe(true);
+  });
+
+  it('renders suggestions inline under the expanded prompt', () => {
+    const onSelectQuestion = jest.fn();
+
+    render(
+      <CoachModePicker
+        availablePrompts={['latest_scan', 'weekly_plan']}
+        selectedQuestionPromptType="weekly_plan"
+        expandedPromptType="weekly_plan"
+        questionOptionsByPromptType={{
+          latest_scan: [
+            {
+              key: 'latest_scan__three_simple_actions',
+              label: 'Three simple actions',
+            },
+          ],
+          weekly_plan: [
+            {
+              key: 'weekly_plan__realistic_week',
+              label: 'Build a realistic week',
+            },
+          ],
+        }}
+        selectedQuestionKey="weekly_plan__realistic_week"
+        questionSelectionMode="preset"
+        onSelect={jest.fn()}
+        onSelectQuestion={onSelectQuestion}
+        promptTitle={(prompt) => `Title ${prompt}`}
+        categoryTitle={(category) => CATEGORY_LABELS[category]}
+        questionSectionLabel="Suggestions"
+        selectedBadgeLabel="Selected"
+        testID="coach-mode-picker-test"
+      />,
+    );
+
+    expect(
+      screen.queryByTestId('coach-mode-picker-test-suggestions-latest_scan'),
+    ).toBeNull();
+    expect(
+      screen.getByTestId('coach-mode-picker-test-suggestions-weekly_plan'),
+    ).toBeTruthy();
+
+    fireEvent.press(
+      screen.getByTestId(
+        'coach-mode-picker-test-question-weekly_plan__realistic_week',
+      ),
+    );
+
+    expect(onSelectQuestion).toHaveBeenCalledWith('weekly_plan__realistic_week');
   });
 });

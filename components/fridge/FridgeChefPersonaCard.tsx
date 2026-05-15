@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Check } from 'lucide-react-native';
 
 import { ChefModeIcon } from '@/components/fridge/ChefModeIcon';
+import { OptimizedImage } from '@/components/OptimizedImage';
 import {
   BORDER_RADIUS,
   FONT_WEIGHTS,
@@ -118,9 +119,10 @@ export function FridgeChefPersonaCard({
               <Text style={styles.avatarFallbackText}>{persona.fallbackLabel}</Text>
             </View>
           ) : (
-            <Image
+            <OptimizedImage
               source={persona.imageSource}
-              resizeMode="cover"
+              contentFit="cover"
+              showPlaceholder={false}
               onError={() => setImageFailed(true)}
               style={styles.avatarImage}
               testID={testID ? `${testID}-image` : undefined}

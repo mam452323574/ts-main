@@ -1694,6 +1694,89 @@ describe('coach service', () => {
     );
   });
 
+  it('sends user-authored free text as the visible free_question prompt with scan context', async () => {
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'scans') {
+        return createScansSelectMock(recentScans);
+      }
+
+      return createLatestEntrySelectMock(null);
+    });
+
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            success: true,
+            applied_count: 0,
+            profile_memory: null,
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            success: true,
+            cached: false,
+            entry_id: 'entry-free-question',
+            persona_key: 'patient_calm',
+            prompt_type: 'free_question',
+            question_key: null,
+            question_text:
+              'Comment adapter ma semaine avec mes derniers scans ?',
+            status: 'ready',
+            title: 'Question libre',
+            body: 'On garde le contexte et on repond a ta question.',
+            disclaimer:
+              'Wellness guidance only. This is not a diagnosis or medical advice.',
+            cta_label: null,
+            cta_route: null,
+            source: 'n8n',
+            expires_at: null,
+            response_payload_json: {},
+          }),
+      }) as typeof global.fetch;
+
+    const result = await generateCoachGuidance({
+      promptType: 'free_question',
+      locale: 'fr',
+      personaKey: 'patient_calm',
+      questionKey: 'latest_scan__three_simple_actions',
+      questionText: 'Comment adapter ma semaine avec mes derniers scans ?',
+      scanIntent: {
+        has_actionable_issue: true,
+        priority_metric: 'hydration_level',
+        priority_label: 'Hydratation',
+        severity: 'medium',
+        question_text: 'Comment adapter ma semaine avec mes derniers scans ?',
+        user_facing_summary:
+          'Un point du scan peut devenir une action simple.',
+      },
+    });
+
+    const requestBody = JSON.parse(
+      (global.fetch as jest.Mock).mock.calls[1][1].body as string,
+    );
+
+    expect(requestBody.payload.prompt_type).toBe('free_question');
+    expect(requestBody.payload.question_key).toBeNull();
+    expect(requestBody.payload.question_text).toBe(
+      'Comment adapter ma semaine avec mes derniers scans ?',
+    );
+    expect(requestBody.payload.question_hints).toEqual(
+      expect.objectContaining({
+        intent_key: 'free_question_open',
+      }),
+    );
+    expect(requestBody.payload.latest_scan).toEqual(expect.any(Object));
+    expect(requestBody.payload.latest_by_type).toEqual(expect.any(Object));
+    expect(requestBody.payload).not.toHaveProperty('scan_intent');
+    expect(result.prompt_type).toBe('free_question');
+    expect(result.question_key).toBeNull();
+  });
+
   it('retries coach generation once with a legacy payload when the backend rejects new question fields', async () => {
     supabase.from.mockImplementation((table: string) => {
       if (table === 'scans') {
@@ -1787,6 +1870,63 @@ describe('coach service', () => {
     expect(result.payload.question_key).toBe(richRequestBody.payload.question_key);
     expect(result.payload.question_text).toBe(
       richRequestBody.payload.question_text,
+    );
+  });
+
+  it('does not retry free_question with a legacy payload that would remove the user text', async () => {
+    supabase.from.mockImplementation((table: string) => {
+      if (table === 'scans') {
+        return createScansSelectMock(recentScans);
+      }
+
+      return createLatestEntrySelectMock(null);
+    });
+
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            success: true,
+            applied_count: 0,
+            profile_memory: null,
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        text: async () =>
+          JSON.stringify({
+            error: 'payload contains unsupported fields',
+            code: 'invalid_coach_payload',
+            status: 400,
+            request_id: 'req-free-question',
+          }),
+      }) as typeof global.fetch;
+
+    await expect(
+      generateCoachGuidance({
+        promptType: 'free_question',
+        locale: 'fr',
+        personaKey: 'patient_calm',
+        questionText: 'Quelle priorite suivre cette semaine ?',
+      }),
+    ).rejects.toMatchObject({
+      message: 'payload contains unsupported fields',
+      code: 'invalid_coach_payload',
+      status: 400,
+      requestId: 'req-free-question',
+      functionName: 'coach-generate-response',
+    });
+
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    const requestBody = JSON.parse(
+      (global.fetch as jest.Mock).mock.calls[1][1].body as string,
+    );
+    expect(requestBody.payload.prompt_type).toBe('free_question');
+    expect(requestBody.payload.question_text).toBe(
+      'Quelle priorite suivre cette semaine ?',
     );
   });
 

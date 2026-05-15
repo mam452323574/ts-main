@@ -50,6 +50,8 @@ jest.mock('@/utils/oauthState', () => ({
 
 jest.mock('@/utils/observability', () => ({
   logOperationalError: (...args: unknown[]) => mockLogOperationalError(...args),
+  sanitizeObservabilityProperties: (properties?: Record<string, unknown>) =>
+    properties,
 }));
 
 jest.mock('@/services/avatar', () => ({
@@ -171,6 +173,7 @@ function AuthStateProbe({ onRender }: { onRender: jest.Mock }) {
     userProfile: auth.userProfile,
     loading: auth.loading,
     signUp: auth.signUp,
+    signInWithGoogle: auth.signInWithGoogle,
     signInWithOAuth: auth.signInWithOAuth,
   });
   return <Text testID="auth-child">ready</Text>;
@@ -197,6 +200,7 @@ function getLastAuthRender(onAuthRender: jest.Mock) {
           userId: string;
           email: string;
         }>;
+        signInWithGoogle: () => Promise<void>;
         signInWithOAuth: (provider: 'google' | 'apple') => Promise<void>;
       }
     | undefined;
@@ -276,7 +280,7 @@ describe('AuthProvider RevenueCat startup behavior', () => {
     });
     openAuthSessionAsync.mockResolvedValue({
       type: 'success',
-      url: 'exp://oauth/callback?code=oauth-code&state=oauth-state-1',
+      url: 'exp://auth/callback?code=oauth-code&state=oauth-state-1',
     });
   });
 
@@ -1050,8 +1054,23 @@ describe('AuthProvider RevenueCat startup behavior', () => {
       expect(getLastAuthRender(onAuthRender)?.loading).toBe(false);
     });
 
-    const signInWithOAuth = getLastAuthRender(onAuthRender)?.signInWithOAuth;
-    await expect(signInWithOAuth?.('google')).resolves.toBeUndefined();
+    const signInWithGoogle = getLastAuthRender(onAuthRender)?.signInWithGoogle;
+    await expect(signInWithGoogle?.()).resolves.toBeUndefined();
+
+    expect(supabase.auth.signInWithOAuth).toHaveBeenCalledWith({
+      provider: 'google',
+      options: {
+        redirectTo: 'exp://auth/callback',
+        queryParams: {
+          state: 'oauth-state-1',
+        },
+        skipBrowserRedirect: true,
+      },
+    });
+    expect(openAuthSessionAsync).toHaveBeenCalledWith(
+      'https://oauth.example/authorize',
+      'exp://auth/callback',
+    );
 
     expect(supabase.rpc).toHaveBeenCalledWith('repair_missing_user_profile', {
       p_avatar_url: 'https://avatar.example/profile.png',
@@ -1059,5 +1078,104 @@ describe('AuthProvider RevenueCat startup behavior', () => {
     expect(supabase.auth.exchangeCodeForSession).toHaveBeenCalledWith(
       'oauth-code',
     );
+  });
+
+  it('keeps the legacy OAuth wrapper delegated to the Google flow', async () => {
+    mockGetRuntimeCapabilities.mockReturnValue({
+      platform: 'ios',
+      appOwnership: 'expo',
+      isExpoGo: true,
+      canUseNativePurchases: false,
+      canRegisterForPushNotifications: false,
+      canUseLocalNotifications: true,
+    });
+    const onAuthRender = jest.fn();
+
+    supabase.auth.getSession.mockResolvedValueOnce({ data: { session: null } });
+
+    renderProvider(onAuthRender);
+
+    await waitFor(() => {
+      expect(getLastAuthRender(onAuthRender)?.loading).toBe(false);
+    });
+
+    const signInWithOAuth = getLastAuthRender(onAuthRender)?.signInWithOAuth;
+    await expect(signInWithOAuth?.('google')).resolves.toBeUndefined();
+
+    expect(supabase.auth.signInWithOAuth).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'google',
+        options: expect.objectContaining({
+          redirectTo: 'exp://auth/callback',
+          skipBrowserRedirect: true,
+        }),
+      }),
+    );
+  });
+
+  it('treats a dismissed OAuth browser session as a clean cancellation', async () => {
+    mockGetRuntimeCapabilities.mockReturnValue({
+      platform: 'ios',
+      appOwnership: 'expo',
+      isExpoGo: true,
+      canUseNativePurchases: false,
+      canRegisterForPushNotifications: false,
+      canUseLocalNotifications: true,
+    });
+    const onAuthRender = jest.fn();
+
+    supabase.auth.getSession.mockResolvedValueOnce({ data: { session: null } });
+    openAuthSessionAsync.mockResolvedValueOnce({
+      type: 'dismiss',
+    });
+
+    renderProvider(onAuthRender);
+
+    await waitFor(() => {
+      expect(getLastAuthRender(onAuthRender)?.loading).toBe(false);
+    });
+
+    const signInWithGoogle = getLastAuthRender(onAuthRender)?.signInWithGoogle;
+    await expect(signInWithGoogle?.()).rejects.toThrow(
+      'Authentification annulée',
+    );
+
+    expect(supabase.auth.exchangeCodeForSession).not.toHaveBeenCalled();
+  });
+
+  it('does not log OAuth callback codes or tokens during debug logging', async () => {
+    mockGetRuntimeCapabilities.mockReturnValue({
+      platform: 'ios',
+      appOwnership: 'expo',
+      isExpoGo: true,
+      canUseNativePurchases: false,
+      canRegisterForPushNotifications: false,
+      canUseLocalNotifications: true,
+    });
+    const onAuthRender = jest.fn();
+    const consoleInfoSpy = jest
+      .spyOn(console, 'info')
+      .mockImplementation(() => undefined);
+
+    supabase.auth.getSession.mockResolvedValueOnce({ data: { session: null } });
+
+    renderProvider(onAuthRender);
+
+    await waitFor(() => {
+      expect(getLastAuthRender(onAuthRender)?.loading).toBe(false);
+    });
+
+    const signInWithGoogle = getLastAuthRender(onAuthRender)?.signInWithGoogle;
+    await expect(signInWithGoogle?.()).resolves.toBeUndefined();
+
+    const serializedDebugLogs = JSON.stringify([
+      consoleInfoSpy.mock.calls,
+      mockLogOperationalError.mock.calls,
+    ]);
+    expect(serializedDebugLogs).not.toContain('oauth-code');
+    expect(serializedDebugLogs).not.toContain('oauth-session-token');
+    expect(serializedDebugLogs).not.toContain('oauth-refresh-token');
+
+    consoleInfoSpy.mockRestore();
   });
 });

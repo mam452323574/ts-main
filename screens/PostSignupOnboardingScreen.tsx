@@ -2,7 +2,7 @@ import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   BackHandler,
-  Image,
+  Image as RNImage,
   Platform,
   Pressable,
   StyleSheet,
@@ -19,6 +19,7 @@ import {
   LineChart,
   Users,
 } from 'lucide-react-native';
+import { Image as ExpoImage } from 'expo-image';
 
 import { AppScreen } from '@/components/AppScreen';
 import { AvatarPicker } from '@/components/AvatarPicker';
@@ -35,6 +36,7 @@ import {
 } from '@/components/auth/tokens';
 import { FridgeScanIllustration } from '@/components/home/FridgeScanIllustration';
 import { NativePagerView } from '@/components/NativePagerView';
+import { OptimizedImage } from '@/components/OptimizedImage';
 import {
   BORDER_RADIUS,
   FONT_FAMILIES,
@@ -251,6 +253,25 @@ export default function PostSignupOnboardingScreen() {
     [colors, isDark, onboardingPalette, t],
   );
 
+  useEffect(() => {
+    const nextSlide = slides[currentPage + 1];
+    if (!nextSlide) {
+      return;
+    }
+
+    const nextAsset = getOnboardingPromoAsset(onboardingThemeVariant, nextSlide.key);
+    if (!nextAsset) {
+      return;
+    }
+
+    const nextAssetUri = RNImage.resolveAssetSource(nextAsset)?.uri;
+    if (!nextAssetUri) {
+      return;
+    }
+
+    void ExpoImage.prefetch(nextAssetUri, 'disk').catch(() => undefined);
+  }, [currentPage, onboardingThemeVariant, slides]);
+
   const hasAvatar = Boolean(
     selectedAvatarReference ?? userProfile?.avatar_url,
   );
@@ -427,9 +448,9 @@ export default function PostSignupOnboardingScreen() {
             setCurrentPage(event.nativeEvent.position)
           }
         >
-          {slides.map((slide) => (
+          {slides.map((slide, index) => (
             <View key={slide.key} style={styles.nativePage}>
-              {renderSlide(slide)}
+              {Math.abs(index - currentPage) <= 1 ? renderSlide(slide) : null}
             </View>
           ))}
         </NativePagerView>
@@ -598,7 +619,7 @@ function PromoHeroSlide({
   styles,
 }: PromoHeroSlideProps) {
   const accentColor = getPromoHeroAccent(slide.key, colors);
-  const assetMetadata = Image.resolveAssetSource(source);
+  const assetMetadata = RNImage.resolveAssetSource(source);
   const assetRatio =
     assetMetadata?.width && assetMetadata?.height
       ? assetMetadata.width / assetMetadata.height
@@ -632,15 +653,6 @@ function PromoHeroSlide({
       style={styles.promoHeroWrap}
       testID={`post-signup-promo-slide-${slide.key}`}
     >
-      <Image
-        source={source}
-        resizeMode="cover"
-        blurRadius={34}
-        style={[
-          styles.promoHeroBackdropImage,
-          { opacity: isDark ? 0.3 : 0.22 },
-        ]}
-      />
       <View
         style={[
           styles.promoHeroGlow,
@@ -664,9 +676,10 @@ function PromoHeroSlide({
         style={styles.promoHeroStage}
         contentStyle={styles.promoHeroStageContent}
       >
-        <Image
+        <OptimizedImage
           source={source}
-          resizeMode="cover"
+          contentFit="cover"
+          showPlaceholder={false}
           testID={`post-signup-promo-hero-image-${slide.key}`}
           style={[
             styles.promoHeroImage,

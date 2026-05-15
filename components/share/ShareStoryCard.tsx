@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, {
   Circle,
@@ -8,6 +8,7 @@ import Svg, {
   Stop,
 } from 'react-native-svg';
 import { FONT_WEIGHTS, mixColors, withAlpha } from '@/constants/theme';
+import { OptimizedImage } from '@/components/OptimizedImage';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ShareStoryMetric, ShareStoryPayload } from '@/types';
 import { RESULT_TEXT_PROPS, getResultScaledRadius } from '@/utils/resultLayout';
@@ -37,6 +38,10 @@ interface CardPalette {
 }
 
 const BASE_CARD_WIDTH = 360;
+const SHARE_STORY_TEXT_PROPS = {
+  ...RESULT_TEXT_PROPS,
+  lineBreakStrategyIOS: 'standard' as const,
+};
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -490,7 +495,7 @@ export function ShareStoryCard({
             >
               <Text
                 adjustsFontSizeToFit
-                {...RESULT_TEXT_PROPS}
+                {...SHARE_STORY_TEXT_PROPS}
                 minimumFontScale={0.82}
                 numberOfLines={2}
                 style={[
@@ -518,7 +523,7 @@ export function ShareStoryCard({
               >
                 <Text
                   adjustsFontSizeToFit
-                  {...RESULT_TEXT_PROPS}
+                  {...SHARE_STORY_TEXT_PROPS}
                   minimumFontScale={0.82}
                   numberOfLines={2}
                   style={[
@@ -557,9 +562,10 @@ export function ShareStoryCard({
                 testID="share-story-hero-image-frame"
               >
                 {payload.heroImageUri ? (
-                  <Image
+                  <OptimizedImage
                     source={{ uri: payload.heroImageUri }}
-                    resizeMode="cover"
+                    contentFit="cover"
+                    recyclingKey={payload.heroImageUri}
                     onLoadEnd={onHeroImageLoadEnd}
                     style={styles.heroImage}
                     testID="share-story-hero-image"
@@ -654,7 +660,7 @@ export function ShareStoryCard({
                     testID={`share-story-metric-label-wrap-${index}`}
                   >
                     <Text
-                      {...RESULT_TEXT_PROPS}
+                      {...SHARE_STORY_TEXT_PROPS}
                       ellipsizeMode="tail"
                       numberOfLines={Math.max(metric.labelMaxLines, labelSlotLines)}
                       style={[styles.metricLabel, { color: palette.textSecondary }]}
@@ -672,7 +678,7 @@ export function ShareStoryCard({
                     testID={`share-story-metric-value-wrap-${index}`}
                   >
                     <Text
-                      {...RESULT_TEXT_PROPS}
+                      {...SHARE_STORY_TEXT_PROPS}
                       ellipsizeMode="tail"
                       {...(metric.valueVariant === 'text'
                         ? {}

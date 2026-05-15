@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import {
-  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -19,6 +18,7 @@ import { SocialCategoryPill } from './SocialCategoryPill';
 import { SocialIdentityRow } from './SocialIdentityRow';
 import { SocialModerationBadge } from './SocialModerationBadge';
 
+import { OptimizedImage } from '@/components/OptimizedImage';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import {
@@ -135,9 +135,10 @@ export function SocialPostCard({
           style={styles.imageWrap}
           testID={`social-post-image-wrap-${post.id}`}
         >
-          <Image
+          <OptimizedImage
             source={{ uri: safeImageUri }}
-            resizeMode="cover"
+            contentFit="cover"
+            recyclingKey={post.id}
             style={styles.postImage}
             testID={`social-post-image-${post.id}`}
           />

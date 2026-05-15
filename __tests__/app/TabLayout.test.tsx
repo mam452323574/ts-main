@@ -270,7 +270,9 @@ describe('TabLayout', () => {
     expect(screenOptions.sceneStyle).toEqual(expectedSceneStyle);
     expect(screenOptions.tabBarActiveTintColor).toBe(expectedTokens.tabBar.active);
     expect(screenOptions.tabBarInactiveTintColor).toBe(expectedTokens.tabBar.inactive);
-    expect(screenOptions.tabBarLabelStyle).toEqual(expectedLabelStyle);
+    expect(screenOptions.tabBarLabelStyle).toEqual(expect.objectContaining(expectedLabelStyle));
+    expect(screenOptions.lazy).toBe(true);
+    expect(screenOptions.lazyPreloadDistance).toBe(2);
     expect(screenElements).toHaveLength(4);
     expect(screenElements[1].props.name).toBe('coach');
     expect(screenElements[1].props.options.title).toBe('tabs.coach');

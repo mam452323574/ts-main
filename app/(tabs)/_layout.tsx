@@ -180,6 +180,7 @@ export default function TabLayout() {
         tabBarShowLabel: true,
         swipeEnabled: true,
         lazy: true, // Load tabs lazily for performance
+        lazyPreloadDistance: 2,
       }}
     >
       <MaterialTopTabs.Screen

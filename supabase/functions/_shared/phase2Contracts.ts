@@ -1,5 +1,6 @@
 import { isCoachPersonaKey } from '../../../shared/coachPersonas.ts';
 import {
+  COACH_FREE_QUESTION_MAX_LENGTH,
   COACH_QUESTION_MAX_LENGTH,
   isCoachQuestionForPromptType,
   normalizeCoachQuestionKey,
@@ -7,7 +8,11 @@ import {
   resolveCoachQuestionSelection,
   sanitizeCoachQuestionHints,
 } from '../../../shared/coachQuestions.ts';
-import { normalizeCoachGenerationPromptType } from '../../../shared/coachPromptTypes.ts';
+import {
+  FREE_QUESTION_PROMPT_TYPE,
+  normalizeCoachGenerationPromptType,
+  type CoachGenerationPromptType,
+} from '../../../shared/coachPromptTypes.ts';
 import { Phase2HttpError } from './phase2Errors.ts';
 import type {
   CoachGenerateRequest,
@@ -218,6 +223,40 @@ const COACH_INNER_PAYLOAD_MAX_PRIOR_SCANS = 16;
 const COACH_INNER_PAYLOAD_MAX_ARRAY_LENGTH = 64;
 const COACH_INNER_PAYLOAD_MAX_KEYS_PER_OBJECT = 80;
 const COACH_SELECTED_SCAN_ID_MAX_LENGTH = 120;
+
+function isFreeQuestionPromptType(
+  promptType: CoachGenerationPromptType | null,
+) {
+  return promptType === FREE_QUESTION_PROMPT_TYPE;
+}
+
+function getCoachQuestionTextMaxLength(
+  promptType: CoachGenerationPromptType | null,
+) {
+  return isFreeQuestionPromptType(promptType)
+    ? COACH_FREE_QUESTION_MAX_LENGTH
+    : COACH_QUESTION_MAX_LENGTH;
+}
+
+function normalizeCoachPayloadQuestionText(
+  value: unknown,
+  promptType: CoachGenerationPromptType | null,
+) {
+  const normalized = normalizeOptionalFreeText(value, {
+    fieldName: 'payload.question_text',
+    maxLength: getCoachQuestionTextMaxLength(promptType),
+  });
+
+  if (isFreeQuestionPromptType(promptType) && !normalized) {
+    throw new Phase2HttpError(
+      400,
+      'invalid_coach_payload',
+      'payload.question_text is required for free_question',
+    );
+  }
+
+  return normalized ?? null;
+}
 
 const COACH_SCAN_INTENT_ALLOWED_KEYS = [
   'scan_id',
@@ -480,6 +519,18 @@ export function assertCoachInnerPayload(payload: Record<string, unknown>) {
   normalizeCoachSelectedScanId(payload.selected_scan_id);
   normalizeCoachScanIntent(payload.scan_intent);
 
+  if (
+    isFreeQuestionPromptType(promptType) &&
+    payload.question_key !== undefined &&
+    payload.question_key !== null
+  ) {
+    throw new Phase2HttpError(
+      400,
+      'invalid_coach_payload',
+      'payload.question_key is not supported for free_question',
+    );
+  }
+
   if (payload.question_key !== undefined && payload.question_key !== null) {
     const normalizedQuestionKey = normalizeCoachQuestionKey(payload.question_key);
     if (
@@ -496,11 +547,11 @@ export function assertCoachInnerPayload(payload: Record<string, unknown>) {
     }
   }
 
-  if (payload.question_text !== undefined) {
-    normalizeOptionalFreeText(payload.question_text, {
-      fieldName: 'payload.question_text',
-      maxLength: COACH_QUESTION_MAX_LENGTH,
-    });
+  if (
+    payload.question_text !== undefined ||
+    isFreeQuestionPromptType(promptType)
+  ) {
+    normalizeCoachPayloadQuestionText(payload.question_text, promptType);
   }
 
   if (
@@ -1433,24 +1484,37 @@ export function parseCoachGenerateRequest(payload: unknown): CoachGenerateReques
 
   if (promptType) {
     normalizedPayload.prompt_type = promptType;
-    const resolvedQuestionSelection = resolveCoachQuestionSelection({
+    const normalizedQuestionText = normalizeCoachPayloadQuestionText(
+      payload.payload.question_text,
       promptType,
-      questionKey: normalizeCoachQuestionKey(payload.payload.question_key),
-      questionText:
-        normalizeOptionalFreeText(payload.payload.question_text, {
-          fieldName: 'payload.question_text',
-          maxLength: COACH_QUESTION_MAX_LENGTH,
-        }) ?? null,
-      locale,
-    });
-    normalizedPayload.question_key = resolvedQuestionSelection.questionKey ?? null;
-    normalizedPayload.question_text = resolvedQuestionSelection.questionText ?? null;
-    normalizedPayload.question_hints = resolveCoachQuestionHints({
-      promptType,
-      questionKey: resolvedQuestionSelection.questionKey,
-      questionText: resolvedQuestionSelection.questionText,
-      locale,
-    });
+    );
+    if (isFreeQuestionPromptType(promptType)) {
+      normalizedPayload.question_key = null;
+      normalizedPayload.question_text = normalizedQuestionText;
+      normalizedPayload.question_hints = resolveCoachQuestionHints({
+        promptType,
+        questionKey: null,
+        questionText: normalizedQuestionText,
+        locale,
+      });
+    } else {
+      const resolvedQuestionSelection = resolveCoachQuestionSelection({
+        promptType,
+        questionKey: normalizeCoachQuestionKey(payload.payload.question_key),
+        questionText: normalizedQuestionText,
+        locale,
+      });
+      normalizedPayload.question_key =
+        resolvedQuestionSelection.questionKey ?? null;
+      normalizedPayload.question_text =
+        resolvedQuestionSelection.questionText ?? null;
+      normalizedPayload.question_hints = resolveCoachQuestionHints({
+        promptType,
+        questionKey: resolvedQuestionSelection.questionKey,
+        questionText: resolvedQuestionSelection.questionText,
+        locale,
+      });
+    }
   } else if (sanitizedQuestionHints) {
     normalizedPayload.question_hints = sanitizedQuestionHints;
   }
@@ -1460,7 +1524,11 @@ export function parseCoachGenerateRequest(payload: unknown): CoachGenerateReques
   }
 
   if (normalizedScanIntent !== undefined) {
-    normalizedPayload.scan_intent = normalizedScanIntent;
+    if (isFreeQuestionPromptType(promptType)) {
+      delete normalizedPayload.scan_intent;
+    } else {
+      normalizedPayload.scan_intent = normalizedScanIntent;
+    }
   }
 
   return {

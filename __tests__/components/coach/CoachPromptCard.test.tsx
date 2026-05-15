@@ -109,6 +109,7 @@ describe('CoachPromptCard', () => {
       disabled: true,
       busy: true,
       selected: false,
+      expanded: false,
     });
   });
 
@@ -196,7 +197,74 @@ describe('CoachPromptCard', () => {
       disabled: false,
       busy: false,
       selected: true,
+      expanded: false,
     });
+  });
+
+  it('can show selector cards as expanded without marking them selected', () => {
+    render(
+      <CoachPromptCard
+        promptType="latest_scan"
+        title="Latest scan"
+        onPress={jest.fn()}
+        variant="compact"
+        mode="selector"
+        expanded
+        testID="coach-prompt-selector-expanded"
+      />,
+    );
+
+    expect(
+      screen.getByTestId('coach-prompt-selector-expanded').props
+        .accessibilityState,
+    ).toEqual({
+      disabled: false,
+      busy: false,
+      selected: false,
+      expanded: true,
+    });
+    expect(
+      screen.queryByTestId('coach-prompt-selector-expanded-selected-badge'),
+    ).toBeNull();
+    expect(
+      screen.queryByTestId(
+        'coach-prompt-selector-expanded-contains-selection-indicator',
+      ),
+    ).toBeNull();
+  });
+
+  it('can show that a selector card contains a selected child without reusing the selected state', () => {
+    render(
+      <CoachPromptCard
+        promptType="weekly_plan"
+        title="Weekly plan"
+        onPress={jest.fn()}
+        variant="compact"
+        mode="selector"
+        containsSelectedQuestion
+        testID="coach-prompt-selector-child-selection"
+      />,
+    );
+
+    expect(
+      screen.getByTestId('coach-prompt-selector-child-selection').props
+        .accessibilityState,
+    ).toEqual({
+      disabled: false,
+      busy: false,
+      selected: false,
+      expanded: false,
+    });
+    expect(
+      screen.queryByTestId(
+        'coach-prompt-selector-child-selection-selected-badge',
+      ),
+    ).toBeNull();
+    expect(
+      screen.getByTestId(
+        'coach-prompt-selector-child-selection-contains-selection-indicator',
+      ),
+    ).toBeTruthy();
   });
 
   it('keeps selector artwork visible under premium lock chrome', () => {

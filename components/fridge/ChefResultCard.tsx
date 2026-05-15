@@ -1,6 +1,5 @@
 import { useMemo, type ReactNode } from 'react';
 import {
-  Image,
   StyleSheet,
   Text,
   View,
@@ -15,6 +14,7 @@ import {
 } from 'lucide-react-native';
 
 import { ChefModeIcon } from '@/components/fridge/ChefModeIcon';
+import { OptimizedImage } from '@/components/OptimizedImage';
 import { PremiumTeaserCard } from '@/components/results/PremiumTeaserCard';
 import {
   BORDER_RADIUS,
@@ -506,9 +506,10 @@ export function ChefResultCard({
 
         <View style={styles.cookMainRow}>
           {imageUri ? (
-            <Image
+            <OptimizedImage
               source={{ uri: imageUri }}
               style={styles.mealImage}
+              recyclingKey={imageUri}
               testID="chef-result-image"
             />
           ) : null}

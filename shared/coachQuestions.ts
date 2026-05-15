@@ -1,10 +1,13 @@
 import {
+  FREE_QUESTION_PROMPT_TYPE,
   resolveVisibleCoachPromptType,
   type CoachGenerationPromptType,
   type CoachPromptType,
 } from './coachPromptTypes.ts';
 
-export const COACH_QUESTION_MAX_LENGTH = 200;
+export const COACH_PRESET_QUESTION_MAX_LENGTH = 200;
+export const COACH_FREE_QUESTION_MAX_LENGTH = 800;
+export const COACH_QUESTION_MAX_LENGTH = COACH_PRESET_QUESTION_MAX_LENGTH;
 
 export const COACH_QUESTION_LOCALES = [
   'fr',
@@ -103,6 +106,7 @@ export const COACH_QUESTION_INTENT_KEYS = [
   'trend_continue',
   'trend_next_adjustment',
   'trend_biggest_regression',
+  'free_question_open',
   'recovery_reset_48h',
   'recovery_restart_after_excess',
   'recovery_today_after_bad_night',
@@ -118,6 +122,7 @@ export type CoachQuestionTimeOfDay = (typeof COACH_QUESTION_TIME_OF_DAY_VALUES)[
 export type CoachQuestionIntentKey = (typeof COACH_QUESTION_INTENT_KEYS)[number];
 
 export const COACH_WORKFLOW_ROUTES = [
+  'free_question',
   'latest_scan',
   'weekly_plan',
   'nutrition_meal',
@@ -220,6 +225,15 @@ export interface CoachQuestionRankingContext {
   hasSuperScan?: boolean;
   historyDepth?: number | null;
 }
+
+const FREE_QUESTION_COACH_HINTS: CoachQuestionHints = {
+  intent_key: 'free_question_open',
+  time_scope: 'ongoing',
+  preferred_artifacts: ['priorities', 'action_steps', 'context_notes'],
+  discouraged_artifacts: ['shopping_list'],
+  meal_slot: null,
+  ui_tags: ['free_question'],
+};
 
 type CoachQuestionHintSeed = Omit<
   CoachQuestionDefinition,
@@ -1315,6 +1329,7 @@ const COACH_WORKFLOW_ROUTE_BY_INTENT_KEY: Readonly<
   trend_continue: 'trend_review_continue',
   trend_next_adjustment: 'trend_review_continue',
   trend_biggest_regression: 'trend_review_blocked',
+  free_question_open: 'free_question',
   recovery_reset_48h: 'recovery_reset_48h',
   recovery_restart_after_excess: 'recovery_restart',
   recovery_today_after_bad_night: 'recovery_restart',
@@ -1474,6 +1489,10 @@ function resolveCoachQuestionHistoryBand(historyDepth?: number | null) {
 }
 
 function buildGenericCoachQuestionHints(promptType: CoachGenerationPromptType) {
+  if (promptType === FREE_QUESTION_PROMPT_TYPE) {
+    return cloneCoachQuestionHints(FREE_QUESTION_COACH_HINTS);
+  }
+
   const visiblePromptType = resolveVisibleCoachPromptType(promptType);
   const definition = getDefaultCoachQuestionDefinition(visiblePromptType);
   if (!definition) {
@@ -1487,6 +1506,10 @@ function findCoachQuestionDefinitionByText(
   promptType: CoachGenerationPromptType,
   questionText: string | null | undefined,
 ) {
+  if (promptType === FREE_QUESTION_PROMPT_TYPE) {
+    return null;
+  }
+
   const visiblePromptType = resolveVisibleCoachPromptType(promptType);
   const normalizedQuestionText = normalizeCoachQuestionMatchText(questionText);
   if (!normalizedQuestionText) {
@@ -2319,6 +2342,10 @@ function classifyFreeTextCoachQuestion(
   promptType: CoachGenerationPromptType,
   questionText: string | null | undefined,
 ) {
+  if (promptType === FREE_QUESTION_PROMPT_TYPE) {
+    return null;
+  }
+
   const visiblePromptType = resolveVisibleCoachPromptType(promptType);
   const normalizedQuestionText = normalizeCoachQuestionText(questionText);
   if (!normalizedQuestionText) {
@@ -2494,6 +2521,10 @@ export function getCoachQuestionDefinition(
 export function getCoachQuestionsForPromptType(
   promptType: CoachGenerationPromptType,
 ): readonly CoachQuestionDefinition[] {
+  if (promptType === FREE_QUESTION_PROMPT_TYPE) {
+    return [];
+  }
+
   return COACH_QUESTIONS_BY_PROMPT.get(resolveVisibleCoachPromptType(promptType)) ?? [];
 }
 
@@ -2521,6 +2552,10 @@ export function isCoachQuestionForPromptType(
   questionKey: CoachQuestionKey,
   promptType: CoachGenerationPromptType,
 ): boolean {
+  if (promptType === FREE_QUESTION_PROMPT_TYPE) {
+    return false;
+  }
+
   const visiblePromptType = resolveVisibleCoachPromptType(promptType);
   const normalizedKey = normalizeCoachQuestionKey(questionKey);
   return (
@@ -2541,6 +2576,10 @@ export function getDefaultCoachQuestionDefinition(
   promptType: CoachGenerationPromptType,
   context?: CoachQuestionRankingContext,
 ): CoachQuestionDefinition {
+  if (promptType === FREE_QUESTION_PROMPT_TYPE) {
+    throw new Error('free_question does not have preset coach questions');
+  }
+
   const visiblePromptType = resolveVisibleCoachPromptType(promptType);
   const definition = rankCoachQuestionsForPromptType(visiblePromptType, context)[0];
   if (!definition) {
@@ -2568,8 +2607,15 @@ export function resolveCoachQuestionSelection(options: {
   questionText?: string | null;
   locale?: string | null;
 }) {
-  const visiblePromptType = resolveVisibleCoachPromptType(options.promptType);
   const normalizedQuestionText = normalizeCoachQuestionText(options.questionText);
+  if (options.promptType === FREE_QUESTION_PROMPT_TYPE) {
+    return {
+      questionKey: null,
+      questionText: normalizedQuestionText,
+    };
+  }
+
+  const visiblePromptType = resolveVisibleCoachPromptType(options.promptType);
   const normalizedQuestionKey = normalizeCoachQuestionKey(options.questionKey);
   const hasValidQuestionKey =
     normalizedQuestionKey &&
@@ -2615,6 +2661,10 @@ export function getCoachWorkflowRouteForIntentKey(
 export function getDefaultCoachWorkflowRoute(
   promptType: CoachGenerationPromptType,
 ): CoachWorkflowRoute {
+  if (promptType === FREE_QUESTION_PROMPT_TYPE) {
+    return 'free_question';
+  }
+
   return COACH_WORKFLOW_DEFAULT_ROUTE_BY_PROMPT_TYPE[
     resolveVisibleCoachPromptType(promptType)
   ];
@@ -2626,6 +2676,10 @@ export function resolveCoachQuestionHints(options: {
   questionText?: string | null;
   locale?: string | null;
 }) {
+  if (options.promptType === FREE_QUESTION_PROMPT_TYPE) {
+    return cloneCoachQuestionHints(FREE_QUESTION_COACH_HINTS);
+  }
+
   const questionSelection = resolveCoachQuestionSelection(options);
 
   if (questionSelection.questionKey) {
@@ -2660,6 +2714,10 @@ export function resolveCoachWorkflowRoute(options: {
   locale?: string | null;
   questionHints?: CoachQuestionHints | null;
 }): CoachWorkflowRoute {
+  if (options.promptType === FREE_QUESTION_PROMPT_TYPE) {
+    return 'free_question';
+  }
+
   const visiblePromptType = resolveVisibleCoachPromptType(options.promptType);
   const questionHints =
     options.questionHints ??
@@ -2671,7 +2729,9 @@ export function resolveCoachWorkflowRoute(options: {
     });
 
   return (
-    COACH_WORKFLOW_ROUTE_BY_INTENT_KEY[questionHints.intent_key] ??
+    (questionHints
+      ? COACH_WORKFLOW_ROUTE_BY_INTENT_KEY[questionHints.intent_key]
+      : null) ??
     COACH_WORKFLOW_DEFAULT_ROUTE_BY_PROMPT_TYPE[visiblePromptType]
   );
 }

@@ -137,4 +137,34 @@ describe('phase2 utils', () => {
     expect(hashA).toBe(hashB);
     expect(hashA).not.toBe(hashC);
   });
+
+  it('builds distinct free_question hashes for different text and persona values', async () => {
+    const basePayload = {
+      payload: {
+        prompt_type: 'free_question',
+        generated_at: '2026-05-14T08:00:00.000Z',
+        question_text: 'Comment adapter ma semaine avec mes derniers scans ?',
+        latest_scan: {
+          scan_id: 'scan-1',
+        },
+      },
+      persona_key: 'gentle_supportive',
+      locale: 'fr',
+    };
+    const hashA = await buildNormalizedPayloadHash(basePayload);
+    const hashB = await buildNormalizedPayloadHash({
+      ...basePayload,
+      payload: {
+        ...basePayload.payload,
+        question_text: 'Quelle priorite suivre aujourd hui ?',
+      },
+    });
+    const hashC = await buildNormalizedPayloadHash({
+      ...basePayload,
+      persona_key: 'patient_calm',
+    });
+
+    expect(hashA).not.toBe(hashB);
+    expect(hashA).not.toBe(hashC);
+  });
 });

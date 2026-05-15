@@ -170,6 +170,15 @@ jest.mock('@/components/Button', () => ({
   },
 }));
 
+const mockLoadingMiniGame = jest.fn((props: any) => {
+  const { View } = require('react-native');
+  return <View testID="loading-mini-game" {...props} />;
+});
+
+jest.mock('@/components/loading/LoadingMiniGame', () => ({
+  LoadingMiniGame: (props: any) => mockLoadingMiniGame(props),
+}));
+
 describe('ScanPreviewScreen', () => {
   const originalPlatform = Platform.OS;
   const reactNativeModule =
@@ -220,6 +229,31 @@ describe('ScanPreviewScreen', () => {
 
     // The Image component should be rendered with the imageUri
     expect(screen.getByTestId('confirm-button')).toBeTruthy();
+  });
+
+  it('does not apply full-image gradients over the preview or loading photos', async () => {
+    mockCreateScanWithAnalysis.mockImplementation(() => new Promise(() => {}));
+
+    render(<ScanPreviewScreen />);
+
+    expect(
+      screen
+        .getByTestId('scan-preview-image-container')
+        .findAllByType('LinearGradient' as any),
+    ).toHaveLength(0);
+    expect(screen.getAllByText('Visage').length).toBeGreaterThan(0);
+
+    fireEvent.press(screen.getByTestId('confirm-button'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('scan-preview-loading-overlay')).toBeTruthy();
+    });
+
+    expect(
+      screen
+        .getByTestId('scan-preview-loading-vignette')
+        .findAllByType('LinearGradient' as any),
+    ).toHaveLength(0);
   });
 
   it('displays the scan type label', () => {
@@ -642,6 +676,133 @@ describe('ScanPreviewScreen', () => {
       expect(screen.getByText(chipLabel)).toBeTruthy();
     },
   );
+
+  it('shows a compact mini-game only while the super scan is waiting', async () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      imageUri: 'file:///test-image.jpg',
+      scanType: 'super',
+    });
+    mockCreateScanWithAnalysis.mockImplementation(() => new Promise(() => {}));
+
+    render(<ScanPreviewScreen />);
+
+    fireEvent.press(screen.getByTestId('confirm-button'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('loading-mini-game')).toBeTruthy();
+    });
+
+    expect(screen.getByTestId('scan-preview-super-scan-mini-game-slot')).toBeTruthy();
+    expect(mockLoadingMiniGame).toHaveBeenCalledWith(
+      expect.objectContaining({
+        active: true,
+        compact: true,
+        durationHintMs: 10000,
+        variant: 'superScan',
+      }),
+    );
+    expect(mockLoadingMiniGame.mock.calls[0][0]).not.toHaveProperty('onComplete');
+  });
+
+  it.each(['health', 'body', 'nutrition'] as const)(
+    'does not show the loading mini-game for %s scans',
+    async (scanType) => {
+      mockUseLocalSearchParams.mockReturnValue({
+        imageUri: 'file:///test-image.jpg',
+        scanType,
+      });
+      mockCreateScanWithAnalysis.mockImplementation(() => new Promise(() => {}));
+
+      render(<ScanPreviewScreen />);
+
+      fireEvent.press(screen.getByTestId('confirm-button'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('scan-preview-loading-overlay')).toBeTruthy();
+      });
+
+      expect(screen.queryByTestId('loading-mini-game')).toBeNull();
+      expect(screen.queryByTestId('scan-preview-super-scan-mini-game-slot')).toBeNull();
+      expect(mockLoadingMiniGame).not.toHaveBeenCalled();
+    },
+  );
+
+  it('hides the super scan mini-game on ultra-tight loading layouts', async () => {
+    Object.defineProperty(Platform, 'OS', {
+      value: 'ios',
+      configurable: true,
+    });
+    useWindowDimensionsSpy.mockReturnValue({
+      width: 320,
+      height: 568,
+      scale: 2,
+      fontScale: 1,
+    });
+    mockUseSafeAreaInsets.mockReturnValue({
+      top: 20,
+      bottom: 0,
+      left: 0,
+      right: 0,
+    });
+    mockUseLocalSearchParams.mockReturnValue({
+      imageUri: 'file:///test-image.jpg',
+      scanType: 'super',
+    });
+    mockCreateScanWithAnalysis.mockImplementation(() => new Promise(() => {}));
+
+    render(<ScanPreviewScreen />);
+
+    fireEvent.press(screen.getByTestId('confirm-button'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('scan-preview-loading-scroll-view')).toBeTruthy();
+    });
+
+    expect(screen.queryByTestId('loading-mini-game')).toBeNull();
+    expect(screen.queryByTestId('scan-preview-super-scan-mini-game-slot')).toBeNull();
+    expect(mockLoadingMiniGame).not.toHaveBeenCalled();
+  });
+
+  it('removes the super scan mini-game once the result is ready and before navigation', async () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      imageUri: 'file:///test-image.jpg',
+      scanType: 'super',
+    });
+    mockCreateScanWithAnalysis.mockResolvedValue({
+      scan: {
+        id: 'scan-super-ready-123',
+        analysis_result: {
+          scan_type: 'super_health_v2',
+          global_risk_score: 88,
+        },
+      },
+      analysisSucceeded: true,
+    });
+
+    render(<ScanPreviewScreen />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('confirm-button'));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('loading-mini-game')).toBeTruthy();
+    });
+
+    await act(async () => {
+      jest.advanceTimersByTime(7000);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('scan-preview-loading-percentage').props.children).toBe(
+        '100%',
+      );
+    });
+
+    expect(screen.queryByTestId('loading-mini-game')).toBeNull();
+    expect(screen.getByTestId('scan-preview-super-scan-mini-game-slot')).toBeTruthy();
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
 
   it('navigates back when X button is pressed', () => {
     render(<ScanPreviewScreen />);
@@ -1378,26 +1539,20 @@ describe('ScanPreviewScreen', () => {
   });
 
   describe('different scan types', () => {
-    it('displays body scan type correctly', () => {
+    it.each([
+      ['health', 'Visage'],
+      ['body', 'Corps'],
+      ['nutrition', 'Nutrition'],
+      ['super', 'Super Scan'],
+    ] as const)('displays %s scan type correctly', (scanType, label) => {
       mockUseLocalSearchParams.mockReturnValue({
         imageUri: 'file:///test-image.jpg',
-        scanType: 'body',
+        scanType,
       });
 
       render(<ScanPreviewScreen />);
 
-      expect(screen.getAllByText('Corps').length).toBeGreaterThan(0);
-    });
-
-    it('displays nutrition scan type correctly', () => {
-      mockUseLocalSearchParams.mockReturnValue({
-        imageUri: 'file:///test-image.jpg',
-        scanType: 'nutrition',
-      });
-
-      render(<ScanPreviewScreen />);
-
-      expect(screen.getAllByText('Nutrition').length).toBeGreaterThan(0);
+      expect(screen.getAllByText(label).length).toBeGreaterThan(0);
     });
   });
 });

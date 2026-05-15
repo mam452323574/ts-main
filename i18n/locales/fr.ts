@@ -42,6 +42,13 @@ export const FR_TRANSLATIONS = {
     yesterday: 'Hier',
     days_ago: 'Il y a {{count}} jours',
   },
+  loading_mini_game: {
+    title: 'Mini-jeu',
+    score: 'Score',
+    tap_targets_prompt: 'Touchez les signaux',
+    float_dodge_prompt: 'Gardez le signal en vol',
+    reflex_dots_prompt: 'Touchez les bons points',
+  },
   tabs: {
     home: 'Accueil',
     analytics: 'Analyses',
@@ -839,6 +846,11 @@ export const FR_TRANSLATIONS = {
         subtitle:
           'À partir de mon dernier scan, dis-moi les 3 actions les plus utiles aujourd’hui.',
       },
+      free_question: {
+        title: 'Question libre',
+        subtitle:
+          'Pose ta question libre et reçois une réponse concrète à partir de tes scans.',
+      },
       latest_scan_issue_resolution: {
         title: 'Action post-scan',
         subtitle:
@@ -891,6 +903,7 @@ export const FR_TRANSLATIONS = {
       },
     },
     prompt_categories: {
+      question: 'Question libre',
       today: "Aujourd'hui",
       plan: 'Plans',
       focus: 'Focus',
@@ -1021,13 +1034,24 @@ export const FR_TRANSLATIONS = {
       subtitle: 'Écris ta question, puis ajuste le coach et le focus si besoin.',
     },
     questions: {
-      section_label: 'Suggestions utiles',
-      custom_label: 'Ta question au coach',
-      custom_placeholder:
-        'Écris ce que tu veux demander : peau, nutrition, sport, sommeil...',
+      section_label: 'Suggestions',
+      custom_label: 'Pose ta question au coach',
+      custom_helper: 'Demande ce que tu veux.',
+      custom_placeholder: 'Écris ta demande',
+      selected_label: 'Sélectionné',
       empty_summary: 'Question au coach',
+      empty_error: 'Ajoute quelques mots pour que le coach puisse répondre',
+      too_long_error: 'Question trop longue',
       counter: '{{count}}/{{max}}',
+      scan_result_improve: 'Que devrais-je améliorer à partir de mon dernier scan ?',
+      scan_result_maintain: 'Comment maintenir mes bons résultats après ce scan ?',
     },
+    selectionRequiredTitle: 'Fais une sélection',
+    selectionRequiredMessage:
+      'Choisis une question ou écris ta demande avant de demander un conseil.',
+    freeQuestionRequiredTitle: 'Écris ta demande',
+    freeQuestionRequiredMessage:
+      'Ajoute une question avant de demander un conseil.',
     options_sheet: {
       persona_label: 'Coach',
       mode_label: 'Question au coach',

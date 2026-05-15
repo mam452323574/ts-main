@@ -1,9 +1,10 @@
-import { View, Text, Image, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useMemo } from 'react';
 import * as Haptics from 'expo-haptics';
 import { ChevronRight } from 'lucide-react-native';
 import { Product } from '@/types';
 import { useTheme } from '@/contexts/ThemeContext';
+import { OptimizedImage } from '@/components/OptimizedImage';
 import { SIZES, SPACING, BORDER_RADIUS, FONT_WEIGHTS, SHADOWS } from '@/constants/theme';
 import {
   normalizeTrustedHttpsImageUri,
@@ -41,7 +42,7 @@ export function ProductCard({ product }: ProductCardProps) {
       <View style={styles.container}>
         <View style={styles.imageContainer}>
           {safeImageUri ? (
-            <Image source={{ uri: safeImageUri }} style={styles.image} />
+            <OptimizedImage source={{ uri: safeImageUri }} style={styles.image} />
           ) : null}
         </View>
         <View style={styles.content}>

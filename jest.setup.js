@@ -681,9 +681,12 @@ jest.mock('expo-linear-gradient', () => ({
 
 jest.mock('expo-image', () => {
   const { Image } = require('react-native');
+  const ExpoImage = Object.assign(Image, {
+    prefetch: jest.fn(() => Promise.resolve(true)),
+  });
 
   return {
-    Image,
+    Image: ExpoImage,
   };
 });
 

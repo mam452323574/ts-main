@@ -31,9 +31,10 @@ export function useBootPrefetch() {
       return;
     }
 
-    let prefetchTimeout: ReturnType<typeof setTimeout> | null = null;
+    let eligibilityPrefetchTimeout: ReturnType<typeof setTimeout> | null = null;
+    let secondaryPrefetchTimeout: ReturnType<typeof setTimeout> | null = null;
     const interactionTask = InteractionManager.runAfterInteractions(() => {
-      prefetchTimeout = setTimeout(() => {
+      eligibilityPrefetchTimeout = setTimeout(() => {
         void queryClient.prefetchQuery({
           queryKey: SCAN_ELIGIBILITY_BATCH_QUERY_KEY(user.id),
           queryFn: () =>
@@ -45,7 +46,9 @@ export function useBootPrefetch() {
             ]),
           staleTime: 1000 * 60 * 2,
         });
+      }, 450);
 
+      secondaryPrefetchTimeout = setTimeout(() => {
         if (userProfile?.id) {
           void queryClient.prefetchQuery({
             queryKey: getCoachScreenSnapshotQueryKey(user.id, {
@@ -82,7 +85,7 @@ export function useBootPrefetch() {
             staleTime: 1000 * 30,
           });
         }
-      }, 250);
+      }, 1100);
     });
 
     void queryClient.prefetchQuery({
@@ -99,8 +102,11 @@ export function useBootPrefetch() {
 
     return () => {
       interactionTask.cancel?.();
-      if (prefetchTimeout) {
-        clearTimeout(prefetchTimeout);
+      if (eligibilityPrefetchTimeout) {
+        clearTimeout(eligibilityPrefetchTimeout);
+      }
+      if (secondaryPrefetchTimeout) {
+        clearTimeout(secondaryPrefetchTimeout);
       }
     };
   }, [

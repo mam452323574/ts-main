@@ -23,7 +23,18 @@ jest.mock('@/components/Button', () => ({
 }));
 
 jest.mock('@/components/OAuthButton', () => ({
-  OAuthButton: () => null,
+  OAuthButton: ({ provider, onPress, loading, disabled }: any) => {
+    const { TouchableOpacity, Text } = require('react-native');
+    return (
+      <TouchableOpacity
+        onPress={onPress}
+        disabled={disabled || loading}
+        testID={`oauth-${provider}-button`}
+      >
+        <Text>{loading ? 'Google loading' : 'Continuer avec Google'}</Text>
+      </TouchableOpacity>
+    );
+  },
 }));
 
 const mockPush = jest.fn();
@@ -36,13 +47,13 @@ jest.mock('expo-router', () => ({
 }));
 
 const mockSignIn = jest.fn();
-const mockSignInWithOAuth = jest.fn();
+const mockSignInWithGoogle = jest.fn();
 const mockSendVerificationEmail = jest.fn();
 
 jest.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
     signIn: mockSignIn,
-    signInWithOAuth: mockSignInWithOAuth,
+    signInWithGoogle: mockSignInWithGoogle,
     sendVerificationEmail: mockSendVerificationEmail,
   }),
 }));
@@ -51,6 +62,7 @@ describe('LoginScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSignIn.mockResolvedValue({ nextStep: 'ready', userId: 'user-123' });
+    mockSignInWithGoogle.mockResolvedValue(undefined);
     mockSendVerificationEmail.mockResolvedValue(undefined);
   });
 
@@ -83,6 +95,12 @@ describe('LoginScreen', () => {
     render(<LoginScreen />);
     
     expect(screen.getByText('Se Connecter')).toBeTruthy();
+  });
+
+  it('displays the Google sign-in button', () => {
+    render(<LoginScreen />);
+
+    expect(screen.getByText('Continuer avec Google')).toBeTruthy();
   });
 
   it('displays signup link', () => {
@@ -124,6 +142,16 @@ describe('LoginScreen', () => {
     fireEvent.press(signupText.parent!);
     
     expect(mockPush).toHaveBeenCalledWith('/signup');
+  });
+
+  it('calls signInWithGoogle from the Google button', async () => {
+    render(<LoginScreen />);
+
+    fireEvent.press(screen.getByTestId('oauth-google-button'));
+
+    await waitFor(() => {
+      expect(mockSignInWithGoogle).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('keeps unverified users on verification when the resend fails', async () => {

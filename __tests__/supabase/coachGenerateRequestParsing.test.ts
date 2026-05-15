@@ -162,6 +162,64 @@ describe('parseCoachGenerateRequest — coach inner payload validation (C-02)', 
     );
   });
 
+  it('accepts free_question with required free text and no question key', () => {
+    const payload = buildValidPayload();
+    (payload.payload as Record<string, unknown>).prompt_type = 'free_question';
+    (payload.payload as Record<string, unknown>).question_text =
+      'Comment adapter mes habitudes cette semaine avec mes derniers scans ?';
+    (payload.payload as Record<string, unknown>).question_key = undefined;
+    (payload.payload as Record<string, unknown>).question_hints = {
+      intent_key: 'latest_scan_priority_today',
+      time_scope: 'today',
+      preferred_artifacts: ['priorities'],
+    };
+
+    const parsed = parseCoachGenerateRequest(payload);
+
+    expect(parsed.payload.prompt_type).toBe('free_question');
+    expect(parsed.payload.question_key).toBeNull();
+    expect(parsed.payload.question_text).toBe(
+      'Comment adapter mes habitudes cette semaine avec mes derniers scans ?',
+    );
+    expect(parsed.payload.question_hints).toEqual(
+      expect.objectContaining({
+        intent_key: 'free_question_open',
+        preferred_artifacts: expect.arrayContaining(['context_notes']),
+      }),
+    );
+  });
+
+  it('rejects free_question without non-empty question text', () => {
+    const payload = buildValidPayload();
+    (payload.payload as Record<string, unknown>).prompt_type = 'free_question';
+    (payload.payload as Record<string, unknown>).question_text = '   ';
+
+    expect(() => parseCoachGenerateRequest(payload)).toThrow(
+      expect.objectContaining({ code: 'invalid_coach_payload' }),
+    );
+
+    const missing = buildValidPayload();
+    (missing.payload as Record<string, unknown>).prompt_type = 'free_question';
+    delete (missing.payload as Record<string, unknown>).question_text;
+
+    expect(() => parseCoachGenerateRequest(missing)).toThrow(
+      expect.objectContaining({ code: 'invalid_coach_payload' }),
+    );
+  });
+
+  it('rejects question_key on free_question payloads', () => {
+    const payload = buildValidPayload();
+    (payload.payload as Record<string, unknown>).prompt_type = 'free_question';
+    (payload.payload as Record<string, unknown>).question_key =
+      'latest_scan__top_priority_today';
+    (payload.payload as Record<string, unknown>).question_text =
+      'Quelle priorite suivre cette semaine ?';
+
+    expect(() => parseCoachGenerateRequest(payload)).toThrow(
+      expect.objectContaining({ code: 'invalid_coach_payload' }),
+    );
+  });
+
   it('rejects unknown keys at the inner payload level', () => {
     const malicious = buildValidPayload();
     (malicious.payload as Record<string, unknown>).system_override =
@@ -223,9 +281,27 @@ describe('parseCoachGenerateRequest — coach inner payload validation (C-02)', 
     );
   });
 
-  it('rejects question_text values longer than 200 characters', () => {
+  it('rejects preset question_text values longer than 200 characters', () => {
     const payload = buildValidPayload();
     (payload.payload as Record<string, unknown>).question_text = 'x'.repeat(201);
+
+    expect(() => parseCoachGenerateRequest(payload)).toThrow(
+      expect.objectContaining({ code: 'text_too_long' }),
+    );
+  });
+
+  it('rejects free_question question_text values longer than 800 characters', () => {
+    const accepted = buildValidPayload();
+    (accepted.payload as Record<string, unknown>).prompt_type = 'free_question';
+    (accepted.payload as Record<string, unknown>).question_text = 'x'.repeat(800);
+
+    expect(parseCoachGenerateRequest(accepted).payload.question_text).toHaveLength(
+      800,
+    );
+
+    const payload = buildValidPayload();
+    (payload.payload as Record<string, unknown>).prompt_type = 'free_question';
+    (payload.payload as Record<string, unknown>).question_text = 'x'.repeat(801);
 
     expect(() => parseCoachGenerateRequest(payload)).toThrow(
       expect.objectContaining({ code: 'text_too_long' }),

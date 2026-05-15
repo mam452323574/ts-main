@@ -11,6 +11,8 @@ import {
 import CoachScreen from '@/screens/CoachScreen';
 import { SPACING } from '@/constants/theme';
 import { CoachServiceError } from '@/services/coach';
+import { resolveCoachQuestionText } from '@/shared/coachQuestions';
+import { encodeScanCoachIntentParam } from '@/shared/scanCoachIntent';
 
 const mockMutateAsync = jest.fn();
 const mockUseCoachEntries = jest.fn();
@@ -487,6 +489,75 @@ describe('CoachScreen', () => {
     ).toBeTruthy();
   });
 
+  it('keeps free_question hidden from presets and submits typed free text', async () => {
+    const screen = render(<CoachScreen />);
+
+    expect(
+      screen.queryByTestId('coach-settings-inline-mode-picker-card-free_question'),
+    ).toBeNull();
+    expect(
+      screen.queryByTestId(
+        'coach-settings-inline-mode-picker-suggestions-free_question',
+      ),
+    ).toBeNull();
+    expect(
+      screen.getByTestId('coach-action-primary').props.accessibilityState
+        ?.disabled,
+    ).toBe(false);
+
+    enterCoachQuestion(screen);
+    fireEvent.press(screen.getByTestId('coach-action-primary'));
+
+    await waitFor(() => {
+      expect(mockMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          promptType: 'free_question',
+          questionKey: null,
+          questionText: DEFAULT_FREE_COACH_QUESTION,
+        }),
+      );
+    });
+  });
+
+  it('shows a clear alert when asking without any selected question', () => {
+    const screen = render(<CoachScreen />);
+
+    fireEvent.press(screen.getByTestId('coach-action-primary'));
+
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+    expect(mockShowAlert).toHaveBeenCalledWith(
+      'Fais une sélection',
+      'Choisis une question ou écris ta demande avant de demander un conseil.',
+      expect.arrayContaining([
+        expect.objectContaining({
+          text: expect.any(String),
+        }),
+      ]),
+      expect.anything(),
+      expect.objectContaining({ emoji: null }),
+    );
+  });
+
+  it('shows a clear alert when the selected free question is empty', () => {
+    const screen = render(<CoachScreen />);
+
+    fireEvent.press(screen.getByTestId('coach-settings-inline-question-input-card'));
+    fireEvent.press(screen.getByTestId('coach-action-primary'));
+
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+    expect(mockShowAlert).toHaveBeenCalledWith(
+      'Écris ta demande',
+      'Ajoute une question avant de demander un conseil.',
+      expect.arrayContaining([
+        expect.objectContaining({
+          text: expect.any(String),
+        }),
+      ]),
+      expect.anything(),
+      expect.objectContaining({ emoji: null }),
+    );
+  });
+
   it('keeps the latest guidance ahead of history, personas, and prompts', () => {
     mockCoachEntriesState = {
       ...mockCoachEntriesState,
@@ -711,11 +782,14 @@ describe('CoachScreen', () => {
     expect(
       screen.getByTestId('coach-settings-inline-question-input-card').props
         .accessibilityState?.selected,
-    ).toBe(true);
+    ).toBe(false);
+    expect(
+      screen.queryByTestId('coach-settings-inline-question-input-selected-badge'),
+    ).toBeNull();
     expect(
       screen.getByTestId('coach-action-primary').props.accessibilityState
       ?.disabled,
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('keeps cached Coach settings visible during a silent focus refetch', () => {
@@ -889,7 +963,7 @@ describe('CoachScreen', () => {
 
     expect(mockMutateAsync).toHaveBeenCalledWith(
       expect.objectContaining({
-        promptType: 'latest_scan',
+        promptType: 'free_question',
         personaKey: 'gentle_supportive',
       }),
     );
@@ -1094,6 +1168,10 @@ describe('CoachScreen', () => {
     };
 
     const screen = render(<CoachScreen />);
+    const selectedWeeklyQuestion = resolveCoachQuestionText(
+      'weekly_plan__realistic_week',
+      'fr',
+    );
 
     fireEvent.press(
       screen.getByTestId('coach-settings-inline-mode-picker-card-weekly_plan'),
@@ -1107,20 +1185,24 @@ describe('CoachScreen', () => {
     expect(
       screen.getByTestId('coach-settings-inline-mode-picker-card-weekly_plan')
         .props.accessibilityState?.selected,
+    ).toBe(false);
+    expect(
+      screen.getByTestId('coach-settings-inline-mode-picker-card-weekly_plan')
+        .props.accessibilityState?.expanded,
     ).toBe(true);
     expect(
       screen.getByTestId('coach-action-primary').props.accessibilityState
         ?.disabled,
-    ).toBe(true);
+    ).toBe(false);
 
     fireEvent.press(
       screen.getByTestId(
-        'coach-settings-inline-question-weekly_plan__realistic_week',
+        'coach-settings-inline-mode-picker-question-weekly_plan__realistic_week',
       ),
     );
-    const selectedWeeklyQuestion = screen.getByTestId(
-      'coach-settings-inline-question-input',
-    ).props.value;
+    expect(
+      screen.getByTestId('coach-settings-inline-question-input').props.value,
+    ).toBe('');
 
     fireEvent.press(screen.getByTestId('coach-action-primary'));
 
@@ -1157,7 +1239,7 @@ describe('CoachScreen', () => {
     await waitFor(() => {
       expect(mockMutateAsync).toHaveBeenCalledWith(
         expect.objectContaining({
-          promptType: 'latest_scan',
+          promptType: 'free_question',
           personaKey: 'gentle_supportive',
         }),
       );
@@ -1193,7 +1275,7 @@ describe('CoachScreen', () => {
     await waitFor(() => {
       expect(mockMutateAsync).toHaveBeenCalledWith(
         expect.objectContaining({
-          promptType: 'latest_scan',
+          promptType: 'free_question',
           personaKey: 'gentle_supportive',
         }),
       );
@@ -1409,7 +1491,7 @@ describe('CoachScreen', () => {
     await waitFor(() => {
       expect(mockMutateAsync).toHaveBeenCalledWith(
         expect.objectContaining({
-          promptType: 'latest_scan',
+          promptType: 'free_question',
           personaKey: 'gentle_supportive',
         }),
       );
@@ -1473,7 +1555,7 @@ describe('CoachScreen', () => {
     await waitFor(() => {
       expect(mockMutateAsync).toHaveBeenCalledWith(
         expect.objectContaining({
-          promptType: 'latest_scan',
+          promptType: 'free_question',
           personaKey: 'analytical_precise',
         }),
       );
@@ -1701,6 +1783,14 @@ describe('CoachScreen', () => {
     const screen = render(<CoachScreen />);
 
     expect(screen.getByTestId('coach-generation-loading-state')).toBeTruthy();
+    expect(screen.getByText('Conseil en préparation')).toBeTruthy();
+    expect(
+      screen.getByText("Le Coach s'appuie sur vos derniers scans."),
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId('coach-generation-loading-percentage'),
+    ).toHaveTextContent('0%');
+    expect(screen.getByTestId('coach-loading-mini-game')).toBeTruthy();
     expect(screen.queryByTestId('coach-ready-state')).toBeNull();
     expect(screen.queryByTestId('coach-guidance-card')).toBeNull();
     expect(screen.queryByText('Saved coach guidance')).toBeNull();
@@ -1708,6 +1798,106 @@ describe('CoachScreen', () => {
     expect(screen.queryByTestId('coach-error-state')).toBeNull();
     expect(screen.queryByTestId('coach-empty-state')).toBeNull();
     expect(screen.queryByTestId('coach-unavailable-state')).toBeNull();
+  });
+
+  it('keeps the loading panel for the quick finish and hides the mini-game once guidance is ready', () => {
+    jest.useFakeTimers();
+    let rendered: ReturnType<typeof render> | null = null;
+
+    try {
+      mockCoachGenerationState = {
+        data: null,
+        isPending: true,
+        isError: false,
+        error: null,
+      };
+
+      rendered = render(<CoachScreen />);
+
+      expect(screen.getByTestId('coach-generation-loading-state')).toBeTruthy();
+      expect(screen.getByTestId('coach-loading-mini-game')).toBeTruthy();
+
+      mockCoachGenerationState = {
+        data: {
+          success: true,
+          entry_id: 'entry-fast-ready',
+          persona_key: 'gentle_supportive',
+          cached: false,
+          fallback: false,
+          status: 'ready',
+          title: 'Fast ready guidance',
+          body: 'The coach finished quickly.',
+          disclaimer:
+            'Wellness guidance only. This is not a diagnosis or medical advice.',
+          cta_label: null,
+          cta_route: null,
+          source: 'n8n',
+          expires_at: null,
+          response_payload_json: {},
+          payload: {},
+        },
+        isPending: false,
+        isError: false,
+        error: null,
+      };
+
+      rendered.rerender(<CoachScreen />);
+
+      expect(screen.getByTestId('coach-generation-loading-state')).toBeTruthy();
+      expect(screen.queryByTestId('coach-loading-mini-game')).toBeNull();
+      expect(screen.queryByTestId('coach-ready-state')).toBeNull();
+
+      act(() => {
+        jest.advanceTimersByTime(450);
+      });
+
+      expect(screen.queryByTestId('coach-generation-loading-state')).toBeNull();
+      expect(screen.getByTestId('coach-ready-state')).toBeTruthy();
+      expect(screen.getByText('Fast ready guidance')).toBeTruthy();
+      expect(screen.getByText('The coach finished quickly.')).toBeTruthy();
+    } finally {
+      rendered?.unmount();
+      jest.useRealTimers();
+    }
+  });
+
+  it('holds a slow generation near 97 percent without revealing older guidance', () => {
+    jest.useFakeTimers();
+    let rendered: ReturnType<typeof render> | null = null;
+
+    try {
+      mockCoachGenerationState = {
+        data: null,
+        isPending: true,
+        isError: false,
+        error: null,
+      };
+
+      rendered = render(<CoachScreen />);
+
+      act(() => {
+        jest.advanceTimersByTime(30_000);
+      });
+
+      expect(
+        screen.getByTestId('coach-generation-loading-percentage'),
+      ).toHaveTextContent('97%');
+      expect(screen.getByTestId('coach-loading-mini-game')).toBeTruthy();
+      expect(screen.queryByTestId('coach-ready-state')).toBeNull();
+      expect(screen.queryByText('Saved coach guidance')).toBeNull();
+
+      act(() => {
+        jest.advanceTimersByTime(30_000);
+      });
+
+      expect(
+        screen.getByTestId('coach-generation-loading-percentage'),
+      ).toHaveTextContent('97%');
+      expect(screen.queryByTestId('coach-ready-state')).toBeNull();
+    } finally {
+      rendered?.unmount();
+      jest.useRealTimers();
+    }
   });
 
   it('keeps history visible while a new generation is pending and older ready entries exist', () => {
@@ -1802,7 +1992,7 @@ describe('CoachScreen', () => {
     await waitFor(() => {
       expect(mockMutateAsync).toHaveBeenCalledWith(
         expect.objectContaining({
-          promptType: 'latest_scan',
+          promptType: 'free_question',
           personaKey: 'gentle_supportive',
         }),
       );
@@ -1849,9 +2039,12 @@ describe('CoachScreen', () => {
 
     screen.rerender(<CoachScreen />);
 
-    await waitFor(() => {
-      expect(screen.queryByTestId('coach-generation-loading-state')).toBeNull();
-    });
+    await waitFor(
+      () => {
+        expect(screen.queryByTestId('coach-generation-loading-state')).toBeNull();
+      },
+      { timeout: 3000 },
+    );
     expect(screen.getByText('Ready coach guidance')).toBeTruthy();
     expect(
       screen.getByTestId('coach-guidance-card-variant-fresh'),
@@ -2203,9 +2396,12 @@ describe('CoachScreen', () => {
 
     screen.rerender(<CoachScreen />);
 
-    await waitFor(() => {
-      expect(screen.queryByTestId('coach-generation-loading-state')).toBeNull();
-    });
+    await waitFor(
+      () => {
+        expect(screen.queryByTestId('coach-generation-loading-state')).toBeNull();
+      },
+      { timeout: 3000 },
+    );
     expect(screen.getByText('Recovered coach guidance')).toBeTruthy();
   });
 
@@ -2294,6 +2490,178 @@ describe('CoachScreen', () => {
       ),
     ).toBeNull();
     expect(screen.getByTestId('coach-history-icon-button')).toBeTruthy();
+  });
+
+  it('refreshes a stale focused snapshot only once across fetch rerenders', async () => {
+    const focusRefetch = jest.fn();
+    const snapshotState = {
+      isFetched: true,
+      isFetching: false,
+      isStale: true,
+    };
+
+    mockUseCoachScreenSnapshot.mockImplementation(
+      (options?: { excludeEntryId?: string | null }) => {
+        const scansQuery = mockUseCoachScans();
+        const latestReadyQuery = mockUseLatestReadyCoachEntry({
+          personaKey: mockAuthState.userProfile.coach_persona_key,
+        });
+        const historySummaryQuery = mockUseCoachHistorySummary({
+          excludeEntryId: options?.excludeEntryId,
+        });
+
+        return {
+          data: {
+            entries: mockCoachEntriesState.data,
+            quota: mockCoachQuotaState.data,
+            recentScans:
+              scansQuery && 'data' in scansQuery ? scansQuery.data : [],
+            latestReadyEntry:
+              latestReadyQuery && 'data' in latestReadyQuery
+                ? latestReadyQuery.data
+                : null,
+            historySummary:
+              historySummaryQuery && 'data' in historySummaryQuery
+                ? historySummaryQuery.data
+                : buildHistorySummary(options?.excludeEntryId),
+          },
+          error: null,
+          isLoading: false,
+          isFetching: snapshotState.isFetching,
+          isFetched: snapshotState.isFetched,
+          isStale: snapshotState.isStale,
+          isTrackedEntryStale: false,
+          refetch: focusRefetch,
+        };
+      },
+    );
+
+    const rendered = render(<CoachScreen />);
+
+    await waitFor(() => {
+      expect(focusRefetch).toHaveBeenCalledTimes(1);
+    });
+
+    snapshotState.isFetching = true;
+    await act(async () => {
+      rendered.rerender(<CoachScreen />);
+    });
+
+    expect(focusRefetch).toHaveBeenCalledTimes(1);
+
+    snapshotState.isFetching = false;
+    await act(async () => {
+      rendered.rerender(<CoachScreen />);
+    });
+
+    expect(focusRefetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not refetch again after a focused tracked entry settles ready', async () => {
+    const focusRefetch = jest.fn();
+    const snapshotState = {
+      isFetched: true,
+      isFetching: false,
+      isStale: true,
+    };
+
+    mockCoachEntriesState = {
+      data: [
+        {
+          id: 'entry-focus-tracked',
+          title: null,
+          body: null,
+          disclaimer:
+            'Wellness guidance only. This is not a diagnosis or medical advice.',
+          persona_key: 'gentle_supportive',
+          cta_label: null,
+          cta_route: null,
+          created_at: '2026-04-06T09:50:00.000Z',
+          source: 'n8n',
+          status: 'pending',
+        },
+      ],
+      error: null,
+      isFetching: false,
+      refetch: jest.fn(),
+    };
+
+    mockUseCoachScreenSnapshot.mockImplementation(
+      (options?: { excludeEntryId?: string | null }) => {
+        const scansQuery = mockUseCoachScans();
+        const latestReadyQuery = mockUseLatestReadyCoachEntry({
+          personaKey: mockAuthState.userProfile.coach_persona_key,
+        });
+        const historySummaryQuery = mockUseCoachHistorySummary({
+          excludeEntryId: options?.excludeEntryId,
+        });
+
+        return {
+          data: {
+            entries: mockCoachEntriesState.data,
+            quota: mockCoachQuotaState.data,
+            recentScans:
+              scansQuery && 'data' in scansQuery ? scansQuery.data : [],
+            latestReadyEntry:
+              latestReadyQuery && 'data' in latestReadyQuery
+                ? latestReadyQuery.data
+                : null,
+            historySummary:
+              historySummaryQuery && 'data' in historySummaryQuery
+                ? historySummaryQuery.data
+                : buildHistorySummary(options?.excludeEntryId),
+          },
+          error: null,
+          isLoading: false,
+          isFetching: snapshotState.isFetching,
+          isFetched: snapshotState.isFetched,
+          isStale: snapshotState.isStale,
+          isTrackedEntryStale: false,
+          refetch: focusRefetch,
+        };
+      },
+    );
+
+    const rendered = render(<CoachScreen />);
+
+    await waitFor(() => {
+      expect(mockUseCoachScreenSnapshot).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          trackedEntryId: 'entry-focus-tracked',
+        }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(focusRefetch).toHaveBeenCalledTimes(1);
+    });
+
+    mockCoachEntriesState = {
+      ...mockCoachEntriesState,
+      data: [
+        createCoachEntry({
+          id: 'entry-focus-tracked',
+          title: 'Focused tracked guidance',
+          body: 'This tracked guidance should not trigger another focus refresh.',
+          created_at: '2026-04-06T10:00:00.000Z',
+          generated_at: '2026-04-06T10:00:00.000Z',
+        }),
+      ],
+    };
+
+    snapshotState.isFetching = true;
+    await act(async () => {
+      rendered.rerender(<CoachScreen />);
+    });
+
+    expect(focusRefetch).toHaveBeenCalledTimes(1);
+
+    snapshotState.isFetching = false;
+    await act(async () => {
+      rendered.rerender(<CoachScreen />);
+    });
+
+    expect(focusRefetch).toHaveBeenCalledTimes(1);
   });
 
   it('does not render archived guidance from another persona at cold start', () => {
@@ -2538,7 +2906,8 @@ describe('CoachScreen', () => {
       expect(consoleLogSpy).toHaveBeenCalledWith(
         '[CoachScreen] generation request failed',
         expect.objectContaining({
-          prompt_type: 'latest_scan',
+          prompt_type: 'free_question',
+          visible_prompt_type: 'latest_scan',
           persona_key: 'gentle_supportive',
           locale: 'fr',
           message: 'Coach route "coach-generate-response" failed (503).',
@@ -2929,7 +3298,7 @@ describe('CoachScreen', () => {
     );
   });
 
-  it('prefills from scan result route params and sends exact scan context after user action', async () => {
+  it('preserves scan result intent when opening preset cards without replacing the question', async () => {
     mockAuthState = {
       ...mockAuthState,
       userProfile: {
@@ -2937,6 +3306,21 @@ describe('CoachScreen', () => {
         account_tier: 'premium',
       },
     };
+    const encodedScanIntent = encodeScanCoachIntentParam({
+      scan_id: 'scan-route-123',
+      scan_type: 'body',
+      has_actionable_issue: true,
+      priority_metric: 'posture_score',
+      priority_label: 'Posture',
+      severity: 'medium',
+      reason: 'Posture score needs attention.',
+      user_facing_summary: 'Le scan fait ressortir une priorite claire.',
+      prompt_type: 'latest_scan_issue_resolution',
+      question_key: null,
+      question_text: 'Que dois-je travailler apres ce scan ?',
+      fallback_prompt_type: 'latest_scan',
+      premium_required: false,
+    });
     mockLocalSearchParams.mockReturnValue({
       source: 'scan_result',
       scanId: 'scan-route-123',
@@ -2945,6 +3329,7 @@ describe('CoachScreen', () => {
       fallback_prompt_type: 'latest_scan',
       questionText: 'Que dois-je travailler apres ce scan ?',
       priorityMetric: 'posture_score',
+      scanIntent: encodedScanIntent,
     });
 
     const rendered = render(<CoachScreen />);
@@ -2956,6 +3341,20 @@ describe('CoachScreen', () => {
     });
     expect(mockMutateAsync).not.toHaveBeenCalled();
 
+    fireEvent.press(
+      rendered.getByTestId('coach-settings-inline-mode-picker-card-latest_scan'),
+    );
+    fireEvent.press(
+      rendered.getByTestId(
+        'coach-settings-inline-mode-picker-card-nutrition_focus',
+      ),
+    );
+    fireEvent.press(
+      rendered.getByTestId(
+        'coach-settings-inline-mode-picker-card-nutrition_focus',
+      ),
+    );
+
     fireEvent.press(rendered.getByTestId('coach-action-primary'));
 
     await waitFor(() => {
@@ -2965,6 +3364,11 @@ describe('CoachScreen', () => {
           questionKey: null,
           questionText: 'Que dois-je travailler apres ce scan ?',
           selectedScanId: 'scan-route-123',
+          scanIntent: expect.objectContaining({
+            scan_id: 'scan-route-123',
+            priority_metric: 'posture_score',
+            question_text: 'Que dois-je travailler apres ce scan ?',
+          }),
         }),
       );
     });
@@ -3035,7 +3439,7 @@ describe('CoachScreen', () => {
     });
   });
 
-  it('lets the user edit scan result route question before generation', async () => {
+  it('treats an edited scan result route question as a true free-text request', async () => {
     mockLocalSearchParams.mockReturnValue({
       source: 'scan_result',
       scanId: 'scan-edit-123',
@@ -3061,10 +3465,9 @@ describe('CoachScreen', () => {
     await waitFor(() => {
       expect(mockMutateAsync).toHaveBeenCalledWith(
         expect.objectContaining({
-          promptType: 'latest_scan',
+          promptType: 'free_question',
           questionKey: null,
           questionText: 'Question modifiee avant envoi',
-          selectedScanId: 'scan-edit-123',
         }),
       );
     });
@@ -3105,7 +3508,7 @@ describe('CoachScreen', () => {
     expect(mockMutateAsync).toHaveBeenCalledTimes(1);
   });
 
-  it('starts on an empty free question and keeps it selected when the mode changes', () => {
+  it('starts without a selected question and keeps the free draft independent when opening modes', () => {
     jest.useFakeTimers();
     jest.setSystemTime(new Date('2026-04-06T12:30:00.000Z'));
     mockAuthState = {
@@ -3126,14 +3529,17 @@ describe('CoachScreen', () => {
       expect(
         screen.getByTestId('coach-settings-inline-question-input-card').props
           .accessibilityState?.selected,
-      ).toBe(true);
+      ).toBe(false);
+      expect(
+        screen.queryByTestId('coach-settings-inline-question-input-selected-badge'),
+      ).toBeNull();
       expect(
         screen.getByText('Doux & Bienveillant · Question requise'),
       ).toBeTruthy();
       expect(
         screen.getByTestId('coach-action-primary').props.accessibilityState
           ?.disabled,
-      ).toBe(true);
+      ).toBe(false);
 
       fireEvent.press(
         screen.getByTestId('coach-settings-inline-mode-picker-card-nutrition_focus'),
@@ -3145,13 +3551,24 @@ describe('CoachScreen', () => {
       expect(
         screen.getByTestId('coach-settings-inline-question-input-card').props
           .accessibilityState?.selected,
+      ).toBe(false);
+      expect(
+        screen.queryByTestId('coach-settings-inline-question-input-selected-badge'),
+      ).toBeNull();
+      expect(
+        screen.getByTestId('coach-settings-inline-mode-picker-card-nutrition_focus')
+          .props.accessibilityState?.expanded,
       ).toBe(true);
+      expect(
+        screen.getByTestId('coach-settings-inline-mode-picker-card-nutrition_focus')
+          .props.accessibilityState?.selected,
+      ).toBe(false);
     } finally {
       jest.useRealTimers();
     }
   });
 
-  it('places the free question input before coach, mode, and suggested questions', () => {
+  it('places the free question input before coach and mode suggestions', () => {
     const rendered = render(<CoachScreen />);
     const testIds = collectTestIds(rendered.toJSON());
 
@@ -3162,8 +3579,9 @@ describe('CoachScreen', () => {
       testIds.indexOf('coach-settings-inline-mode-picker'),
     );
     expect(testIds.indexOf('coach-settings-inline-question-input')).toBeLessThan(
-      testIds.indexOf('coach-settings-inline-question-list'),
+      testIds.indexOf('coach-settings-inline-mode-picker-card-latest_scan'),
     );
+    expect(testIds).not.toContain('coach-settings-inline-question-list');
   });
 
   it('keeps a typed free question when the mode changes', async () => {
@@ -3177,6 +3595,9 @@ describe('CoachScreen', () => {
     const screen = render(<CoachScreen />);
 
     enterCoachQuestion(screen);
+    expect(
+      screen.getByTestId('coach-settings-inline-question-input-selected-badge'),
+    ).toBeTruthy();
     fireEvent.press(
       screen.getByTestId('coach-settings-inline-mode-picker-card-nutrition_focus'),
     );
@@ -3190,12 +3611,45 @@ describe('CoachScreen', () => {
     await waitFor(() => {
       expect(mockMutateAsync).toHaveBeenCalledWith(
         expect.objectContaining({
-          promptType: 'nutrition_focus',
+          promptType: 'free_question',
           questionKey: null,
           questionText: DEFAULT_FREE_COACH_QUESTION,
         }),
       );
     });
+  });
+
+  it('shows suggestions inline for only one opened prompt card at a time', () => {
+    mockAuthState = {
+      ...mockAuthState,
+      userProfile: {
+        ...mockAuthState.userProfile,
+        account_tier: 'premium',
+      },
+    };
+    const screen = render(<CoachScreen />);
+
+    fireEvent.press(
+      screen.getByTestId('coach-settings-inline-mode-picker-card-latest_scan'),
+    );
+    expect(
+      screen.getByTestId('coach-settings-inline-mode-picker-suggestions-latest_scan'),
+    ).toBeTruthy();
+
+    fireEvent.press(
+      screen.getByTestId('coach-settings-inline-mode-picker-card-nutrition_focus'),
+    );
+
+    expect(
+      screen.queryByTestId(
+        'coach-settings-inline-mode-picker-suggestions-latest_scan',
+      ),
+    ).toBeNull();
+    expect(
+      screen.getByTestId(
+        'coach-settings-inline-mode-picker-suggestions-nutrition_focus',
+      ),
+    ).toBeTruthy();
   });
 
   it.each([
@@ -3223,14 +3677,15 @@ describe('CoachScreen', () => {
         );
 
         const questionIds = collectTestIds(
-          screen.getByTestId('coach-settings-inline-question-list'),
+          screen.getByTestId(
+            'coach-settings-inline-mode-picker-suggestions-nutrition_focus',
+          ),
         ).filter((testId) =>
-          testId.startsWith('coach-settings-inline-question-') &&
-          testId !== 'coach-settings-inline-question-list',
+          testId.startsWith('coach-settings-inline-mode-picker-question-'),
         );
 
         expect(questionIds[0]).toBe(
-          `coach-settings-inline-question-${expectedFirstQuestionKey}`,
+          `coach-settings-inline-mode-picker-question-${expectedFirstQuestionKey}`,
         );
       } finally {
         jest.useRealTimers();
@@ -3257,17 +3712,52 @@ describe('CoachScreen', () => {
     ).toBe(customQuestion);
   });
 
-  it('fills the composer from a suggested question and sends its preset key unchanged', async () => {
+  it('fills the composer from a suggested question without auto-submit and sends the preset key', async () => {
     const screen = render(<CoachScreen />);
+    const selectedQuestionText = resolveCoachQuestionText(
+      'latest_scan__three_simple_actions',
+      'fr',
+    );
 
     fireEvent.press(
+      screen.getByTestId('coach-settings-inline-mode-picker-card-latest_scan'),
+    );
+    fireEvent.press(
       screen.getByTestId(
-        'coach-settings-inline-question-latest_scan__three_simple_actions',
+        'coach-settings-inline-mode-picker-question-latest_scan__three_simple_actions',
       ),
     );
-    const selectedQuestionText = screen.getByTestId(
-      'coach-settings-inline-question-input',
-    ).props.value;
+    expect(
+      screen.getByTestId(
+        'coach-settings-inline-mode-picker-question-latest_scan__three_simple_actions-selected-badge',
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId(
+        'coach-settings-inline-mode-picker-question-latest_scan__three_simple_actions',
+      ).props.accessibilityState?.selected,
+    ).toBe(true);
+    expect(
+      screen.getByTestId('coach-settings-inline-mode-picker-card-latest_scan')
+        .props.accessibilityState?.selected,
+    ).toBe(false);
+    expect(
+      screen.queryByTestId(
+        'coach-settings-inline-mode-picker-card-latest_scan-selected-badge',
+      ),
+    ).toBeNull();
+    expect(
+      screen.getByTestId(
+        'coach-settings-inline-mode-picker-card-latest_scan-contains-selection-indicator',
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.queryByTestId('coach-settings-inline-question-input-selected-badge'),
+    ).toBeNull();
+    expect(
+      screen.getByTestId('coach-settings-inline-question-input').props.value,
+    ).toBe('');
+    expect(screen.getAllByText(selectedQuestionText).length).toBeGreaterThan(0);
 
     fireEvent.press(screen.getByTestId('coach-action-primary'));
 
@@ -3287,8 +3777,11 @@ describe('CoachScreen', () => {
     const screen = render(<CoachScreen />);
 
     fireEvent.press(
+      screen.getByTestId('coach-settings-inline-mode-picker-card-latest_scan'),
+    );
+    fireEvent.press(
       screen.getByTestId(
-        'coach-settings-inline-question-latest_scan__three_simple_actions',
+        'coach-settings-inline-mode-picker-question-latest_scan__three_simple_actions',
       ),
     );
 
@@ -3296,6 +3789,9 @@ describe('CoachScreen', () => {
       screen.getByTestId('coach-settings-inline-question-input-card').props
         .accessibilityState?.selected,
     ).toBe(false);
+    expect(
+      screen.queryByTestId('coach-settings-inline-question-input-selected-badge'),
+    ).toBeNull();
 
     fireEvent(screen.getByTestId('coach-settings-inline-question-input'), 'focus');
 
@@ -3303,6 +3799,9 @@ describe('CoachScreen', () => {
       screen.getByTestId('coach-settings-inline-question-input-card').props
         .accessibilityState?.selected,
     ).toBe(true);
+    expect(
+      screen.getByTestId('coach-settings-inline-question-input-selected-badge'),
+    ).toBeTruthy();
   });
 
   it('clears question_key when the preset question is edited and sends only free text', async () => {
@@ -3310,7 +3809,7 @@ describe('CoachScreen', () => {
       success: true,
       entry_id: 'entry-free-question',
       persona_key: 'gentle_supportive',
-      prompt_type: 'latest_scan',
+      prompt_type: 'free_question',
       question_key: null,
       question_text: 'Sur quoi je dois me concentrer avant ma seance ce soir ?',
       cached: false,
@@ -3331,20 +3830,31 @@ describe('CoachScreen', () => {
     const screen = render(<CoachScreen />);
 
     fireEvent.press(
+      screen.getByTestId('coach-settings-inline-mode-picker-card-latest_scan'),
+    );
+    fireEvent.press(
       screen.getByTestId(
-        'coach-settings-inline-question-latest_scan__three_simple_actions',
+        'coach-settings-inline-mode-picker-question-latest_scan__three_simple_actions',
       ),
     );
     fireEvent.changeText(
       screen.getByTestId('coach-settings-inline-question-input'),
       'Sur quoi je dois me concentrer avant ma seance ce soir ?',
     );
+    expect(
+      screen.getByTestId('coach-settings-inline-question-input-selected-badge'),
+    ).toBeTruthy();
+    expect(
+      screen.queryByTestId(
+        'coach-settings-inline-mode-picker-question-latest_scan__three_simple_actions-selected-badge',
+      ),
+    ).toBeNull();
     fireEvent.press(screen.getByTestId('coach-action-primary'));
 
     await waitFor(() => {
       expect(mockMutateAsync).toHaveBeenCalledWith(
         expect.objectContaining({
-          promptType: 'latest_scan',
+          promptType: 'free_question',
           personaKey: 'gentle_supportive',
           questionKey: null,
           questionText:
@@ -3357,12 +3867,15 @@ describe('CoachScreen', () => {
     });
   });
 
-  it('disables the ask CTA when the question field is cleared after leaving preset mode', () => {
+  it('shows free-question feedback when editing a selected suggestion to empty text', async () => {
     const screen = render(<CoachScreen />);
 
     fireEvent.press(
+      screen.getByTestId('coach-settings-inline-mode-picker-card-latest_scan'),
+    );
+    fireEvent.press(
       screen.getByTestId(
-        'coach-settings-inline-question-latest_scan__three_simple_actions',
+        'coach-settings-inline-mode-picker-question-latest_scan__three_simple_actions',
       ),
     );
     fireEvent.changeText(
@@ -3373,7 +3886,21 @@ describe('CoachScreen', () => {
     expect(
       screen.getByTestId('coach-action-primary').props.accessibilityState
         ?.disabled,
-    ).toBe(true);
-    expect(screen.getByText('Doux & Bienveillant · Question requise')).toBeTruthy();
+    ).toBe(false);
+
+    fireEvent.press(screen.getByTestId('coach-action-primary'));
+
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+    expect(mockShowAlert).toHaveBeenCalledWith(
+      'Écris ta demande',
+      'Ajoute une question avant de demander un conseil.',
+      expect.arrayContaining([
+        expect.objectContaining({
+          text: expect.any(String),
+        }),
+      ]),
+      expect.anything(),
+      expect.objectContaining({ emoji: null }),
+    );
   });
 });

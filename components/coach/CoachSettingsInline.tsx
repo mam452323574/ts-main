@@ -7,8 +7,12 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { Check } from 'lucide-react-native';
 
-import { CoachModePicker } from '@/components/coach/CoachModePicker';
+import {
+  CoachModePicker,
+  type CoachModePickerQuestionOption,
+} from '@/components/coach/CoachModePicker';
 import { CoachPersonaCard } from '@/components/coach/CoachPersonaCard';
 import { useTheme } from '@/contexts/ThemeContext';
 import {
@@ -39,17 +43,26 @@ export interface CoachSettingsInlineQuestionOption {
   label: string;
 }
 
+export type CoachSettingsInlineQuestionSelectionMode =
+  | 'preset'
+  | 'free_text';
+
 interface CoachSettingsInlineProps {
   activePersonaKey: string;
-  selectedPromptType: CoachPromptType;
+  selectedQuestionPromptType: CoachPromptType | null;
+  expandedPromptType: CoachPromptType | null;
   personaOptions: readonly CoachSettingsInlinePersonaOption[];
-  questionOptions: readonly CoachSettingsInlineQuestionOption[];
+  questionOptionsByPromptType: Partial<
+    Record<CoachPromptType, readonly CoachModePickerQuestionOption[]>
+  >;
   selectedQuestionKey: CoachQuestionKey | null;
-  isCustomQuestionSelected: boolean;
+  questionSelectionMode: CoachSettingsInlineQuestionSelectionMode | null;
   questionText: string;
   questionSectionLabel: string;
   customQuestionLabel: string;
+  customQuestionHelper: string;
   customQuestionPlaceholder: string;
+  selectedBadgeLabel: string;
   questionCounterLabel: (count: number, max: number) => string;
   questionMaxLength: number;
   promptTitle: (prompt: CoachPromptType) => string;
@@ -76,15 +89,18 @@ interface CoachSettingsInlineProps {
 
 export function CoachSettingsInline({
   activePersonaKey,
-  selectedPromptType,
+  selectedQuestionPromptType,
+  expandedPromptType,
   personaOptions,
-  questionOptions,
+  questionOptionsByPromptType,
   selectedQuestionKey,
-  isCustomQuestionSelected,
+  questionSelectionMode,
   questionText,
   questionSectionLabel,
   customQuestionLabel,
+  customQuestionHelper,
   customQuestionPlaceholder,
+  selectedBadgeLabel,
   questionCounterLabel,
   questionMaxLength,
   promptTitle,
@@ -113,6 +129,8 @@ export function CoachSettingsInline({
     () => createStyles(colors, isDark, accentColor),
     [accentColor, colors, isDark],
   );
+  const isCustomQuestionSelected = questionSelectionMode === 'free_text';
+  const selectionAccent = accentColor ?? colors.primary;
 
   return (
     <View style={styles.container} testID={testID}>
@@ -121,30 +139,52 @@ export function CoachSettingsInline({
         <Text style={styles.subtitle}>{subtitle}</Text>
       </View>
 
-      <View
+      <Pressable
+        accessibilityRole="button"
         accessibilityState={{
           disabled: busy || disabled,
           selected: isCustomQuestionSelected,
         }}
-        style={[
+        disabled={busy || disabled}
+        onPress={onSelectCustomQuestion}
+        style={({ pressed }) => [
           styles.questionInputSection,
           styles.questionInputSectionFeatured,
           isCustomQuestionSelected
             ? styles.questionInputSectionSelected
             : styles.questionInputSectionIdle,
+          pressed && !busy && !disabled ? styles.questionInputSectionPressed : null,
           busy || disabled ? styles.questionInputSectionDisabled : null,
         ]}
         testID={`${testID}-question-input-card`}
       >
         <View style={styles.questionInputHeader}>
-          <Text
-            style={[
-              styles.questionInputLabel,
-              isCustomQuestionSelected ? styles.questionInputLabelSelected : null,
-            ]}
-          >
-            {customQuestionLabel}
-          </Text>
+          <View style={styles.questionInputTitleRow}>
+            <Text
+              style={[
+                styles.questionInputLabel,
+                isCustomQuestionSelected ? styles.questionInputLabelSelected : null,
+              ]}
+            >
+              {customQuestionLabel}
+            </Text>
+            {isCustomQuestionSelected ? (
+              <View
+                style={styles.selectedBadge}
+                testID={`${testID}-question-input-selected-badge`}
+              >
+                <Check
+                  color={selectionAccent}
+                  size={12}
+                  strokeWidth={3}
+                  testID={`${testID}-question-input-selected-icon`}
+                />
+                <Text numberOfLines={1} style={styles.selectedBadgeText}>
+                  {selectedBadgeLabel}
+                </Text>
+              </View>
+            ) : null}
+          </View>
           <Text
             style={[
               styles.questionInputCounter,
@@ -170,7 +210,8 @@ export function CoachSettingsInline({
           style={styles.questionInput}
           testID={`${testID}-question-input`}
         />
-      </View>
+        <Text style={styles.questionInputHelper}>{customQuestionHelper}</Text>
+      </Pressable>
 
       <Text style={styles.sectionLabel}>{personaSectionLabel}</Text>
       <ScrollView
@@ -204,11 +245,19 @@ export function CoachSettingsInline({
         {modeSectionLabel}
       </Text>
       <CoachModePicker
-        selectedPromptType={selectedPromptType}
+        selectedQuestionPromptType={selectedQuestionPromptType}
+        expandedPromptType={expandedPromptType}
+        questionOptionsByPromptType={questionOptionsByPromptType}
+        selectedQuestionKey={selectedQuestionKey}
+        questionSelectionMode={questionSelectionMode}
         onSelect={onSelectPromptType}
+        onSelectQuestion={onSelectQuestion}
         promptTitle={promptTitle}
         promptSubtitle={promptSubtitle}
         categoryTitle={promptCategoryLabel}
+        questionSectionLabel={questionSectionLabel}
+        selectedBadgeLabel={selectedBadgeLabel}
+        questionTestIDPrefix={`${testID}-mode-picker`}
         disabled={busy || disabled}
         busyPromptType={busyPromptType}
         isPromptLocked={isPromptLocked}
@@ -216,39 +265,6 @@ export function CoachSettingsInline({
         lockedHint={lockedHint}
         testID={`${testID}-mode-picker`}
       />
-
-      <Text style={[styles.sectionLabel, styles.sectionLabelSpaced]}>
-        {questionSectionLabel}
-      </Text>
-      <View style={styles.questionList} testID={`${testID}-question-list`}>
-        {questionOptions.map((question) => {
-          const active = question.key === selectedQuestionKey;
-
-          return (
-            <Pressable
-              key={question.key}
-              accessibilityRole="button"
-              disabled={busy || disabled}
-              onPress={() => onSelectQuestion(question.key)}
-              style={[
-                styles.questionChip,
-                active ? styles.questionChipActive : null,
-                busy || disabled ? styles.questionChipDisabled : null,
-              ]}
-              testID={`${testID}-question-${question.key}`}
-            >
-              <Text
-                style={[
-                  styles.questionChipText,
-                  active ? styles.questionChipTextActive : null,
-                ]}
-              >
-                {question.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
     </View>
   );
 }
@@ -302,36 +318,6 @@ const createStyles = (colors: any, isDark: boolean, accentColor?: string) => {
       paddingRight: SPACING.page,
       paddingBottom: SPACING.xs,
     },
-    questionList: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: SPACING.sm,
-    },
-    questionChip: {
-      width: '100%',
-      paddingHorizontal: SPACING.md,
-      paddingVertical: SPACING.sm + 2,
-      borderRadius: BORDER_RADIUS.lg,
-      borderWidth: 1,
-      borderColor: insetSurface.borderColor,
-      backgroundColor: insetSurface.backgroundColor,
-    },
-    questionChipActive: {
-      borderColor: withAlpha(accentColor ?? colors.primary, 0.22),
-      backgroundColor: withAlpha(accentColor ?? colors.primary, isDark ? 0.11 : 0.07),
-    },
-    questionChipDisabled: {
-      opacity: 0.6,
-    },
-    questionChipText: {
-      fontSize: 13,
-      lineHeight: 18,
-      color: colors.primaryText,
-    },
-    questionChipTextActive: {
-      color: accentColor ?? colors.primary,
-      fontWeight: FONT_WEIGHTS.semiBold,
-    },
     questionInputSection: {
       gap: SPACING.xs,
     },
@@ -349,6 +335,9 @@ const createStyles = (colors: any, isDark: boolean, accentColor?: string) => {
       borderColor: withAlpha(accentColor ?? colors.primary, isDark ? 0.3 : 0.24),
       backgroundColor: withAlpha(accentColor ?? colors.primary, isDark ? 0.12 : 0.08),
     },
+    questionInputSectionPressed: {
+      transform: [{ scale: 0.995 }],
+    },
     questionInputSectionDisabled: {
       opacity: 0.72,
     },
@@ -358,8 +347,16 @@ const createStyles = (colors: any, isDark: boolean, accentColor?: string) => {
       justifyContent: 'space-between',
       gap: SPACING.sm,
     },
+    questionInputTitleRow: {
+      flex: 1,
+      minWidth: 0,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+    },
     questionInputLabel: {
       flex: 1,
+      minWidth: 0,
       fontSize: 15,
       lineHeight: 20,
       fontWeight: FONT_WEIGHTS.bold,
@@ -388,6 +385,33 @@ const createStyles = (colors: any, isDark: boolean, accentColor?: string) => {
       fontSize: 14,
       lineHeight: 20,
       textAlignVertical: 'top',
+    },
+    questionInputHelper: {
+      fontSize: 12,
+      lineHeight: 17,
+      color: withAlpha(colors.primaryText, 0.58),
+    },
+    selectedBadge: {
+      flexShrink: 0,
+      minHeight: 24,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: SPACING.sm,
+      paddingVertical: 3,
+      borderRadius: BORDER_RADIUS.full,
+      borderWidth: 1,
+      borderColor: withAlpha(accentColor ?? colors.primary, isDark ? 0.34 : 0.24),
+      backgroundColor: withAlpha(
+        accentColor ?? colors.primary,
+        isDark ? 0.16 : 0.08,
+      ),
+    },
+    selectedBadgeText: {
+      fontSize: 11,
+      lineHeight: 14,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      color: accentColor ?? colors.primary,
     },
   });
 };

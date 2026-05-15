@@ -30,6 +30,8 @@ interface CoachPromptCardProps {
   busy?: boolean;
   disabled?: boolean;
   selected?: boolean;
+  expanded?: boolean;
+  containsSelectedQuestion?: boolean;
   locked?: boolean;
   lockedBadgeLabel?: string;
   lockedHint?: string;
@@ -46,6 +48,8 @@ export function CoachPromptCard({
   busy = false,
   disabled = false,
   selected = false,
+  expanded = false,
+  containsSelectedQuestion = false,
   locked = false,
   lockedBadgeLabel,
   lockedHint,
@@ -66,16 +70,33 @@ export function CoachPromptCard({
   const isDisabled = disabled || busy;
   const isCompact = variant === 'compact';
   const isSelector = mode === 'selector';
+  const selectorContainsSelectedQuestion =
+    isSelector && containsSelectedQuestion && !selected;
   const iconGlyphColor = mixColors(colors.white, accentColor, 0.18);
   const goldColor = colors.gold ?? '#FFD700';
   const neutralSurface = colors.surfaceMuted ?? colors.cardBackground;
   const neutralBorder = colors.borderSubtle ?? colors.lightGray ?? '#E3E7EF';
+  const selectorContainsBackgroundColor = mixColors(
+    promptPalette.selectorBackgroundColor,
+    promptPalette.selectorSelectedBackgroundColor,
+    0.38,
+  );
+  const selectorContainsBorderColor = mixColors(
+    promptPalette.selectorBorderColor,
+    promptPalette.selectorSelectedBorderColor,
+    0.55,
+  );
+  const selectorContainsIconBackgroundColor = mixColors(
+    promptPalette.selectorIconBackgroundColor,
+    promptPalette.selectorSelectedIconBackgroundColor,
+    0.45,
+  );
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityHint={locked ? lockedHint : undefined}
-      accessibilityState={{ disabled: isDisabled, busy, selected }}
+      accessibilityState={{ disabled: isDisabled, busy, selected, expanded }}
       disabled={isDisabled}
       onPress={onPress}
       style={({ pressed }) => [
@@ -94,7 +115,11 @@ export function CoachPromptCard({
               ? promptPalette.selectorPressedBackgroundColor
               : selected
                 ? promptPalette.selectorSelectedBackgroundColor
-                : promptPalette.selectorBackgroundColor
+                : selectorContainsSelectedQuestion
+                  ? selectorContainsBackgroundColor
+                : expanded
+                  ? promptPalette.selectorPressedBackgroundColor
+                  : promptPalette.selectorBackgroundColor
             : mixColors(
                 neutralSurface,
                 accentColor,
@@ -107,7 +132,11 @@ export function CoachPromptCard({
                 ? promptPalette.selectorPressedBorderColor
                 : selected
                   ? promptPalette.selectorSelectedBorderColor
-                  : promptPalette.selectorBorderColor
+                  : selectorContainsSelectedQuestion
+                    ? selectorContainsBorderColor
+                  : expanded
+                    ? promptPalette.selectorPressedBorderColor
+                    : promptPalette.selectorBorderColor
               : mixColors(
                   neutralBorder,
                   accentColor,
@@ -144,6 +173,8 @@ export function CoachPromptCard({
             colors={
               selected
                 ? promptPalette.selectorSelectedBackdropColors
+                : selectorContainsSelectedQuestion
+                  ? promptPalette.selectorBackdropColors
                 : promptPalette.selectorBackdropColors
             }
             start={{ x: 0, y: 0 }}
@@ -189,6 +220,26 @@ export function CoachPromptCard({
                 testID={testID ? `${testID}-selected-icon` : undefined}
               />
             </View>
+          ) : selectorContainsSelectedQuestion ? (
+            <View
+              style={[
+                styles.childSelectionIndicator,
+                {
+                  backgroundColor: selectorContainsIconBackgroundColor,
+                  borderColor: selectorContainsBorderColor,
+                },
+              ]}
+              testID={testID ? `${testID}-contains-selection-indicator` : undefined}
+            >
+              <View
+                style={[
+                  styles.childSelectionIndicatorDot,
+                  {
+                    backgroundColor: promptPalette.selectorIconColor,
+                  },
+                ]}
+              />
+            </View>
           ) : null}
 
           <View
@@ -225,6 +276,8 @@ export function CoachPromptCard({
               {
                 backgroundColor: selected
                   ? promptPalette.selectorSelectedIconBackgroundColor
+                  : selectorContainsSelectedQuestion
+                    ? selectorContainsIconBackgroundColor
                   : promptPalette.selectorIconBackgroundColor,
               },
             ]}
@@ -586,6 +639,23 @@ const createStyles = (colors: any, isDark: boolean) =>
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 4,
+    },
+    childSelectionIndicator: {
+      position: 'absolute',
+      top: 12,
+      right: 12,
+      width: 16,
+      height: 16,
+      borderRadius: 8,
+      borderWidth: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 4,
+    },
+    childSelectionIndicatorDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
     },
     busyFloatingBadge: {
       width: 30,

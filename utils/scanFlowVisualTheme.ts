@@ -56,7 +56,6 @@ export interface ScanPreviewVisualTheme {
   loadingProgressValue: string;
   loadingInsightsLabel: string;
   loadingHeroShadowColor: string;
-  loadingHeroScrimGradient: [string, string, string];
   loadingStepBackground: string;
   loadingStepBorder: string;
   loadingStepLabel: string;
@@ -87,7 +86,6 @@ export interface ScanFlowAccentTheme {
   instructionText: string;
   countdownText: string;
   countdownRing: string;
-  heroPreviewGradient: [string, string, string];
   heroPreviewMetaBackground: string;
   heroPreviewMetaBorder: string;
   heroPreviewMetaText: string;
@@ -197,11 +195,6 @@ export function resolveScanPreviewVisualTheme(
     loadingProgressValue: textPrimary,
     loadingInsightsLabel: textMuted,
     loadingHeroShadowColor: premium.shadowColor,
-    loadingHeroScrimGradient: [
-      withAlpha('#030A10', 0),
-      withAlpha('#030A10', 0.18),
-      withAlpha('#030A10', 0.78),
-    ],
     loadingStepBackground: withAlpha(colors.white, 0.04),
     loadingStepBorder: premium.borderSubtle,
     loadingStepLabel: textSecondary,
@@ -286,11 +279,6 @@ export function resolveScanFlowAccentTheme(
       instructionText: '#F6FBFF',
       countdownText: '#F6FBFF',
       countdownRing: withAlpha(softenedStrong, 0.2),
-      heroPreviewGradient: [
-        withAlpha(softenedStrong, isDark ? 0.18 : 0.11),
-        withAlpha(softenedAccent, isDark ? 0.07 : 0.045),
-        withAlpha('#050B11', 0),
-      ],
       heroPreviewMetaBackground: withAlpha('#050B11', 0.82),
       heroPreviewMetaBorder: withAlpha(softenedStrong, 0.18),
       heroPreviewMetaText: '#F6FBFF',

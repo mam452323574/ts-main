@@ -5,6 +5,7 @@ import {
   Droplets,
   Dumbbell,
   LineChart,
+  MessageCircle,
   Moon,
   RefreshCw,
   ScanFace,
@@ -52,6 +53,11 @@ export interface CoachPromptPalette {
 }
 
 export const COACH_PROMPT_VISUALS: Record<CoachGenerationPromptType, CoachPromptVisual> = {
+  free_question: {
+    icon: MessageCircle,
+    accentColor: '#88A978',
+    artworkSource: require('../assets/images/coach/prompts/latest_scan.webp'),
+  },
   latest_scan: {
     icon: ScanSearch,
     accentColor: '#7FA9D4',

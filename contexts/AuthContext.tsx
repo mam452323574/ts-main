@@ -28,6 +28,7 @@ import {
 import { normalizePersistedInferredPersona } from '@/shared/coachProfileMemory';
 import {
   logOperationalError,
+  sanitizeObservabilityProperties,
   type SafeObservabilityProperties,
 } from '@/utils/observability';
 import { validateCanonicalUsername } from '@/utils/username';
@@ -65,6 +66,7 @@ interface AuthContextType {
     username: string,
     avatarUrl?: string
   ) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   signInWithOAuth: (provider: 'google' | 'apple') => Promise<void>;
   signOut: () => Promise<void>;
   checkUsernameAvailability: (username: string) => Promise<boolean>;
@@ -160,6 +162,35 @@ function resolveOAuthAuthorizationCode(
   }
 
   return authCode;
+}
+
+function logOAuthDebug(
+  message: string,
+  properties?: SafeObservabilityProperties,
+) {
+  if (!__DEV__) {
+    return;
+  }
+
+  const metadata = sanitizeObservabilityProperties(properties);
+  if (metadata) {
+    console.info(message, metadata);
+    return;
+  }
+
+  console.info(message);
+}
+
+function logOAuthDebugError(
+  message: string,
+  error: unknown,
+  properties?: SafeObservabilityProperties,
+) {
+  if (!__DEV__) {
+    return;
+  }
+
+  logOperationalError(message, error, properties);
 }
 
 const normalizeLoadedUserProfile = (
@@ -1518,12 +1549,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signInWithOAuth = async (provider: 'google' | 'apple') => {
+  const signInWithOAuthProvider = async (provider: 'google' | 'apple') => {
     try {
       const redirectUrl =
         Platform.OS === 'web'
           ? window.location.origin
-          : Linking.createURL('oauth/callback');
+          : Linking.createURL('auth/callback');
+      // L'URL generee par Linking.createURL('auth/callback') doit etre ajoutee
+      // dans Supabase Authentication > URL Configuration > Redirect URLs.
+      logOAuthDebug('[OAuth] Generated redirect URL', {
+        provider,
+        redirectTo: redirectUrl,
+      });
       const oauthState = createOAuthState();
 
       const { data, error } = await supabase.auth.signInWithOAuth({
@@ -1533,52 +1570,72 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           queryParams: {
             state: oauthState,
           },
-          skipBrowserRedirect: Platform.OS !== 'web',
+          skipBrowserRedirect: true,
         },
       });
 
       if (error) {
-        logOperationalError('[OAuth] Failed to initiate OAuth', error, {
+        logOAuthDebugError('[OAuth] Failed to initiate OAuth', error, {
           provider,
         });
         throw error;
       }
 
-      if (Platform.OS !== 'web' && data?.url) {
-        const result = await WebBrowser.openAuthSessionAsync(
-          data.url,
-          redirectUrl
-        );
-
-        if (result.type === 'success' && result.url) {
-          const authCode = resolveOAuthAuthorizationCode(
-            result.url,
-            redirectUrl,
-            oauthState,
-          );
-          const { data: sessionData, error: sessionError } =
-            await supabase.auth.exchangeCodeForSession(authCode);
-
-          if (sessionError) {
-            logOperationalError('[OAuth] Failed to exchange OAuth code', sessionError, {
-              provider,
-            });
-            throw sessionError;
-          }
-
-          if (sessionData.user) {
-            await handleOAuthUserSetup(sessionData.user, provider);
-          }
-        } else if (result.type === 'cancel') {
-          throw new Error(t('auth.error_auth_cancelled'));
-        }
+      if (!data?.url) {
+        throw new Error('OAuth authorization URL is missing');
       }
+
+      if (Platform.OS === 'web') {
+        window.location.assign(data.url);
+        return;
+      }
+
+      const result = await WebBrowser.openAuthSessionAsync(
+        data.url,
+        redirectUrl
+      );
+
+      if (result.type === 'success' && result.url) {
+        const authCode = resolveOAuthAuthorizationCode(
+          result.url,
+          redirectUrl,
+          oauthState,
+        );
+        const { data: sessionData, error: sessionError } =
+          await supabase.auth.exchangeCodeForSession(authCode);
+
+        if (sessionError) {
+          logOAuthDebugError('[OAuth] Failed to exchange OAuth code', sessionError, {
+            provider,
+          });
+          throw sessionError;
+        }
+
+        if (sessionData.user) {
+          await handleOAuthUserSetup(sessionData.user, provider);
+        }
+        return;
+      }
+
+      logOAuthDebug('[OAuth] Auth session closed before completion', {
+        provider,
+        result_type: result.type,
+      });
+      throw new Error(t('auth.error_auth_cancelled'));
     } catch (error) {
-      logOperationalError('[OAuth] OAuth flow failed', error, {
+      logOAuthDebugError('[OAuth] OAuth flow failed', error, {
         provider,
       });
       throw error;
     }
+  };
+
+  const signInWithGoogle = async () => {
+    await signInWithOAuthProvider('google');
+  };
+
+  const signInWithOAuth = async (provider: 'google' | 'apple') => {
+    await signInWithOAuthProvider(provider);
   };
 
   const handleOAuthUserSetup = async (
@@ -1980,6 +2037,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signIn,
         signUp,
         completeSignUp,
+        signInWithGoogle,
         signInWithOAuth,
         signOut,
         checkUsernameAvailability,

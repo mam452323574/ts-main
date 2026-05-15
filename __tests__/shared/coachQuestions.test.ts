@@ -1,6 +1,8 @@
 import {
   buildDefaultCoachQuestionSelection,
+  COACH_FREE_QUESTION_MAX_LENGTH,
   COACH_QUESTION_DEFINITIONS,
+  COACH_QUESTION_MAX_LENGTH,
   COACH_QUESTION_LOCALES,
   COACH_WORKFLOW_ROUTES,
   getCoachWorkflowRouteForIntentKey,
@@ -10,7 +12,14 @@ import {
   resolveCoachWorkflowRoute,
   resolveCoachQuestionHints,
 } from '@/shared/coachQuestions';
-import { COACH_PROMPT_TYPES } from '@/shared/coachPromptTypes';
+import {
+  COACH_GENERATION_PROMPT_TYPES,
+  COACH_PROMPT_TYPES,
+  FREE_QUESTION_PROMPT_TYPE,
+  isCoachGenerationPromptType,
+  normalizeCoachGenerationPromptType,
+  normalizeCoachPromptType,
+} from '@/shared/coachPromptTypes';
 
 describe('coach question catalog', () => {
   it('contains the expected 49 preset questions', () => {
@@ -70,7 +79,7 @@ describe('coach question catalog', () => {
     }
   });
 
-  it('maps every question intent to one of the 19 workflow routes', () => {
+  it('maps every question intent to one of the workflow routes', () => {
     const supportedRoutes = new Set(COACH_WORKFLOW_ROUTES);
 
     for (const question of COACH_QUESTION_DEFINITIONS) {
@@ -142,6 +151,77 @@ describe('coach question catalog', () => {
     expect(getDefaultCoachWorkflowRoute('recovery_plan')).toBe(
       'recovery_reset_48h',
     );
+  });
+
+  it('keeps free_question hidden from presets, presetless, and valid for generation', () => {
+    expect(COACH_PROMPT_TYPES).not.toContain(FREE_QUESTION_PROMPT_TYPE);
+    expect(COACH_GENERATION_PROMPT_TYPES).toContain(FREE_QUESTION_PROMPT_TYPE);
+    expect(isCoachGenerationPromptType(FREE_QUESTION_PROMPT_TYPE)).toBe(true);
+    expect(normalizeCoachGenerationPromptType(' free_question ')).toBe(
+      FREE_QUESTION_PROMPT_TYPE,
+    );
+    expect(normalizeCoachPromptType(FREE_QUESTION_PROMPT_TYPE)).toBeNull();
+    expect(normalizeCoachGenerationPromptType('unknown_prompt')).toBeNull();
+    expect(COACH_FREE_QUESTION_MAX_LENGTH).toBe(800);
+    expect(COACH_QUESTION_MAX_LENGTH).toBe(200);
+  });
+
+  it('routes free-question hints to the dedicated free_question route, not latest_scan', () => {
+    const hints = resolveCoachQuestionHints({
+      promptType: FREE_QUESTION_PROMPT_TYPE,
+      questionText: 'Comment rester motive avec mes derniers scans ?',
+      locale: 'fr',
+    });
+
+    expect(hints).toEqual(
+      expect.objectContaining({
+        intent_key: 'free_question_open',
+        ui_tags: expect.arrayContaining(['free_question']),
+      }),
+    );
+    expect(
+      resolveCoachWorkflowRoute({
+        promptType: FREE_QUESTION_PROMPT_TYPE,
+        questionText: 'Comment rester motive avec mes derniers scans ?',
+        locale: 'fr',
+        questionHints: hints,
+      }),
+    ).toBe('free_question');
+    expect(getDefaultCoachWorkflowRoute(FREE_QUESTION_PROMPT_TYPE)).toBe(
+      'free_question',
+    );
+  });
+
+  it('keeps free_question presetless with generic non-reclassifying hints', () => {
+    expect(rankCoachQuestionsForPromptType('free_question')).toEqual([]);
+    expect(() =>
+      buildDefaultCoachQuestionSelection('free_question', 'fr'),
+    ).toThrow('free_question does not have preset coach questions');
+
+    expect(
+      resolveCoachQuestionHints({
+        promptType: 'free_question',
+        questionText:
+          'Quelle est ma priorite aujourd hui selon mes derniers scans ?',
+        locale: 'fr',
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        intent_key: 'free_question_open',
+        preferred_artifacts: expect.arrayContaining([
+          'action_steps',
+          'context_notes',
+        ]),
+      }),
+    );
+    expect(
+      resolveCoachWorkflowRoute({
+        promptType: 'free_question',
+        questionText:
+          'Quelle est ma priorite aujourd hui selon mes derniers scans ?',
+        locale: 'fr',
+      }),
+    ).toBe('free_question');
   });
 
   it('classifies free text into intent-aware question hints across route-specific modes', () => {

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -36,6 +35,7 @@ import {
 } from '@/components/fridge/ChefResultCard';
 import { ChefModeIcon } from '@/components/fridge/ChefModeIcon';
 import { ModalHandle } from '@/components/ModalHandle';
+import { OptimizedImage } from '@/components/OptimizedImage';
 import {
   BORDER_RADIUS,
   FONT_WEIGHTS,
@@ -319,7 +319,12 @@ export default function FridgeScanResultScreen() {
             testID="fridge-scan-result-pending-card"
           >
             {imageUri ? (
-              <Image source={{ uri: imageUri }} style={styles.pendingImage} />
+              <OptimizedImage
+                source={{ uri: imageUri }}
+                style={styles.pendingImage}
+                recyclingKey={imageUri}
+                testID="fridge-scan-result-pending-image"
+              />
             ) : null}
             <View style={styles.modePill}>
               <ChefModeIcon mode={selectedMode} color={modeTheme.accent} />

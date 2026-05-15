@@ -21,6 +21,7 @@ import { CoachActionComposer } from '@/components/coach/CoachActionComposer';
 import { CoachGuidanceCard } from '@/components/coach/CoachGuidanceCard';
 import { CoachPersonaDetailsModal } from '@/components/coach/CoachPersonaDetailsModal';
 import { CoachSettingsInline } from '@/components/coach/CoachSettingsInline';
+import { LoadingMiniGame } from '@/components/loading/LoadingMiniGame';
 import {
   BORDER_RADIUS,
   FONT_WEIGHTS,
@@ -39,6 +40,7 @@ import {
   useCoachScreenSnapshot,
 } from '@/hooks/queries/useCoachScreenSnapshot';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
+import { useSmoothLoadingProgress } from '@/hooks/useSmoothLoadingProgress';
 import { trackEvent } from '@/services/analytics';
 import {
   COACH_NO_USABLE_SCAN_ERROR_CODE,
@@ -55,8 +57,9 @@ import {
 import { markCoachSeen } from '@/services/growthExperience';
 import { getCoachPersonaVisual } from '@/shared/coachPersonaVisuals';
 import {
+  COACH_FREE_QUESTION_MAX_LENGTH,
   COACH_QUESTION_MAX_LENGTH,
-  buildDefaultCoachQuestionSelection,
+  getCoachQuestionDefinition,
   getCoachQuestionTimeOfDay,
   isCoachQuestionForPromptType,
   normalizeCoachQuestionKey,
@@ -68,6 +71,7 @@ import {
 import {
   COACH_PROMPT_TYPES,
   DEFAULT_COACH_PROMPT_TYPE,
+  FREE_QUESTION_PROMPT_TYPE,
   normalizeCoachGenerationPromptType,
   normalizeCoachPromptType,
   resolveVisibleCoachPromptType,
@@ -78,6 +82,7 @@ import {
   decodeScanCoachIntentParam,
   type ScanCoachIntent,
 } from '@/utils/scanCoachIntent';
+import { resolveCoachSubmitIntent } from '@/utils/coachSubmitIntent';
 import type {
   CoachEntry,
   CoachPersonaKey,
@@ -110,6 +115,9 @@ import { getMainTabBarMetrics } from '@/utils/mainTabBarMetrics';
 const PROMPT_TYPES: readonly CoachPromptType[] = COACH_PROMPT_TYPES;
 const DEFAULT_PROMPT_TYPE: CoachPromptType = DEFAULT_COACH_PROMPT_TYPE;
 const COACH_SCREEN_ENTRIES_LIMIT = 10;
+const COACH_GENERATION_LOADING_DURATION_MS = 30_000;
+const COACH_GENERATION_LOADING_HOLD_PERCENT = 97;
+const COACH_GENERATION_LOADING_FINISH_DURATION_MS = 450;
 
 function shouldDebugCoachScreen() {
   return (
@@ -135,7 +143,7 @@ type CoachGuidanceViewModel = {
 
 type CoachGuidanceSource = 'mutation' | 'tracked' | 'latest_ready';
 type CoachLoadErrorSource = 'entries' | 'scans' | 'latest_ready' | 'none';
-type CoachQuestionSelectionMode = 'auto' | 'preset' | 'free_text';
+type CoachQuestionSelectionMode = 'preset' | 'free_text';
 
 type CoachRenderableCandidate = {
   status?: CoachEntry['status'] | null;
@@ -200,25 +208,21 @@ function clampCoachRouteQuestionText(value: string | null) {
     return null;
   }
 
-  return Array.from(normalizedText).slice(0, COACH_QUESTION_MAX_LENGTH).join('');
+  return Array.from(normalizedText)
+    .slice(0, COACH_QUESTION_MAX_LENGTH)
+    .join('');
 }
 
 function resolveScanResultFallbackQuestion(options: {
   priorityMetric?: string | null;
-  locale?: string | null;
+  t: (scope: string) => string;
 }) {
   const hasPriorityMetric = !!options.priorityMetric?.trim();
-  const localeKey = String(options.locale ?? '').trim().toLowerCase();
-
-  if (localeKey.startsWith('en')) {
-    return hasPriorityMetric
-      ? 'What should I improve from my latest scan?'
-      : 'How can I maintain my good results after this scan?';
-  }
-
-  return hasPriorityMetric
-    ? 'Que devrais-je améliorer à partir de mon dernier scan ?'
-    : 'Comment maintenir mes bons résultats après ce scan ?';
+  return options.t(
+    hasPriorityMetric
+      ? 'coach.questions.scan_result_improve'
+      : 'coach.questions.scan_result_maintain',
+  );
 }
 
 function hasRenderableCoachContent(
@@ -334,11 +338,13 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
   const [trackedEntryId, setTrackedEntryId] = useState<string | null>(null);
   const loadingWasActiveRef = useRef(false);
   const trackedEntryTerminalInvalidationRef = useRef<string | null>(null);
-  const [selectedPromptType, setSelectedPromptType] =
-    useState<CoachPromptType>(DEFAULT_PROMPT_TYPE);
+  const [expandedPromptType, setExpandedPromptType] =
+    useState<CoachPromptType | null>(null);
   const [selectedQuestionKey, setSelectedQuestionKey] =
     useState<CoachQuestionKey | null>(null);
-  const [questionDraft, setQuestionDraft] = useState('');
+  const [questionSelectionMode, setQuestionSelectionModeState] =
+    useState<CoachQuestionSelectionMode | null>(null);
+  const [freeQuestionDraft, setFreeQuestionDraft] = useState('');
   const [submittingPromptType, setSubmittingPromptType] =
     useState<CoachPromptType | null>(null);
   const [pendingPersonaKey, setPendingPersonaKey] =
@@ -350,14 +356,16 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
   );
   const [scanResultContext, setScanResultContext] =
     useState<CoachScanResultContext | null>(null);
-  const questionSelectionModeRef = useRef<CoachQuestionSelectionMode>('free_text');
-  const previousPromptTypeRef = useRef<CoachPromptType>(DEFAULT_PROMPT_TYPE);
-  const previousLocaleRef = useRef(locale);
   const appliedScanResultRouteSignatureRef = useRef<string | null>(null);
   const autoSubmitAttemptedRouteSignatureRef = useRef<string | null>(null);
   const pendingAutoSubmitRef = useRef(false);
-  const skipNextPromptTypeResetRef = useRef(false);
   const coachGeneration = useCoachGeneration();
+  const setQuestionSelectionMode = useCallback(
+    (mode: CoachQuestionSelectionMode | null) => {
+      setQuestionSelectionModeState(mode);
+    },
+    [],
+  );
 
   useEffect(() => {
     trackEvent('coach_opened');
@@ -693,9 +701,20 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
           trackedReadyEntry.generated_at ??
           trackedReadyEntry.created_at ??
           null,
-      }
+    }
     : null;
   const hasTrackedGuidance = !!trackedGuidance;
+  const hasCurrentGenerationReadyGuidance =
+    hasGenerationGuidance || hasTrackedGuidance;
+  const coachLoadingProgress = useSmoothLoadingProgress({
+    active: isGenerationAwaitingResult || hasCurrentGenerationReadyGuidance,
+    done: !isGenerationAwaitingResult && hasCurrentGenerationReadyGuidance,
+    durationMs: COACH_GENERATION_LOADING_DURATION_MS,
+    holdPercent: COACH_GENERATION_LOADING_HOLD_PERCENT,
+    finishDurationMs: COACH_GENERATION_LOADING_FINISH_DURATION_MS,
+  });
+  const showCoachGenerationProgressState =
+    coachLoadingProgress.shouldShowLoading;
   const latestReadyGuidance: CoachGuidanceViewModel | null = latestReadyEntry
     ? {
         title: latestReadyEntry.title,
@@ -718,7 +737,8 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
   const canDisplayReadyGuidance =
     displayMode === 'result' &&
     !isGenerationAwaitingResult &&
-    !hasGenerationFailure;
+    !hasGenerationFailure &&
+    !showCoachGenerationProgressState;
   const activeGuidanceSource: CoachGuidanceSource | null =
     canDisplayReadyGuidance && generationGuidance
       ? 'mutation'
@@ -792,25 +812,44 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     [activeEntryId, entries],
   );
   const hasHistorySignal = hasHistoryEntries || hasRenderableHistoryEntries;
+  const coachSnapshotFocusStateRef = useRef({
+    isFetched: coachSnapshotQuery.isFetched,
+    isFetching: coachSnapshotQuery.isFetching,
+    isStale: coachSnapshotQuery.isStale,
+    refetch: refetchCoachSnapshot,
+  });
+
+  useEffect(() => {
+    coachSnapshotFocusStateRef.current = {
+      isFetched: coachSnapshotQuery.isFetched,
+      isFetching: coachSnapshotQuery.isFetching,
+      isStale: coachSnapshotQuery.isStale,
+      refetch: refetchCoachSnapshot,
+    };
+  }, [
+    coachSnapshotQuery.isFetched,
+    coachSnapshotQuery.isFetching,
+    coachSnapshotQuery.isStale,
+    refetchCoachSnapshot,
+  ]);
+
   useFocusEffect(
     useCallback(() => {
       if (!user?.id) {
         return;
       }
 
-      if (
-        !coachSnapshotQuery.isFetching &&
-        (!coachSnapshotQuery.isFetched || coachSnapshotQuery.isStale)
-      ) {
-        void refetchCoachSnapshot();
+      const {
+        isFetched,
+        isFetching,
+        isStale,
+        refetch,
+      } = coachSnapshotFocusStateRef.current;
+
+      if (!isFetching && (!isFetched || isStale)) {
+        void refetch();
       }
-    }, [
-      coachSnapshotQuery.isFetched,
-      coachSnapshotQuery.isFetching,
-      coachSnapshotQuery.isStale,
-      refetchCoachSnapshot,
-      user?.id,
-    ]),
+    }, [user?.id]),
   );
   const latestReadyError =
     latestReadyEntryError instanceof Error ? latestReadyEntryError : null;
@@ -904,6 +943,8 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     !isGenerationAwaitingResult &&
     !displayedGuidance;
   const showGenerationLoadingState =
+    !showLoadingState && !loadError && showCoachGenerationProgressState;
+  const isCoachLoadingMiniGameActive =
     !showLoadingState && !loadError && isGenerationAwaitingResult;
   const showQueryErrorState =
     !showLoadingState && !showGenerationLoadingState && !!loadError;
@@ -1026,6 +1067,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
   }, [displayedGuidance?.primary_metric_delta, t]);
   const showEmptyState =
     !showLoadingState &&
+    !showGenerationLoadingState &&
     !showQueryErrorState &&
     !showProviderUnavailableState &&
     !showGenerationErrorState &&
@@ -1075,7 +1117,6 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     isCoachQuotaFetching,
     t,
   ]);
-  const shouldUseCompactGenerationState = !!displayedGuidance;
   const displayedGuidanceTimestampLabel = useMemo(
     () => formatCoachTimestamp(displayedGuidance?.renderedAt ?? null, locale),
     [displayedGuidance?.renderedAt, locale],
@@ -1103,49 +1144,118 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     }),
     [entries.length, historySummary?.total_count, recentScans],
   );
-  const rankedQuestionDefinitions = useMemo(
+  const questionOptionsByPromptType = useMemo(
     () =>
-      rankCoachQuestionsForPromptType(
-        selectedPromptType,
-        questionRankingContext,
+      PROMPT_TYPES.reduce(
+        (acc, promptType) => {
+          acc[promptType] = rankCoachQuestionsForPromptType(
+            promptType,
+            questionRankingContext,
+          ).map((question) => ({
+            key: question.key,
+            label: resolveCoachQuestionText(question.key, locale),
+          }));
+          return acc;
+        },
+        {} as Record<
+          CoachPromptType,
+          { key: CoachQuestionKey; label: string }[]
+        >,
       ),
-    [questionRankingContext, selectedPromptType],
+    [locale, questionRankingContext],
   );
-  const questionOptions = useMemo(
-    () =>
-      rankedQuestionDefinitions.map((question) => ({
-        key: question.key,
-        label: resolveCoachQuestionText(question.key, locale),
-      })),
-    [locale, rankedQuestionDefinitions],
+  const normalizedFreeQuestionDraft = useMemo(
+    () => normalizeCoachQuestionText(freeQuestionDraft),
+    [freeQuestionDraft],
   );
-  const normalizedQuestionDraft = useMemo(
-    () => normalizeCoachQuestionText(questionDraft),
-    [questionDraft],
-  );
-  const selectedQuestionText = useMemo(
+  const selectedQuestionPromptType = useMemo(
     () =>
       selectedQuestionKey
+        ? getCoachQuestionDefinition(selectedQuestionKey).promptType
+        : null,
+    [selectedQuestionKey],
+  );
+  const selectedQuestionParentPromptType =
+    questionSelectionMode === 'preset' ? selectedQuestionPromptType : null;
+  const selectedQuestionText = useMemo(
+    () =>
+      questionSelectionMode === 'preset' && selectedQuestionKey
         ? resolveCoachQuestionText(selectedQuestionKey, locale)
         : null,
-    [locale, selectedQuestionKey],
+    [locale, questionSelectionMode, selectedQuestionKey],
   );
-  const resolvedQuestionSelection = useMemo(
-    () =>
-      resolveCoachQuestionSelection({
-        promptType: selectedPromptType,
+  const resolvedPresetQuestionSelection = useMemo(
+    () => {
+      if (
+        questionSelectionMode !== 'preset' ||
+        !selectedQuestionPromptType ||
+        !selectedQuestionKey
+      ) {
+        return null;
+      }
+
+      return resolveCoachQuestionSelection({
+        promptType: selectedQuestionPromptType,
         questionKey: selectedQuestionKey,
-        questionText: questionDraft,
+        questionText: null,
         locale,
-      }),
-    [locale, questionDraft, selectedPromptType, selectedQuestionKey],
+      });
+    },
+    [
+      locale,
+      questionSelectionMode,
+      selectedQuestionKey,
+      selectedQuestionPromptType,
+    ],
   );
-  const canSubmitSelectedQuestion =
-    selectedQuestionKey !== null || normalizedQuestionDraft !== null;
+  const resolvedSubmitIntent = useMemo(
+    () => {
+      const visiblePromptType =
+        selectedQuestionPromptType ??
+        (scanResultContext?.generationPromptType
+          ? resolveVisibleCoachPromptType(scanResultContext.generationPromptType)
+          : DEFAULT_PROMPT_TYPE);
+      const selectedQuestionSelection =
+        questionSelectionMode === 'free_text'
+          ? { questionKey: null, questionText: normalizedFreeQuestionDraft }
+          : questionSelectionMode === 'preset'
+            ? resolvedPresetQuestionSelection
+            : null;
+
+      if (
+        !selectedQuestionSelection?.questionKey &&
+        !selectedQuestionSelection?.questionText
+      ) {
+        return null;
+      }
+
+      return {
+        ...resolveCoachSubmitIntent({
+          visiblePromptType,
+          explicitGenerationPromptType:
+            scanResultContext?.generationPromptType ?? null,
+          questionSelectionMode: questionSelectionMode ?? 'free_text',
+          questionKey: selectedQuestionSelection.questionKey,
+          questionText: selectedQuestionSelection.questionText,
+        }),
+        visiblePromptType,
+      };
+    },
+    [
+      normalizedFreeQuestionDraft,
+      questionSelectionMode,
+      resolvedPresetQuestionSelection,
+      scanResultContext?.generationPromptType,
+      selectedQuestionPromptType,
+    ],
+  );
+  const hasValidSubmitIntent = resolvedSubmitIntent !== null;
   const selectedQuestionLabel =
-    normalizedQuestionDraft ??
-    selectedQuestionText ??
-    t('coach.questions.empty_summary');
+    questionSelectionMode === 'preset' && selectedQuestionText
+      ? selectedQuestionText
+      : questionSelectionMode === 'free_text'
+        ? (normalizedFreeQuestionDraft ?? t('coach.questions.custom_label'))
+        : t('coach.questions.empty_summary');
 
   const inlinePersonaOptions = useMemo(
     () =>
@@ -1206,25 +1316,27 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
       )
         ? scanResultRouteRequest.questionKey
         : null;
-    const resolvedQuestionText =
+    const resolvedFreeQuestionText =
       scanResultRouteRequest.questionText ??
       (resolvedQuestionKey
-        ? resolveCoachQuestionText(resolvedQuestionKey, locale)
+        ? null
         : resolveScanResultFallbackQuestion({
             priorityMetric: scanResultRouteRequest.priorityMetric,
-            locale,
+            t,
           }));
+    const nextQuestionSelectionMode: CoachQuestionSelectionMode =
+      resolvedFreeQuestionText ? 'free_text' : 'preset';
 
     appliedScanResultRouteSignatureRef.current =
       scanResultRouteRequest.signature;
-    previousPromptTypeRef.current = resolvedPromptType;
-    skipNextPromptTypeResetRef.current = true;
-    questionSelectionModeRef.current = resolvedQuestionKey
-      ? 'preset'
-      : 'free_text';
-    setSelectedPromptType(resolvedPromptType);
-    setSelectedQuestionKey(resolvedQuestionKey);
-    setQuestionDraft(resolvedQuestionText);
+    setQuestionSelectionMode(nextQuestionSelectionMode);
+    setExpandedPromptType(resolvedPromptType);
+    setSelectedQuestionKey(
+      nextQuestionSelectionMode === 'preset' ? resolvedQuestionKey : null,
+    );
+    if (resolvedFreeQuestionText) {
+      setFreeQuestionDraft(resolvedFreeQuestionText);
+    }
     setScanResultContext({
       source: 'scan_result',
       scanId: scanResultRouteRequest.scanId,
@@ -1237,59 +1349,34 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     });
     setTrackedEntryId(null);
     setDisplayMode('settings');
-  }, [isPromptLockedForUser, locale, scanResultRouteRequest]);
+  }, [
+    isPromptLockedForUser,
+    locale,
+    scanResultRouteRequest,
+    setQuestionSelectionMode,
+  ]);
 
   // Garde-fou : si le mode courant est verrouillé pour le tier actuel
   // (ex: l'utilisateur est passé free avec un mode premium en state local),
-  // on rebascule sur le mode par défaut.
+  // on le retire sans toucher à une question libre déjà écrite.
   useEffect(() => {
-    if (isPromptLockedForUser(selectedPromptType)) {
-      setSelectedPromptType(DEFAULT_PROMPT_TYPE);
-    }
-  }, [isPromptLockedForUser, selectedPromptType]);
-
-  useEffect(() => {
-    if (skipNextPromptTypeResetRef.current) {
-      skipNextPromptTypeResetRef.current = false;
-      return;
+    if (expandedPromptType && isPromptLockedForUser(expandedPromptType)) {
+      setExpandedPromptType(null);
     }
 
-    const promptTypeChanged = previousPromptTypeRef.current !== selectedPromptType;
-    previousPromptTypeRef.current = selectedPromptType;
-
-    if (!promptTypeChanged) {
-      return;
-    }
-
-    if (questionSelectionModeRef.current === 'free_text') {
+    if (
+      selectedQuestionPromptType &&
+      isPromptLockedForUser(selectedQuestionPromptType)
+    ) {
       setSelectedQuestionKey(null);
-      return;
+      setQuestionSelectionMode(null);
     }
-
-    const defaultQuestionSelection = buildDefaultCoachQuestionSelection(
-      selectedPromptType,
-      locale,
-      questionRankingContext,
-    );
-    questionSelectionModeRef.current = 'auto';
-    setSelectedQuestionKey(defaultQuestionSelection.questionKey);
-    setQuestionDraft(defaultQuestionSelection.questionText);
-  }, [locale, questionRankingContext, selectedPromptType]);
-
-  useEffect(() => {
-    const localeChanged = previousLocaleRef.current !== locale;
-    previousLocaleRef.current = locale;
-
-    if (!localeChanged || !selectedQuestionKey) {
-      return;
-    }
-
-    if (questionSelectionModeRef.current === 'free_text') {
-      return;
-    }
-
-    setQuestionDraft(resolveCoachQuestionText(selectedQuestionKey, locale));
-  }, [locale, selectedQuestionKey]);
+  }, [
+    expandedPromptType,
+    isPromptLockedForUser,
+    selectedQuestionPromptType,
+    setQuestionSelectionMode,
+  ]);
 
   useEffect(() => {
     if (hasGenerationGuidance && !scanResultRouteRequest) {
@@ -1549,19 +1636,39 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
   };
 
   async function handleGenerate() {
-    const visiblePromptType = selectedPromptType;
-    const promptType =
-      scanResultContext?.generationPromptType ?? visiblePromptType;
+    const submitIntent = resolvedSubmitIntent;
+    if (!submitIntent) {
+      pendingAutoSubmitRef.current = false;
+      if (questionSelectionMode === 'free_text') {
+        showAlert(
+          t('coach.freeQuestionRequiredTitle'),
+          t('coach.freeQuestionRequiredMessage'),
+          [{ text: t('common.ok') }],
+          coachAlertIcon,
+          { emoji: null },
+        );
+        return;
+      }
+
+      showAlert(
+        t('coach.selectionRequiredTitle'),
+        t('coach.selectionRequiredMessage'),
+        [{ text: t('common.ok') }],
+        coachAlertIcon,
+        { emoji: null },
+      );
+      return;
+    }
+
+    const visiblePromptType = submitIntent.visiblePromptType;
+    const promptType = submitIntent.promptType;
+    const questionKey = submitIntent.questionKey;
+    const questionText = submitIntent.questionText;
     const scanId = scanResultContext?.scanId ?? null;
-    const questionSelection = resolvedQuestionSelection;
     const submissionTrigger = pendingAutoSubmitRef.current
       ? 'auto_from_scan_result'
       : 'manual';
     pendingAutoSubmitRef.current = false;
-
-    if (!canSubmitSelectedQuestion) {
-      return;
-    }
 
     if (activePersonaLocked) {
       trackEvent('coach_generation_locked_persona_blocked', {
@@ -1642,13 +1749,15 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
       prompt_type: promptType,
       visible_prompt_type: visiblePromptType,
       persona_key: activePersonaKey,
-      question_key: questionSelection.questionKey,
-      question_text: questionSelection.questionText,
+      question_key: questionKey,
+      question_text: questionText,
       has_recent_scans: hasUsableCoachScans,
       source: scanResultContext?.source ?? 'coach',
       scan_id: scanId,
       scan_type: scanResultContext?.scanType ?? null,
-      has_scan_intent: !!scanResultContext?.scanIntent,
+      has_scan_intent:
+        promptType !== FREE_QUESTION_PROMPT_TYPE &&
+        !!scanResultContext?.scanIntent,
       submission_trigger: submissionTrigger,
     });
 
@@ -1656,10 +1765,11 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
       const response = await coachGeneration.mutateAsync({
         promptType,
         personaKey: activePersonaKey,
-        questionKey: questionSelection.questionKey,
-        questionText: questionSelection.questionText,
+        questionKey,
+        questionText,
         ...(scanId ? { selectedScanId: scanId } : {}),
-        ...(scanResultContext?.scanIntent
+        ...(promptType !== FREE_QUESTION_PROMPT_TYPE &&
+        scanResultContext?.scanIntent
           ? { scanIntent: scanResultContext.scanIntent }
           : {}),
       });
@@ -1763,8 +1873,8 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
         prompt_type: promptType,
         visible_prompt_type: visiblePromptType,
         persona_key: activePersonaKey,
-        question_key: questionSelection.questionKey,
-        question_text: questionSelection.questionText,
+        question_key: submitIntent.questionKey,
+        question_text: submitIntent.questionText,
         message: error instanceof Error ? error.message : 'unknown',
         submission_trigger: submissionTrigger,
       });
@@ -1797,7 +1907,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
       displayMode !== 'settings' ||
       isGenerationAwaitingResult ||
       submittingPromptType ||
-      !canSubmitSelectedQuestion
+      !hasValidSubmitIntent
     ) {
       return;
     }
@@ -1805,19 +1915,21 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     autoSubmitAttemptedRouteSignatureRef.current = scanResultRouteRequest.signature;
     pendingAutoSubmitRef.current = true;
     trackEvent('coach_scan_result_auto_submit_started', {
-      prompt_type: scanResultContext.generationPromptType ?? selectedPromptType,
+      prompt_type: resolvedSubmitIntent?.promptType ?? null,
       scan_id: scanResultContext.scanId,
       scan_type: scanResultContext.scanType,
-      has_scan_intent: !!scanResultContext.scanIntent,
+      has_scan_intent:
+        resolvedSubmitIntent?.promptType !== FREE_QUESTION_PROMPT_TYPE &&
+        !!scanResultContext.scanIntent,
     });
     void handleGenerate();
   }, [
-    canSubmitSelectedQuestion,
     displayMode,
+    hasValidSubmitIntent,
     isGenerationAwaitingResult,
     scanResultContext,
     scanResultRouteRequest,
-    selectedPromptType,
+    resolvedSubmitIntent,
     showGenerationErrorState,
     showLoadingState,
     showProviderUnavailableState,
@@ -1870,7 +1982,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     ? t('coach.action_bar.status_scan_required')
     : isResultDisplay
       ? t('coach.action_bar.status_result')
-      : !canSubmitSelectedQuestion
+      : !hasValidSubmitIntent
         ? t('coach.action_bar.status_question_required')
         : coachQuotaStatusLabel;
   const actionPrimaryLabel = isGenerationAwaitingResult
@@ -1891,10 +2003,11 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
         ? false
         : isCoachQuotaUnknown || isCoachQuotaUnavailable
           ? true
-          : arePromptCardsDisabled || !canSubmitSelectedQuestion;
+          : arePromptCardsDisabled;
   const isActionPrimaryMuted =
     shouldRoutePrimaryToScanner ||
     (!isGenerationAwaitingResult && !isResultDisplay && isCoachQuotaExhausted) ||
+    (!isGenerationAwaitingResult && !isResultDisplay && !hasValidSubmitIntent) ||
     (!isGenerationAwaitingResult && isActionPrimaryDisabled);
   const handleActionPrimaryPress = () => {
     if (shouldRoutePrimaryToScanner) {
@@ -1908,6 +2021,8 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     }
     void handleGenerate();
   };
+  const coachLoadingPercent = Math.round(coachLoadingProgress.progress);
+  const coachLoadingProgressWidth = `${coachLoadingProgress.progress}%` as `${number}%`;
 
   return (
     <AppScreen bottomInset={false} style={styles.safeArea}>
@@ -1966,19 +2081,22 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
             !isGenerationAwaitingResult ? (
               <CoachSettingsInline
                 activePersonaKey={activePersonaKey}
-                selectedPromptType={selectedPromptType}
+                selectedQuestionPromptType={selectedQuestionParentPromptType}
+                expandedPromptType={expandedPromptType}
                 personaOptions={inlinePersonaOptions}
-                questionOptions={questionOptions}
+                questionOptionsByPromptType={questionOptionsByPromptType}
                 selectedQuestionKey={selectedQuestionKey}
-                isCustomQuestionSelected={selectedQuestionKey === null}
-                questionText={questionDraft}
+                questionSelectionMode={questionSelectionMode}
+                questionText={freeQuestionDraft}
                 questionSectionLabel={t('coach.questions.section_label')}
                 customQuestionLabel={t('coach.questions.custom_label')}
+                customQuestionHelper={t('coach.questions.custom_helper')}
                 customQuestionPlaceholder={t('coach.questions.custom_placeholder')}
+                selectedBadgeLabel={t('coach.questions.selected_label')}
                 questionCounterLabel={(count, max) =>
                   t('coach.questions.counter', { count, max })
                 }
-                questionMaxLength={COACH_QUESTION_MAX_LENGTH}
+                questionMaxLength={COACH_FREE_QUESTION_MAX_LENGTH}
                 promptTitle={promptTitleResolver}
                 promptSubtitle={promptSubtitleResolver}
                 promptCategoryLabel={promptCategoryTitleResolver}
@@ -1990,18 +2108,23 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
                 lockedBadgeLabel={t('coach.locked_badge')}
                 lockedHint={t('coach.locked_tap_hint')}
                 onSelectQuestion={(questionKey) => {
-                  questionSelectionModeRef.current = 'preset';
+                  const questionPromptType =
+                    getCoachQuestionDefinition(questionKey).promptType;
+                  setScanResultContext(null);
+                  setExpandedPromptType(questionPromptType);
+                  setQuestionSelectionMode('preset');
                   setSelectedQuestionKey(questionKey);
-                  setQuestionDraft(resolveCoachQuestionText(questionKey, locale));
                 }}
                 onSelectCustomQuestion={() => {
-                  questionSelectionModeRef.current = 'free_text';
+                  setScanResultContext(null);
+                  setQuestionSelectionMode('free_text');
                   setSelectedQuestionKey(null);
                 }}
                 onChangeQuestionText={(value) => {
-                  questionSelectionModeRef.current = 'free_text';
+                  setScanResultContext(null);
+                  setFreeQuestionDraft(value);
                   setSelectedQuestionKey(null);
-                  setQuestionDraft(value);
+                  setQuestionSelectionMode('free_text');
                 }}
                 onSelectPromptType={(promptType) => {
                   if (isPromptLockedForUser(promptType)) {
@@ -2010,8 +2133,9 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
                     });
                     return;
                   }
-                  setScanResultContext(null);
-                  setSelectedPromptType(promptType);
+                  setExpandedPromptType((currentPromptType) =>
+                    currentPromptType === promptType ? null : promptType,
+                  );
                 }}
                 onPreviewPersona={(personaKey) => {
                   handlePersonaPress(personaKey as CoachPersonaKey);
@@ -2033,14 +2157,78 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
             ) : null}
 
             {showGenerationLoadingState ? (
-              <ScreenState
-                tone="loading"
-                layout="inline"
-                title={t('coach.loading_title')}
-                message={t('coach.loading_body')}
-                surfaceVariant={shouldUseCompactGenerationState ? 'inset' : 'raised'}
+              <View
+                style={styles.generationLoadingShell}
                 testID="coach-generation-loading-state"
-              />
+              >
+                <View style={styles.generationLoadingCard}>
+                  <View style={styles.generationLoadingHeader}>
+                    <View style={styles.generationLoadingIconShell}>
+                      <CoachFeatureIcon
+                        color={activePersonaVisual.haloTint}
+                        size={22}
+                        strokeWidth={2.4}
+                      />
+                    </View>
+                    <View style={styles.generationLoadingCopy}>
+                      <Text style={styles.generationLoadingTitle}>
+                        {t('coach.loading_title')}
+                      </Text>
+                      <Text style={styles.generationLoadingBody}>
+                        {t('coach.loading_body')}
+                      </Text>
+                    </View>
+                    <Text
+                      style={styles.generationLoadingPercent}
+                      testID="coach-generation-loading-percentage"
+                    >
+                      {`${coachLoadingPercent}%`}
+                    </Text>
+                  </View>
+
+                  <View
+                    style={styles.generationProgressTrack}
+                    testID="coach-generation-loading-progress-track"
+                  >
+                    <View
+                      style={[
+                        styles.generationProgressFillHost,
+                        { width: coachLoadingProgressWidth },
+                      ]}
+                      testID="coach-generation-loading-progress-fill"
+                    >
+                      <LinearGradient
+                        colors={[
+                          withAlpha(activePersonaVisual.haloTint, 0.72),
+                          activePersonaVisual.haloTint,
+                        ]}
+                        end={{ x: 1, y: 0 }}
+                        start={{ x: 0, y: 0 }}
+                        style={styles.generationProgressFill}
+                      />
+                    </View>
+                  </View>
+
+                  <Text style={styles.generationLoadingHint}>
+                    {t('coach.loading_hint')}
+                  </Text>
+                </View>
+
+                {isCoachLoadingMiniGameActive ? (
+                  <View
+                    style={styles.generationMiniGameHost}
+                    testID="coach-loading-mini-game"
+                  >
+                    <LoadingMiniGame
+                      accentColor={activePersonaVisual.haloTint}
+                      active
+                      compact={false}
+                      durationHintMs={COACH_GENERATION_LOADING_DURATION_MS}
+                      variant="coach"
+                    />
+                  </View>
+                ) : null}
+              </View>
             ) : null}
 
             {showQueryErrorState ? (
@@ -2336,6 +2524,92 @@ const createStyles = (
       lineHeight: 20,
       color: colors.textMuted ?? colors.gray,
       textAlign: 'left',
+    },
+    generationLoadingShell: {
+      gap: SPACING.sm + 2,
+      alignSelf: 'stretch',
+    },
+    generationLoadingCard: {
+      padding: SPACING.md + 2,
+      borderRadius: BORDER_RADIUS.xl,
+      backgroundColor: isDark
+        ? withAlpha(chrome.elevatedSurface.backgroundColor, 0.92)
+        : chrome.elevatedSurface.backgroundColor,
+      borderWidth: 1,
+      borderColor: withAlpha(accentColor, isDark ? 0.24 : 0.18),
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 12 },
+      shadowOpacity: isDark ? 0.2 : 0.12,
+      shadowRadius: 24,
+      elevation: 4,
+      gap: SPACING.sm + 2,
+      overflow: 'hidden',
+    },
+    generationLoadingHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+    },
+    generationLoadingIconShell: {
+      width: 42,
+      height: 42,
+      borderRadius: BORDER_RADIUS.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: withAlpha(accentColor, isDark ? 0.16 : 0.1),
+      borderWidth: 1,
+      borderColor: withAlpha(accentColor, isDark ? 0.32 : 0.22),
+    },
+    generationLoadingCopy: {
+      flex: 1,
+      minWidth: 0,
+      gap: 2,
+    },
+    generationLoadingTitle: {
+      fontSize: SIZES.text16,
+      lineHeight: 21,
+      fontWeight: FONT_WEIGHTS.bold,
+      color: colors.primaryText,
+    },
+    generationLoadingBody: {
+      fontSize: SIZES.text14,
+      lineHeight: 18,
+      fontWeight: FONT_WEIGHTS.medium,
+      color: colors.textMuted ?? colors.gray,
+    },
+    generationLoadingPercent: {
+      minWidth: 48,
+      fontSize: SIZES.text18,
+      lineHeight: 23,
+      fontWeight: FONT_WEIGHTS.bold,
+      color: colors.primaryText,
+      textAlign: 'right',
+    },
+    generationProgressTrack: {
+      height: 8,
+      borderRadius: BORDER_RADIUS.full,
+      overflow: 'hidden',
+      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.09 : 0.07),
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: withAlpha(accentColor, isDark ? 0.22 : 0.16),
+    },
+    generationProgressFillHost: {
+      height: '100%',
+      borderRadius: BORDER_RADIUS.full,
+      overflow: 'hidden',
+    },
+    generationProgressFill: {
+      flex: 1,
+      borderRadius: BORDER_RADIUS.full,
+    },
+    generationLoadingHint: {
+      fontSize: SIZES.text12,
+      lineHeight: 16,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      color: colors.textMuted ?? colors.gray,
+    },
+    generationMiniGameHost: {
+      alignSelf: 'stretch',
     },
     emptyCard: {
       alignItems: 'flex-start',

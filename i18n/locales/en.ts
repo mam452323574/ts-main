@@ -42,6 +42,13 @@ export const EN_TRANSLATIONS = {
     yesterday: 'Yesterday',
     days_ago: '{{count}} days ago',
   },
+  loading_mini_game: {
+    title: 'Mini-game',
+    score: 'Score',
+    tap_targets_prompt: 'Tap the signals',
+    float_dodge_prompt: 'Keep the signal afloat',
+    reflex_dots_prompt: 'Tap the right dots',
+  },
   tabs: {
     home: 'Home',
     analytics: 'Analytics',
@@ -885,6 +892,11 @@ export const EN_TRANSLATIONS = {
         subtitle:
           'From my latest scan, give me the 3 most useful actions for today.',
       },
+      free_question: {
+        title: 'Ask Coach',
+        subtitle:
+          'Ask a free question and get one concrete next step from your scans.',
+      },
       latest_scan_issue_resolution: {
         title: 'Post-scan action',
         subtitle:
@@ -937,6 +949,7 @@ export const EN_TRANSLATIONS = {
       },
     },
     prompt_categories: {
+      question: 'Open question',
       today: 'Today',
       plan: 'Plans',
       focus: 'Focus',
@@ -1067,13 +1080,23 @@ export const EN_TRANSLATIONS = {
       subtitle: 'Write your question, then adjust the coach and focus if needed.',
     },
     questions: {
-      section_label: 'Useful suggestions',
-      custom_label: 'Your question for Coach',
-      custom_placeholder:
-        'Ask anything about your skin, nutrition, training, or sleep...',
+      section_label: 'Suggestions',
+      custom_label: 'Ask your coach',
+      custom_helper: 'Ask anything.',
+      custom_placeholder: 'Write your request',
+      selected_label: 'Selected',
       empty_summary: 'Question for Coach',
+      empty_error: 'Add a few words so your coach can respond',
+      too_long_error: 'Question too long',
       counter: '{{count}}/{{max}}',
+      scan_result_improve: 'What should I improve from my latest scan?',
+      scan_result_maintain: 'How can I maintain my good results after this scan?',
     },
+    selectionRequiredTitle: 'Make a selection',
+    selectionRequiredMessage:
+      'Choose a question or write your request before asking for advice.',
+    freeQuestionRequiredTitle: 'Write your request',
+    freeQuestionRequiredMessage: 'Add a question before asking for advice.',
     options_sheet: {
       persona_label: 'Coach',
       mode_label: 'Coach question',

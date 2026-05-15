@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import {
-  Image,
   Platform,
   StyleSheet,
   Text,
@@ -15,6 +14,7 @@ import {
   buildPremiumHealthModulePalette,
   getPremiumHealthResponsiveCardMetrics,
 } from '@/constants/premiumHealth';
+import { OptimizedImage } from '@/components/OptimizedImage';
 import {
   BORDER_RADIUS,
   FONT_FAMILIES,
@@ -93,9 +93,10 @@ export function ChefHomeCard({ onPress }: ChefHomeCardProps) {
             end={{ x: 0.92, y: 0.92 }}
             style={styles.visualGlow}
           />
-          <Image
+          <OptimizedImage
             source={CHEF_HOME_GROUP_IMAGE}
-            resizeMode="contain"
+            contentFit="contain"
+            showPlaceholder={false}
             style={styles.chefGroupImage}
             testID="home-chef-group-image"
           />

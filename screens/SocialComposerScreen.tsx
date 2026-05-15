@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   KeyboardAvoidingView,
   Keyboard,
   type KeyboardEvent,
@@ -22,6 +21,7 @@ import { captureRef } from 'react-native-view-shot';
 import { AtSign, Camera, Globe2, Hash, ImagePlus } from 'lucide-react-native';
 
 import { AppScreen } from '@/components/AppScreen';
+import { OptimizedImage } from '@/components/OptimizedImage';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { SocialCategoryPill } from '@/components/social/SocialCategoryPill';
 import { SocialIdentityRow } from '@/components/social/SocialIdentityRow';
@@ -613,9 +613,10 @@ export default function SocialComposerScreen() {
                     </Text>
                   </TouchableOpacity>
                 </View>
-                <Image
+                <OptimizedImage
                   source={{ uri: selectedImageUri }}
-                  resizeMode="cover"
+                  contentFit="cover"
+                  recyclingKey={selectedImageUri}
                   style={styles.heroImagePreview}
                   testID="social-compose-image-preview"
                 />

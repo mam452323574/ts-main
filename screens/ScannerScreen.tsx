@@ -9,11 +9,11 @@ import {
 import {
   View,
   Text,
-  InteractionManager,
   StyleSheet,
   TouchableOpacity,
   useWindowDimensions,
 } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 import {
   CameraView,
   CameraType,
@@ -23,7 +23,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, usePathname } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   Camera,
@@ -124,6 +124,18 @@ const SCAN_ICON_TOKENS = {
   body: 'body',
   nutrition: 'nutrition',
 } as const;
+const MAIN_TABS_PATHNAMES = new Set([
+  '/',
+  '/index',
+  '/coach',
+  '/scanner',
+  '/social',
+  '/(tabs)',
+  '/(tabs)/index',
+  '/(tabs)/coach',
+  '/(tabs)/scanner',
+  '/(tabs)/social',
+]);
 
 const getScannerDockMetrics = (
   bottomInset: number,
@@ -152,12 +164,14 @@ const getScannerDockMetrics = (
 
 export default function ScannerScreen() {
   const router = useRouter();
+  const pathname = usePathname();
   const { userProfile } = useAuth();
   const { scheduleSuperScanReset } = useNotificationContext();
   const { colors, isDark } = useTheme();
   const { t } = useLanguage();
   const { showAlert, alertElement } = useCustomAlert();
   const { playValidationFeedback } = useScanValidationFeedback();
+  const isScannerFocused = useIsFocused();
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const isCompactVerticalLayout = windowHeight < 760;
@@ -188,7 +202,7 @@ export default function ScannerScreen() {
   const [showConnectivityBanner, setShowConnectivityBanner] = useState(false);
   const [captureSequenceActive, setCaptureSequenceActive] = useState(false);
   const [openingPreview, setOpeningPreview] = useState(false);
-  const [isCameraReadyToMount, setIsCameraReadyToMount] = useState(false);
+  const [isCameraPreviewReady, setIsCameraPreviewReady] = useState(false);
   const cameraRef = useRef<CameraView>(null);
   const captureSequenceActiveRef = useRef(false);
   const gallerySelectionActiveRef = useRef(false);
@@ -246,8 +260,10 @@ export default function ScannerScreen() {
     checkingEligibility ||
     captureSequenceActive ||
     openingPreview ||
-    !isCameraReadyToMount;
+    !isScannerFocused ||
+    !isCameraPreviewReady;
   const shouldShowConnectivityBanner = showConnectivityBanner || isRetrying;
+  const shouldMountCamera = permission?.granted && MAIN_TABS_PATHNAMES.has(pathname);
 
   useEffect(() => {
     if (hasConnectivityError) {
@@ -268,6 +284,12 @@ export default function ScannerScreen() {
   }, [hasConnectivityError]);
 
   useEffect(() => {
+    if (!shouldMountCamera) {
+      setIsCameraPreviewReady(false);
+    }
+  }, [shouldMountCamera]);
+
+  useEffect(() => {
     return () => {
       if (connectivityBannerTimeoutRef.current) {
         clearTimeout(connectivityBannerTimeoutRef.current);
@@ -275,23 +297,9 @@ export default function ScannerScreen() {
     };
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      setIsCameraReadyToMount(false);
-      let isActive = true;
-      const task = InteractionManager.runAfterInteractions(() => {
-        if (isActive) {
-          setIsCameraReadyToMount(true);
-        }
-      });
-
-      return () => {
-        isActive = false;
-        task.cancel?.();
-        setIsCameraReadyToMount(false);
-      };
-    }, []),
-  );
+  const handleCameraReady = useCallback(() => {
+    setIsCameraPreviewReady(true);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -949,7 +957,7 @@ export default function ScannerScreen() {
       {alertElement}
 
       <View style={styles.cameraShell}>
-        {isCameraReadyToMount ? (
+        {shouldMountCamera ? (
           <CameraView
             ref={cameraRef}
             style={styles.camera}
@@ -957,11 +965,10 @@ export default function ScannerScreen() {
             autofocus={captureSequenceActive ? 'on' : 'off'}
             animateShutter={false}
             mirror={false}
+            onCameraReady={handleCameraReady}
             testID="scanner-camera-view"
           />
-        ) : (
-          <View style={styles.camera} testID="scanner-camera-deferred-placeholder" />
-        )}
+        ) : null}
 
         <View
           style={styles.cameraInteractionLayer}

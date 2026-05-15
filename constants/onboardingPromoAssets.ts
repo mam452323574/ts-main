@@ -17,19 +17,19 @@ const LIGHT_HERO_ASSETS: Record<
   OnboardingPromoSlideKey,
   ImageSourcePropType
 > = {
-  analytics: require('../assets/onboarding/light/analytics/hero.png'),
-  coach: require('../assets/onboarding/light/coach/hero.png'),
-  fridge: require('../assets/onboarding/light/fridge/hero.png'),
-  scanner: require('../assets/onboarding/light/scanner/hero.png'),
-  social: require('../assets/onboarding/light/social/hero.png'),
+  analytics: require('../assets/onboarding/light/analytics/hero.webp'),
+  coach: require('../assets/onboarding/light/coach/hero.webp'),
+  fridge: require('../assets/onboarding/light/fridge/hero.webp'),
+  scanner: require('../assets/onboarding/light/scanner/hero.webp'),
+  social: require('../assets/onboarding/light/social/hero.webp'),
 };
 
 const DARK_HERO_ASSETS: OnboardingPromoThemeAssets = {
-  analytics: require('../assets/onboarding/dark/analytics/hero.png'),
-  coach: require('../assets/onboarding/dark/coach/hero.png'),
-  fridge: require('../assets/onboarding/dark/fridge/hero.png'),
-  scanner: require('../assets/onboarding/dark/scanner/hero.png'),
-  social: require('../assets/onboarding/dark/social/hero.png'),
+  analytics: require('../assets/onboarding/dark/analytics/hero.webp'),
+  coach: require('../assets/onboarding/dark/coach/hero.webp'),
+  fridge: require('../assets/onboarding/dark/fridge/hero.webp'),
+  scanner: require('../assets/onboarding/dark/scanner/hero.webp'),
+  social: require('../assets/onboarding/dark/social/hero.webp'),
 };
 
 const ONBOARDING_PROMO_ASSETS: Record<

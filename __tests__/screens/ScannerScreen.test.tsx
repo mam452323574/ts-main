@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
-import { Alert, InteractionManager, Platform, StyleSheet } from 'react-native';
+import { Alert, Platform, StyleSheet } from 'react-native';
 import ScannerScreen from '@/screens/ScannerScreen';
 import { paywallSession } from '@/utils/paywallSession';
 import { ApiError } from '@/services/api';
@@ -11,6 +11,7 @@ import { getMainTabBarMetrics } from '@/utils/mainTabBarMetrics';
 const mockUseCameraPermissions = jest.fn();
 const mockTakePictureAsync = jest.fn();
 const mockCameraViewProps: { current: Record<string, any> | null } = { current: null };
+let mockAutoCameraReady = true;
 const mockCameraGuideProps: { current: Record<string, any> | null } = { current: null };
 const mockManipulateAsync = jest.fn();
 const mockShowAlert = jest.fn();
@@ -18,10 +19,15 @@ const mockScheduleSuperScanReset = jest.fn();
 const mockNextScanTimerProps: any[] = [];
 const mockUseSafeAreaInsets = jest.fn(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 const mockUseTheme = jest.fn();
+const mockUseIsFocused = jest.fn(() => true);
 
 jest.mock('@/contexts/ThemeContext', () => ({
   useTheme: () => mockUseTheme(),
   ThemeProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+jest.mock('@react-navigation/native', () => ({
+  useIsFocused: () => mockUseIsFocused(),
 }));
 
 jest.mock('expo-camera', () => ({
@@ -34,6 +40,12 @@ jest.mock('expo-camera', () => ({
       React.useImperativeHandle(ref, () => ({
         takePictureAsync: mockTakePictureAsync,
       }));
+
+      React.useEffect(() => {
+        if (mockAutoCameraReady) {
+          props.onCameraReady?.();
+        }
+      }, [props.onCameraReady, props.facing]);
 
       return React.createElement(View, { testID: 'mock-camera-view' });
     });
@@ -66,17 +78,11 @@ jest.mock('expo-image-manipulator', () => ({
 
 // Mock expo-router
 const mockPush = jest.fn();
+const mockUsePathname = jest.fn(() => '/scanner');
 let latestFocusEffectCallback: (() => void) | undefined;
 let focusEffectRegistrationCount = 0;
 const mockUseFocusEffect = jest.fn((callback: () => void) => {
   focusEffectRegistrationCount += 1;
-
-  if (focusEffectRegistrationCount % 2 === 1) {
-    const ReactLocal = require('react');
-    ReactLocal.useEffect(callback, [callback]);
-    return;
-  }
-
   latestFocusEffectCallback = callback;
 });
 jest.mock('expo-router', () => ({
@@ -84,6 +90,7 @@ jest.mock('expo-router', () => ({
     push: mockPush,
     back: jest.fn(),
   }),
+  usePathname: () => mockUsePathname(),
   useFocusEffect: (callback: () => void) => mockUseFocusEffect(callback),
 }));
 
@@ -274,23 +281,13 @@ describe('ScannerScreen', () => {
     mockTakePictureAsync.mockResolvedValue({ uri: 'file:///captured-photo.jpg' });
     mockManipulateAsync.mockResolvedValue({ uri: 'file:///mirrored-photo.jpg', width: 100, height: 200 });
     mockCameraViewProps.current = null;
+    mockAutoCameraReady = true;
     mockCameraGuideProps.current = null;
     mockNextScanTimerProps.length = 0;
+    mockUseIsFocused.mockReturnValue(true);
+    mockUsePathname.mockReturnValue('/scanner');
     latestFocusEffectCallback = undefined;
     focusEffectRegistrationCount = 0;
-    jest.spyOn(InteractionManager, 'runAfterInteractions').mockImplementation(((task?: any) => {
-      if (typeof task === 'function') {
-        task();
-      } else {
-        task?.gen?.();
-      }
-
-      return {
-        then: jest.fn(),
-        done: jest.fn(),
-        cancel: jest.fn(),
-      };
-    }) as any);
     mockUseTheme.mockReturnValue({
       theme: 'light',
       colors: LIGHT_COLORS,
@@ -875,6 +872,98 @@ describe('ScannerScreen', () => {
         { granted: true },
         jest.fn(),
       ]);
+    });
+
+    it('renders the camera immediately without the deferred placeholder', () => {
+      render(<ScannerScreen />);
+
+      expect(screen.getByTestId('mock-camera-view')).toBeTruthy();
+      expect(
+        screen.queryByTestId('scanner-camera-deferred-placeholder'),
+      ).toBeNull();
+      expect(mockCameraViewProps.current?.onCameraReady).toEqual(expect.any(Function));
+    });
+
+    it('preloads the camera on main tabs even when the scanner tab is not focused', () => {
+      mockUseIsFocused.mockReturnValue(false);
+      mockUsePathname.mockReturnValue('/');
+
+      render(<ScannerScreen />);
+
+      expect(screen.getByTestId('mock-camera-view')).toBeTruthy();
+
+      fireEvent.press(screen.getByTestId('scanner-capture-button'));
+      fireEvent.press(screen.getByTestId('scanner-flip-camera-button'));
+
+      expect(mockShowAlert).not.toHaveBeenCalled();
+      expect(mockCameraViewProps.current?.facing).toBe('back');
+    });
+
+    it('uses an already warmed camera as soon as the scanner tab receives focus', () => {
+      mockUseIsFocused.mockReturnValue(false);
+      mockUsePathname.mockReturnValue('/');
+      mockAutoCameraReady = false;
+
+      const { rerender } = render(<ScannerScreen />);
+
+      act(() => {
+        mockCameraViewProps.current?.onCameraReady?.();
+      });
+
+      fireEvent.press(screen.getByTestId('scanner-capture-button'));
+      expect(mockShowAlert).not.toHaveBeenCalled();
+
+      mockUseIsFocused.mockReturnValue(true);
+      mockUsePathname.mockReturnValue('/scanner');
+      rerender(<ScannerScreen />);
+
+      fireEvent.press(screen.getByTestId('scanner-capture-button'));
+      expect(mockShowAlert).toHaveBeenCalledWith(
+        'Type de scan requis',
+        'Veuillez sélectionner un type de scan.',
+        undefined,
+        undefined,
+        expect.objectContaining({ variant: 'info' }),
+      );
+    });
+
+    it('unmounts the warmed camera when navigation leaves the main tabs', () => {
+      mockUsePathname.mockReturnValue('/scan-preview');
+
+      render(<ScannerScreen />);
+
+      expect(screen.queryByTestId('mock-camera-view')).toBeNull();
+    });
+
+    it('keeps camera actions locked until the preview reports ready', () => {
+      const ImagePicker = require('expo-image-picker');
+      mockAutoCameraReady = false;
+
+      render(<ScannerScreen />);
+
+      fireEvent.press(screen.getByTestId('scanner-capture-button'));
+      fireEvent.press(screen.getByTestId('scanner-gallery-button'));
+      fireEvent.press(screen.getByTestId('scanner-flip-camera-button'));
+
+      expect(mockShowAlert).not.toHaveBeenCalled();
+      expect(ImagePicker.launchImageLibraryAsync).not.toHaveBeenCalled();
+      expect(mockCameraViewProps.current?.facing).toBe('back');
+
+      act(() => {
+        mockCameraViewProps.current?.onCameraReady?.();
+      });
+
+      fireEvent.press(screen.getByTestId('scanner-capture-button'));
+      expect(mockShowAlert).toHaveBeenCalledWith(
+        'Type de scan requis',
+        'Veuillez sélectionner un type de scan.',
+        undefined,
+        undefined,
+        expect.objectContaining({ variant: 'info' }),
+      );
+
+      fireEvent.press(screen.getByTestId('scanner-flip-camera-button'));
+      expect(mockCameraViewProps.current?.facing).toBe('front');
     });
 
     it('passes mirror false to CameraView', async () => {

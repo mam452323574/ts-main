@@ -702,6 +702,112 @@ describe('coach generate response handler', () => {
     );
   });
 
+  it('persists and forwards free_question pending entries with quota', async () => {
+    const requestClient = createRequestClient({
+      pendingEntry: {
+        id: 'entry-free-question',
+        persona_key: 'gentle_supportive',
+        prompt_type: 'free_question',
+        question_key: null,
+        question_text:
+          'Comment adapter ma semaine avec mes derniers scans ?',
+        status: 'pending',
+        title: null,
+        body: null,
+        disclaimer:
+          'Wellness guidance only. This is not a diagnosis or medical advice.',
+        cta_label: null,
+        cta_route: null,
+        source: 'n8n',
+        expires_at: null,
+        response_payload_json: {},
+      },
+    });
+    mockParseCoachGenerateRequest.mockReturnValueOnce({
+      payload: {
+        payload_version: 2,
+        prompt_type: 'free_question',
+        latest_scan: { scan_id: 'scan-1' },
+        latest_by_type: {
+          health: { scan_id: 'scan-1' },
+          body: null,
+          nutrition: null,
+          super: null,
+        },
+        question_key: null,
+        question_text:
+          'Comment adapter ma semaine avec mes derniers scans ?',
+        question_hints: {
+          intent_key: 'free_question_open',
+          time_scope: 'ongoing',
+          preferred_artifacts: ['action_steps', 'context_notes'],
+        },
+      },
+      persona_key: 'gentle_supportive',
+    });
+    mockCreateServiceRoleClient.mockReturnValue(requestClient);
+    mockPostCoachGenerateWebhook.mockReturnValue(new Promise(() => undefined));
+
+    const response = await handleCoachGenerateResponseRequest(
+      new Request('https://example.com/functions/v1/coach-generate-response', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer token-123',
+        },
+        body: JSON.stringify({ payload: { payload_version: 2 } }),
+      }),
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      entry_id: 'entry-free-question',
+      prompt_type: 'free_question',
+      question_key: null,
+      question_text:
+        'Comment adapter ma semaine avec mes derniers scans ?',
+      quota: expect.objectContaining({
+        limit: 8,
+        available: 7,
+      }),
+    });
+
+    const coachEntriesRelation = requestClient.from.mock.results
+      .filter((_, index) => requestClient.from.mock.calls[index]?.[0] === 'coach_entries')
+      .map((result) => result.value)
+      .find((relation) => relation?.upsert?.mock?.calls?.length > 0);
+
+    expect(coachEntriesRelation.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt_type: 'free_question',
+        question_key: null,
+        question_text:
+          'Comment adapter ma semaine avec mes derniers scans ?',
+      }),
+      expect.objectContaining({
+        onConflict: 'user_id,cache_key',
+      }),
+    );
+    expect(mockPostCoachGenerateWebhook).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          entry_id: 'entry-free-question',
+          payload: expect.objectContaining({
+            prompt_type: 'free_question',
+            question_text:
+              'Comment adapter ma semaine avec mes derniers scans ?',
+          }),
+        }),
+      }),
+    );
+    expect(requestClient.rpc).toHaveBeenCalledWith(
+      'reserve_coach_quota',
+      expect.objectContaining({
+        p_user_id: 'user-1',
+        p_source: 'coach_generation',
+      }),
+    );
+  });
+
   it('rejects exhausted Coach product quota before creating entries or calling the provider', async () => {
     const requestClient = createRequestClient({
       quotaReservation: {

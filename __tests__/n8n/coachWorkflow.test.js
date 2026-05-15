@@ -265,7 +265,7 @@ describe('coach n8n workflow export', () => {
     expect(routeCode).not.toMatch(/N.utilise pas latest_by_type\.face/);
   });
 
-  it('expands the visible coach matrix to 19 routes per persona', () => {
+  it('expands the visible coach matrix to 20 routes per persona', () => {
     const workflow = readWorkflow();
     const coachNodes = workflow.nodes.filter((node) => /^Coach /.test(node.name));
     const byPersona = {};
@@ -279,16 +279,17 @@ describe('coach n8n workflow export', () => {
       byRoute[route] = (byRoute[route] ?? 0) + 1;
     }
 
-    expect(coachNodes).toHaveLength(114);
+    expect(coachNodes).toHaveLength(120);
     expect(byPersona).toEqual({
-      Gentle: 19,
-      Strict: 19,
-      Motivational: 19,
-      Calm: 19,
-      Analytical: 19,
-      Playful: 19,
+      Gentle: 20,
+      Strict: 20,
+      Motivational: 20,
+      Calm: 20,
+      Analytical: 20,
+      Playful: 20,
     });
     expect(byRoute).toMatchObject({
+      free_question: 6,
       nutrition_meal: 6,
       nutrition_swaps: 6,
       nutrition_shopping: 6,
@@ -427,6 +428,28 @@ describe('coach n8n workflow export', () => {
     expect(result.content.title).toBe('Your nutrition focus');
   });
 
+  it('keeps a localized fallback title for free_question in the final normalizer', () => {
+    const workflow = readWorkflow();
+    const result = runCodeNode(
+      workflow,
+      'Code in JavaScript2',
+      {
+        language: 'en',
+        locale: 'en',
+        coach_route: 'free_question',
+        title: '',
+        body: '',
+        content: {},
+        message: { content: '{}' },
+      },
+      { coach_route: 'free_question' },
+    )[0].json;
+
+    expect(result.response_version).toBe(2);
+    expect(result.title).toBe('Your coach question');
+    expect(result.content.title).toBe('Your coach question');
+  });
+
   it('injects the preset coach question into the shared prompt builder', () => {
     const workflow = readWorkflow();
     const result = runCodeNode(workflow, 'Determine Coach Route', {
@@ -501,6 +524,74 @@ describe('coach n8n workflow export', () => {
     );
     expect(result.coach_prompt_user_text).toContain(
       'Sur quoi je dois me concentrer avant ma seance ce soir ?',
+    );
+  });
+
+  it('routes free_question explicitly without classifying the user question', () => {
+    const workflow = readWorkflow();
+    const userQuestion =
+      'Je veux manger mieux dehors et reprendre le sport apres mon scan, je fais quoi aujourd hui ?';
+    const result = runCodeNode(workflow, 'Determine Coach Route', {
+      payload: {
+        prompt_type: 'free_question',
+        question_key: 'nutrition_focus__minimal_three_day_shopping',
+        question_text: userQuestion,
+        question_hints: {
+          intent_key: 'nutrition_shopping_list',
+          time_scope: 'week',
+          preferred_artifacts: ['shopping_list', 'quick_recipe'],
+          ui_tags: ['shopping'],
+        },
+      },
+      scan_context: {
+        has_any_scan: true,
+        primary_scan: {
+          scan_type: 'nutrition',
+        },
+      },
+    })[0].json;
+
+    expect(result.coach_route).toBe('free_question');
+    expect(result.coach_question_key).toBeNull();
+    expect(result.coach_question_text).toBe(userQuestion);
+    expect(result.coach_question_hints).toBeNull();
+    expect(result.coach_prompt_system_text).toContain(
+      'Prompt specialise - free_question',
+    );
+    expect(result.coach_prompt_user_text).toContain(userQuestion);
+    expect(result.coach_prompt_user_text).toContain(
+      'Pour free_question, la question utilisateur reste prioritaire',
+    );
+    expect(result.coach_prompt_user_text).not.toContain(
+      'content.shopping_list puis content.quick_recipe',
+    );
+  });
+
+  it.each([
+    ['motivation', 'Je manque de motivation, aide-moi a repartir simplement.'],
+    ['nutrition', 'Que manger ce soir pour recuperer sans repas lourd ?'],
+    ['sport', 'Quelle seance courte faire si je suis fatigue ?'],
+    ['scan-related', 'Que disent mes derniers scans sur ma priorite du jour ?'],
+  ])('keeps %s natural-language questions on the free_question route', (_, question) => {
+    const workflow = readWorkflow();
+    const result = runCodeNode(workflow, 'Determine Coach Route', {
+      payload: {
+        prompt_type: 'free_question',
+        question_key: null,
+        question_text: question,
+      },
+      scan_context: {
+        has_any_scan: true,
+        primary_scan: {
+          scan_type: 'body',
+        },
+      },
+    })[0].json;
+
+    expect(result.coach_route).toBe('free_question');
+    expect(result.coach_question_text).toBe(question);
+    expect(result.coach_prompt_system_text).toContain(
+      'Prompt specialise - free_question',
     );
   });
 
@@ -919,18 +1010,22 @@ describe('coach n8n workflow export', () => {
     );
   });
 
-  it('keeps the strict coach model token budget high enough without forcing n8n JSON parsing', () => {
+  it('keeps all coach model token budgets high enough without forcing n8n JSON parsing', () => {
     const workflow = readWorkflow();
+    const deepSeekNodes = workflow.nodes.filter(
+      (node) => node.type === '@n8n/n8n-nodes-langchain.lmChatDeepSeek',
+    );
     const strictModelNode = getNode(workflow, 'DeepSeek Strict');
 
+    expect(deepSeekNodes).toHaveLength(6);
+    deepSeekNodes.forEach((node) => {
+      expect(node.parameters.options).not.toHaveProperty('responseFormat');
+    });
     expect(strictModelNode.parameters.options).toMatchObject({
       maxTokens: 2400,
       temperature: 0.1,
       topP: 0.8,
     });
-    expect(strictModelNode.parameters.options).not.toHaveProperty(
-      'responseFormat',
-    );
   });
 
   it('asks for compact content-first JSON without literal string newlines', () => {
@@ -1000,6 +1095,12 @@ describe('coach n8n workflow export', () => {
 
     expect(result.coach_prompt_blocks.weekly_plan).toContain(
       '12 slots max sur toute la semaine',
+    );
+    expect(result.coach_prompt_blocks.weekly_plan).not.toContain(
+      '2 à 4 slots',
+    );
+    expect(result.coach_prompt_blocks.weekly_plan).not.toContain(
+      '2 a 4 slots',
     );
     expect(result.coach_prompt_blocks.weekly_plan).not.toContain(
       'Exemple JSON minimal attendu',
@@ -1091,6 +1192,41 @@ describe('coach n8n workflow export', () => {
     expect(result.content.action_steps).toEqual([
       'Bois un verre d eau avant midi.',
     ]);
+  });
+
+  it('falls back to a valid v2 payload when LLM JSON is truncated', () => {
+    const workflow = readWorkflow();
+    const upstreamContext = {
+      locale: 'fr',
+      language: 'fr',
+      coach_route: 'weekly_plan',
+      persona_key: 'analytical_precise',
+      scan_context: {
+        has_any_scan: true,
+        recent_scans: [{ scan_type: 'face' }],
+        prior_scans: [],
+      },
+    };
+    const truncatedJson =
+      '{"response_version":2,"title":"Plan hebdo","body":null,"content":{"title":"Plan hebdo","summary":"Hydratation","daily_schedule":[{"day":"Jeudi","slots":[{"time":"07:30","duration_min":5,"action":"Etirements + 1 verre d eau","';
+
+    const result = runCodeNode(
+      workflow,
+      'Code in JavaScript2',
+      { message: { content: truncatedJson } },
+      upstreamContext,
+    )[0].json;
+
+    expect(result.response_version).toBe(2);
+    expect(result.title).toBe('Ton plan de la semaine');
+    expect(result.source).toBe('n8n');
+    expect(result.body).toContain(
+      "Je n'ai pas pu formuler un conseil personnalise fiable",
+    );
+    expect(result.disclaimer).toBeTruthy();
+    expect(result.content.title).toBe('Ton plan de la semaine');
+    expect(result.content.daily_schedule).toEqual([]);
+    expect(result.content.confidence).toBeTruthy();
   });
 
   it('uses the shared dynamic system prompt across coach persona nodes', () => {

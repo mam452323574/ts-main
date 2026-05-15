@@ -4,6 +4,8 @@ import {
   type OnboardingPromoSlideKey,
   type OnboardingPromoThemeVariant,
 } from '@/constants/onboardingPromoAssets';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const SLIDES: OnboardingPromoSlideKey[] = [
   'scanner',
@@ -27,5 +29,15 @@ describe('onboarding promo asset manifest', () => {
 
   it('matches the final 9:16 hero aspect ratio', () => {
     expect(ONBOARDING_PROMO_ASSET_ASPECT_RATIO).toBeCloseTo(9 / 16);
+  });
+
+  it('uses WebP hero assets for the app-loaded promo images', () => {
+    const manifestSource = fs.readFileSync(
+      path.join(__dirname, '../../constants/onboardingPromoAssets.ts'),
+      'utf8',
+    );
+
+    expect(manifestSource).toContain('hero.webp');
+    expect(manifestSource).not.toContain('hero.png');
   });
 });

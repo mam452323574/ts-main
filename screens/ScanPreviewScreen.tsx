@@ -10,7 +10,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Image,
   ScrollView,
   TouchableOpacity,
   Animated,
@@ -31,6 +30,8 @@ import { BlurView } from 'expo-blur';
 import { ApiService, ApiError, ApiErrorType } from '@/services/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { SuperScanFeatureIcon } from '@/components/FeatureIcons';
+import { OptimizedImage } from '@/components/OptimizedImage';
+import { LoadingMiniGame } from '@/components/loading/LoadingMiniGame';
 import { useBadges } from '@/contexts/BadgeContext';
 import { useGamification } from '@/contexts/GamificationContext';
 import { ScanType } from '@/types';
@@ -71,6 +72,7 @@ const EXPECTED_SCAN_ERROR_TYPES: ReadonlySet<ApiErrorType> = new Set([
 ]);
 
 const VALID_SCAN_TYPES: ScanType[] = ['body', 'health', 'nutrition', 'super'];
+const SUPER_SCAN_MINI_GAME_DURATION_HINT_MS = 10000;
 
 function renderScanTypeIcon(scanType: ScanType, color: string, size: number) {
   if (scanType === 'super') {
@@ -498,6 +500,10 @@ export default function ScanPreviewScreen() {
     () => resolveScanPreviewLoadingContent(resolvedScanType, resolvedProgress),
     [resolvedProgress, resolvedScanType],
   );
+  const shouldReserveSuperScanMiniGameSlot =
+    loading && resolvedScanType === 'super' && loadingDensity !== 'ultraTight';
+  const shouldShowSuperScanMiniGame =
+    shouldReserveSuperScanMiniGameSlot && !isApiComplete;
 
   useEffect(() => {
     const listenerId = progressAnim.addListener(({ value }) => {
@@ -819,18 +825,11 @@ export default function ScanPreviewScreen() {
 
       <View style={styles.imageContainer} testID="scan-preview-image-container">
         <View style={styles.imageFrame}>
-          <Image source={{ uri: imageUri }} style={styles.image} />
-          <LinearGradient
-            colors={accentTheme.heroPreviewGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <LinearGradient
-            colors={previewTheme.loadingHeroScrimGradient}
-            start={{ x: 0.5, y: 0 }}
-            end={{ x: 0.5, y: 1 }}
-            style={StyleSheet.absoluteFill}
+          <OptimizedImage
+            source={{ uri: imageUri }}
+            style={styles.image}
+            recyclingKey={imageUri}
+            testID="scan-preview-image"
           />
           <View
             style={[
@@ -1003,22 +1002,12 @@ export default function ScanPreviewScreen() {
                 ]}
                 testID="scan-preview-loading-vignette"
               >
-                <Image
+                <OptimizedImage
                   source={{ uri: imageUri }}
                   style={styles.loadingVignetteImage}
-                  resizeMode="cover"
-                />
-                <LinearGradient
-                  colors={accentTheme.heroPreviewGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={StyleSheet.absoluteFill}
-                />
-                <LinearGradient
-                  colors={previewTheme.loadingHeroScrimGradient}
-                  start={{ x: 0.5, y: 0 }}
-                  end={{ x: 0.5, y: 1 }}
-                  style={StyleSheet.absoluteFill}
+                  contentFit="cover"
+                  recyclingKey={imageUri}
+                  testID="scan-preview-loading-image"
                 />
                 <View
                   style={[
@@ -1037,7 +1026,7 @@ export default function ScanPreviewScreen() {
                         borderColor: accentTheme.vignetteFrameBorder,
                       },
                     ]}
-                    >
+                  >
                     {renderScanTypeIcon(
                       resolvedScanType,
                       accentTheme.accentColor,
@@ -1198,6 +1187,28 @@ export default function ScanPreviewScreen() {
                 </View>
               </View>
             </View>
+
+            {shouldReserveSuperScanMiniGameSlot ? (
+              <View
+                pointerEvents={shouldShowSuperScanMiniGame ? 'auto' : 'none'}
+                style={[
+                  styles.superScanMiniGameSlot,
+                  !shouldShowSuperScanMiniGame &&
+                    styles.superScanMiniGameSlotHidden,
+                ]}
+                testID="scan-preview-super-scan-mini-game-slot"
+              >
+                {shouldShowSuperScanMiniGame ? (
+                  <LoadingMiniGame
+                    accentColor={accentTheme.accentColor}
+                    active
+                    compact
+                    durationHintMs={SUPER_SCAN_MINI_GAME_DURATION_HINT_MS}
+                    variant="superScan"
+                  />
+                ) : null}
+              </View>
+            ) : null}
             </View>,
           )}
         </View>
@@ -1501,6 +1512,16 @@ const createStyles = (
     progressCardFrame: {
       width: '100%',
       maxWidth: loadingMetrics.progressMaxWidth,
+    },
+    superScanMiniGameSlot: {
+      width: '100%',
+      maxWidth: loadingMetrics.progressMaxWidth,
+      height: 118,
+      marginTop: loadingDensity === 'tight' ? SPACING.sm : SPACING.md,
+      overflow: 'hidden',
+    },
+    superScanMiniGameSlotHidden: {
+      opacity: 0,
     },
     completionGlow: {
       position: 'absolute',

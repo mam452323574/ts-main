@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
+import { OptimizedImage } from '@/components/OptimizedImage';
 import { FONT_WEIGHTS, SIZES, withAlpha } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useResolvedAvatarUrl } from '@/hooks/useResolvedAvatarUrl';
@@ -51,8 +52,11 @@ export function ProfileAvatar({
 
   if (shouldRenderImage) {
     return (
-      <Image
+      <OptimizedImage
         source={{ uri: resolvedAvatarUrl }}
+        cachePolicy="memory-disk"
+        contentFit="cover"
+        recyclingKey={resolvedAvatarUrl}
         resizeMode="cover"
         style={[styles.avatar, avatarSizeStyle, style]}
         onError={() => setImageFailed(true)}

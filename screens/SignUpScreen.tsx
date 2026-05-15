@@ -30,6 +30,7 @@ import {
 } from '@/components/auth';
 import { AvatarCropModal, type AvatarCropAsset } from '@/components/AvatarCropModal';
 import { Button } from '@/components/Button';
+import { OAuthButton } from '@/components/OAuthButton';
 import { ProfileAvatar } from '@/components/ProfileAvatar';
 import {
   BORDER_RADIUS,
@@ -70,7 +71,12 @@ function isMediaLibraryGranted(permission: ImagePicker.MediaLibraryPermissionRes
 
 export default function SignUpScreen() {
   const router = useRouter();
-  const { signUp, sendVerificationEmail, isDisposableEmail } = useAuth();
+  const {
+    signUp,
+    signInWithGoogle,
+    sendVerificationEmail,
+    isDisposableEmail,
+  } = useAuth();
   const { colors, isDark, setTheme, theme: activeTheme } = useTheme();
   const { t } = useLanguage();
   const { showAlert, alertElement } = useCustomAlert();
@@ -92,6 +98,7 @@ export default function SignUpScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const usernameValidation = useMemo(
@@ -421,7 +428,7 @@ export default function SignUpScreen() {
       return;
     }
 
-    if (loading) {
+    if (loading || googleLoading) {
       return;
     }
 
@@ -495,6 +502,36 @@ export default function SignUpScreen() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleSignUp = async () => {
+    if (loading || googleLoading) {
+      return;
+    }
+
+    cancelPendingDraftSave();
+
+    try {
+      setGoogleLoading(true);
+      setError(null);
+      await updatePreAuthOnboardingDraft({
+        selectedTheme,
+        username,
+        avatarLocalUri,
+        avatarSkipped,
+        email,
+        lastStep: 'account',
+      });
+      await signInWithGoogle();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : t('auth.errors.oauth_login', { provider: 'google' }),
+      );
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -703,6 +740,22 @@ export default function SignUpScreen() {
         subtitle={t('onboarding.account_step_subtitle')}
         visual={<AccountStepVisual />}
       />
+
+      <View style={styles.oauthSection}>
+        <OAuthButton
+          provider="google"
+          onPress={handleGoogleSignUp}
+          loading={googleLoading}
+          disabled={loading || googleLoading}
+        />
+      </View>
+
+      <View style={styles.divider}>
+        <View style={styles.dividerLine} />
+        <Text style={styles.dividerText}>{t('auth.or_divider')}</Text>
+        <View style={styles.dividerLine} />
+      </View>
+
       <View style={styles.accountForm}>
         <AuthInput
           label={t('auth.email_label')}
@@ -746,7 +799,9 @@ export default function SignUpScreen() {
         title={t('auth.signup_btn')}
         onPress={handleSignUp}
         loading={loading}
-        disabled={loading || !email || !password || !confirmPassword}
+        disabled={
+          loading || googleLoading || !email || !password || !confirmPassword
+        }
         variant="premium"
         size="lg"
       />
@@ -1132,6 +1187,25 @@ const createStyles = (colors: any, isDark: boolean) =>
     },
     accountForm: {
       gap: SPACING.md,
+    },
+    oauthSection: {
+      width: '100%',
+    },
+    divider: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginVertical: 0,
+    },
+    dividerLine: {
+      flex: 1,
+      height: 1,
+      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.12 : 0.08),
+    },
+    dividerText: {
+      marginHorizontal: SPACING.md,
+      fontSize: SIZES.sm,
+      color: colors.gray,
+      fontWeight: '600',
     },
     infoContainer: {
       backgroundColor: mixColors(

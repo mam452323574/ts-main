@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, TextInput } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput } from 'react-native';
 import { Search } from 'lucide-react-native';
 import { useExercises } from '@/hooks/queries/useExercises';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -8,6 +8,7 @@ import { AppScreen } from '@/components/AppScreen';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ErrorMessage } from '@/components/ErrorMessage';
 import { ModalHandle } from '@/components/ModalHandle';
+import { OptimizedImage } from '@/components/OptimizedImage';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ScreenState } from '@/components/ScreenState';
 import { SIZES, SPACING, BORDER_RADIUS, FONT_WEIGHTS, getMainPageChrome, withAlpha } from '@/constants/theme';
@@ -37,28 +38,35 @@ export default function ExercisesScreen() {
     return <ErrorMessage message={error.message} />;
   }
 
-  const renderExercise = ({ item }: { item: any }) => (
-    <TouchableOpacity style={styles.exerciseCard}>
-      <Image source={{ uri: item.image_url }} style={styles.exerciseImage} />
-      <View style={styles.exerciseContent}>
-        <Text style={styles.exerciseName}>{item.name}</Text>
-        <View style={styles.exerciseInfo}>
-          <Text style={styles.exerciseDuration}>{item.duration} {t('exercises.duration')}</Text>
-          <View
-            style={[
-              styles.difficultyBadge,
-              item.difficulty === 'easy' && styles.difficultyEasy,
-              item.difficulty === 'medium' && styles.difficultyMedium,
-              item.difficulty === 'hard' && styles.difficultyHard,
-            ]}
-          >
-            <Text style={[styles.difficultyText, { color: getDifficultyTextColor(item.difficulty, colors) }]}>
-              {t(`exercises.difficulty.${item.difficulty}`)}
-            </Text>
+  const renderExercise = useCallback(
+    ({ item }: { item: any }) => (
+      <TouchableOpacity style={styles.exerciseCard}>
+        <OptimizedImage
+          source={{ uri: item.image_url }}
+          style={styles.exerciseImage}
+          recyclingKey={String(item.id)}
+        />
+        <View style={styles.exerciseContent}>
+          <Text style={styles.exerciseName}>{item.name}</Text>
+          <View style={styles.exerciseInfo}>
+            <Text style={styles.exerciseDuration}>{item.duration} {t('exercises.duration')}</Text>
+            <View
+              style={[
+                styles.difficultyBadge,
+                item.difficulty === 'easy' && styles.difficultyEasy,
+                item.difficulty === 'medium' && styles.difficultyMedium,
+                item.difficulty === 'hard' && styles.difficultyHard,
+              ]}
+            >
+              <Text style={[styles.difficultyText, { color: getDifficultyTextColor(item.difficulty, colors) }]}>
+                {t(`exercises.difficulty.${item.difficulty}`)}
+              </Text>
+            </View>
           </View>
         </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    ),
+    [colors, styles, t],
   );
 
   return (
@@ -94,6 +102,11 @@ export default function ExercisesScreen() {
           renderItem={renderExercise}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.list}
+          initialNumToRender={4}
+          maxToRenderPerBatch={4}
+          removeClippedSubviews
+          updateCellsBatchingPeriod={80}
+          windowSize={5}
         />
       )}
     </AppScreen>

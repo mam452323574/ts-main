@@ -14,6 +14,9 @@ describe('OAuthButton', () => {
     render(<OAuthButton provider="google" onPress={mockOnPress} />);
     
     expect(screen.getByText('Continuer avec Google')).toBeTruthy();
+    expect(screen.getByTestId('oauth-google-button').props.accessibilityRole).toBe(
+      'button',
+    );
   });
 
   it('renders Apple button correctly', () => {
@@ -45,6 +48,9 @@ describe('OAuthButton', () => {
     fireEvent.press(screen.getByText('Continuer avec Google'));
     
     expect(mockOnPress).not.toHaveBeenCalled();
+    expect(screen.getByTestId('oauth-google-button').props.accessibilityState).toEqual(
+      expect.objectContaining({ disabled: true }),
+    );
   });
 
   it('does not call onPress when loading', () => {

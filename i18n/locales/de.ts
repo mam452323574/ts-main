@@ -49,6 +49,13 @@ export const DE_TRANSLATIONS = {
     yesterday: 'Gestern',
     days_ago: 'Vor {{count}} Tagen',
   },
+  loading_mini_game: {
+    title: 'Minispiel',
+    score: 'Score',
+    tap_targets_prompt: 'Tippe die Signale',
+    float_dodge_prompt: 'Halte das Signal in der Luft',
+    reflex_dots_prompt: 'Tippe die richtigen Punkte',
+  },
   scan_limits: {
     week_1: '1 Scan alle 24 Stunden',
     month_1: '1 Scan alle 24 Stunden',
@@ -778,6 +785,11 @@ export const DE_TRANSLATIONS = {
         subtitle:
           'Aus meinem letzten Scan: Welche 3 Aktionen helfen mir heute am meisten?',
       },
+      free_question: {
+        title: 'Coach fragen',
+        subtitle:
+          'Stell eine freie Frage und erhalte einen konkreten naechsten Schritt aus deinen Scans.',
+      },
       latest_scan_issue_resolution: {
         title: 'Aktion nach dem Scan',
         subtitle:
@@ -830,6 +842,7 @@ export const DE_TRANSLATIONS = {
       },
     },
     prompt_categories: {
+      question: 'Freie Frage',
       today: 'Heute',
       plan: 'Plaene',
       focus: 'Fokus',
@@ -960,13 +973,24 @@ export const DE_TRANSLATIONS = {
       subtitle: 'Schreibe deine Frage, passe Coach und Fokus bei Bedarf an.',
     },
     questions: {
-      section_label: 'Nutzliche Vorschlaege',
-      custom_label: 'Deine Frage an den Coach',
-      custom_placeholder:
-        'Frage etwas zu Haut, Ernaehrung, Training oder Schlaf...',
+      section_label: 'Vorschlaege',
+      custom_label: 'Coach fragen',
+      custom_helper: 'Frag, was du wissen moechtest.',
+      custom_placeholder: 'Schreibe deine Anfrage',
+      selected_label: 'Ausgewaehlt',
       empty_summary: 'Frage an den Coach',
+      empty_error: 'Fuege ein paar Worte hinzu, damit der Coach antworten kann',
+      too_long_error: 'Frage zu lang',
       counter: '{{count}}/{{max}}',
+      scan_result_improve: 'Was sollte ich aus meinem letzten Scan verbessern?',
+      scan_result_maintain: 'Wie halte ich meine guten Ergebnisse nach diesem Scan?',
     },
+    selectionRequiredTitle: 'Triff eine Auswahl',
+    selectionRequiredMessage:
+      'Wähle eine Frage aus oder schreibe deine Anfrage, bevor du einen Tipp anforderst.',
+    freeQuestionRequiredTitle: 'Schreibe deine Anfrage',
+    freeQuestionRequiredMessage:
+      'Füge eine Frage hinzu, bevor du einen Tipp anforderst.',
     options_sheet: {
       persona_label: 'Coach',
       mode_label: 'Coach-Frage',

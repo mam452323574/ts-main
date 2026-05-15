@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, TextInput } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput } from 'react-native';
 import { Search } from 'lucide-react-native';
 import { useRecipes } from '@/hooks/queries/useRecipes';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -8,6 +8,7 @@ import { AppScreen } from '@/components/AppScreen';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ErrorMessage } from '@/components/ErrorMessage';
 import { ModalHandle } from '@/components/ModalHandle';
+import { OptimizedImage } from '@/components/OptimizedImage';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ScreenState } from '@/components/ScreenState';
 import { SIZES, SPACING, BORDER_RADIUS, FONT_WEIGHTS, getMainPageChrome, withAlpha } from '@/constants/theme';
@@ -37,28 +38,35 @@ export default function RecipesScreen() {
     return <ErrorMessage message={error.message} />;
   }
 
-  const renderRecipe = ({ item }: { item: any }) => (
-    <TouchableOpacity style={styles.recipeCard}>
-      <Image source={{ uri: item.image_url }} style={styles.recipeImage} />
-      <View style={styles.recipeContent}>
-        <Text style={styles.recipeName}>{item.name}</Text>
-        <View style={styles.recipeInfo}>
-          <Text style={styles.recipeTime}>{item.preparation_time} {t('recipes.prep_time')}</Text>
-          <View
-            style={[
-              styles.difficultyBadge,
-              item.difficulty === 'easy' && styles.difficultyEasy,
-              item.difficulty === 'medium' && styles.difficultyMedium,
-              item.difficulty === 'hard' && styles.difficultyHard,
-            ]}
-          >
-            <Text style={[styles.difficultyText, { color: getDifficultyTextColor(item.difficulty, colors) }]}>
-              {t(`recipes.difficulty.${item.difficulty}`)}
-            </Text>
+  const renderRecipe = useCallback(
+    ({ item }: { item: any }) => (
+      <TouchableOpacity style={styles.recipeCard}>
+        <OptimizedImage
+          source={{ uri: item.image_url }}
+          style={styles.recipeImage}
+          recyclingKey={String(item.id)}
+        />
+        <View style={styles.recipeContent}>
+          <Text style={styles.recipeName}>{item.name}</Text>
+          <View style={styles.recipeInfo}>
+            <Text style={styles.recipeTime}>{item.preparation_time} {t('recipes.prep_time')}</Text>
+            <View
+              style={[
+                styles.difficultyBadge,
+                item.difficulty === 'easy' && styles.difficultyEasy,
+                item.difficulty === 'medium' && styles.difficultyMedium,
+                item.difficulty === 'hard' && styles.difficultyHard,
+              ]}
+            >
+              <Text style={[styles.difficultyText, { color: getDifficultyTextColor(item.difficulty, colors) }]}>
+                {t(`recipes.difficulty.${item.difficulty}`)}
+              </Text>
+            </View>
           </View>
         </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    ),
+    [colors, styles, t],
   );
 
   return (
@@ -94,6 +102,11 @@ export default function RecipesScreen() {
           renderItem={renderRecipe}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.list}
+          initialNumToRender={4}
+          maxToRenderPerBatch={4}
+          removeClippedSubviews
+          updateCellsBatchingPeriod={80}
+          windowSize={5}
         />
       )}
     </AppScreen>
