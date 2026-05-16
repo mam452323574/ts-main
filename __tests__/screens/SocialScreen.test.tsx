@@ -1,15 +1,19 @@
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 
 import SocialScreen from '@/screens/SocialScreen';
+import { SPACING, withAlpha } from '@/constants/theme';
 import { DEFAULT_APP_CONFIG } from '@/services/appConfig';
 import { SocialServiceError } from '@/services/social';
 
+const MOCK_SAFE_AREA_INSETS = { top: 24, right: 0, bottom: 0, left: 0 };
 let latestFocusEffectCallback: (() => void) | undefined;
 const mockPush = jest.fn();
 const mockUseFocusEffect = jest.fn((callback: () => void) => {
   latestFocusEffectCallback = callback;
 });
+const mockUseSafeAreaInsets = jest.fn(() => MOCK_SAFE_AREA_INSETS);
 const mockUseSocialFeed = jest.fn();
 const mockUseFeatureFlags = jest.fn();
 const mockUseSocialMutations = jest.fn();
@@ -32,10 +36,16 @@ jest.mock('expo-router', () => ({
   useFocusEffect: (callback: () => void) => mockUseFocusEffect(callback),
 }));
 
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => mockUseSafeAreaInsets(),
+  SafeAreaProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
 jest.mock('@shopify/flash-list', () => ({
   FlashList: ({
     data,
     renderItem,
+    ListHeaderComponent,
     ListEmptyComponent,
     ListFooterComponent,
     ItemSeparatorComponent,
@@ -46,6 +56,7 @@ jest.mock('@shopify/flash-list', () => ({
   }: {
     data: unknown[];
     renderItem: (item: { item: any; index: number }) => React.ReactNode;
+    ListHeaderComponent?: React.ReactNode | React.ComponentType<any>;
     ListEmptyComponent?: React.ReactNode;
     ListFooterComponent?: React.ReactNode;
     ItemSeparatorComponent?: React.ComponentType<any> | null;
@@ -58,12 +69,31 @@ jest.mock('@shopify/flash-list', () => ({
     testID?: string;
     [key: string]: unknown;
   }) => {
-    if (!data.length) {
-      return <>{ListEmptyComponent ?? null}</>;
-    }
-
     const ReactLocal = require('react');
     const { View: RNView } = require('react-native');
+    const renderListSlot = (slot?: React.ReactNode | React.ComponentType<any>) => {
+      if (!slot) {
+        return null;
+      }
+
+      return typeof slot === 'function'
+        ? ReactLocal.createElement(slot)
+        : slot;
+    };
+    const header = renderListSlot(ListHeaderComponent);
+    const empty = renderListSlot(ListEmptyComponent);
+    const footer = renderListSlot(ListFooterComponent);
+
+    if (!data.length) {
+      return (
+        <RNView {...props} testID={testID}>
+          {header}
+          {empty}
+          {footer}
+        </RNView>
+      );
+    }
+
     const Separator = ItemSeparatorComponent;
     const viewableItems = (data as any[]).map((item) => ({
       item,
@@ -72,6 +102,7 @@ jest.mock('@shopify/flash-list', () => ({
 
     return (
       <RNView {...props} testID={testID}>
+        {header}
         {viewabilityConfigCallbackPairs?.map((pair, index) => (
           <ReactLocal.Fragment key={`viewability-pair-${index}`}>
             {pair.onViewableItemsChanged?.({
@@ -97,7 +128,7 @@ jest.mock('@shopify/flash-list', () => ({
               : null}
           </ReactLocal.Fragment>
         ))}
-        {ListFooterComponent ?? null}
+        {footer}
       </RNView>
     );
   },
@@ -526,6 +557,176 @@ describe('SocialScreen', () => {
     fireEvent.press(screen.getByTestId('social-pill-food'));
 
     expect(mockUseSocialFeed).toHaveBeenLastCalledWith('food');
+  });
+
+  it('shows floating filters after a small upward scroll away from the top', () => {
+    const screen = render(<SocialScreen />);
+    const feedList = screen.getByTestId('social-feed-list');
+    const floatingFiltersStyle = screen.getByTestId('social-floating-filters', {
+      includeHiddenElements: true,
+    }).props.style;
+    const floatingFiltersDockStyle = screen.getByTestId(
+      'social-floating-filters-dock',
+      {
+        includeHiddenElements: true,
+      },
+    ).props.style;
+    const floatingFiltersSegmentsStyle = screen.getByTestId(
+      'social-floating-filters-segments',
+      {
+        includeHiddenElements: true,
+      },
+    ).props.style;
+
+    expect(collectFlattenedStyleValue(floatingFiltersStyle, 'top')).toBe(
+      MOCK_SAFE_AREA_INSETS.top + SPACING.sm,
+    );
+    expect(
+      collectFlattenedStyleValue(floatingFiltersDockStyle, 'backgroundColor'),
+    ).toBe(withAlpha('#000000', 0.68));
+    expect(collectFlattenedStyleValue(floatingFiltersDockStyle, 'borderRadius')).toBeGreaterThanOrEqual(999);
+    expect(
+      collectFlattenedStyleValue(floatingFiltersSegmentsStyle, 'backgroundColor'),
+    ).toBe('transparent');
+    expect(
+      collectFlattenedStyleValue(floatingFiltersSegmentsStyle, 'borderColor'),
+    ).toBe('transparent');
+
+    expect(
+      screen.getByTestId('social-floating-filters', { includeHiddenElements: true })
+        .props.pointerEvents,
+    ).toBe('none');
+
+    fireEvent.scroll(feedList, {
+      nativeEvent: {
+        contentOffset: { y: 180 },
+      },
+    });
+
+    expect(
+      screen.getByTestId('social-floating-filters', { includeHiddenElements: true })
+        .props.pointerEvents,
+    ).toBe('none');
+
+    fireEvent.scroll(feedList, {
+      nativeEvent: {
+        contentOffset: { y: 170 },
+      },
+    });
+
+    expect(screen.getByTestId('social-floating-filters').props.pointerEvents).toBe('auto');
+  });
+
+  it('waits for the measured title and inline filters to clear before showing floating filters', () => {
+    const screen = render(<SocialScreen />);
+    const feedChrome = screen.getByTestId('social-feed-chrome');
+    const feedList = screen.getByTestId('social-feed-list');
+
+    fireEvent(feedChrome, 'layout', {
+      nativeEvent: {
+        layout: {
+          height: 180,
+          width: 320,
+          x: 0,
+          y: 0,
+        },
+      },
+    });
+
+    fireEvent.scroll(feedList, {
+      nativeEvent: {
+        contentOffset: { y: 200 },
+      },
+    });
+    fireEvent.scroll(feedList, {
+      nativeEvent: {
+        contentOffset: { y: 192 },
+      },
+    });
+
+    expect(
+      screen.getByTestId('social-floating-filters', { includeHiddenElements: true })
+        .props.pointerEvents,
+    ).toBe('none');
+
+    fireEvent.scroll(feedList, {
+      nativeEvent: {
+        contentOffset: { y: 240 },
+      },
+    });
+    fireEvent.scroll(feedList, {
+      nativeEvent: {
+        contentOffset: { y: 232 },
+      },
+    });
+
+    expect(screen.getByTestId('social-floating-filters').props.pointerEvents).toBe('auto');
+  });
+
+  it('hides floating filters again after a downward scroll threshold', () => {
+    const screen = render(<SocialScreen />);
+    const feedList = screen.getByTestId('social-feed-list');
+
+    fireEvent.scroll(feedList, {
+      nativeEvent: {
+        contentOffset: { y: 180 },
+      },
+    });
+    fireEvent.scroll(feedList, {
+      nativeEvent: {
+        contentOffset: { y: 170 },
+      },
+    });
+
+    expect(screen.getByTestId('social-floating-filters').props.pointerEvents).toBe('auto');
+
+    fireEvent.scroll(feedList, {
+      nativeEvent: {
+        contentOffset: { y: 190 },
+      },
+    });
+
+    expect(
+      screen.getByTestId('social-floating-filters', { includeHiddenElements: true })
+        .props.pointerEvents,
+    ).toBe('none');
+  });
+
+  it('switches category from the floating filters and keeps them visible', () => {
+    const screen = render(<SocialScreen />);
+    const feedList = screen.getByTestId('social-feed-list');
+
+    fireEvent.scroll(feedList, {
+      nativeEvent: {
+        contentOffset: { y: 180 },
+      },
+    });
+    fireEvent.scroll(feedList, {
+      nativeEvent: {
+        contentOffset: { y: 170 },
+      },
+    });
+
+    fireEvent.press(screen.getByTestId('social-floating-pill-food'));
+
+    expect(mockUseSocialFeed).toHaveBeenLastCalledWith('food');
+    expect(screen.getByTestId('social-floating-filters').props.pointerEvents).toBe('auto');
+  });
+
+  it('keeps pagination wired through the feed list', () => {
+    const mockFetchNextPage = jest.fn();
+    mockUseSocialFeed.mockReturnValue(
+      createSocialFeedQueryResult({
+        fetchNextPage: mockFetchNextPage,
+        hasNextPage: true,
+        isFetchingNextPage: false,
+      }),
+    );
+    const screen = render(<SocialScreen />);
+
+    screen.getByTestId('social-feed-list').props.onEndReached();
+
+    expect(mockFetchNextPage).toHaveBeenCalledTimes(1);
   });
 
   it('hides comment actions when the comments flag is disabled', () => {
@@ -1322,3 +1523,11 @@ describe('SocialScreen', () => {
     expect(mockRefetch).toHaveBeenCalledTimes(1);
   });
 });
+
+function collectFlattenedStyleValue(
+  style: unknown,
+  key: string,
+) {
+  const flattenedStyle = StyleSheet.flatten(style as any);
+  return flattenedStyle?.[key];
+}

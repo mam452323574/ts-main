@@ -32,6 +32,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { SuperScanFeatureIcon } from '@/components/FeatureIcons';
 import { OptimizedImage } from '@/components/OptimizedImage';
 import { LoadingMiniGame } from '@/components/loading/LoadingMiniGame';
+import { resolveLoadingMiniGameHeight } from '@/components/loading/loadingMiniGameChrome';
 import { useBadges } from '@/contexts/BadgeContext';
 import { useGamification } from '@/contexts/GamificationContext';
 import { ScanType } from '@/types';
@@ -1516,7 +1517,7 @@ const createStyles = (
     superScanMiniGameSlot: {
       width: '100%',
       maxWidth: loadingMetrics.progressMaxWidth,
-      height: 118,
+      height: resolveLoadingMiniGameHeight(true, 'superScan'),
       marginTop: loadingDensity === 'tight' ? SPACING.sm : SPACING.md,
       overflow: 'hidden',
     },

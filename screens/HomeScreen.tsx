@@ -143,15 +143,6 @@ export default function HomeScreen() {
     () => [t('tabs.coach'), t('scan_types.super'), t('tabs.analytics')],
     [t],
   );
-  const scanSectionSupportText = useMemo(
-    () =>
-      [
-        t(SCAN_TYPE_LABELS.health),
-        t(SCAN_TYPE_LABELS.body),
-        t(SCAN_TYPE_LABELS.nutrition),
-      ].join(' · '),
-    [t],
-  );
 
   const { checkForAchievements, scheduleScanReadyNotification } =
     useNotificationContext();
@@ -511,9 +502,11 @@ export default function HomeScreen() {
     );
   };
 
-  // Header avec logo et branding
-  const renderFixedHeader = () => (
-    <View style={[styles.header, { paddingTop: insets.top + SPACING.sm }]}>
+  const renderScrollHeader = () => (
+    <View
+      style={[styles.header, { paddingTop: insets.top + SPACING.sm }]}
+      testID="home-scroll-header"
+    >
       <View style={styles.headerLeft}>
         <Text
           style={styles.username}
@@ -537,21 +530,19 @@ export default function HomeScreen() {
     </View>
   );
 
-  // Contenu scrollable du header
   const renderScrollableHeader = () => {
     if (!data) return null;
 
     return (
       <>
+        {renderScrollHeader()}
+
         <Animated.View
           style={[styles.companionSection, journeyAnimatedStyle]}
           testID="home-journey-section"
         >
           <View style={styles.sectionHeading}>
             <Text style={styles.sectionEyebrow}>{t('home.companion_title')}</Text>
-            <Text style={styles.sectionSupportText}>
-              {t('home.companion_subtitle')}
-            </Text>
           </View>
           <View style={styles.companionCardShell}>
             <View style={styles.companionCardSurface}>
@@ -589,16 +580,10 @@ export default function HomeScreen() {
             <View style={styles.scanSectionHeaderCard}>
               <View style={styles.scanSectionHeaderCopy}>
                 <Text style={styles.scanSectionEyebrow}>{t('home.items_available')}</Text>
-                <Text style={styles.scanSectionSupport}>
-                  {scanSectionSupportText}
-                </Text>
               </View>
               <View style={styles.scanSectionAvailabilityPill}>
                 <Text style={styles.scanSectionAvailabilityValue}>
                   {totalAvailableScans}
-                </Text>
-                <Text style={styles.scanSectionAvailabilityLabel}>
-                  {t('scan_limit.available')}
                 </Text>
               </View>
             </View>
@@ -679,10 +664,6 @@ export default function HomeScreen() {
 
   return (
     <AppScreen topInset={false} bottomInset={false} style={styles.container}>
-      {/* Header fixe */}
-      {renderFixedHeader()}
-
-      {/* Contenu scrollable */}
       <ScrollView
         style={styles.listContainer}
         contentContainerStyle={styles.listContent}
@@ -783,9 +764,9 @@ const createStyles = (
       paddingHorizontal: HOME_HORIZONTAL_PADDING,
       paddingTop: SPACING.md,
       paddingBottom: SPACING.md,
-      backgroundColor: chrome.headerBackground,
-      borderBottomWidth: 1,
-      borderBottomColor: chrome.headerBorder,
+      backgroundColor: 'transparent',
+      borderBottomWidth: 0,
+      borderBottomColor: 'transparent',
     },
     headerLeft: {
       flexDirection: 'column',
@@ -838,7 +819,6 @@ const createStyles = (
     scanSectionHeaderCopy: {
       flex: 1,
       minWidth: 0,
-      gap: 2,
     },
     scanSectionEyebrow: {
       fontSize: SIZES.text16,
@@ -846,33 +826,22 @@ const createStyles = (
       color: colors.primaryText,
       fontFamily: FONT_FAMILIES.display,
     },
-    scanSectionSupport: {
-      fontSize: SIZES.text12,
-      lineHeight: 18,
-      color: colors.gray,
-    },
     scanSectionAvailabilityPill: {
-      minWidth: 86,
+      minWidth: 54,
       borderRadius: BORDER_RADIUS.xl,
-      paddingHorizontal: SPACING.md,
-      paddingVertical: SPACING.sm,
+      paddingHorizontal: SPACING.sm,
+      paddingVertical: 7,
       alignItems: 'center',
+      justifyContent: 'center',
       backgroundColor: chrome.chipActive.backgroundColor,
       borderWidth: 1,
       borderColor: chrome.chipActive.borderColor,
-      gap: 2,
     },
     scanSectionAvailabilityValue: {
       fontSize: SIZES.text18,
       fontWeight: FONT_WEIGHTS.bold,
       color: colors.primaryText,
       fontFamily: FONT_FAMILIES.accent,
-    },
-    scanSectionAvailabilityLabel: {
-      fontSize: SIZES.text10,
-      fontWeight: FONT_WEIGHTS.medium,
-      color: colors.gray,
-      textAlign: 'center',
     },
     scanCardsGrid: {
       width: '100%',
@@ -1064,7 +1033,7 @@ const createStyles = (
     companionSection: {
       paddingHorizontal: HOME_HORIZONTAL_PADDING,
       paddingTop: SPACING.xl,
-      gap: SPACING.md,
+      gap: SPACING.sm,
     },
     secondaryModulesSection: {
       paddingHorizontal: HOME_HORIZONTAL_PADDING,

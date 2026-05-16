@@ -89,7 +89,7 @@ function GlassTabBar(props: MaterialTopTabBarProps) {
   const androidSurfaceColor = getAndroidMainTabsSurfaceColor(colors);
   const tintOverlayColor =
     Platform.OS === 'android'
-      ? withAlpha(androidSurfaceColor, isDark ? 0.58 : 0.68)
+      ? withAlpha(androidSurfaceColor, isDark ? 0.68 : 0.76)
       : chrome.headerBackground;
 
   return (
@@ -142,6 +142,7 @@ export default function TabLayout() {
   const { t } = useLanguage();
   const { badges } = useBadges();
   const tokens = getThemeTokens(isDark);
+  const chrome = getMainPageChrome(colors, isDark, 'trust');
   const initialLayout =
     Platform.OS === 'web' ? undefined : { width: Dimensions.get('window').width };
 
@@ -152,7 +153,7 @@ export default function TabLayout() {
       tabBar={(props) => <GlassTabBar {...props} />}
       initialRouteName="index"
       screenOptions={{
-        sceneStyle: { backgroundColor: colors.background },
+        sceneStyle: { backgroundColor: chrome.canvas },
         tabBarActiveTintColor: tokens.tabBar.active,
         tabBarInactiveTintColor: tokens.tabBar.inactive,
         tabBarStyle: {

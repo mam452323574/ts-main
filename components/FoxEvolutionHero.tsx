@@ -79,15 +79,9 @@ export function FoxEvolutionHero({
 
       <View style={styles.headerRow}>
         <View style={styles.copyColumn}>
-          <Text style={styles.eyebrow}>{t('home.fox_evolution.eyebrow')}</Text>
           <Text style={styles.stageLabel} testID="fox-evolution-stage-label">
             {t('home.fox_evolution.stage_label', {
               stage: progress.currentStage,
-            })}
-          </Text>
-          <Text style={styles.scanTotal}>
-            {t('home.fox_evolution.scan_total', {
-              count: gamification.scanCount,
             })}
           </Text>
           {progress.isFinalStage ? (
@@ -113,6 +107,37 @@ export function FoxEvolutionHero({
       </View>
 
       <View style={styles.progressSection}>
+        <View style={styles.progressMeta}>
+          <View style={styles.progressRangePill}>
+            <Text
+              style={styles.progressRangeText}
+              testID="fox-evolution-progress-range"
+            >
+              {progress.isFinalStage
+                ? t('home.fox_evolution.stage_range_max', {
+                    start: progress.currentStageMinScans,
+                  })
+                : t('home.fox_evolution.stage_range', {
+                    start: progress.currentStageMinScans,
+                    end: progress.nextStageMinScans,
+                  })}
+            </Text>
+          </View>
+          {!progress.isFinalStage ? (
+            <View style={styles.progressValuePill}>
+              <Text
+                style={styles.progressValueText}
+                testID="fox-evolution-stage-progress"
+              >
+                {t('home.fox_evolution.stage_progress', {
+                  current: progress.scansIntoStage,
+                  total: stageSpan,
+                })}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+
         <View style={styles.progressTrack}>
           <LinearGradient
             colors={[premiumHealth.trustAccent, premiumHealth.premiumAccent]}
@@ -121,33 +146,6 @@ export function FoxEvolutionHero({
             style={[styles.progressFill, { width: progressWidth }]}
             testID="fox-evolution-progress-fill"
           />
-        </View>
-
-        <View style={styles.progressMeta}>
-          <Text
-            style={styles.progressRangeText}
-            testID="fox-evolution-progress-range"
-          >
-            {progress.isFinalStage
-              ? t('home.fox_evolution.stage_range_max', {
-                  start: progress.currentStageMinScans,
-                })
-              : t('home.fox_evolution.stage_range', {
-                  start: progress.currentStageMinScans,
-                  end: progress.nextStageMinScans,
-                })}
-          </Text>
-          {!progress.isFinalStage ? (
-            <Text
-              style={styles.progressValueText}
-              testID="fox-evolution-stage-progress"
-            >
-              {t('home.fox_evolution.stage_progress', {
-                current: progress.scansIntoStage,
-                total: stageSpan,
-              })}
-            </Text>
-          ) : null}
         </View>
       </View>
     </View>
@@ -220,16 +218,8 @@ const createStyles = (
     copyColumn: {
       flex: 1,
       minWidth: 0,
-      gap: SPACING.xs,
-    },
-    eyebrow: {
-      fontSize: SIZES.text10,
-      lineHeight: 14,
-      fontWeight: FONT_WEIGHTS.bold,
-      letterSpacing: 1.2,
-      color: premiumHealth.trustAccent,
-      textTransform: 'uppercase',
-      fontFamily: FONT_FAMILIES.display,
+      justifyContent: 'center',
+      gap: SPACING.sm,
     },
     stageLabel: {
       fontSize: isTablet ? 30 : isCompact ? 22 : 26,
@@ -239,15 +229,7 @@ const createStyles = (
       textAlign: 'left',
       fontFamily: FONT_FAMILIES.display,
     },
-    scanTotal: {
-      fontSize: SIZES.text12,
-      lineHeight: 18,
-      fontWeight: FONT_WEIGHTS.medium,
-      color: colors.gray,
-      fontFamily: FONT_FAMILIES.display,
-    },
     supportingText: {
-      marginTop: 2,
       fontSize: SIZES.text12,
       lineHeight: 18,
       fontWeight: FONT_WEIGHTS.medium,
@@ -280,7 +262,7 @@ const createStyles = (
     },
     progressSection: {
       width: '100%',
-      gap: SPACING.xs,
+      gap: SPACING.sm,
       marginTop: SPACING.md,
     },
     progressTrack: {
@@ -297,34 +279,42 @@ const createStyles = (
       borderRadius: BORDER_RADIUS.full,
     },
     progressMeta: {
-      flexDirection: isCompact ? 'column' : 'row',
-      alignItems: isCompact ? 'flex-start' : 'center',
-      justifyContent: isCompact ? 'flex-start' : 'space-between',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
       gap: isCompact ? SPACING.xs : SPACING.sm,
     },
+    progressRangePill: {
+      flex: 1,
+      minWidth: 0,
+      alignSelf: 'flex-start',
+      borderRadius: BORDER_RADIUS.full,
+      paddingHorizontal: SPACING.sm,
+      paddingVertical: 6,
+      backgroundColor: withAlpha(colors.white, isDark ? 0.055 : 0.58),
+      borderWidth: 1,
+      borderColor: withAlpha(premiumHealth.trustAccent, isDark ? 0.14 : 0.09),
+    },
     progressRangeText: {
-      ...(isCompact
-        ? {
-            width: '100%',
-          }
-        : {
-            flex: 1,
-          }),
       fontSize: SIZES.text12,
-      fontWeight: FONT_WEIGHTS.medium,
-      color: colors.gray,
+      fontWeight: FONT_WEIGHTS.bold,
+      color: mixColors(colors.primaryText, premiumHealth.trustAccent, 0.2),
       fontFamily: FONT_FAMILIES.display,
     },
+    progressValuePill: {
+      flexShrink: 0,
+      borderRadius: BORDER_RADIUS.full,
+      paddingHorizontal: SPACING.sm,
+      paddingVertical: 6,
+      backgroundColor: withAlpha(premiumHealth.premiumAccent, isDark ? 0.12 : 0.1),
+      borderWidth: 1,
+      borderColor: withAlpha(premiumHealth.premiumAccent, isDark ? 0.18 : 0.16),
+    },
     progressValueText: {
-      ...(isCompact
-        ? {
-            width: '100%',
-          }
-        : {}),
       fontSize: SIZES.text12,
       fontWeight: FONT_WEIGHTS.bold,
       color: mixColors(colors.primaryText, premiumHealth.trustAccent, 0.12),
-      textAlign: isCompact ? 'left' : 'right',
+      textAlign: 'right',
       fontFamily: FONT_FAMILIES.accent,
     },
   });

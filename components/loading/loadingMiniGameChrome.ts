@@ -26,10 +26,10 @@ export function resolveLoadingMiniGameHeight(
   variant: LoadingMiniGameVariant,
 ) {
   if (compact) {
-    return 118;
+    return 160;
   }
 
-  return variant === 'superScan' ? 132 : 164;
+  return variant === 'superScan' ? 174 : 210;
 }
 
 export function createLoadingMiniGameChrome({
@@ -86,8 +86,8 @@ export function createLoadingMiniGameChrome({
       flexDirection: 'row',
       gap: SPACING.sm,
       justifyContent: 'space-between',
-      marginBottom: compact ? SPACING.xs : SPACING.sm,
-      minHeight: compact ? 30 : 34,
+      marginBottom: compact ? SPACING.sm : SPACING.md,
+      minHeight: compact ? 32 : 38,
     },
     titleBlock: {
       flex: 1,
@@ -161,6 +161,14 @@ export function createLoadingMiniGameChrome({
       borderColor: signalBorder,
       shadowColor: secondaryAccent,
     },
+    markerBonus: {
+      backgroundColor: mixColors(colors.gold, colors.white, isDark ? 0.08 : 0.2),
+      borderColor: withAlpha(colors.gold, isDark ? 0.82 : 0.54),
+      borderWidth: 2,
+      shadowColor: colors.gold,
+      shadowOpacity: isDark ? 0.5 : 0.2,
+      shadowRadius: 13,
+    },
     markerDanger: {
       backgroundColor: withAlpha(dangerAccent, isDark ? 0.38 : 0.16),
       borderColor: withAlpha(dangerAccent, isDark ? 0.62 : 0.32),
@@ -171,21 +179,21 @@ export function createLoadingMiniGameChrome({
       borderColor: signalBorder,
       borderRadius: compact ? 9 : 11,
       borderWidth: 1,
-      height: compact ? 18 : 22,
+      height: compact ? 22 : 26,
       left: '17%',
-      marginTop: compact ? -9 : -11,
+      marginTop: compact ? -11 : -13,
       position: 'absolute',
       shadowColor: accent,
       shadowOffset: { width: 0, height: 0 },
       shadowOpacity: isDark ? 0.42 : 0.14,
       shadowRadius: 10,
-      width: compact ? 24 : 30,
+      width: compact ? 30 : 36,
     },
     obstacleColumn: {
       bottom: 0,
       position: 'absolute',
       top: 0,
-      width: compact ? 18 : 22,
+      width: compact ? 20 : 24,
     },
     obstacleSegment: {
       backgroundColor: withAlpha(secondaryAccent, isDark ? 0.34 : 0.22),
@@ -194,6 +202,10 @@ export function createLoadingMiniGameChrome({
       borderWidth: 1,
       position: 'absolute',
       width: '100%',
+    },
+    obstacleSegmentHit: {
+      backgroundColor: withAlpha(dangerAccent, isDark ? 0.36 : 0.18),
+      borderColor: withAlpha(dangerAccent, isDark ? 0.52 : 0.34),
     },
   });
 

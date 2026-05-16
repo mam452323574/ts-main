@@ -312,7 +312,10 @@ export default function ScanResultScreen() {
 
   if (!analysisData || !viewModel) {
     return (
-      <View style={styles.container}>
+      <View
+        style={[styles.container, { backgroundColor: fallbackBackgroundGradient[0] }]}
+        testID="scan-result-screen"
+      >
         <LinearGradient
           colors={fallbackBackgroundGradient}
           end={{ x: 1, y: 1 }}
@@ -320,35 +323,46 @@ export default function ScanResultScreen() {
           style={styles.backgroundLayer}
           testID="scan-result-background-layer"
         />
-        <ModalHandle />
-        <ScreenHeader
-          title={t('common.results.title')}
-          onClose={handleClose}
-          centered
-          variant="inline"
-          style={styles.resultHeader}
-          testID="scan-result-screen-header"
-        />
-        <View style={styles.errorContainer}>
-          <AlertCircle color={colors.error} size={48} />
-          <Text
-            {...RESULT_TEXT_PROPS}
-            style={[styles.errorText, { color: colors.gray }]}
-          >
-            {t('common.results.no_data')}
-          </Text>
-          <TouchableOpacity
-            style={[styles.errorButton, { backgroundColor: colors.primaryText }]}
-            onPress={handleClose}
-          >
+        <ScrollView
+          contentContainerStyle={[styles.scrollContent, styles.errorScrollContent]}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.resultTopChrome} testID="scan-result-top-chrome">
+            <ModalHandle />
+            <ScreenHeader
+              title={t('common.results.title')}
+              onClose={handleClose}
+              centered
+              variant="inline"
+              borderless
+              topInset={false}
+              closeTestID="scan-result-close-button"
+              style={styles.resultHeader}
+              testID="scan-result-screen-header"
+            />
+          </View>
+
+          <View style={styles.errorContainer}>
+            <AlertCircle color={colors.error} size={48} />
             <Text
               {...RESULT_TEXT_PROPS}
-              style={[styles.errorButtonText, { color: colors.background }]}
+              style={[styles.errorText, { color: colors.gray }]}
             >
-              {t('common.home_back')}
+              {t('common.results.no_data')}
             </Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              style={[styles.errorButton, { backgroundColor: colors.primaryText }]}
+              onPress={handleClose}
+            >
+              <Text
+                {...RESULT_TEXT_PROPS}
+                style={[styles.errorButtonText, { color: colors.background }]}
+              >
+                {t('common.home_back')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
       </View>
     );
   }
@@ -362,7 +376,10 @@ export default function ScanResultScreen() {
   });
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[styles.container, { backgroundColor: backgroundGradient[0] }]}
+      testID="scan-result-screen"
+    >
       <LinearGradient
         colors={backgroundGradient}
         end={{ x: 1, y: 1 }}
@@ -371,21 +388,26 @@ export default function ScanResultScreen() {
         testID="scan-result-background-layer"
       />
       {alertElement}
-      <ModalHandle />
-
-      <ScreenHeader
-        title={t('common.results.title')}
-        onClose={handleClose}
-        centered
-        variant="inline"
-        style={styles.resultHeader}
-        testID="scan-result-screen-header"
-      />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        <View style={styles.resultTopChrome} testID="scan-result-top-chrome">
+          <ModalHandle />
+          <ScreenHeader
+            title={t('common.results.title')}
+            onClose={handleClose}
+            centered
+            variant="inline"
+            borderless
+            topInset={false}
+            closeTestID="scan-result-close-button"
+            style={styles.resultHeader}
+            testID="scan-result-screen-header"
+          />
+        </View>
+
         <Animated.View
           style={[
             styles.content,
@@ -853,8 +875,18 @@ const createStyles = (
       borderBottomWidth: 0,
     },
     scrollContent: {
-      padding: SPACING.page,
+      paddingHorizontal: SPACING.page,
+      paddingTop: 0,
       paddingBottom: SPACING.xxxl + insets.bottom,
+    },
+    errorScrollContent: {
+      flexGrow: 1,
+    },
+    resultTopChrome: {
+      marginHorizontal: -SPACING.page,
+      paddingTop: insets.top,
+      paddingBottom: SPACING.sm,
+      backgroundColor: 'transparent',
     },
     content: {
       gap: layout.contentGap,

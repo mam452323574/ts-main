@@ -5,11 +5,13 @@ import { useTheme } from '@/contexts/ThemeContext';
 
 import type { LoadingMiniGameGameProps } from './LoadingMiniGame';
 import { createLoadingMiniGameChrome } from './loadingMiniGameChrome';
+import { triggerLoadingMiniGameHaptic } from './loadingMiniGameHaptics';
 
 interface Signal {
   id: number;
-  isDecoy: boolean;
+  kind: 'good' | 'bonus' | 'decoy';
   size: number;
+  value: number;
   x: number;
   y: number;
 }
@@ -20,12 +22,12 @@ const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
 
 function resolveSpawnMs(compact: boolean, durationHintMs?: number) {
-  const base = compact ? 620 : 440;
+  const base = compact ? 800 : 680;
   if (!durationHintMs) {
     return base;
   }
 
-  return clamp(Math.round(durationHintMs / 44), 360, base);
+  return clamp(Math.round(durationHintMs / 34), compact ? 580 : 540, base);
 }
 
 export function ReflexDotsGame({
@@ -55,7 +57,7 @@ export function ReflexDotsGame({
   const nextSignalIdRef = useRef(0);
   const signalTimeoutsRef = useRef<Map<number, TimeoutHandle>>(new Map());
   const spawnMs = resolveSpawnMs(compact, durationHintMs);
-  const visibleMs = compact ? 680 : 780;
+  const visibleMs = compact ? 1100 : 1280;
 
   const clearSignalTimeout = useCallback((id: number) => {
     const timeout = signalTimeoutsRef.current.get(id);
@@ -73,16 +75,20 @@ export function ReflexDotsGame({
   const spawnSignal = useCallback(() => {
     const id = nextSignalIdRef.current;
     nextSignalIdRef.current += 1;
+    const toneRoll = Math.random();
+    const kind = toneRoll < 0.18 ? 'decoy' : toneRoll > 0.86 ? 'bonus' : 'good';
+    const baseSize = compact ? 24 : 30;
 
     const signal: Signal = {
       id,
-      isDecoy: Math.random() < 0.22,
-      size: compact ? 22 : 26,
-      x: Math.round(8 + Math.random() * 78),
-      y: Math.round(12 + Math.random() * 62),
+      kind,
+      size: baseSize + Math.round(Math.random() * (kind === 'bonus' ? 7 : 5)),
+      value: kind === 'bonus' ? 2 : kind === 'good' ? 1 : -1,
+      x: Math.round(6 + Math.random() * 82),
+      y: Math.round(10 + Math.random() * 70),
     };
 
-    setSignals((currentSignals) => [...currentSignals.slice(-5), signal]);
+    setSignals((currentSignals) => [...currentSignals.slice(-6), signal]);
 
     const timeout = setTimeout(() => {
       signalTimeoutsRef.current.delete(id);
@@ -126,7 +132,16 @@ export function ReflexDotsGame({
         currentSignals.filter((currentSignal) => currentSignal.id !== signal.id),
       );
       setScore((currentScore) =>
-        signal.isDecoy ? Math.max(0, currentScore - 1) : currentScore + 1,
+        signal.value < 0
+          ? Math.max(0, currentScore + signal.value)
+          : currentScore + signal.value,
+      );
+      triggerLoadingMiniGameHaptic(
+        signal.kind === 'decoy'
+          ? 'miss'
+          : signal.kind === 'bonus'
+            ? 'bonus'
+            : 'success',
       );
     },
     [clearSignalTimeout],
@@ -162,7 +177,8 @@ export function ReflexDotsGame({
             onPress={() => handleSignalPress(signal)}
             style={[
               styles.marker,
-              signal.isDecoy ? styles.markerDanger : styles.markerSecondary,
+              signal.kind === 'decoy' ? styles.markerDanger : styles.markerSecondary,
+              signal.kind === 'bonus' && styles.markerBonus,
               {
                 height: signal.size,
                 left: `${signal.x}%`,
@@ -171,7 +187,13 @@ export function ReflexDotsGame({
                 borderRadius: signal.size / 2,
               },
             ]}
-            testID={signal.isDecoy ? 'reflex-signal-decoy' : 'reflex-signal-good'}
+            testID={
+              signal.kind === 'decoy'
+                ? 'reflex-signal-decoy'
+                : signal.kind === 'bonus'
+                  ? 'reflex-signal-bonus'
+                  : 'reflex-signal-good'
+            }
           />
         ))}
       </View>

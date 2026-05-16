@@ -89,12 +89,9 @@ export const DE_TRANSLATIONS = {
     global_score: 'Gesamtpunktzahl',
     hero_title: 'Global Score',
     companion_title: 'Begleiter',
-    companion_subtitle: 'Entwickelt sich mit deinen Scans',
     fox_evolution: {
-      eyebrow: 'Evolutionsfuchs',
-      scan_total: '{{count}} Scans',
-      stage_label: 'Stage {{stage}}',
-      stage_range: '{{start}} -> {{end}} Scans',
+      stage_label: 'Stufe {{stage}}',
+      stage_range: '{{start}} bis {{end}} Scans',
       stage_range_max: '{{start}}+ Scans',
       stage_progress: '{{current}} / {{total}}',
       scans_remaining: '{{count}} Scans bis zur naechsten Evolution',
@@ -622,8 +619,7 @@ export const DE_TRANSLATIONS = {
       'Nur Wellness-Hinweise. Das ist weder eine Diagnose noch ein medizinischer Rat.',
     locked_badge: 'Premium',
     locked_tap_hint: 'Tippe, um diese Persoenlichkeit freizuschalten.',
-    free_persona_hint:
-      'Sanft und unterstuetzend ist im Gratis-Tarif enthalten.',
+    free_persona_hint: 'Noah ist im kostenlosen Plan enthalten.',
     active_persona_label: 'Coach-Persoenlichkeit',
     selected_persona_label: 'Ausgewaehlter Coach',
     next_persona_label: 'Naechster Coach',
@@ -701,8 +697,8 @@ export const DE_TRANSLATIONS = {
     },
     personas: {
       gentle_supportive: {
-        title: 'Sanft Unterstuetzend',
-        subtitle: 'Warmherzige, beruhigende Guidance mit sanftem Ton.',
+        title: 'Noah',
+        subtitle: 'Warm und beruhigend.',
         tone_badge: 'Sanft',
         summary:
           'Ein warmer Coach, der beruhigt, ohne dich kleinzureden, und dich sanft wieder auf Kurs bringt.',
@@ -713,8 +709,8 @@ export const DE_TRANSLATIONS = {
           'Ideal, wenn du vorankommen willst, ohne dich beurteilt zu fuehlen.',
       },
       strict_tough: {
-        title: 'Streng Direkt',
-        subtitle: 'Klare Verantwortung und naechste Schritte ohne Ausreden.',
+        title: 'Axel',
+        subtitle: 'Direkt und anspruchsvoll.',
         tone_badge: 'Streng',
         summary:
           'Ein direkter Coach, der Ausreden stoppt und dich schnell wieder in Aktion bringt.',
@@ -726,8 +722,8 @@ export const DE_TRANSLATIONS = {
           'Ideal, wenn du gut auf einen klaren Rahmen reagierst.',
       },
       motivational_energetic: {
-        title: 'Motivierend Energetisch',
-        subtitle: 'Viel Energie und Momentum fuer konsequentes Handeln.',
+        title: 'Leo',
+        subtitle: 'Motivierend und energiegeladen.',
         tone_badge: 'Energie',
         summary:
           'Ein Coach, der dich schnell anschiebt und Motivation in echtes Momentum verwandelt.',
@@ -739,8 +735,8 @@ export const DE_TRANSLATIONS = {
           'Ideal, wenn du einen echten Energieschub brauchst.',
       },
       patient_calm: {
-        title: 'Geduldig Ruhig',
-        subtitle: 'Ruhiges, stabiles Coaching fuer schrittweisen Fortschritt.',
+        title: 'Mira',
+        subtitle: 'Ruhig und gelassen.',
         tone_badge: 'Ruhig',
         summary:
           'Ein gelassener Coach, der Ordnung schafft, ohne Druck aufzubauen.',
@@ -752,8 +748,8 @@ export const DE_TRANSLATIONS = {
           'Ideal, wenn du weniger Stress und mehr Konstanz willst.',
       },
       analytical_precise: {
-        title: 'Analytisch Praezise',
-        subtitle: 'Strukturierte Guidance, sauber aus deinen Daten abgeleitet.',
+        title: 'Elias',
+        subtitle: 'Klar und präzise.',
         tone_badge: 'Praezise',
         summary:
           'Ein Coach, der Ordnung in deine Daten bringt und klar erklaert, was du tun solltest und warum.',
@@ -765,9 +761,8 @@ export const DE_TRANSLATIONS = {
           'Ideal, wenn du erst verstehen willst, bevor du umsetzt.',
       },
       playful_light: {
-        title: 'Locker Spielerisch',
-        subtitle:
-          'Leichter, freundlicher Stil, der dich trotzdem auf Kurs haelt.',
+        title: 'Milo',
+        subtitle: 'Leicht und positiv.',
         tone_badge: 'Locker',
         summary:
           'Ein leichterer Coach, der nuetzlich bleibt, ohne schwer zu wirken.',
@@ -975,8 +970,7 @@ export const DE_TRANSLATIONS = {
     questions: {
       section_label: 'Vorschlaege',
       custom_label: 'Coach fragen',
-      custom_helper: 'Frag, was du wissen moechtest.',
-      custom_placeholder: 'Schreibe deine Anfrage',
+      custom_placeholder: 'Frag, was du wissen moechtest',
       selected_label: 'Ausgewaehlt',
       empty_summary: 'Frage an den Coach',
       empty_error: 'Fuege ein paar Worte hinzu, damit der Coach antworten kann',

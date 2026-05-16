@@ -15,6 +15,7 @@ import {
   SIZES,
   SPACING,
   getThemeTokens,
+  withAlpha,
 } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 
@@ -51,6 +52,12 @@ export function SegmentedControl<T extends string>({
   const { colors, isDark } = useTheme();
   const styles = useMemo(() => createStyles(isDark), [isDark]);
   const tokens = getThemeTokens(isDark);
+  const containerBackground = isDark
+    ? withAlpha(colors.white ?? colors.primaryText, 0.05)
+    : withAlpha(colors.white ?? colors.cardBackground, 0.72);
+  const containerBorder = isDark
+    ? withAlpha(colors.white ?? colors.primaryText, 0.07)
+    : withAlpha(colors.primaryText, 0.055);
 
   const content = (
     <View
@@ -58,8 +65,8 @@ export function SegmentedControl<T extends string>({
       style={[
         styles.container,
         {
-          backgroundColor: tokens.surfaceMuted.base,
-          borderColor: tokens.border.subtle,
+          backgroundColor: containerBackground,
+          borderColor: containerBorder,
         },
         style,
       ]}
@@ -152,7 +159,7 @@ const createStyles = (isDark: boolean) =>
       flexDirection: 'row',
       alignItems: 'center',
       borderRadius: BORDER_RADIUS.full,
-      borderWidth: 1,
+      borderWidth: StyleSheet.hairlineWidth,
       padding: 4,
       gap: 4,
     },
@@ -177,9 +184,9 @@ const createStyles = (isDark: boolean) =>
     optionSelected: {
       shadowColor: '#000000',
       shadowOffset: { width: 0, height: 6 },
-      shadowOpacity: isDark ? 0.24 : 0.08,
-      shadowRadius: 12,
-      elevation: 2,
+      shadowOpacity: isDark ? 0.16 : 0.06,
+      shadowRadius: 10,
+      elevation: 1,
     },
     optionDisabled: {
       opacity: 0.54,

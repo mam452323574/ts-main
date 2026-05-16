@@ -77,6 +77,7 @@ describe('Coach and fridge scan translation catalog completeness', () => {
     date: '12 Apr',
     remaining: 1,
     limit: 3,
+    max: 800,
     time: '6 hours',
     available: 2,
     cooldown: '6 hours',

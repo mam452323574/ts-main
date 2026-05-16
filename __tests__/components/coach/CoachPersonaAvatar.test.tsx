@@ -20,7 +20,7 @@ describe('CoachPersonaAvatar', () => {
   it('renders a styled fallback when no image source is provided', () => {
     render(
       <CoachPersonaAvatar
-        fallbackLabel="GS"
+        fallbackLabel="NO"
         haloTint="#6CA7FF"
         testID="coach-avatar"
       />,
@@ -28,14 +28,14 @@ describe('CoachPersonaAvatar', () => {
 
     expect(screen.getByTestId('coach-avatar')).toBeTruthy();
     expect(screen.getByTestId('coach-avatar-fallback')).toBeTruthy();
-    expect(screen.getByText('GS')).toBeTruthy();
+    expect(screen.getByText('NO')).toBeTruthy();
   });
 
   it('renders the bundled image when a persona visual source is available', () => {
     render(
       <CoachPersonaAvatar
         imageSource={getCoachPersonaVisual('gentle_supportive').imageSource}
-        fallbackLabel="GS"
+        fallbackLabel="NO"
         haloTint="#6CA7FF"
         testID="coach-avatar-image"
       />,
@@ -48,7 +48,7 @@ describe('CoachPersonaAvatar', () => {
   it('supports featured emphasis for premium hero compositions', () => {
     render(
       <CoachPersonaAvatar
-        fallbackLabel="GS"
+        fallbackLabel="NO"
         haloTint="#6CA7FF"
         emphasis="featured"
         testID="coach-avatar-featured"

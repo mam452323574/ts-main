@@ -22,7 +22,7 @@ const mockResolveAvatarUrl = jest.fn();
 const mockSaveShareStorySocialComposerDraft = jest.fn();
 let mockUserProfile: any = { account_tier: 'free' };
 let mockAuthLoading = false;
-const mockThemeColors = {
+const baseMockThemeColors = {
   primary: '#007AFF',
   primaryLight: '#E3F2FF',
   primaryDark: '#0056B3',
@@ -45,6 +45,8 @@ const mockThemeColors = {
   darkGray: '#424242',
   white: '#FFFFFF',
 };
+const mockThemeColors = { ...baseMockThemeColors };
+let mockIsDark = false;
 
 const expectTransparentResultHeader = (style: unknown) => {
   expect(StyleSheet.flatten(style)).toEqual(
@@ -124,7 +126,7 @@ jest.mock('@/services/socialDraftStore', () => ({
 jest.mock('@/contexts/ThemeContext', () => ({
   useTheme: () => ({
     colors: mockThemeColors,
-    isDark: false,
+    isDark: mockIsDark,
   }),
 }));
 
@@ -255,6 +257,8 @@ describe('SuperScanResultScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    Object.assign(mockThemeColors, baseMockThemeColors);
+    mockIsDark = false;
     i18n.locale = 'en';
     mockUserProfile = { account_tier: 'free' };
     mockAuthLoading = false;
@@ -293,6 +297,8 @@ describe('SuperScanResultScreen', () => {
     expectTransparentResultHeader(
       getByTestId('super-scan-result-screen-header').props.style,
     );
+    expect(getByTestId('super-scan-result-top-chrome')).toBeTruthy();
+    expect(getByTestId('super-scan-result-close-button')).toBeTruthy();
     expect(getByText(i18n.t('common.results.no_data'))).toBeTruthy();
     expect(getByText(i18n.t('common.home_back'))).toBeTruthy();
   });
@@ -321,8 +327,50 @@ describe('SuperScanResultScreen', () => {
     expectTransparentResultHeader(
       getByTestId('super-scan-result-screen-header').props.style,
     );
+    expect(getByTestId('super-scan-result-top-chrome')).toBeTruthy();
+    expect(getByTestId('super-scan-result-close-button')).toBeTruthy();
     expect(getByTestId('result-hero-surface')).toBeTruthy();
     expect(queryByTestId('super-scan-score-card')).toBeNull();
+  });
+
+  it('keeps the super result top chrome inside the scroll flow and uses a non-black dark gradient container', () => {
+    Object.assign(mockThemeColors, {
+      background: '#000000',
+      cardBackground: '#121212',
+      surfaceElevated: '#1C1C1E',
+      surfaceMuted: '#242426',
+      primaryText: '#F7F7F7',
+      gray: '#8E8E93',
+    });
+    mockIsDark = true;
+    mockParams.mockReturnValue({
+      analysisData: JSON.stringify(
+        makeResult({
+          global_risk_score: 42,
+          urgency_flag: false,
+        }),
+      ),
+    });
+    const expectedPalette = resolveLegacySuperScanPalette({
+      colors: mockThemeColors as any,
+      isDark: true,
+      globalRiskScore: 42,
+      urgencyFlag: false,
+    });
+
+    const rendered = render(<SuperScanResultScreen />);
+    const testIds = collectTestIds(rendered.toJSON());
+    const containerStyle = StyleSheet.flatten(
+      rendered.getByTestId('super-scan-result-screen').props.style,
+    );
+
+    expect(testIds.indexOf('super-scan-result-top-chrome')).toBeLessThan(
+      testIds.indexOf('result-hero-surface'),
+    );
+    expect(containerStyle.backgroundColor).toBe(
+      expectedPalette.backgroundGradient[0],
+    );
+    expect(containerStyle.backgroundColor).not.toBe('#000000');
   });
 
   it('applies the recovery premium palette to low-risk legacy results', () => {

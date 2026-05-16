@@ -5,11 +5,14 @@ import { useTheme } from '@/contexts/ThemeContext';
 
 import type { LoadingMiniGameGameProps } from './LoadingMiniGame';
 import { createLoadingMiniGameChrome } from './loadingMiniGameChrome';
+import { triggerLoadingMiniGameHaptic } from './loadingMiniGameHaptics';
 
 interface Target {
   id: number;
+  kind: 'standard' | 'bonus';
   size: number;
   tone: 'cool' | 'warm';
+  value: number;
   x: number;
   y: number;
 }
@@ -20,12 +23,12 @@ const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
 
 function resolveSpawnMs(compact: boolean, durationHintMs?: number) {
-  const base = compact ? 660 : 520;
+  const base = compact ? 880 : 740;
   if (!durationHintMs) {
     return base;
   }
 
-  return clamp(Math.round(durationHintMs / 36), 430, base);
+  return clamp(Math.round(durationHintMs / 30), compact ? 620 : 660, base);
 }
 
 export function TapTargetsGame({
@@ -51,11 +54,12 @@ export function TapTargetsGame({
   );
   const { styles } = chrome;
   const [score, setScore] = useState(0);
+  const [streak, setStreak] = useState(0);
   const [targets, setTargets] = useState<Target[]>([]);
   const nextTargetIdRef = useRef(0);
   const targetTimeoutsRef = useRef<Map<number, TimeoutHandle>>(new Map());
   const spawnMs = resolveSpawnMs(compact, durationHintMs);
-  const visibleMs = compact ? 900 : 1100;
+  const visibleMs = compact ? 1450 : 1700;
 
   const clearTargetTimeout = useCallback((id: number) => {
     const timeout = targetTimeoutsRef.current.get(id);
@@ -73,22 +77,28 @@ export function TapTargetsGame({
   const spawnTarget = useCallback(() => {
     const id = nextTargetIdRef.current;
     nextTargetIdRef.current += 1;
+    const isBonus = Math.random() < 0.16;
+    const baseSize = compact ? 28 : 36;
+    const sizeRange = isBonus ? 8 : 6;
 
     const target: Target = {
       id,
-      size: compact ? 24 : 30,
+      kind: isBonus ? 'bonus' : 'standard',
+      size: baseSize + Math.round(Math.random() * sizeRange),
       tone: Math.random() > 0.5 ? 'cool' : 'warm',
-      x: Math.round(8 + Math.random() * 78),
-      y: Math.round(12 + Math.random() * 64),
+      value: isBonus ? 3 : 1,
+      x: Math.round(6 + Math.random() * 82),
+      y: Math.round(10 + Math.random() * 70),
     };
 
-    setTargets((currentTargets) => [...currentTargets.slice(-4), target]);
+    setTargets((currentTargets) => [...currentTargets.slice(-5), target]);
 
     const timeout = setTimeout(() => {
       targetTimeoutsRef.current.delete(id);
       setTargets((currentTargets) =>
         currentTargets.filter((currentTarget) => currentTarget.id !== id),
       );
+      setStreak(0);
     }, visibleMs);
 
     targetTimeoutsRef.current.set(id, timeout);
@@ -120,12 +130,20 @@ export function TapTargetsGame({
   }, [active, durationHintMs, onComplete]);
 
   const handleTargetPress = useCallback(
-    (targetId: number) => {
-      clearTargetTimeout(targetId);
+    (target: Target) => {
+      clearTargetTimeout(target.id);
       setTargets((currentTargets) =>
-        currentTargets.filter((target) => target.id !== targetId),
+        currentTargets.filter((currentTarget) => currentTarget.id !== target.id),
       );
-      setScore((currentScore) => currentScore + 1);
+      setStreak((currentStreak) => {
+        const nextStreak = currentStreak + 1;
+        const streakBonus = nextStreak > 0 && nextStreak % 3 === 0 ? 1 : 0;
+        setScore((currentScore) => currentScore + target.value + streakBonus);
+        triggerLoadingMiniGameHaptic(
+          target.kind === 'bonus' || streakBonus > 0 ? 'bonus' : 'success',
+        );
+        return nextStreak;
+      });
     },
     [clearTargetTimeout],
   );
@@ -159,12 +177,13 @@ export function TapTargetsGame({
             accessibilityRole="button"
             hitSlop={8}
             key={target.id}
-            onPress={() => handleTargetPress(target.id)}
+            onPress={() => handleTargetPress(target)}
             style={[
               styles.marker,
               target.tone === 'warm'
                 ? styles.markerSecondary
                 : styles.markerPrimary,
+              target.kind === 'bonus' && styles.markerBonus,
               {
                 height: target.size,
                 left: `${target.x}%`,

@@ -12,7 +12,7 @@ import {
   resolveScanTypeTheme,
 } from '@/utils/resultVisualTheme';
 
-const mockThemeColors = {
+const baseMockThemeColors = {
   primary: '#007AFF',
   accentGreen: '#34C759',
   success: '#34C759',
@@ -31,6 +31,8 @@ const mockThemeColors = {
   primaryLight: '#E3F2FF',
   white: '#FFFFFF',
 };
+const mockThemeColors = { ...baseMockThemeColors };
+let mockIsDark = false;
 
 const expectTransparentResultHeader = (style: unknown) => {
   expect(StyleSheet.flatten(style)).toEqual(
@@ -97,7 +99,7 @@ jest.mock('@/contexts/AuthContext', () => ({
 jest.mock('@/contexts/ThemeContext', () => ({
   useTheme: () => ({
     colors: mockThemeColors,
-    isDark: false,
+    isDark: mockIsDark,
   }),
 }));
 
@@ -299,6 +301,8 @@ describe('ScanResultScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    Object.assign(mockThemeColors, baseMockThemeColors);
+    mockIsDark = false;
     i18n.locale = 'en';
     mockUserProfile = { account_tier: 'free' };
     mockAuthLoading = false;
@@ -352,19 +356,56 @@ describe('ScanResultScreen', () => {
     expectTransparentResultHeader(
       getByTestId('scan-result-screen-header').props.style,
     );
+    expect(getByTestId('scan-result-top-chrome')).toBeTruthy();
+    expect(getByTestId('scan-result-close-button')).toBeTruthy();
     expect(queryByTestId('trajectory-preview-card')).toBeNull();
   });
 
-  it('keeps the result header transparent over the result gradient', () => {
+  it('keeps the result header transparent inside the scrollable result top chrome', () => {
     mockParams.mockReturnValue({
       analysisData: JSON.stringify(makeFaceResult()),
     });
 
-    const { getByTestId } = render(<ScanResultScreen />);
+    const rendered = render(<ScanResultScreen />);
+    const testIds = collectTestIds(rendered.toJSON());
 
     expectTransparentResultHeader(
-      getByTestId('scan-result-screen-header').props.style,
+      rendered.getByTestId('scan-result-screen-header').props.style,
     );
+    expect(rendered.getByTestId('scan-result-top-chrome')).toBeTruthy();
+    expect(rendered.getByTestId('scan-result-close-button')).toBeTruthy();
+    expect(testIds.indexOf('scan-result-top-chrome')).toBeLessThan(
+      testIds.indexOf('result-hero-surface'),
+    );
+  });
+
+  it('uses the result gradient as the visible dark container background', () => {
+    Object.assign(mockThemeColors, {
+      background: '#000000',
+      cardBackground: '#121212',
+      surfaceElevated: '#1C1C1E',
+      surfaceMuted: '#242426',
+      primaryText: '#F7F7F7',
+      gray: '#8E8E93',
+    });
+    mockIsDark = true;
+    mockParams.mockReturnValue({
+      analysisData: JSON.stringify(makeFaceResult()),
+    });
+    const faceTheme = resolveScanTypeTheme('face', mockThemeColors as any, true);
+    const expectedGradient = getResultScreenGradient({
+      colors: mockThemeColors as any,
+      isDark: true,
+      accentColor: faceTheme.accentColor,
+    });
+
+    const { getByTestId } = render(<ScanResultScreen />);
+    const containerStyle = StyleSheet.flatten(
+      getByTestId('scan-result-screen').props.style,
+    );
+
+    expect(containerStyle.backgroundColor).toBe(expectedGradient[0]);
+    expect(containerStyle.backgroundColor).not.toBe('#000000');
   });
 
   it('shows the locked trajectory card for free results', () => {

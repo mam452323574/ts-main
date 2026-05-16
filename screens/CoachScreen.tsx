@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Keyboard,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   View,
+  type LayoutChangeEvent,
 } from 'react-native';
 import {
   useSafeAreaInsets,
@@ -28,7 +31,6 @@ import {
   SIZES,
   SPACING,
   getMainPageChrome,
-  getVisualMoodSurface,
   withAlpha,
 } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
@@ -345,6 +347,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
   const [questionSelectionMode, setQuestionSelectionModeState] =
     useState<CoachQuestionSelectionMode | null>(null);
   const [freeQuestionDraft, setFreeQuestionDraft] = useState('');
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [submittingPromptType, setSubmittingPromptType] =
     useState<CoachPromptType | null>(null);
   const [pendingPersonaKey, setPendingPersonaKey] =
@@ -356,9 +359,13 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
   );
   const [scanResultContext, setScanResultContext] =
     useState<CoachScanResultContext | null>(null);
+  const [actionBarHeight, setActionBarHeight] = useState(0);
   const appliedScanResultRouteSignatureRef = useRef<string | null>(null);
   const autoSubmitAttemptedRouteSignatureRef = useRef<string | null>(null);
   const pendingAutoSubmitRef = useRef(false);
+  const scrollViewRef = useRef<ScrollView | null>(null);
+  const questionInputYRef = useRef(0);
+  const questionScrollFrameRef = useRef<number | null>(null);
   const coachGeneration = useCoachGeneration();
   const setQuestionSelectionMode = useCallback(
     (mode: CoachQuestionSelectionMode | null) => {
@@ -367,10 +374,75 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     [],
   );
 
+  const cancelScheduledQuestionScroll = useCallback(() => {
+    if (questionScrollFrameRef.current === null) {
+      return;
+    }
+
+    cancelAnimationFrame(questionScrollFrameRef.current);
+    questionScrollFrameRef.current = null;
+  }, []);
+
+  const scrollQuestionInputIntoView = useCallback(() => {
+    cancelScheduledQuestionScroll();
+    questionScrollFrameRef.current = requestAnimationFrame(() => {
+      questionScrollFrameRef.current = null;
+      scrollViewRef.current?.scrollTo({
+        y: Math.max(questionInputYRef.current - SPACING.md, 0),
+        animated: true,
+      });
+    });
+  }, [cancelScheduledQuestionScroll]);
+
+  const handleQuestionInputLayout = useCallback(
+    ({ nativeEvent: { layout } }: LayoutChangeEvent) => {
+      questionInputYRef.current = Math.max(Math.round(layout.y), 0);
+    },
+    [],
+  );
+
   useEffect(() => {
     trackEvent('coach_opened');
     void markCoachSeen();
   }, []);
+
+  useEffect(
+    () => () => {
+      cancelScheduledQuestionScroll();
+    },
+    [cancelScheduledQuestionScroll],
+  );
+
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      return undefined;
+    }
+
+    const handleKeyboardShow = () => {
+      setIsKeyboardVisible(true);
+      if (questionSelectionMode === 'free_text') {
+        scrollQuestionInputIntoView();
+      }
+    };
+
+    const handleKeyboardHide = () => {
+      setIsKeyboardVisible(false);
+    };
+
+    const keyboardShowSubscription = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      handleKeyboardShow,
+    );
+    const keyboardHideSubscription = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      handleKeyboardHide,
+    );
+
+    return () => {
+      keyboardShowSubscription.remove();
+      keyboardHideSubscription.remove();
+    };
+  }, [questionSelectionMode, scrollQuestionInputIntoView]);
 
   const scanResultRouteRequest = useMemo<CoachScanResultRouteRequest | null>(() => {
     const source = readCoachRouteParam(routeParams.source);
@@ -497,7 +569,6 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
   const hasEntriesData = entriesData !== undefined;
   const coachQuota = coachSnapshot?.quota;
   const coachQuotaError = snapshotError;
-  const isCoachQuotaFetching = coachSnapshotQuery.isFetching;
   const refetchCoachQuota = refetchCoachSnapshot;
   const recentScansData = coachSnapshot?.recentScans;
   const recentScansError = snapshotError;
@@ -536,22 +607,37 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     () => getCoachPersonaVisual(activePersonaKey),
     [activePersonaKey],
   );
-  const styles = useMemo(
-    () => createStyles(colors, isDark, insets, variant, activePersonaVisual.haloTint),
-    [activePersonaVisual.haloTint, colors, insets, isDark, variant],
-  );
+  const tabBarMetrics = useMemo(() => getMainTabBarMetrics(insets.bottom), [insets.bottom]);
   const coachChrome = useMemo(
     () => getMainPageChrome(colors, isDark, 'coach'),
     [colors, isDark],
   );
-  const shellGradientColors = useMemo(
+  const coachCanvas = isDark ? coachChrome.canvasElevated : coachChrome.canvas;
+  const styles = useMemo(
     () =>
-      [
-        coachChrome.canvas,
-        coachChrome.canvasElevated,
-        coachChrome.canvas,
-      ] as [string, string, string],
-    [coachChrome],
+      createStyles(
+        colors,
+        isDark,
+        insets,
+        variant,
+        activePersonaVisual.haloTint,
+        isKeyboardVisible,
+      ),
+    [activePersonaVisual.haloTint, colors, insets, isDark, isKeyboardVisible, variant],
+  );
+  const actionBarBottomOffset =
+    !isKeyboardVisible && variant === 'tab'
+      ? tabBarMetrics.topOffsetFromBottom + SPACING.xs
+      : 0;
+  const resolvedActionBarHeight = Math.max(actionBarHeight, 116);
+  const actionBarOverlayInset = actionBarBottomOffset + resolvedActionBarHeight;
+  const coachScrollIndicatorBottomInset = Math.max(
+    SPACING.xl,
+    actionBarOverlayInset + SPACING.sm,
+  );
+  const coachContentBottomPadding = Math.max(
+    isKeyboardVisible ? SPACING.xxl + SPACING.sm : SPACING.xl + 4,
+    actionBarOverlayInset + SPACING.md,
   );
   const personaOptions = useMemo(
     () => getCoachPersonaOptionsForProfile(previewProfile),
@@ -1082,41 +1168,6 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     isPersonaSaving ||
     coachProviderUnavailable ||
     (isScansFetching && !hasRecentScansData);
-  const coachQuotaStatusLabel = useMemo(() => {
-    if (!coachQuota) {
-      return isCoachQuotaFetching
-        ? t('coach.action_bar.status_checking')
-        : t('coach.action_bar.status_unavailable');
-    }
-
-    if (coachQuota.unlimited) {
-      return t('coach.action_bar.status_unlimited');
-    }
-
-    const available = coachQuota.available ?? 0;
-    const limit = coachQuota.limit ?? 0;
-
-    if (available <= 0) {
-      const cooldown = coachQuotaCountdownLabel
-        ? t('coach.quota.next_request_in', {
-            duration: coachQuotaCountdownLabel,
-          })
-        : t('coach.quota.recharge_soon');
-
-      return t('coach.action_bar.status_exhausted', {
-        available,
-        limit,
-        cooldown,
-      });
-    }
-
-    return t('coach.action_bar.status_available', { available, limit });
-  }, [
-    coachQuota,
-    coachQuotaCountdownLabel,
-    isCoachQuotaFetching,
-    t,
-  ]);
   const displayedGuidanceTimestampLabel = useMemo(
     () => formatCoachTimestamp(displayedGuidance?.renderedAt ?? null, locale),
     [displayedGuidance?.renderedAt, locale],
@@ -1177,13 +1228,6 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
   );
   const selectedQuestionParentPromptType =
     questionSelectionMode === 'preset' ? selectedQuestionPromptType : null;
-  const selectedQuestionText = useMemo(
-    () =>
-      questionSelectionMode === 'preset' && selectedQuestionKey
-        ? resolveCoachQuestionText(selectedQuestionKey, locale)
-        : null,
-    [locale, questionSelectionMode, selectedQuestionKey],
-  );
   const resolvedPresetQuestionSelection = useMemo(
     () => {
       if (
@@ -1250,12 +1294,6 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     ],
   );
   const hasValidSubmitIntent = resolvedSubmitIntent !== null;
-  const selectedQuestionLabel =
-    questionSelectionMode === 'preset' && selectedQuestionText
-      ? selectedQuestionText
-      : questionSelectionMode === 'free_text'
-        ? (normalizedFreeQuestionDraft ?? t('coach.questions.custom_label'))
-        : t('coach.questions.empty_summary');
 
   const inlinePersonaOptions = useMemo(
     () =>
@@ -1270,8 +1308,20 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
   );
 
   const handleEditSettings = useCallback(() => {
+    setTrackedEntryId(null);
+    coachGeneration.reset();
     setDisplayMode('settings');
-  }, []);
+  }, [coachGeneration]);
+
+  const handleActionBarLayout = useCallback(
+    ({ nativeEvent: { layout } }: LayoutChangeEvent) => {
+      const nextHeight = Math.max(Math.round(layout.height), 0);
+      setActionBarHeight((currentHeight) =>
+        Math.abs(currentHeight - nextHeight) < 1 ? currentHeight : nextHeight,
+      );
+    },
+    [],
+  );
 
   const isPromptLockedForUser = useCallback(
     (promptType: CoachPromptType) =>
@@ -1452,9 +1502,10 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
                   : 'idle';
 
     console.log('[CoachScreen] ui state', {
-      mutation_entry_id: coachGeneration.data?.entry_id ?? null,
-      mutation_status: coachGeneration.data?.status ?? null,
+      last_mutation_entry_id: coachGeneration.data?.entry_id ?? null,
+      last_mutation_status: coachGeneration.data?.status ?? null,
       display_mode: displayMode,
+      result_display_enabled: displayMode === 'result',
       tracked_entry_id: effectiveTrackedEntryId,
       tracked_status:
         trackedCoachEntry?.status ??
@@ -1471,8 +1522,8 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
       has_recent_scans_data: hasRecentScansData,
       has_latest_ready_error: hasLatestReadyError,
       has_latest_ready_entry_data: hasLatestReadyEntryData,
-      has_tracked_guidance: hasTrackedGuidance,
-      has_generation_guidance: hasGenerationGuidance,
+      tracked_guidance_available: hasTrackedGuidance,
+      mutation_guidance_available: hasGenerationGuidance,
       generation_error_kind: showGenerationErrorState
         ? generationFailureKind
         : null,
@@ -1977,14 +2028,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     !hasScanResultSelectedScan &&
     hasConfirmedNoUsableCoachScans;
   const activePersonaTitle = t(activePersona.titleTranslationKey);
-  const selectedPromptTitle = selectedQuestionLabel;
-  const actionComposerStatusLabel = shouldRoutePrimaryToScanner
-    ? t('coach.action_bar.status_scan_required')
-    : isResultDisplay
-      ? t('coach.action_bar.status_result')
-      : !hasValidSubmitIntent
-        ? t('coach.action_bar.status_question_required')
-        : coachQuotaStatusLabel;
+  const selectedPromptTitle = t('coach.questions.empty_summary');
   const actionPrimaryLabel = isGenerationAwaitingResult
     ? t('coach.action_bar.cta_generating')
     : shouldRoutePrimaryToScanner
@@ -2025,55 +2069,49 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
   const coachLoadingProgressWidth = `${coachLoadingProgress.progress}%` as `${number}%`;
 
   return (
-    <AppScreen bottomInset={false} style={styles.safeArea}>
+    <AppScreen bottomInset={false} keyboard style={styles.safeArea}>
       {alertElement}
       <View style={styles.container}>
-        <LinearGradient
-          colors={shellGradientColors}
-          end={{ x: 1, y: 1 }}
-          pointerEvents="none"
-          start={{ x: 0, y: 0 }}
-          style={styles.shellBackdrop}
-        />
-        <LinearGradient
-          colors={[
-            withAlpha(activePersonaVisual.haloTint, isDark ? 0.06 : 0.025),
-            withAlpha(colors.background, 0),
-          ]}
-          end={{ x: 0.85, y: 0.5 }}
-          pointerEvents="none"
-          start={{ x: 0.05, y: 0 }}
-          style={styles.shellTopGlow}
-        />
-        <ScreenHeader
-          title={t('coach.title')}
-          variant={variant === 'tab' ? 'inline' : 'bar'}
-          onBack={showBackButton ? handleClose : undefined}
-          topInset={false}
-          centered={variant !== 'tab'}
-          backTestID="coach-back-button"
-          right={
-            <HeaderIconButton
-              accessibilityLabel={t('coach.history_button_a11y')}
-              icon={<History color={colors.primaryText} size={20} strokeWidth={2.2} />}
-              onPress={handleViewHistory}
-              testID="coach-history-icon-button"
-            />
-          }
-          testID="coach-screen-header"
-        />
-
         <ScrollView
+          ref={scrollViewRef}
           style={styles.scrollView}
-          contentContainerStyle={styles.content}
+          automaticallyAdjustContentInsets={false}
+          automaticallyAdjustKeyboardInsets={false}
+          contentInsetAdjustmentBehavior="never"
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: coachContentBottomPadding },
+          ]}
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : undefined}
           keyboardShouldPersistTaps="handled"
+          scrollIndicatorInsets={{ bottom: coachScrollIndicatorBottomInset }}
           showsVerticalScrollIndicator={false}
         >
+          <ScreenHeader
+            title={t('coach.title')}
+            variant={variant === 'tab' ? 'inline' : 'bar'}
+            borderless
+            onBack={showBackButton ? handleClose : undefined}
+            topInset={false}
+            centered={variant !== 'tab'}
+            backTestID="coach-back-button"
+            right={
+              <HeaderIconButton
+                accessibilityLabel={t('coach.history_button_a11y')}
+                icon={<History color={colors.primaryText} size={20} strokeWidth={2.2} />}
+                onPress={handleViewHistory}
+                testID="coach-history-icon-button"
+              />
+            }
+            style={styles.scrollHeader}
+            testID="coach-screen-header"
+          />
 
-          <View
-            style={styles.primarySection}
-            testID="coach-latest-guidance-section"
-          >
+          <View style={styles.scrollBody} testID="coach-scroll-body">
+            <View
+              style={styles.primarySection}
+              testID="coach-latest-guidance-section"
+            >
             {displayMode === 'settings' &&
             !showLoadingState &&
             !showQueryErrorState &&
@@ -2090,7 +2128,6 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
                 questionText={freeQuestionDraft}
                 questionSectionLabel={t('coach.questions.section_label')}
                 customQuestionLabel={t('coach.questions.custom_label')}
-                customQuestionHelper={t('coach.questions.custom_helper')}
                 customQuestionPlaceholder={t('coach.questions.custom_placeholder')}
                 selectedBadgeLabel={t('coach.questions.selected_label')}
                 questionCounterLabel={(count, max) =>
@@ -2120,6 +2157,8 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
                   setQuestionSelectionMode('free_text');
                   setSelectedQuestionKey(null);
                 }}
+                onQuestionInputFocus={scrollQuestionInputIntoView}
+                onQuestionInputLayout={handleQuestionInputLayout}
                 onChangeQuestionText={(value) => {
                   setScanResultContext(null);
                   setFreeQuestionDraft(value);
@@ -2325,25 +2364,33 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
                 />
               </View>
             ) : null}
-
           </View>
-
+          </View>
         </ScrollView>
 
-        <View style={styles.actionBar} testID="coach-action-bar">
-          <CoachActionComposer
-            personaTitle={activePersonaTitle}
-            promptTitle={selectedPromptTitle}
-            statusLabel={actionComposerStatusLabel}
-            actionLabel={actionPrimaryLabel}
-            actionA11yLabel={actionPrimaryA11yLabel}
-            personaVisual={activePersonaVisual}
-            busy={isGenerationAwaitingResult}
-            disabled={isActionPrimaryDisabled}
-            muted={isActionPrimaryMuted}
-            onPress={handleActionPrimaryPress}
-            actionTestID="coach-action-primary"
-          />
+        <View
+          pointerEvents="box-none"
+          style={[styles.actionBarOverlay, { bottom: actionBarBottomOffset }]}
+          testID="coach-action-bar-overlay"
+        >
+          <View
+            onLayout={handleActionBarLayout}
+            style={styles.actionBar}
+            testID="coach-action-bar"
+          >
+            <CoachActionComposer
+              personaTitle={activePersonaTitle}
+              promptTitle={selectedPromptTitle}
+              actionLabel={actionPrimaryLabel}
+              actionA11yLabel={actionPrimaryA11yLabel}
+              personaVisual={activePersonaVisual}
+              busy={isGenerationAwaitingResult}
+              disabled={isActionPrimaryDisabled}
+              muted={isActionPrimaryMuted}
+              onPress={handleActionPrimaryPress}
+              actionTestID="coach-action-primary"
+            />
+          </View>
         </View>
 
         <CoachPersonaDetailsModal
@@ -2369,46 +2416,26 @@ const createStyles = (
   insets: { bottom: number },
   variant: NonNullable<CoachScreenProps['variant']>,
   accentColor: string,
+  isKeyboardVisible: boolean,
 ) => {
   const chrome = getMainPageChrome(colors, isDark, 'coach');
-  const tabBarMetrics = getMainTabBarMetrics(insets.bottom);
-  const dockSurface = getVisualMoodSurface(colors, isDark, {
-    mood: 'obsidian',
-    accentColor,
-    intensity: 'subtle',
-    shadow: false,
-  });
-  const {
-    backgroundColor: _dockBackgroundColor,
-    borderColor: _dockBorderColor,
-    ...dockShadowStyle
-  } = dockSurface;
+  const coachCanvas = isDark ? chrome.canvasElevated : chrome.canvas;
   const actionBarBottomPadding =
-    variant === 'tab'
+    isKeyboardVisible
+      ? SPACING.sm + 2
+      : variant === 'tab'
       ? Math.max(SPACING.sm, Math.round(insets.bottom / 2) + SPACING.xs)
       : insets.bottom + SPACING.sm + 2;
-  const actionBarBottomMargin =
-    variant === 'tab' ? tabBarMetrics.topOffsetFromBottom + SPACING.xs : 0;
 
   return StyleSheet.create({
     safeArea: {
       flex: 1,
-      backgroundColor: chrome.canvas,
+      backgroundColor: coachCanvas,
     },
     container: {
       flex: 1,
-      backgroundColor: chrome.canvas,
+      backgroundColor: coachCanvas,
       overflow: 'hidden',
-    },
-    shellBackdrop: {
-      ...StyleSheet.absoluteFillObject,
-    },
-    shellTopGlow: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      height: 260,
     },
     header: {
       flexDirection: 'row',
@@ -2457,26 +2484,31 @@ const createStyles = (
       flex: 1,
     },
     content: {
+      paddingTop: 0,
+    },
+    scrollHeader: {
+      backgroundColor: 'transparent',
+    },
+    scrollBody: {
       paddingHorizontal: SPACING.page,
       paddingTop: SPACING.md + 4,
-      paddingBottom: SPACING.lg + 2,
       gap: SPACING.lg,
     },
     primarySection: {
       gap: SPACING.md,
     },
+    actionBarOverlay: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      zIndex: 12,
+      elevation: 12,
+    },
     actionBar: {
       paddingHorizontal: SPACING.page,
-      paddingTop: SPACING.sm + 2,
+      paddingTop: SPACING.xs,
       paddingBottom: actionBarBottomPadding,
-      marginBottom: actionBarBottomMargin,
-      borderTopWidth: 1,
-      borderTopColor: dockSurface.borderColor || chrome.divider,
-      backgroundColor: withAlpha(
-        chrome.elevatedSurface.backgroundColor,
-        isDark ? 0.96 : 0.98,
-      ),
-      ...dockShadowStyle,
+      backgroundColor: 'transparent',
     },
     stateCard: {
       padding: SPACING.md + 2,
@@ -2484,7 +2516,7 @@ const createStyles = (
       backgroundColor: chrome.surface.backgroundColor,
       borderWidth: 1,
       borderColor: chrome.surface.borderColor,
-      shadowColor: '#000000',
+      shadowColor: chrome.accentColor,
       shadowOffset: { width: 0, height: 8 },
       shadowOpacity: 0.16,
       shadowRadius: 18,
@@ -2537,7 +2569,7 @@ const createStyles = (
         : chrome.elevatedSurface.backgroundColor,
       borderWidth: 1,
       borderColor: withAlpha(accentColor, isDark ? 0.24 : 0.18),
-      shadowColor: '#000000',
+      shadowColor: chrome.accentColor,
       shadowOffset: { width: 0, height: 12 },
       shadowOpacity: isDark ? 0.2 : 0.12,
       shadowRadius: 24,

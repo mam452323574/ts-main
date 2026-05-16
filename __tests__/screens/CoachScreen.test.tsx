@@ -1,5 +1,10 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+} from 'react-native';
 import {
   act,
   fireEvent,
@@ -15,6 +20,7 @@ import { resolveCoachQuestionText } from '@/shared/coachQuestions';
 import { encodeScanCoachIntentParam } from '@/shared/scanCoachIntent';
 
 const mockMutateAsync = jest.fn();
+const mockResetCoachGeneration = jest.fn();
 const mockUseCoachEntries = jest.fn();
 const mockUseCoachGeneration = jest.fn();
 const mockUseCoachHistorySummary = jest.fn();
@@ -106,6 +112,18 @@ function enterCoachQuestion(
     rendered.getByTestId('coach-settings-inline-question-input'),
     question,
   );
+}
+
+function expectActionComposerSummary(
+  rendered: ReturnType<typeof render>,
+  personaTitle = 'Noah',
+) {
+  expect(
+    rendered.getByTestId('coach-action-composer-prompt-title').props.children,
+  ).toBe('Question au coach');
+  expect(
+    rendered.getByTestId('coach-action-composer-persona-title').props.children,
+  ).toBe(personaTitle);
 }
 
 let mockCoachEntriesState: {
@@ -267,6 +285,14 @@ jest.spyOn(require('react-native').Animated, 'timing').mockImplementation(
 describe('CoachScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockResetCoachGeneration.mockImplementation(() => {
+      mockCoachGenerationState = {
+        data: null,
+        isPending: false,
+        isError: false,
+        error: null,
+      };
+    });
     mockLocaleState.locale = 'fr';
     mockRouterCanDismiss.mockReturnValue(false);
     mockLocalSearchParams.mockReturnValue({});
@@ -399,7 +425,7 @@ describe('CoachScreen', () => {
     mockUseCoachGeneration.mockImplementation(() => ({
       ...mockCoachGenerationState,
       mutateAsync: (...args: unknown[]) => mockMutateAsync(...args),
-      reset: jest.fn(),
+      reset: (...args: unknown[]) => mockResetCoachGeneration(...args),
     }));
     mockMutateAsync.mockResolvedValue({
       success: true,
@@ -593,6 +619,125 @@ describe('CoachScreen', () => {
     );
   });
 
+  it('uses the shared keyboard shell and disables native scroll keyboard inset drift', () => {
+    render(<CoachScreen />);
+
+    const keyboardShell = screen.UNSAFE_getByType(KeyboardAvoidingView);
+    expect(keyboardShell.props.behavior).toBe(
+      Platform.OS === 'ios' ? 'padding' : 'height',
+    );
+
+    const scrollView = screen
+      .UNSAFE_getAllByType(ScrollView)
+      .find(
+        (node) =>
+          node.props.contentInsetAdjustmentBehavior === 'never' &&
+          node.props.keyboardShouldPersistTaps === 'handled',
+      );
+
+    expect(scrollView).toBeTruthy();
+    expect(scrollView?.props.automaticallyAdjustContentInsets).toBe(false);
+    expect(scrollView?.props.automaticallyAdjustKeyboardInsets).toBe(false);
+    expect(scrollView?.props.keyboardDismissMode).toBe(
+      Platform.OS === 'ios' ? 'interactive' : undefined,
+    );
+    expect(scrollView?.props.scrollIndicatorInsets).toEqual(
+      expect.objectContaining({
+        bottom: expect.any(Number),
+      }),
+    );
+  });
+
+  it('keeps the screen header inside the scroll content and floats the action bar overlay', () => {
+    render(<CoachScreen />);
+
+    const scrollView = screen
+      .UNSAFE_getAllByType(ScrollView)
+      .find(
+        (node) =>
+          node.props.contentInsetAdjustmentBehavior === 'never' &&
+          node.props.keyboardShouldPersistTaps === 'handled',
+      );
+
+    expect(scrollView).toBeTruthy();
+
+    expect(() => scrollView?.findByProps({ testID: 'coach-screen-header' })).not.toThrow();
+    expect(() => scrollView?.findByProps({ testID: 'coach-scroll-body' })).not.toThrow();
+
+    const contentContainerStyle = StyleSheet.flatten(scrollView?.props.contentContainerStyle);
+    expect(contentContainerStyle?.paddingBottom).toBeGreaterThan(SPACING.xl);
+
+    const actionBarOverlayStyle = StyleSheet.flatten(
+      screen.getByTestId('coach-action-bar-overlay').props.style,
+    );
+    expect(actionBarOverlayStyle).toEqual(
+      expect.objectContaining({
+        position: 'absolute',
+        left: 0,
+        right: 0,
+      }),
+    );
+    const actionBarOverlayChildren = React.Children.toArray(
+      screen.getByTestId('coach-action-bar-overlay').props.children,
+    );
+    expect(
+      actionBarOverlayChildren.some((child: any) => child?.type === 'LinearGradient'),
+    ).toBe(false);
+
+    const actionBarStyle = StyleSheet.flatten(
+      screen.getByTestId('coach-action-bar').props.style,
+    );
+    expect(actionBarStyle).toEqual(
+      expect.objectContaining({
+        backgroundColor: 'transparent',
+      }),
+    );
+  });
+
+  it('scrolls the free question field into view on focus and keeps the primary action mounted', async () => {
+    const originalRequestAnimationFrame = global.requestAnimationFrame;
+    const originalCancelAnimationFrame = global.cancelAnimationFrame;
+    const scrollToSpy = jest
+      .spyOn(ScrollView.prototype as any, 'scrollTo')
+      .mockImplementation(() => {});
+
+    global.requestAnimationFrame = ((callback: (time: number) => void) => {
+      callback(0);
+      return 1;
+    }) as typeof requestAnimationFrame;
+    global.cancelAnimationFrame = jest.fn() as unknown as typeof cancelAnimationFrame;
+
+    try {
+      const rendered = render(<CoachScreen />);
+
+      fireEvent(rendered.getByTestId('coach-settings-inline-question-input-card'), 'layout', {
+        nativeEvent: {
+          layout: {
+            height: 160,
+            width: 320,
+            x: 0,
+            y: 96,
+          },
+        },
+      });
+
+      await act(async () => {
+        fireEvent(rendered.getByTestId('coach-settings-inline-question-input'), 'focus');
+        await Promise.resolve();
+      });
+
+      expect(scrollToSpy).toHaveBeenCalledWith({
+        y: 96 - SPACING.md,
+        animated: true,
+      });
+      expect(rendered.getByTestId('coach-action-primary')).toBeTruthy();
+    } finally {
+      global.requestAnimationFrame = originalRequestAnimationFrame;
+      global.cancelAnimationFrame = originalCancelAnimationFrame;
+      scrollToSpy.mockRestore();
+    }
+  });
+
   it('keeps the inline persona rail aligned with the resolved active persona', () => {
     mockAuthState = {
       ...mockAuthState,
@@ -778,7 +923,8 @@ describe('CoachScreen', () => {
     expect(screen.getByTestId('coach-action-composer')).toBeTruthy();
     expect(defaultQuestion).toBe('');
     expect(screen.getByText('Demander')).toBeTruthy();
-    expect(screen.getByText('Doux & Bienveillant · Question requise')).toBeTruthy();
+    expectActionComposerSummary(screen);
+    expect(screen.queryByText('Noah · Question requise')).toBeNull();
     expect(
       screen.getByTestId('coach-settings-inline-question-input-card').props
         .accessibilityState?.selected,
@@ -1036,7 +1182,8 @@ describe('CoachScreen', () => {
     expect(screen.queryByTestId('coach-quota-box')).toBeNull();
     expect(screen.queryByTestId('coach-quota-pill')).toBeNull();
     expect(screen.getByText('Demander')).toBeTruthy();
-    expect(screen.getByText('Doux & Bienveillant · 6/8 disponible')).toBeTruthy();
+    expectActionComposerSummary(screen);
+    expect(screen.queryByText('Noah · 6/8 disponible')).toBeNull();
     expect(
       screen.getByTestId('coach-action-primary').props.accessibilityState
         ?.disabled,
@@ -1066,9 +1213,8 @@ describe('CoachScreen', () => {
     expect(screen.queryByTestId('coach-quota-box')).toBeNull();
     expect(screen.queryByTestId('coach-quota-pill')).toBeNull();
     expect(screen.queryByText(/0\/1 · Recharge/)).toBeNull();
-    expect(
-      screen.getByText(/^Doux & Bienveillant · 0\/1 · Prochaine demande dans /),
-    ).toBeTruthy();
+    expectActionComposerSummary(screen);
+    expect(screen.queryByText(/^Noah · 0\/1 · Prochaine demande dans /)).toBeNull();
     expect(screen.getByTestId('coach-settings-inline')).toBeTruthy();
     expect(
       screen.getByTestId('coach-action-primary').props.accessibilityState
@@ -1104,7 +1250,8 @@ describe('CoachScreen', () => {
 
     expect(screen.queryByTestId('coach-quota-box')).toBeNull();
     expect(screen.queryByTestId('coach-quota-pill')).toBeNull();
-    expect(screen.getByText('Doux & Bienveillant · Quota indisponible')).toBeTruthy();
+    expectActionComposerSummary(screen);
+    expect(screen.queryByText('Noah · Quota indisponible')).toBeNull();
     expect(
       screen.getByTestId('coach-action-primary').props.accessibilityState
         ?.disabled,
@@ -1268,7 +1415,8 @@ describe('CoachScreen', () => {
     expect(
       screen.queryByText('Fais un scan pour débloquer le coach'),
     ).toBeNull();
-    expect(screen.getByText('Doux & Bienveillant · 1/1 disponible')).toBeTruthy();
+    expectActionComposerSummary(screen);
+    expect(screen.queryByText('Noah · 1/1 disponible')).toBeNull();
 
     fireEvent.press(screen.getByTestId('coach-action-primary'));
 
@@ -1601,6 +1749,7 @@ describe('CoachScreen', () => {
           expect.objectContaining({
             ui_state: 'query_error',
             display_mode: 'settings',
+            result_display_enabled: false,
             load_error_source: 'entries',
             has_entries_error: true,
             has_entries_data: false,
@@ -1608,8 +1757,8 @@ describe('CoachScreen', () => {
             has_recent_scans_data: true,
             has_latest_ready_error: true,
             has_latest_ready_entry_data: true,
-            has_tracked_guidance: false,
-            has_generation_guidance: false,
+            tracked_guidance_available: false,
+            mutation_guidance_available: false,
           }),
         );
       });
@@ -1676,6 +1825,7 @@ describe('CoachScreen', () => {
           expect.objectContaining({
             ui_state: 'query_error',
             display_mode: 'settings',
+            result_display_enabled: false,
             load_error_source: 'latest_ready',
             has_entries_error: true,
             has_entries_data: true,
@@ -1683,8 +1833,8 @@ describe('CoachScreen', () => {
             has_recent_scans_data: true,
             has_latest_ready_error: true,
             has_latest_ready_entry_data: false,
-            has_tracked_guidance: false,
-            has_generation_guidance: false,
+            tracked_guidance_available: false,
+            mutation_guidance_available: false,
           }),
         );
       });
@@ -2405,6 +2555,124 @@ describe('CoachScreen', () => {
     expect(screen.getByText('Recovered coach guidance')).toBeTruthy();
   });
 
+  it('clears stale tracked and mutation debug state after leaving a tracked ready result', async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const consoleLogSpy = jest
+      .spyOn(console, 'log')
+      .mockImplementation(() => undefined);
+
+    mockCoachEntriesState = {
+      data: [],
+      error: null,
+      isFetching: false,
+      refetch: jest.fn(),
+    };
+
+    const nonRenderableResponse = {
+      success: true,
+      entry_id: 'entry-tracked-ready',
+      persona_key: 'gentle_supportive',
+      cached: false,
+      fallback: false,
+      status: 'ready',
+      title: null,
+      body: null,
+      disclaimer:
+        'Wellness guidance only. This is not a diagnosis or medical advice.',
+      cta_label: null,
+      cta_route: null,
+      source: 'n8n',
+      expires_at: null,
+      response_payload_json: {},
+      payload: {},
+    };
+
+    mockMutateAsync.mockImplementation(async () => {
+      mockCoachGenerationState = {
+        data: nonRenderableResponse,
+        isPending: false,
+        isError: false,
+        error: null,
+      };
+      return nonRenderableResponse;
+    });
+
+    (process.env as Record<string, string | undefined>).NODE_ENV =
+      'development';
+
+    try {
+      const screen = render(<CoachScreen />);
+      enterCoachQuestion(screen);
+
+      fireEvent.press(screen.getByTestId('coach-action-primary'));
+
+      await waitFor(() => {
+        expect(mockUseCoachScreenSnapshot).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            trackedEntryId: 'entry-tracked-ready',
+          }),
+        );
+      });
+      expect(screen.getByTestId('coach-generation-loading-state')).toBeTruthy();
+
+      mockCoachEntriesState = {
+        ...mockCoachEntriesState,
+        data: [
+          {
+            id: 'entry-tracked-ready',
+            title: 'Tracked ready guidance',
+            body: 'The pending tracked entry eventually became ready.',
+            disclaimer:
+              'Wellness guidance only. This is not a diagnosis or medical advice.',
+            persona_key: 'gentle_supportive',
+            cta_label: null,
+            cta_route: null,
+            created_at: '2026-04-06T09:35:00.000Z',
+            source: 'n8n',
+            status: 'ready',
+          },
+        ],
+      };
+
+      screen.rerender(<CoachScreen />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('coach-ready-state')).toBeTruthy();
+      });
+
+      fireEvent.press(screen.getByTestId('coach-action-primary'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('coach-settings-inline')).toBeTruthy();
+      });
+      expect(screen.queryByTestId('coach-ready-state')).toBeNull();
+      expect(mockResetCoachGeneration).toHaveBeenCalledTimes(1);
+      expect(mockUseCoachScreenSnapshot).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          trackedEntryId: null,
+        }),
+      );
+      await waitFor(() => {
+        expect(consoleLogSpy).toHaveBeenCalledWith(
+          '[CoachScreen] ui state',
+          expect.objectContaining({
+            display_mode: 'settings',
+            result_display_enabled: false,
+            displayed_guidance_source: null,
+            tracked_entry_id: null,
+            tracked_guidance_available: false,
+            last_mutation_status: null,
+            mutation_guidance_available: false,
+          }),
+        );
+      });
+    } finally {
+      (process.env as Record<string, string | undefined>).NODE_ENV =
+        originalNodeEnv;
+      consoleLogSpy.mockRestore();
+    }
+  });
+
   it('resumes the latest pending entry for the active persona instead of showing the empty state', async () => {
     mockCoachEntriesState = {
       data: [
@@ -2925,7 +3193,8 @@ describe('CoachScreen', () => {
         '[CoachScreen] ui state',
         expect.objectContaining({
           ui_state: 'generation_error',
-          mutation_entry_id: null,
+          last_mutation_entry_id: null,
+          last_mutation_status: null,
           tracked_entry_id: null,
           generation_error: expect.objectContaining({
             code: 'coach_webhook_failed',
@@ -2981,7 +3250,8 @@ describe('CoachScreen', () => {
     ).toBeTruthy();
     expect(screen.getByText('Faire un scan')).toBeTruthy();
     expect(screen.getByText('Scanner')).toBeTruthy();
-    expect(screen.getByText('Doux & Bienveillant · Scan requis')).toBeTruthy();
+    expectActionComposerSummary(screen);
+    expect(screen.queryByText('Noah · Scan requis')).toBeNull();
     expect(screen.queryByTestId('coach-unavailable-state')).toBeNull();
     expect(
       screen.getByTestId('coach-action-primary').props.accessibilityState
@@ -3170,6 +3440,10 @@ describe('CoachScreen', () => {
   });
 
   it('returns to inline settings when pressing the primary action from the result view', async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const consoleLogSpy = jest
+      .spyOn(console, 'log')
+      .mockImplementation(() => undefined);
     const freshResponse = {
       success: true,
       entry_id: 'entry-fresh',
@@ -3198,22 +3472,53 @@ describe('CoachScreen', () => {
       return freshResponse;
     });
 
-    const screen = render(<CoachScreen />);
-    enterCoachQuestion(screen);
+    (process.env as Record<string, string | undefined>).NODE_ENV =
+      'development';
 
-    fireEvent.press(screen.getByTestId('coach-action-primary'));
+    try {
+      const screen = render(<CoachScreen />);
+      enterCoachQuestion(screen);
 
-    await waitFor(() => {
-      expect(screen.getByTestId('coach-ready-state')).toBeTruthy();
-    });
-    expect(screen.queryByTestId('coach-edit-settings')).toBeNull();
-    expect(screen.queryByText('Modifier les réglages')).toBeNull();
-    expect(screen.getByText('Nouveau conseil')).toBeTruthy();
+      fireEvent.press(screen.getByTestId('coach-action-primary'));
 
-    fireEvent.press(screen.getByTestId('coach-action-primary'));
+      await waitFor(() => {
+        expect(screen.getByTestId('coach-ready-state')).toBeTruthy();
+      });
+      expect(screen.queryByTestId('coach-edit-settings')).toBeNull();
+      expect(screen.queryByText('Modifier les réglages')).toBeNull();
+      expect(screen.getByText('Nouveau conseil')).toBeTruthy();
 
-    expect(screen.getByTestId('coach-settings-inline')).toBeTruthy();
-    expect(screen.queryByTestId('coach-ready-state')).toBeNull();
+      fireEvent.press(screen.getByTestId('coach-action-primary'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('coach-settings-inline')).toBeTruthy();
+      });
+      expect(screen.queryByTestId('coach-ready-state')).toBeNull();
+      expect(mockResetCoachGeneration).toHaveBeenCalledTimes(1);
+      expect(mockUseCoachScreenSnapshot).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          trackedEntryId: null,
+        }),
+      );
+      await waitFor(() => {
+        expect(consoleLogSpy).toHaveBeenCalledWith(
+          '[CoachScreen] ui state',
+          expect.objectContaining({
+            display_mode: 'settings',
+            result_display_enabled: false,
+            displayed_guidance_source: null,
+            tracked_entry_id: null,
+            tracked_guidance_available: false,
+            last_mutation_status: null,
+            mutation_guidance_available: false,
+          }),
+        );
+      });
+    } finally {
+      (process.env as Record<string, string | undefined>).NODE_ENV =
+        originalNodeEnv;
+      consoleLogSpy.mockRestore();
+    }
   });
 
   it('lets users leave a result view even when Coach quota is exhausted, then alerts on the next request attempt', async () => {
@@ -3278,7 +3583,8 @@ describe('CoachScreen', () => {
       'coach-settings-inline-question-input',
     ).props.value;
     expect(resumedQuestion).toBe('');
-    expect(screen.getByText('Doux & Bienveillant · Question requise')).toBeTruthy();
+    expectActionComposerSummary(screen);
+    expect(screen.queryByText('Noah · Question requise')).toBeNull();
     expect(mockShowAlert).not.toHaveBeenCalled();
 
     enterCoachQuestion(screen);
@@ -3336,8 +3642,8 @@ describe('CoachScreen', () => {
 
     await waitFor(() => {
       expect(
-        rendered.getByText('Que dois-je travailler apres ce scan ?'),
-      ).toBeTruthy();
+        rendered.getByTestId('coach-settings-inline-question-input').props.value,
+      ).toBe('Que dois-je travailler apres ce scan ?');
     });
     expect(mockMutateAsync).not.toHaveBeenCalled();
 
@@ -3451,8 +3757,8 @@ describe('CoachScreen', () => {
 
     await waitFor(() => {
       expect(
-        rendered.getByText('Que devrais-je ameliorer a partir de ce scan ?'),
-      ).toBeTruthy();
+        rendered.getByTestId('coach-settings-inline-question-input').props.value,
+      ).toBe('Que devrais-je ameliorer a partir de ce scan ?');
     });
     expect(mockMutateAsync).not.toHaveBeenCalled();
 
@@ -3487,8 +3793,8 @@ describe('CoachScreen', () => {
 
     await waitFor(() => {
       expect(
-        rendered.getByText('Comment maintenir mes bons résultats après ce scan ?'),
-      ).toBeTruthy();
+        rendered.getByTestId('coach-settings-inline-question-input').props.value,
+      ).toBe('Comment maintenir mes bons résultats après ce scan ?');
     });
     expect(mockMutateAsync).not.toHaveBeenCalled();
 
@@ -3533,9 +3839,8 @@ describe('CoachScreen', () => {
       expect(
         screen.queryByTestId('coach-settings-inline-question-input-selected-badge'),
       ).toBeNull();
-      expect(
-        screen.getByText('Doux & Bienveillant · Question requise'),
-      ).toBeTruthy();
+      expectActionComposerSummary(screen);
+      expect(screen.queryByText('Noah · Question requise')).toBeNull();
       expect(
         screen.getByTestId('coach-action-primary').props.accessibilityState
           ?.disabled,
@@ -3862,9 +4167,10 @@ describe('CoachScreen', () => {
         }),
       );
     });
-    await waitFor(() => {
-      expect(screen.getByText('Sur quoi je dois me concentrer avant ma seance ce soir ?')).toBeTruthy();
-    });
+    expectActionComposerSummary(screen);
+    expect(
+      screen.queryByText('Sur quoi je dois me concentrer avant ma seance ce soir ?'),
+    ).toBeNull();
   });
 
   it('shows free-question feedback when editing a selected suggestion to empty text', async () => {

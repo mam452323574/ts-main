@@ -692,7 +692,11 @@ describe('ScanPreviewScreen', () => {
       expect(screen.getByTestId('loading-mini-game')).toBeTruthy();
     });
 
-    expect(screen.getByTestId('scan-preview-super-scan-mini-game-slot')).toBeTruthy();
+    const miniGameSlot = screen.getByTestId('scan-preview-super-scan-mini-game-slot');
+    const miniGameSlotStyle = StyleSheet.flatten(miniGameSlot.props.style);
+
+    expect(miniGameSlot).toBeTruthy();
+    expect(miniGameSlotStyle.height).toBe(160);
     expect(mockLoadingMiniGame).toHaveBeenCalledWith(
       expect.objectContaining({
         active: true,

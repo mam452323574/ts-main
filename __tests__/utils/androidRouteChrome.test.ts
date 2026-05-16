@@ -7,6 +7,13 @@ import {
 
 describe('androidRouteChrome', () => {
   it('uses the shared tabs surface for normalized main tab routes', () => {
+    expect(getAndroidMainTabsSurfaceColor(DARK_COLORS)).toBe(
+      DARK_COLORS.cardBackground,
+    );
+    expect(getAndroidMainTabsSurfaceColor(DARK_COLORS)).not.toBe(
+      ANDROID_SECONDARY_BACKGROUND,
+    );
+
     expect(getAndroidRouteChrome('/', LIGHT_COLORS, false)).toEqual(
       expect.objectContaining({
         systemBackgroundColor: getAndroidMainTabsSurfaceColor(LIGHT_COLORS),

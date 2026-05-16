@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -25,7 +26,6 @@ import type { CoachPersonaVisual } from '@/shared/coachPersonaVisuals';
 interface CoachActionComposerProps {
   personaTitle: string;
   promptTitle: string;
-  statusLabel: string;
   actionLabel: string;
   actionA11yLabel: string;
   personaVisual: CoachPersonaVisual;
@@ -40,7 +40,6 @@ interface CoachActionComposerProps {
 export function CoachActionComposer({
   personaTitle,
   promptTitle,
-  statusLabel,
   actionLabel,
   actionA11yLabel,
   personaVisual,
@@ -62,7 +61,6 @@ export function CoachActionComposer({
   );
   const foregroundColor =
     muted || disabled ? colors.primaryText : actionChrome.foregroundColor;
-  const metaLabel = `${personaTitle} · ${statusLabel}`;
 
   return (
     <View style={styles.container} testID={testID}>
@@ -76,11 +74,19 @@ export function CoachActionComposer({
           testID={`${testID}-avatar`}
         />
         <View style={styles.summaryCopy}>
-          <Text numberOfLines={1} style={styles.promptTitle}>
+          <Text
+            numberOfLines={1}
+            style={styles.promptTitle}
+            testID={`${testID}-prompt-title`}
+          >
             {promptTitle}
           </Text>
-          <Text numberOfLines={1} style={styles.metaText}>
-            {metaLabel}
+          <Text
+            numberOfLines={1}
+            style={styles.metaText}
+            testID={`${testID}-persona-title`}
+          >
+            {personaTitle}
           </Text>
         </View>
       </View>
@@ -199,13 +205,14 @@ function getCoachActionButtonChrome(
 ) {
   const buttonAccent = softenAccentColor(colors, isDark, accentColor, 'selected');
   const backgroundColor = isDark
-    ? mixColors(colors.cardBackground, buttonAccent, 0.16)
-    : mixColors(colors.primaryText, buttonAccent, 0.12);
+    ? mixColors(colors.surfaceElevated ?? colors.cardBackground, buttonAccent, 0.26)
+    : mixColors(colors.primaryText, buttonAccent, 0.08);
 
   return {
     backgroundColor,
     foregroundColor: resolveReadableButtonForeground(backgroundColor, colors),
     accentColor: buttonAccent,
+    borderColor: withAlpha(buttonAccent, isDark ? 0.28 : 0.18),
   };
 }
 
@@ -220,11 +227,28 @@ const createStyles = (
     accentColor,
     intensity: 'card',
   });
-  const {
-    backgroundColor: _dockBackgroundColor,
-    borderColor: _dockBorderColor,
-    ...dockShadowStyle
-  } = dockSurface;
+  const { backgroundColor: dockBackgroundColor } = dockSurface;
+  const isAndroid = Platform.OS === 'android';
+  const floatingSurfaceBackground = isDark
+    ? withAlpha(
+        mixColors(colors.surfaceElevated ?? colors.cardBackground ?? '#121212', accentColor, 0.08),
+        isAndroid ? 0.98 : 0.96,
+      )
+    : withAlpha(
+        mixColors(colors.cardBackground ?? dockBackgroundColor, accentColor, 0.025),
+        isAndroid ? 0.99 : 0.97,
+      );
+  const floatingSurfaceBorder = isDark
+    ? withAlpha(colors.white ?? colors.primaryText, isAndroid ? 0.14 : 0.12)
+    : withAlpha(colors.primaryText, 0.08);
+  const floatingShadowStyle = {
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
+  };
+
   return StyleSheet.create({
     container: {
       minHeight: 74,
@@ -234,10 +258,10 @@ const createStyles = (
       paddingHorizontal: SPACING.sm + 2,
       paddingVertical: SPACING.sm + 2,
       borderRadius: BORDER_RADIUS.hero,
-      backgroundColor: dockSurface.backgroundColor,
+      backgroundColor: floatingSurfaceBackground,
       borderWidth: 1,
-      borderColor: dockSurface.borderColor,
-      ...dockShadowStyle,
+      borderColor: floatingSurfaceBorder,
+      ...floatingShadowStyle,
     },
     summary: {
       flex: 1,
@@ -275,17 +299,21 @@ const createStyles = (
       borderRadius: BORDER_RADIUS.full,
       backgroundColor: actionChrome.backgroundColor,
       borderWidth: 1,
-      borderColor: withAlpha(actionChrome.accentColor, isDark ? 0.18 : 0.12),
+      borderColor: actionChrome.borderColor,
       shadowColor: actionChrome.accentColor,
-      shadowOffset: { width: 0, height: 6 },
-      shadowOpacity: isDark ? 0.08 : 0.045,
-      shadowRadius: 14,
-      elevation: 2,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: isDark ? 0.035 : 0.02,
+      shadowRadius: 8,
+      elevation: 1,
     },
     actionButtonMuted: {
-      backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.1),
-      borderColor: colors.borderStrong ?? withAlpha(colors.primaryText, 0.14),
+      backgroundColor: isDark
+        ? colors.surfaceElevated ?? colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.12)
+        : colors.cardBackground ?? colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.04),
+      borderColor: colors.borderStrong ?? withAlpha(colors.primaryText, isDark ? 0.18 : 0.1),
       shadowOpacity: 0,
+      shadowRadius: 0,
+      shadowOffset: { width: 0, height: 0 },
       elevation: 0,
     },
     actionButtonPressed: {

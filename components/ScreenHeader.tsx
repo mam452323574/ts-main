@@ -17,6 +17,7 @@ interface ScreenHeaderProps {
   title: string;
   subtitle?: string;
   variant?: 'bar' | 'inline';
+  borderless?: boolean;
   onBack?: () => void;
   onClose?: () => void;
   left?: ReactNode;
@@ -33,6 +34,7 @@ export function ScreenHeader({
   title,
   subtitle,
   variant = 'bar',
+  borderless = false,
   onBack,
   onClose,
   left,
@@ -48,6 +50,7 @@ export function ScreenHeader({
   const insets = useSafeAreaInsets();
   const tokens = getThemeTokens(isDark);
   const isInline = variant === 'inline';
+  const useTransparentChrome = isInline || borderless;
   const resolvedLeft =
     left ??
     (onBack ? (
@@ -75,14 +78,15 @@ export function ScreenHeader({
       style={[
         styles.header,
         isInline ? styles.headerInline : styles.headerBar,
+        borderless ? styles.headerBorderless : null,
         {
           paddingTop: topInset
             ? insets.top + (isInline ? SPACING.lg : SPACING.sm)
             : (isInline ? SPACING.md : SPACING.sm),
-          backgroundColor: isInline
+          backgroundColor: useTransparentChrome
             ? 'transparent'
             : withAlpha(tokens.screen.background, isDark ? 0.96 : 1),
-          borderBottomColor: isInline ? 'transparent' : tokens.border.subtle,
+          borderBottomColor: useTransparentChrome ? 'transparent' : tokens.border.subtle,
         },
         style,
       ]}
@@ -130,8 +134,7 @@ interface HeaderIconButtonProps {
 }
 
 export function HeaderIconButton({ accessibilityLabel, icon, onPress, testID }: HeaderIconButtonProps) {
-  const { isDark } = useTheme();
-  const tokens = getThemeTokens(isDark);
+  const { colors, isDark } = useTheme();
 
   return (
     <TouchableOpacity
@@ -142,8 +145,12 @@ export function HeaderIconButton({ accessibilityLabel, icon, onPress, testID }: 
       style={[
         styles.iconButton,
         {
-          backgroundColor: tokens.surfaceMuted.base,
-          borderColor: tokens.border.subtle,
+          backgroundColor: isDark
+            ? withAlpha(colors.white ?? colors.primaryText, 0.055)
+            : withAlpha(colors.white ?? colors.cardBackground, 0.78),
+          borderColor: isDark
+            ? withAlpha(colors.white ?? colors.primaryText, 0.08)
+            : withAlpha(colors.primaryText, 0.065),
         },
       ]}
       hitSlop={8}
@@ -166,6 +173,9 @@ const styles = StyleSheet.create({
   },
   headerInline: {
     paddingBottom: SPACING.sm,
+    borderBottomWidth: 0,
+  },
+  headerBorderless: {
     borderBottomWidth: 0,
   },
   sideSlot: {

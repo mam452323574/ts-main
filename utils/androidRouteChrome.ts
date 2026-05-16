@@ -108,6 +108,10 @@ function isLightColor(color: string) {
 export function getAndroidMainTabsSurfaceColor(
   colors: Pick<ThemeColors, 'cardBackground' | 'background'>
 ) {
+  if (normalizeHex(colors.background) === '000000') {
+    return colors.cardBackground;
+  }
+
   return colors.background;
 }
 

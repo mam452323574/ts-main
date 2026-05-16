@@ -486,7 +486,10 @@ export default function SuperScanResultScreen() {
     (fatDistributionAnalysisData && !fatDistributionViewModel)
   ) {
     return (
-      <View style={styles.container}>
+      <View
+        style={[styles.container, { backgroundColor: screenPalette.backgroundGradient[0] }]}
+        testID="super-scan-result-screen"
+      >
         <LinearGradient
           colors={screenPalette.backgroundGradient}
           end={{ x: 1, y: 1 }}
@@ -494,46 +497,60 @@ export default function SuperScanResultScreen() {
           style={styles.backgroundLayer}
           testID="super-scan-background-layer"
         />
-        <ScreenHeader
-          title={t('scan.super.type_label')}
-          centered
-          variant="inline"
-          style={styles.resultHeader}
-          testID="super-scan-result-screen-header"
-        />
-
-        <View
-          style={[
-            styles.errorCard,
-            getResultSurfaceChrome({
-              colors,
-              isDark,
-              kind: 'hero',
-              accentColor: screenPalette.sectionAccentColor,
-              surfaceVariant: 'soft',
-            }),
-          ]}
-          testID="super-scan-empty-state"
+        <ScrollView
+          contentContainerStyle={[styles.scrollContent, styles.errorScrollContent]}
+          showsVerticalScrollIndicator={false}
         >
-          <AlertCircle color={colors.error} size={34} />
-          <Text {...RESULT_TEXT_PROPS} style={styles.errorText}>
-            {t('common.results.no_data')}
-          </Text>
-          <TouchableOpacity
-            onPress={handleClose}
-            style={[styles.primaryButton, { backgroundColor: colors.primaryText }]}
+          <View style={styles.resultTopChrome} testID="super-scan-result-top-chrome">
+            <ScreenHeader
+              title={t('scan.super.type_label')}
+              centered
+              onClose={handleClose}
+              variant="inline"
+              borderless
+              topInset={false}
+              closeTestID="super-scan-result-close-button"
+              style={styles.resultHeader}
+              testID="super-scan-result-screen-header"
+            />
+          </View>
+
+          <View
+            style={[
+              styles.errorCard,
+              getResultSurfaceChrome({
+                colors,
+                isDark,
+                kind: 'hero',
+                accentColor: screenPalette.sectionAccentColor,
+                surfaceVariant: 'soft',
+              }),
+            ]}
+            testID="super-scan-empty-state"
           >
-            <Text {...RESULT_TEXT_PROPS} style={styles.primaryButtonText}>
-              {t('common.home_back')}
+            <AlertCircle color={colors.error} size={34} />
+            <Text {...RESULT_TEXT_PROPS} style={styles.errorText}>
+              {t('common.results.no_data')}
             </Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              onPress={handleClose}
+              style={[styles.primaryButton, { backgroundColor: colors.primaryText }]}
+            >
+              <Text {...RESULT_TEXT_PROPS} style={styles.primaryButtonText}>
+                {t('common.home_back')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[styles.container, { backgroundColor: screenPalette.backgroundGradient[0] }]}
+      testID="super-scan-result-screen"
+    >
       {alertElement}
 
       <LinearGradient
@@ -549,15 +566,21 @@ export default function SuperScanResultScreen() {
         visible={!!legacyAnalysisData && showUrgencyModal}
       />
 
-      <ScreenHeader
-        title={t('scan.super.type_label')}
-        centered
-        variant="inline"
-        style={styles.resultHeader}
-        testID="super-scan-result-screen-header"
-      />
-
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.resultTopChrome} testID="super-scan-result-top-chrome">
+          <ScreenHeader
+            title={t('scan.super.type_label')}
+            centered
+            onClose={handleClose}
+            variant="inline"
+            borderless
+            topInset={false}
+            closeTestID="super-scan-result-close-button"
+            style={styles.resultHeader}
+            testID="super-scan-result-screen-header"
+          />
+        </View>
+
         <Animated.View
           style={[
             styles.content,
@@ -1048,8 +1071,18 @@ const createStyles = (
       borderBottomWidth: 0,
     },
     scrollContent: {
-      padding: SPACING.page,
+      paddingHorizontal: SPACING.page,
+      paddingTop: 0,
       paddingBottom: SPACING.xxxl + insets.bottom,
+    },
+    errorScrollContent: {
+      flexGrow: 1,
+    },
+    resultTopChrome: {
+      marginHorizontal: -SPACING.page,
+      paddingTop: insets.top,
+      paddingBottom: SPACING.sm,
+      backgroundColor: 'transparent',
     },
     content: {
       gap: layout.contentGap,
@@ -1180,7 +1213,7 @@ const createStyles = (
       includeFontPadding: false,
     },
     errorCard: {
-      marginHorizontal: SPACING.page,
+      marginHorizontal: 0,
       marginTop: SPACING.xxxl,
       borderRadius: layout.heroRadius,
       padding: layout.largeBlockPadding,

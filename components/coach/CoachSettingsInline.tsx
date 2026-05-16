@@ -6,6 +6,7 @@ import {
   Text,
   TextInput,
   View,
+  type LayoutChangeEvent,
 } from 'react-native';
 import { Check } from 'lucide-react-native';
 
@@ -60,7 +61,6 @@ interface CoachSettingsInlineProps {
   questionText: string;
   questionSectionLabel: string;
   customQuestionLabel: string;
-  customQuestionHelper: string;
   customQuestionPlaceholder: string;
   selectedBadgeLabel: string;
   questionCounterLabel: (count: number, max: number) => string;
@@ -77,6 +77,8 @@ interface CoachSettingsInlineProps {
   promptCategoryLabel?: (category: CoachPromptCategory) => string;
   onSelectQuestion: (questionKey: CoachQuestionKey) => void;
   onSelectCustomQuestion: () => void;
+  onQuestionInputFocus?: () => void;
+  onQuestionInputLayout?: (event: LayoutChangeEvent) => void;
   onChangeQuestionText: (value: string) => void;
   onSelectPromptType: (prompt: CoachPromptType) => void;
   onPreviewPersona: (personaKey: string) => void;
@@ -98,7 +100,6 @@ export function CoachSettingsInline({
   questionText,
   questionSectionLabel,
   customQuestionLabel,
-  customQuestionHelper,
   customQuestionPlaceholder,
   selectedBadgeLabel,
   questionCounterLabel,
@@ -115,6 +116,8 @@ export function CoachSettingsInline({
   promptCategoryLabel,
   onSelectQuestion,
   onSelectCustomQuestion,
+  onQuestionInputFocus,
+  onQuestionInputLayout,
   onChangeQuestionText,
   onSelectPromptType,
   onPreviewPersona,
@@ -131,6 +134,10 @@ export function CoachSettingsInline({
   );
   const isCustomQuestionSelected = questionSelectionMode === 'free_text';
   const selectionAccent = accentColor ?? colors.primary;
+  const handleCustomQuestionFocus = () => {
+    onSelectCustomQuestion();
+    onQuestionInputFocus?.();
+  };
 
   return (
     <View style={styles.container} testID={testID}>
@@ -146,7 +153,8 @@ export function CoachSettingsInline({
           selected: isCustomQuestionSelected,
         }}
         disabled={busy || disabled}
-        onPress={onSelectCustomQuestion}
+        onLayout={onQuestionInputLayout}
+        onPress={handleCustomQuestionFocus}
         style={({ pressed }) => [
           styles.questionInputSection,
           styles.questionInputSectionFeatured,
@@ -200,8 +208,8 @@ export function CoachSettingsInline({
         <TextInput
           value={questionText}
           onChangeText={onChangeQuestionText}
-          onFocus={onSelectCustomQuestion}
-          onPressIn={onSelectCustomQuestion}
+          onFocus={handleCustomQuestionFocus}
+          onPressIn={handleCustomQuestionFocus}
           placeholder={customQuestionPlaceholder}
           placeholderTextColor={withAlpha(colors.primaryText, 0.34)}
           maxLength={questionMaxLength}
@@ -210,7 +218,6 @@ export function CoachSettingsInline({
           style={styles.questionInput}
           testID={`${testID}-question-input`}
         />
-        <Text style={styles.questionInputHelper}>{customQuestionHelper}</Text>
       </Pressable>
 
       <Text style={styles.sectionLabel}>{personaSectionLabel}</Text>
@@ -328,12 +335,16 @@ const createStyles = (colors: any, isDark: boolean, accentColor?: string) => {
       marginBottom: SPACING.xs,
     },
     questionInputSectionIdle: {
-      borderColor: withAlpha(accentColor ?? colors.primary, isDark ? 0.14 : 0.1),
-      backgroundColor: withAlpha(accentColor ?? colors.primary, isDark ? 0.055 : 0.035),
+      borderColor: isDark
+        ? withAlpha(colors.white ?? colors.primaryText, 0.08)
+        : withAlpha(colors.primaryText, 0.07),
+      backgroundColor: isDark
+        ? withAlpha(colors.white ?? colors.primaryText, 0.018)
+        : withAlpha(colors.white ?? colors.cardBackground, 0.72),
     },
     questionInputSectionSelected: {
-      borderColor: withAlpha(accentColor ?? colors.primary, isDark ? 0.3 : 0.24),
-      backgroundColor: withAlpha(accentColor ?? colors.primary, isDark ? 0.12 : 0.08),
+      borderColor: withAlpha(accentColor ?? colors.primary, isDark ? 0.22 : 0.18),
+      backgroundColor: withAlpha(accentColor ?? colors.primary, isDark ? 0.045 : 0.035),
     },
     questionInputSectionPressed: {
       transform: [{ scale: 0.995 }],
@@ -374,22 +385,21 @@ const createStyles = (colors: any, isDark: boolean, accentColor?: string) => {
       color: accentColor ?? colors.primary,
     },
     questionInput: {
-      minHeight: 116,
+      minHeight: 104,
       paddingHorizontal: SPACING.md,
       paddingVertical: SPACING.sm + 2,
       borderRadius: BORDER_RADIUS.lg,
       borderWidth: 1,
-      borderColor: withAlpha(accentColor ?? colors.primary, isDark ? 0.22 : 0.18),
-      backgroundColor: colors.cardBackground ?? insetSurface.backgroundColor,
+      borderColor: isDark
+        ? withAlpha(colors.white ?? colors.primaryText, 0.1)
+        : withAlpha(accentColor ?? colors.primary, 0.13),
+      backgroundColor: isDark
+        ? withAlpha(colors.white ?? colors.primaryText, 0.035)
+        : colors.cardBackground ?? insetSurface.backgroundColor,
       color: colors.primaryText,
       fontSize: 14,
       lineHeight: 20,
       textAlignVertical: 'top',
-    },
-    questionInputHelper: {
-      fontSize: 12,
-      lineHeight: 17,
-      color: withAlpha(colors.primaryText, 0.58),
     },
     selectedBadge: {
       flexShrink: 0,

@@ -10,10 +10,13 @@ import { useTheme } from '@/contexts/ThemeContext';
 
 import type { LoadingMiniGameGameProps } from './LoadingMiniGame';
 import { createLoadingMiniGameChrome } from './loadingMiniGameChrome';
+import { triggerLoadingMiniGameHaptic } from './loadingMiniGameHaptics';
 
 interface Obstacle {
   gapY: number;
+  hit: boolean;
   id: number;
+  passed: boolean;
   x: number;
 }
 
@@ -22,8 +25,10 @@ const clamp = (value: number, min: number, max: number) =>
 
 function makeObstacle(id: number, x = 100): Obstacle {
   return {
-    gapY: Math.round(32 + Math.random() * 34),
+    gapY: Math.round(30 + Math.random() * 40),
+    hit: false,
     id,
+    passed: false,
     x,
   };
 }
@@ -51,11 +56,19 @@ export function FloatDodgeGame({
   );
   const { styles } = chrome;
   const [score, setScore] = useState(0);
-  const [playerY, setPlayerY] = useState(54);
+  const [playerY, setPlayerY] = useState(52);
+  const playerYRef = useRef(52);
   const nextObstacleIdRef = useRef(1);
-  const [obstacles, setObstacles] = useState<Obstacle[]>(() => [makeObstacle(0, 86)]);
-  const movementMs = compact ? 150 : 120;
-  const scoreMs = compact ? 900 : 760;
+  const [obstacles, setObstacles] = useState<Obstacle[]>(() => [makeObstacle(0, 88)]);
+  const obstaclesRef = useRef<Obstacle[]>(obstacles);
+  const movementMs = compact ? 170 : 150;
+  const scoreMs = compact ? 1250 : 1100;
+  const gapRadius = compact ? 25 : 27;
+  const movementStep = compact ? 4 : 4.6;
+
+  useEffect(() => {
+    playerYRef.current = playerY;
+  }, [playerY]);
 
   useEffect(() => {
     if (!active) {
@@ -63,21 +76,65 @@ export function FloatDodgeGame({
     }
 
     const movementInterval = setInterval(() => {
-      setPlayerY((currentY) => clamp(currentY + 3, 12, 82));
-      setObstacles((currentObstacles) => {
-        const movedObstacles = currentObstacles
-          .map((obstacle) => ({ ...obstacle, x: obstacle.x - (compact ? 5 : 6) }))
-          .filter((obstacle) => obstacle.x > -12);
+      const nextPlayerY = clamp(
+        playerYRef.current + (compact ? 2.3 : 2.6),
+        10,
+        86,
+      );
+      playerYRef.current = nextPlayerY;
+      setPlayerY(nextPlayerY);
+      let scoreDelta = 0;
+      let hapticKind: 'success' | 'miss' | null = null;
 
-        const lastObstacle = movedObstacles[movedObstacles.length - 1];
-        if (!lastObstacle || lastObstacle.x < 58) {
-          const nextObstacle = makeObstacle(nextObstacleIdRef.current);
-          nextObstacleIdRef.current += 1;
-          return [...movedObstacles, nextObstacle];
-        }
+      const movedObstacles = obstaclesRef.current
+        .map((obstacle) => {
+          const nextObstacle = {
+            ...obstacle,
+            x: obstacle.x - movementStep,
+          };
+          const playerYPosition = playerYRef.current;
+          const isInPlayerLane = nextObstacle.x <= 22 && nextObstacle.x >= 13;
+          const isOutsideGap =
+            playerYPosition < nextObstacle.gapY - gapRadius ||
+            playerYPosition > nextObstacle.gapY + gapRadius;
 
-        return movedObstacles;
-      });
+          if (!nextObstacle.hit && isInPlayerLane && isOutsideGap) {
+            scoreDelta -= 1;
+            hapticKind = 'miss';
+            return { ...nextObstacle, hit: true };
+          }
+
+          if (!nextObstacle.passed && nextObstacle.x < 12) {
+            if (!nextObstacle.hit) {
+              scoreDelta += 2;
+              hapticKind = 'success';
+            }
+            return { ...nextObstacle, passed: true };
+          }
+
+          return nextObstacle;
+        })
+        .filter((obstacle) => obstacle.x > -12);
+
+      const lastObstacle = movedObstacles[movedObstacles.length - 1];
+      const nextObstacles =
+        !lastObstacle || lastObstacle.x < 52
+          ? [...movedObstacles, makeObstacle(nextObstacleIdRef.current)]
+          : movedObstacles;
+
+      if (!lastObstacle || lastObstacle.x < 52) {
+        nextObstacleIdRef.current += 1;
+      }
+
+      obstaclesRef.current = nextObstacles;
+      setObstacles(nextObstacles);
+
+      if (scoreDelta !== 0) {
+        setScore((currentScore) => Math.max(0, currentScore + scoreDelta));
+      }
+      if (hapticKind) {
+        triggerLoadingMiniGameHaptic(hapticKind);
+      }
     }, movementMs);
 
     const scoreInterval = setInterval(() => {
@@ -88,7 +145,7 @@ export function FloatDodgeGame({
       clearInterval(movementInterval);
       clearInterval(scoreInterval);
     };
-  }, [active, compact, movementMs, scoreMs]);
+  }, [active, compact, gapRadius, movementMs, movementStep, scoreMs]);
 
   useEffect(() => {
     if (!active || !durationHintMs || !onComplete) {
@@ -100,7 +157,10 @@ export function FloatDodgeGame({
   }, [active, durationHintMs, onComplete]);
 
   const handlePress = useCallback(() => {
-    setPlayerY((currentY) => clamp(currentY - (compact ? 18 : 22), 10, 82));
+    triggerLoadingMiniGameHaptic('success');
+    const nextY = clamp(playerYRef.current - (compact ? 17 : 20), 8, 86);
+    playerYRef.current = nextY;
+    setPlayerY(nextY);
   }, [compact]);
 
   if (!active) {
@@ -142,11 +202,11 @@ export function FloatDodgeGame({
 
         {obstacles.map((obstacle) => {
           const topHeight =
-            `${Math.max(10, obstacle.gapY - 20)}%` as DimensionValue;
+            `${Math.max(8, obstacle.gapY - gapRadius)}%` as DimensionValue;
           const bottomTop =
-            `${Math.min(76, obstacle.gapY + 20)}%` as DimensionValue;
+            `${Math.min(82, obstacle.gapY + gapRadius)}%` as DimensionValue;
           const bottomHeight =
-            `${Math.max(10, 100 - (obstacle.gapY + 20))}%` as DimensionValue;
+            `${Math.max(8, 100 - (obstacle.gapY + gapRadius))}%` as DimensionValue;
 
           return (
             <View
@@ -158,12 +218,19 @@ export function FloatDodgeGame({
                   left: `${obstacle.x}%`,
                 },
               ]}
-              testID="float-dodge-obstacle"
+              testID={obstacle.hit ? 'float-dodge-obstacle-hit' : 'float-dodge-obstacle'}
             >
-              <View style={[styles.obstacleSegment, { height: topHeight, top: 0 }]} />
               <View
                 style={[
                   styles.obstacleSegment,
+                  obstacle.hit && styles.obstacleSegmentHit,
+                  { height: topHeight, top: 0 },
+                ]}
+              />
+              <View
+                style={[
+                  styles.obstacleSegment,
+                  obstacle.hit && styles.obstacleSegmentHit,
                   {
                     height: bottomHeight,
                     top: bottomTop,

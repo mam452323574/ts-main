@@ -38,8 +38,8 @@ function CoachHistoryCardHarness({
       body={'Keep the routine light.\n\nPrioritize hydration and sleep.'}
       dateLabel="Yesterday"
       personaLabel="Coach personality"
-      personaValue="Gentle Supportive"
-      personaAvatarFallbackLabel="GS"
+      personaValue="Noah"
+      personaAvatarFallbackLabel="NO"
       personaAvatarHaloTint="#6CA7FF"
       recentLabel={recentLabel}
       disclaimerLabel="Disclaimer"
@@ -60,7 +60,7 @@ describe('CoachHistoryCard', () => {
     expect(screen.getByTestId('coach-history-card')).toBeTruthy();
     expect(screen.getByTestId('coach-history-card-date').props.children).toBe('Yesterday');
     expect(screen.getByText('Weekly reset')).toBeTruthy();
-    expect(screen.getByText('Gentle Supportive')).toBeTruthy();
+    expect(screen.getByText('Noah')).toBeTruthy();
     expect(screen.queryByTestId('coach-history-card-expanded')).toBeNull();
   });
 

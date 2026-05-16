@@ -6,7 +6,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react-native';
-import { Platform, StyleSheet } from 'react-native';
+import { Platform, ScrollView, StyleSheet } from 'react-native';
 import HomeScreen from '@/screens/HomeScreen';
 import { getGamificationAssetSource } from '@/constants/gamificationAssets';
 import {
@@ -107,20 +107,24 @@ jest.mock('@/contexts/LanguageContext', () => ({
           return 'Unavailable';
         case 'scan_limit.upgrade':
           return 'Go Premium';
+        case 'scan_limit.available':
+          return 'available';
         case 'home.items_available':
           return 'Available Scans';
         case 'home.global_score':
           return 'Global Score';
         case 'home.companion_title':
           return 'Companion';
+        case 'home.companion_subtitle':
+          return 'Evolves with your scans';
         case 'home.fox_evolution.eyebrow':
           return 'Fox evolution';
         case 'home.fox_evolution.scan_total':
           return `${options.count} scans`;
         case 'home.fox_evolution.stage_label':
-          return `Stage ${options.stage}`;
+          return `Level ${options.stage}`;
         case 'home.fox_evolution.stage_range':
-          return `${options.start} -> ${options.end} scans`;
+          return `${options.start} to ${options.end} scans`;
         case 'home.fox_evolution.stage_range_max':
           return `${options.start}+ scans`;
         case 'home.fox_evolution.stage_progress':
@@ -157,6 +161,12 @@ jest.mock('@/contexts/LanguageContext', () => ({
           return 'Coach';
         case 'scan_types.super':
           return 'Super Scan';
+        case 'scan_types.health':
+          return 'Face';
+        case 'scan_types.body':
+          return 'Body';
+        case 'scan_types.nutrition':
+          return 'Nutrition';
         case 'home.fridge_scan.eyebrow':
           return 'Premium';
         case 'home.fridge_scan.title':
@@ -170,17 +180,17 @@ jest.mock('@/contexts/LanguageContext', () => ({
         case 'home.fridge_scan.cta':
           return 'Open Chef';
         case 'coach.personas.gentle_supportive.title':
-          return 'Gentle Supportive';
+          return 'Noah';
         case 'coach.personas.strict_tough.title':
-          return 'Strict Tough';
+          return 'Axel';
         case 'coach.personas.motivational_energetic.title':
-          return 'Motivational Energetic';
+          return 'Leo';
         case 'coach.personas.patient_calm.title':
-          return 'Patient Calm';
+          return 'Mira';
         case 'coach.personas.analytical_precise.title':
-          return 'Analytical Precise';
+          return 'Elias';
         case 'coach.personas.playful_light.title':
-          return 'Playful Light';
+          return 'Milo';
         default:
           return key;
       }
@@ -517,9 +527,13 @@ describe('HomeScreen', () => {
     const orderedTestIds = collectTestIdsInOrder(toJSON());
 
     expect(screen.queryByTestId('home-editorial-hero-section')).toBeNull();
+    expect(screen.getByTestId('home-scroll-header')).toBeTruthy();
     expect(screen.getByTestId('home-scan-rail-section')).toBeTruthy();
     expect(screen.getByTestId('home-journey-section')).toBeTruthy();
     expect(screen.getByTestId('home-secondary-modules-section')).toBeTruthy();
+    expect(
+      orderedTestIds.indexOf('home-scroll-header'),
+    ).toBeLessThan(orderedTestIds.indexOf('home-journey-section'));
     expect(
       orderedTestIds.indexOf('home-journey-section'),
     ).toBeLessThan(orderedTestIds.indexOf('home-secondary-modules-section'));
@@ -538,6 +552,12 @@ describe('HomeScreen', () => {
     expect(screen.getByTestId('home-scan-cards-grid')).toBeTruthy();
     expect(screen.getAllByTestId('scan-limit-card-shell')).toHaveLength(3);
     expect(screen.getByText('Available Scans')).toBeTruthy();
+    expect(screen.getByText('9')).toBeTruthy();
+    expect(screen.queryByText('Face · Body · Nutrition')).toBeNull();
+    expect(screen.queryByText('available')).toBeNull();
+    expect(screen.getByText('Face')).toBeTruthy();
+    expect(screen.getByText('Body')).toBeTruthy();
+    expect(screen.getByText('Nutrition')).toBeTruthy();
     expect(screen.getByText('TestUser')).toBeTruthy();
     expect(screen.getByTestId('fox-evolution-hero')).toBeTruthy();
     expect(screen.getByTestId('home-super-scan-upsell-card')).toBeTruthy();
@@ -564,6 +584,58 @@ describe('HomeScreen', () => {
     expect(screen.queryByText('...')).toBeNull();
     expect(screen.queryByText('home.hero_title')).toBeNull();
     expect(screen.queryByText('CircularProgress')).toBeNull();
+  });
+
+  it('renders the home header inside the scroll content ahead of the body sections', () => {
+    mockUseDashboard.mockReturnValue({
+      data: buildDashboardData(),
+      isLoading: false,
+      error: null,
+      refetch: jest.fn(),
+      isRefetching: false,
+    });
+    mockUseAllScanEligibility.mockReturnValue(
+      buildEligibilityHookResult({
+        data: {
+          body: {
+            allowed: true,
+            remaining: 3,
+            limit: 3,
+            current_count: 0,
+            message: 'OK',
+          },
+          health: {
+            allowed: true,
+            remaining: 3,
+            limit: 3,
+            current_count: 0,
+            message: 'OK',
+          },
+          nutrition: {
+            allowed: true,
+            remaining: 3,
+            limit: 3,
+            current_count: 0,
+            message: 'OK',
+          },
+          super: {
+            allowed: false,
+            remaining: 0,
+            limit: 0,
+            current_count: 0,
+            message: 'locked',
+          },
+        },
+      }),
+    );
+
+    const rendered = render(<HomeScreen />);
+    const scrollView = rendered.UNSAFE_getByType(ScrollView);
+    expect(() => scrollView.findByProps({ testID: 'home-scroll-header' })).not.toThrow();
+    expect(() => scrollView.findByProps({ testID: 'home-journey-section' })).not.toThrow();
+    expect(() =>
+      scrollView.findByProps({ testID: 'home-secondary-modules-section' }),
+    ).not.toThrow();
   });
 
   it('shows quota and direct recharge timers in scan cards without tapping', () => {
@@ -1025,10 +1097,13 @@ describe('HomeScreen', () => {
     render(<HomeScreen />);
 
     expect(screen.getByTestId('fox-evolution-hero')).toBeTruthy();
-    expect(screen.getByText('Stage 0')).toBeTruthy();
+    expect(screen.getByText('Level 0')).toBeTruthy();
+    expect(screen.queryByText('Evolves with your scans')).toBeNull();
+    expect(screen.queryByText('Fox evolution')).toBeNull();
+    expect(screen.queryByText('0 scans')).toBeNull();
     expect(screen.queryByTestId('fox-evolution-supporting-text')).toBeNull();
     expect(screen.queryByText('1 scans before the next evolution')).toBeNull();
-    expect(screen.getByText('0 -> 1 scans')).toBeTruthy();
+    expect(screen.getByText('0 to 1 scans')).toBeTruthy();
     expect(screen.getByText('0 / 1')).toBeTruthy();
     expect(
       screen.getByTestId('fox-evolution-progress-fill').props.style,
@@ -1067,7 +1142,7 @@ describe('HomeScreen', () => {
     render(<HomeScreen />);
 
     expect(screen.getByTestId('fox-evolution-hero')).toBeTruthy();
-    expect(screen.getByText('Stage 6')).toBeTruthy();
+    expect(screen.getByText('Level 6')).toBeTruthy();
     expect(screen.getByTestId('fox-evolution-mascot-image').props.source).toBe(
       getGamificationAssetSource('stade_6.png'),
     );
@@ -1094,10 +1169,10 @@ describe('HomeScreen', () => {
 
     render(<HomeScreen />);
 
-    expect(screen.getByText('Stage 8')).toBeTruthy();
+    expect(screen.getByText('Level 8')).toBeTruthy();
     expect(screen.queryByTestId('fox-evolution-supporting-text')).toBeNull();
     expect(screen.queryByText('47 scans before the next evolution')).toBeNull();
-    expect(screen.getByText('100 -> 150 scans')).toBeTruthy();
+    expect(screen.getByText('100 to 150 scans')).toBeTruthy();
     expect(screen.getByText('3 / 50')).toBeTruthy();
     expect(
       screen.getByTestId('fox-evolution-progress-fill').props.style,
@@ -1128,7 +1203,7 @@ describe('HomeScreen', () => {
 
     render(<HomeScreen />);
 
-    expect(screen.getByText('Stage 10')).toBeTruthy();
+    expect(screen.getByText('Level 10')).toBeTruthy();
     expect(screen.getByText('Final evolution reached')).toBeTruthy();
     expect(screen.getByTestId('fox-evolution-supporting-text')).toBeTruthy();
     expect(screen.getByText('200+ scans')).toBeTruthy();
@@ -1343,7 +1418,7 @@ describe('HomeScreen', () => {
     expect(screen.getByTestId('home-analytics-scan-label').props.children).toBe(
       'scans analyzed',
     );
-    expect(screen.getByTestId('home-analytics-coach-image').props.resizeMode).toBe(
+    expect(screen.getByTestId('home-analytics-coach-image').props.contentFit).toBe(
       'contain',
     );
     expect(screen.getByTestId('home-analytics-curve')).toBeTruthy();

@@ -89,14 +89,11 @@ export const ES_TRANSLATIONS = {
     items_available: 'Escaneos disponibles',
     items_advised: 'Suplementos Recomendados',
     companion_title: 'Companero',
-    companion_subtitle: 'Evoluciona con tus escaneos',
     global_score: 'Puntuación Global',
     hero_title: 'Global Score',
     fox_evolution: {
-      eyebrow: 'Zorro evolutivo',
-      scan_total: '{{count}} escaneos',
-      stage_label: 'Stage {{stage}}',
-      stage_range: '{{start}} -> {{end}} escaneos',
+      stage_label: 'Nivel {{stage}}',
+      stage_range: '{{start}} a {{end}} escaneos',
       stage_range_max: '{{start}}+ escaneos',
       stage_progress: '{{current}} / {{total}}',
       scans_remaining: '{{count}} escaneos antes de la siguiente evolucion',
@@ -614,7 +611,7 @@ export const ES_TRANSLATIONS = {
       'Orientacion de bienestar unicamente. No es un diagnostico ni un consejo medico.',
     locked_badge: 'Premium',
     locked_tap_hint: 'Toca para desbloquear esta personalidad.',
-    free_persona_hint: 'Suave y cercano esta incluido en el plan gratis.',
+    free_persona_hint: 'Noah está incluido en el plan gratis.',
     active_persona_label: 'Personalidad del Coach',
     selected_persona_label: 'Coach seleccionado',
     next_persona_label: 'Proximo coach',
@@ -692,8 +689,8 @@ export const ES_TRANSLATIONS = {
     },
     personas: {
       gentle_supportive: {
-        title: 'Suave Cercano',
-        subtitle: 'Orientacion calida y tranquilizadora con un tono suave.',
+        title: 'Noah',
+        subtitle: 'Cálido y tranquilizador.',
         tone_badge: 'Suave',
         summary:
           'Un coach cercano que tranquiliza sin condescendencia y te devuelve al rumbo con tacto.',
@@ -703,8 +700,8 @@ export const ES_TRANSLATIONS = {
         best_for: 'Ideal si quieres avanzar sin sentirte juzgado.',
       },
       strict_tough: {
-        title: 'Estricto Directo',
-        subtitle: 'Responsabilidad clara y siguientes pasos sin excusas.',
+        title: 'Axel',
+        subtitle: 'Directo y exigente.',
         tone_badge: 'Firme',
         summary:
           'Un coach directo que corta las excusas y te devuelve rapido a la accion.',
@@ -715,8 +712,8 @@ export const ES_TRANSLATIONS = {
         best_for: 'Ideal si respondes bien a un marco firme.',
       },
       motivational_energetic: {
-        title: 'Motivador Energetico',
-        subtitle: 'Mucha energia y empuje para mantener el ritmo.',
+        title: 'Leo',
+        subtitle: 'Motivador y enérgico.',
         tone_badge: 'Energia',
         summary:
           'Un coach que te reactiva rapido y convierte las ganas en impulso concreto.',
@@ -728,8 +725,8 @@ export const ES_TRANSLATIONS = {
           'Ideal si necesitas un verdadero empujon de energia.',
       },
       patient_calm: {
-        title: 'Paciente Calmado',
-        subtitle: 'Coaching sereno y estable para progresar paso a paso.',
+        title: 'Mira',
+        subtitle: 'Sereno y estable.',
         tone_badge: 'Calma',
         summary:
           'Un coach sereno que ordena las prioridades sin meterte presion.',
@@ -740,8 +737,8 @@ export const ES_TRANSLATIONS = {
         best_for: 'Ideal si quieres menos estres y mas constancia.',
       },
       analytical_precise: {
-        title: 'Analitico Preciso',
-        subtitle: 'Guia estructurada y detallada apoyada en los datos.',
+        title: 'Elias',
+        subtitle: 'Claro y preciso.',
         tone_badge: 'Preciso',
         summary:
           'Un coach que pone orden y explica con claridad que hacer y por que.',
@@ -752,8 +749,8 @@ export const ES_TRANSLATIONS = {
         best_for: 'Ideal si te gusta entender antes de aplicar.',
       },
       playful_light: {
-        title: 'Ligero Jugueton',
-        subtitle: 'Un estilo mas ligero que te mantiene encaminado.',
+        title: 'Milo',
+        subtitle: 'Ligero y positivo.',
         tone_badge: 'Ligero',
         summary:
           'Un coach mas ligero que sigue siendo util sin hacer pesada la conversacion.',
@@ -961,8 +958,7 @@ export const ES_TRANSLATIONS = {
     questions: {
       section_label: 'Sugerencias',
       custom_label: 'Pregunta al coach',
-      custom_helper: 'Pregunta lo que quieras.',
-      custom_placeholder: 'Escribe tu pedido',
+      custom_placeholder: 'Pregunta lo que quieras',
       selected_label: 'Seleccionado',
       empty_summary: 'Pregunta al coach',
       empty_error: 'Anade unas palabras para que el coach responda',

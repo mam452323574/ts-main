@@ -62,12 +62,9 @@ export const FR_TRANSLATIONS = {
     global_score: 'Score Global',
     hero_title: 'Global Score',
     companion_title: 'Compagnon',
-    companion_subtitle: 'Évolue avec vos scans',
     fox_evolution: {
-      eyebrow: 'Renard évolutif',
-      scan_total: '{{count}} scans',
-      stage_label: 'Stage {{stage}}',
-      stage_range: '{{start}} -> {{end}} scans',
+      stage_label: 'Niveau {{stage}}',
+      stage_range: '{{start}} à {{end}} scans',
       stage_range_max: '{{start}}+ scans',
       stage_progress: '{{current}} / {{total}}',
       scans_remaining: '{{count}} scans avant la prochaine évolution',
@@ -691,7 +688,7 @@ export const FR_TRANSLATIONS = {
       'Conseil bien-être uniquement. Ceci ne remplace ni un diagnostic ni un avis médical.',
     locked_badge: 'Premium',
     locked_tap_hint: 'Touchez pour débloquer cette personnalité.',
-    free_persona_hint: "Doux et bienveillant est inclus dans l'offre gratuite.",
+    free_persona_hint: "Noah est inclus dans l'offre gratuite.",
     active_persona_label: 'Personnalité du Coach',
     selected_persona_label: 'Coach sélectionné',
     next_persona_label: 'Prochain coach',
@@ -768,7 +765,7 @@ export const FR_TRANSLATIONS = {
     },
     personas: {
       gentle_supportive: {
-        title: 'Doux & Bienveillant',
+        title: 'Noah',
         subtitle: 'Chaleureux et rassurant.',
         tone_badge: 'Doux',
         summary:
@@ -779,7 +776,7 @@ export const FR_TRANSLATIONS = {
         best_for: 'Ideal si vous voulez avancer sans vous sentir juge.',
       },
       strict_tough: {
-        title: 'Strict & Exigeant',
+        title: 'Axel',
         subtitle: 'Direct et exigeant.',
         tone_badge: 'Exigeant',
         summary:
@@ -791,8 +788,8 @@ export const FR_TRANSLATIONS = {
         best_for: 'Ideal si vous repondez bien a un cadre ferme.',
       },
       motivational_energetic: {
-        title: 'Motivant & Dynamique',
-        subtitle: 'Énergique et entraînant.',
+        title: 'Leo',
+        subtitle: 'Motivant et énergique.',
         tone_badge: 'Energique',
         summary:
           "Un coach qui vous relance vite et transforme l'envie en elan concret.",
@@ -804,7 +801,7 @@ export const FR_TRANSLATIONS = {
         best_for: "Ideal si vous avez besoin d'un vrai coup d'energie.",
       },
       patient_calm: {
-        title: 'Patient & Calme',
+        title: 'Mira',
         subtitle: 'Posé et serein.',
         tone_badge: 'Pose',
         summary:
@@ -816,8 +813,8 @@ export const FR_TRANSLATIONS = {
         best_for: 'Ideal si vous voulez moins de stress et plus de constance.',
       },
       analytical_precise: {
-        title: 'Analytique & Précis',
-        subtitle: 'Structuré et précis.',
+        title: 'Elias',
+        subtitle: 'Clair et précis.',
         tone_badge: 'Analytique',
         summary:
           'Un coach qui met les choses a plat et explique clairement quoi faire et pourquoi.',
@@ -828,8 +825,8 @@ export const FR_TRANSLATIONS = {
         best_for: "Ideal si vous aimez comprendre avant d'appliquer.",
       },
       playful_light: {
-        title: 'Ludique & Léger',
-        subtitle: 'Léger et utile.',
+        title: 'Milo',
+        subtitle: 'Léger et positif.',
         tone_badge: 'Ludique',
         summary:
           "Un coach plus leger qui garde le fond utile sans rendre l'echange pesant.",
@@ -1036,8 +1033,7 @@ export const FR_TRANSLATIONS = {
     questions: {
       section_label: 'Suggestions',
       custom_label: 'Pose ta question au coach',
-      custom_helper: 'Demande ce que tu veux.',
-      custom_placeholder: 'Écris ta demande',
+      custom_placeholder: 'Demande ce que tu veux',
       selected_label: 'Sélectionné',
       empty_summary: 'Question au coach',
       empty_error: 'Ajoute quelques mots pour que le coach puisse répondre',

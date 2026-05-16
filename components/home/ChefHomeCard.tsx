@@ -165,6 +165,7 @@ const createStyles = (
   const imageWidth = metrics.isTablet ? 298 : metrics.isCompact ? 232 : 260;
   const imageHeight = metrics.isTablet ? 298 : metrics.isCompact ? 232 : 260;
   const footerHeight = metrics.ctaHeight + SPACING.md;
+  const subtitleWidth = metrics.isTablet ? metrics.copyWidth : metrics.isCompact ? 164 : 176;
 
   return StyleSheet.create({
     shell: {
@@ -205,13 +206,13 @@ const createStyles = (
         metrics.copyWidth + metrics.horizontalPadding * 2 + 12,
         360,
       ),
-      zIndex: 1,
+      zIndex: 3,
     },
     visualStage: {
       position: 'absolute',
       width: visualStageWidth,
       height: visualStageHeight,
-      right: metrics.isTablet ? 16 : metrics.isCompact ? -28 : -18,
+      right: metrics.isTablet ? 16 : metrics.isCompact ? -34 : -30,
       top: metrics.isTablet ? 64 : metrics.isCompact ? 98 : 96,
       zIndex: 2,
       alignItems: 'center',
@@ -235,7 +236,7 @@ const createStyles = (
     content: {
       minHeight: metrics.cardMinHeight - metrics.horizontalPadding * 2,
       position: 'relative',
-      zIndex: 3,
+      zIndex: 4,
     },
     copyColumn: {
       width: metrics.copyWidth,
@@ -276,6 +277,7 @@ const createStyles = (
       fontSize: metrics.bodySize,
       lineHeight: metrics.bodyLineHeight,
       fontWeight: FONT_WEIGHTS.medium,
+      maxWidth: subtitleWidth,
     },
     metaPanel: {
       marginTop: SPACING.lg,

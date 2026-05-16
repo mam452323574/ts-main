@@ -9,6 +9,8 @@ import { TapTargetsGame } from '@/components/loading/TapTargetsGame';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 
+const Haptics = require('expo-haptics');
+
 jest.mock('@/contexts/LanguageContext', () => ({
   useLanguage: jest.fn(),
 }));
@@ -164,21 +166,51 @@ describe('LoadingMiniGame', () => {
   });
 
   it('increments TapTargetsGame score when a target is pressed', () => {
+    const randomSpy = jest.spyOn(Math, 'random');
+    randomSpy.mockReturnValue(0.5);
     const rendered = render(<TapTargetsGame {...gameProps} />);
 
     fireEvent.press(rendered.getAllByTestId('tap-target')[0]);
 
     expect(rendered.getByTestId('tap-targets-score')).toHaveTextContent('Score 1');
+    expect(Haptics.selectionAsync).toHaveBeenCalled();
+  });
+
+  it('awards TapTargetsGame bonus targets with stronger feedback', () => {
+    const randomSpy = jest.spyOn(Math, 'random');
+    randomSpy.mockReturnValue(0.5).mockReturnValueOnce(0.05);
+    const rendered = render(<TapTargetsGame {...gameProps} />);
+
+    fireEvent.press(rendered.getAllByTestId('tap-target')[0]);
+
+    expect(rendered.getByTestId('tap-targets-score')).toHaveTextContent('Score 3');
+    expect(Haptics.impactAsync).toHaveBeenCalledWith(
+      Haptics.ImpactFeedbackStyle.Light,
+    );
   });
 
   it('increments FloatDodgeGame score over time', () => {
     const rendered = render(<FloatDodgeGame {...gameProps} />);
 
     act(() => {
-      jest.advanceTimersByTime(760);
+      jest.advanceTimersByTime(1100);
     });
 
     expect(rendered.getByTestId('float-dodge-score')).toHaveTextContent('Score 1');
+  });
+
+  it('marks FloatDodgeGame obstacles after a collision and keeps the penalty soft', () => {
+    const randomSpy = jest.spyOn(Math, 'random');
+    randomSpy.mockReturnValue(0);
+    const rendered = render(<FloatDodgeGame {...gameProps} />);
+
+    act(() => {
+      jest.advanceTimersByTime(2250);
+    });
+
+    expect(rendered.getByTestId('float-dodge-obstacle-hit')).toBeTruthy();
+    expect(rendered.getByTestId('float-dodge-score')).toHaveTextContent('Score 1');
+    expect(Haptics.selectionAsync).toHaveBeenCalled();
   });
 
   it('increments ReflexDotsGame score when a good signal is pressed', () => {
@@ -190,6 +222,33 @@ describe('LoadingMiniGame', () => {
     fireEvent.press(rendered.getAllByTestId('reflex-signal-good')[0]);
 
     expect(rendered.getByTestId('reflex-dots-score')).toHaveTextContent('Score 1');
+    expect(Haptics.selectionAsync).toHaveBeenCalled();
+  });
+
+  it('keeps ReflexDotsGame decoy penalties gentle', () => {
+    const randomSpy = jest.spyOn(Math, 'random');
+    randomSpy.mockReturnValue(0.05);
+
+    const rendered = render(<ReflexDotsGame {...gameProps} />);
+
+    fireEvent.press(rendered.getAllByTestId('reflex-signal-decoy')[0]);
+
+    expect(rendered.getByTestId('reflex-dots-score')).toHaveTextContent('Score 0');
+    expect(Haptics.selectionAsync).toHaveBeenCalled();
+  });
+
+  it('awards ReflexDotsGame bonus signals', () => {
+    const randomSpy = jest.spyOn(Math, 'random');
+    randomSpy.mockReturnValue(0.95);
+
+    const rendered = render(<ReflexDotsGame {...gameProps} />);
+
+    fireEvent.press(rendered.getAllByTestId('reflex-signal-bonus')[0]);
+
+    expect(rendered.getByTestId('reflex-dots-score')).toHaveTextContent('Score 2');
+    expect(Haptics.impactAsync).toHaveBeenCalledWith(
+      Haptics.ImpactFeedbackStyle.Light,
+    );
   });
 
   it('cleans timers on unmount', () => {
@@ -224,7 +283,17 @@ describe('LoadingMiniGame', () => {
       rendered.getByTestId('tap-targets-game').props.style,
     );
 
-    expect(flattenedStyle.height).toBe(118);
+    expect(flattenedStyle.height).toBe(160);
+  });
+
+  it('uses a larger coach layout', () => {
+    const rendered = render(<TapTargetsGame {...gameProps} />);
+
+    const flattenedStyle = StyleSheet.flatten(
+      rendered.getByTestId('tap-targets-game').props.style,
+    );
+
+    expect(flattenedStyle.height).toBe(210);
   });
 
   it('keeps compact score text constrained to a stable line', () => {

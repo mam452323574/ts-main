@@ -23,8 +23,8 @@ const defaultProps = {
   personaOptions: [
     {
       key: 'gentle_supportive' as const,
-      title: 'Doux & Bienveillant',
-      subtitle: 'Calme et pratique',
+      title: 'Noah',
+      subtitle: 'Chaleureux et rassurant.',
       visual: getCoachPersonaVisual('gentle_supportive'),
       locked: false,
     },
@@ -42,8 +42,7 @@ const defaultProps = {
   questionText: '',
   questionSectionLabel: 'Suggestions utiles',
   customQuestionLabel: 'Ta question au coach',
-  customQuestionHelper: 'Demande ce que tu veux.',
-  customQuestionPlaceholder: 'Ecris ta question',
+  customQuestionPlaceholder: 'Demande ce que tu veux',
   selectedBadgeLabel: 'Selectionne',
   questionCounterLabel: (count: number, max: number) => `${count}/${max}`,
   questionMaxLength: 800,
@@ -64,6 +63,15 @@ const defaultProps = {
 };
 
 describe('CoachSettingsInline', () => {
+  it('uses one clear placeholder and does not render helper copy below the field', () => {
+    render(<CoachSettingsInline {...defaultProps} />);
+
+    expect(
+      screen.getByTestId('coach-settings-inline-question-input').props.placeholder,
+    ).toBe('Demande ce que tu veux');
+    expect(screen.queryByText('Demande ce que tu veux.')).toBeNull();
+  });
+
   it('shows an explicit selected badge on free text or the active preset', () => {
     const { rerender } = render(<CoachSettingsInline {...defaultProps} />);
 

@@ -70,12 +70,9 @@ export const PT_TRANSLATIONS = {
     global_score: 'Pontuação Global',
     hero_title: 'Global Score',
     companion_title: 'Companheiro',
-    companion_subtitle: 'Evolui com os seus scans',
     fox_evolution: {
-      eyebrow: 'Raposa evolutiva',
-      scan_total: '{{count}} scans',
-      stage_label: 'Stage {{stage}}',
-      stage_range: '{{start}} -> {{end}} scans',
+      stage_label: 'Nível {{stage}}',
+      stage_range: '{{start}} a {{end}} scans',
       stage_range_max: '{{start}}+ scans',
       stage_progress: '{{current}} / {{total}}',
       scans_remaining: '{{count}} scans antes da proxima evolucao',
@@ -591,7 +588,7 @@ export const PT_TRANSLATIONS = {
       'Orientacao de bem-estar apenas. Isto nao e um diagnostico nem um conselho medico.',
     locked_badge: 'Premium',
     locked_tap_hint: 'Toque para desbloquear esta personalidade.',
-    free_persona_hint: 'Gentil e acolhedor esta incluido no plano gratis.',
+    free_persona_hint: 'Noah está incluído no plano grátis.',
     active_persona_label: 'Personalidade do Coach',
     selected_persona_label: 'Coach selecionado',
     next_persona_label: 'Proximo coach',
@@ -669,8 +666,8 @@ export const PT_TRANSLATIONS = {
     },
     personas: {
       gentle_supportive: {
-        title: 'Gentil Acolhedor',
-        subtitle: 'Orientacao calorosa, tranquila e encorajadora.',
+        title: 'Noah',
+        subtitle: 'Caloroso e tranquilizador.',
         tone_badge: 'Acolhedor',
         summary:
           'Um coach caloroso que acalma sem infantilizar e te coloca de volta no ritmo com cuidado.',
@@ -681,8 +678,8 @@ export const PT_TRANSLATIONS = {
           'Ideal se voce quer avancar sem se sentir julgado.',
       },
       strict_tough: {
-        title: 'Rigoroso Direto',
-        subtitle: 'Responsabilidade clara e proximos passos sem desculpas.',
+        title: 'Axel',
+        subtitle: 'Direto e exigente.',
         tone_badge: 'Firme',
         summary:
           'Um coach direto que corta desculpas e te coloca rapido de volta em acao.',
@@ -694,8 +691,8 @@ export const PT_TRANSLATIONS = {
           'Ideal se voce responde bem a um enquadramento firme.',
       },
       motivational_energetic: {
-        title: 'Motivador Energetico',
-        subtitle: 'Alta energia e impulso para manter a constancia.',
+        title: 'Leo',
+        subtitle: 'Motivador e energético.',
         tone_badge: 'Energia',
         summary:
           'Um coach que reacende seu ritmo rapido e transforma vontade em impulso concreto.',
@@ -707,8 +704,8 @@ export const PT_TRANSLATIONS = {
           'Ideal se voce precisa de um verdadeiro gas para comecar.',
       },
       patient_calm: {
-        title: 'Paciente Calmo',
-        subtitle: 'Coaching sereno e estavel para progresso gradual.',
+        title: 'Mira',
+        subtitle: 'Calmo e sereno.',
         tone_badge: 'Calmo',
         summary:
           'Um coach sereno que organiza as prioridades sem aumentar a pressao.',
@@ -720,8 +717,8 @@ export const PT_TRANSLATIONS = {
           'Ideal se voce quer menos estresse e mais constancia.',
       },
       analytical_precise: {
-        title: 'Analitico Preciso',
-        subtitle: 'Orientacao estruturada e detalhada com base nos dados.',
+        title: 'Elias',
+        subtitle: 'Claro e preciso.',
         tone_badge: 'Preciso',
         summary:
           'Um coach que coloca tudo em ordem e explica com clareza o que fazer e por que.',
@@ -733,8 +730,8 @@ export const PT_TRANSLATIONS = {
           'Ideal se voce gosta de entender antes de aplicar.',
       },
       playful_light: {
-        title: 'Leve Descontraido',
-        subtitle: 'Um estilo mais leve que ainda te mantem no rumo.',
+        title: 'Milo',
+        subtitle: 'Leve e positivo.',
         tone_badge: 'Leve',
         summary:
           'Um coach mais leve que continua util sem deixar a conversa pesada.',
@@ -942,8 +939,7 @@ export const PT_TRANSLATIONS = {
     questions: {
       section_label: 'Sugestoes',
       custom_label: 'Pergunte ao coach',
-      custom_helper: 'Pergunte o que quiser.',
-      custom_placeholder: 'Escreva seu pedido',
+      custom_placeholder: 'Pergunte o que quiser',
       selected_label: 'Selecionado',
       empty_summary: 'Pergunta ao coach',
       empty_error: 'Adicione algumas palavras para o coach responder',

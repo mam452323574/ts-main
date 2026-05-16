@@ -62,12 +62,9 @@ export const EN_TRANSLATIONS = {
     global_score: 'Global Score',
     hero_title: 'Global Score',
     companion_title: 'Companion',
-    companion_subtitle: 'Evolves with your scans',
     fox_evolution: {
-      eyebrow: 'Fox evolution',
-      scan_total: '{{count}} scans',
-      stage_label: 'Stage {{stage}}',
-      stage_range: '{{start}} -> {{end}} scans',
+      stage_label: 'Level {{stage}}',
+      stage_range: '{{start}} to {{end}} scans',
       stage_range_max: '{{start}}+ scans',
       stage_progress: '{{current}} / {{total}}',
       scans_remaining: '{{count}} scans before the next evolution',
@@ -737,7 +734,7 @@ export const EN_TRANSLATIONS = {
       'Wellness guidance only. This is not a diagnosis or medical advice.',
     locked_badge: 'Premium',
     locked_tap_hint: 'Tap to unlock this personality.',
-    free_persona_hint: 'Gentle Supportive is included on the free plan.',
+    free_persona_hint: 'Noah is included on the free plan.',
     active_persona_label: 'Coach personality',
     selected_persona_label: 'Selected coach',
     next_persona_label: 'Next coach',
@@ -814,8 +811,8 @@ export const EN_TRANSLATIONS = {
     },
     personas: {
       gentle_supportive: {
-        title: 'Gentle Supportive',
-        subtitle: 'Warm, encouraging guidance with a soft touch.',
+        title: 'Noah',
+        subtitle: 'Warm and reassuring.',
         tone_badge: 'Warm',
         summary:
           'A reassuring coach who keeps things calm, practical, and easy to follow.',
@@ -826,8 +823,8 @@ export const EN_TRANSLATIONS = {
         best_for: 'Best when you want support without feeling judged.',
       },
       strict_tough: {
-        title: 'Strict Tough',
-        subtitle: 'Direct accountability and no-excuses next steps.',
+        title: 'Axel',
+        subtitle: 'Direct and demanding.',
         tone_badge: 'Firm',
         summary:
           'A direct coach who cuts through excuses and pushes you back into action.',
@@ -838,8 +835,8 @@ export const EN_TRANSLATIONS = {
         best_for: 'Best when you respond well to pressure and structure.',
       },
       motivational_energetic: {
-        title: 'Motivational Energetic',
-        subtitle: 'High-energy momentum with upbeat coaching.',
+        title: 'Leo',
+        subtitle: 'Motivating and energetic.',
         tone_badge: 'Boosting',
         summary:
           'A momentum coach who lifts your energy and keeps your focus moving forward.',
@@ -850,8 +847,8 @@ export const EN_TRANSLATIONS = {
         best_for: 'Best when you need a kick of energy to get going.',
       },
       patient_calm: {
-        title: 'Patient Calm',
-        subtitle: 'Steady, reassuring coaching for gradual progress.',
+        title: 'Mira',
+        subtitle: 'Calm and steady.',
         tone_badge: 'Calm',
         summary:
           'A composed coach who slows things down and makes progress feel manageable.',
@@ -862,8 +859,8 @@ export const EN_TRANSLATIONS = {
         best_for: 'Best when you want less pressure and more steadiness.',
       },
       analytical_precise: {
-        title: 'Analytical Precise',
-        subtitle: 'Structured, detailed guidance grounded in the data.',
+        title: 'Elias',
+        subtitle: 'Clear and precise.',
         tone_badge: 'Precise',
         summary:
           'A data-minded coach who turns your results into crisp, structured guidance.',
@@ -874,8 +871,8 @@ export const EN_TRANSLATIONS = {
         best_for: 'Best when you want to understand the why behind the advice.',
       },
       playful_light: {
-        title: 'Playful Light',
-        subtitle: 'A lighter, witty style that still keeps you on track.',
+        title: 'Milo',
+        subtitle: 'Light and positive.',
         tone_badge: 'Playful',
         summary:
           'A lighter coach who keeps the advice useful while making it feel less heavy.',
@@ -1082,8 +1079,7 @@ export const EN_TRANSLATIONS = {
     questions: {
       section_label: 'Suggestions',
       custom_label: 'Ask your coach',
-      custom_helper: 'Ask anything.',
-      custom_placeholder: 'Write your request',
+      custom_placeholder: 'Ask anything',
       selected_label: 'Selected',
       empty_summary: 'Question for Coach',
       empty_error: 'Add a few words so your coach can respond',

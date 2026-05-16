@@ -314,9 +314,9 @@ describe('CoachHistoryScreen', () => {
 
     const screen = render(<CoachHistoryScreen />);
 
-    expect(screen.getByText('Strict & Exigeant')).toBeTruthy();
+    expect(screen.getByText('Axel')).toBeTruthy();
     expect(screen.getByText('Coach')).toBeTruthy();
-    expect(screen.queryAllByText('Doux & Bienveillant')).toHaveLength(0);
+    expect(screen.queryAllByText('Noah')).toHaveLength(0);
   });
 
   it('shows a loading state while entries are fetching for the first load', () => {

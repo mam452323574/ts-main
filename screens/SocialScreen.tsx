@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -9,6 +12,11 @@ import {
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { Plus } from 'lucide-react-native';
 
 import { AppScreen } from '@/components/AppScreen';
@@ -60,6 +68,11 @@ import type {
 } from '@/types';
 
 const SOCIAL_FAB_SIZE = 60;
+const SOCIAL_FLOATING_FILTER_TOP_GUARD = 96;
+const SOCIAL_FLOATING_FILTER_OFFSET = 48;
+const SOCIAL_FLOATING_FILTER_SHOW_DELTA = 8;
+const SOCIAL_FLOATING_FILTER_HIDE_DELTA = 16;
+const SOCIAL_FLOATING_FILTER_ANIMATION_MS = 190;
 const SOCIAL_FILTER_CATEGORIES = [
   'all',
   'before_after',
@@ -86,8 +99,15 @@ export default function SocialScreen() {
   const queueImpressionsHandlerRef = useRef<(postIds: string[]) => void>(() => {});
   const queuePostViewsHandlerRef = useRef<(postIds: string[]) => void>(() => {});
   const seenFocusedCategoriesRef = useRef<Set<SocialCategoryFilter>>(new Set());
+  const previousFeedOffsetRef = useRef(0);
+  const scrollDirectionRef = useRef<'up' | 'down' | null>(null);
+  const scrollDirectionDeltaRef = useRef(0);
+  const floatingFiltersVisibleRef = useRef(false);
+  const headerChromeHeightRef = useRef(0);
   const [selectedCategory, setSelectedCategory] = useState<SocialCategoryFilter>('all');
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
+  const [floatingFiltersInteractive, setFloatingFiltersInteractive] = useState(false);
+  const [headerChromeHeight, setHeaderChromeHeight] = useState(0);
   const [profilePreviewTarget, setProfilePreviewTarget] = useState<{
     userId: string;
     username?: string | null;
@@ -96,8 +116,8 @@ export default function SocialScreen() {
   const [postActionSheetTarget, setPostActionSheetTarget] =
     useState<SocialPost | null>(null);
   const styles = useMemo(
-    () => createStyles(colors, isDark, tabBarMetrics.controlBottomOffset),
-    [colors, isDark, tabBarMetrics.controlBottomOffset],
+    () => createStyles(colors, isDark, insets.top, tabBarMetrics.controlBottomOffset),
+    [colors, insets.top, isDark, tabBarMetrics.controlBottomOffset],
   );
   const categoryOptions = useMemo(
     () =>
@@ -107,6 +127,29 @@ export default function SocialScreen() {
         testID: `social-pill-${category}`,
       })),
     [t],
+  );
+  const floatingCategoryOptions = useMemo(
+    () =>
+      categoryOptions.map((option) => ({
+        ...option,
+        testID: `social-floating-pill-${option.value}`,
+      })),
+    [categoryOptions],
+  );
+  const floatingFiltersProgress = useSharedValue(0);
+  const floatingFiltersAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: floatingFiltersProgress.value,
+    transform: [
+      {
+        translateY: -18 + floatingFiltersProgress.value * 18,
+      },
+    ],
+  }));
+  const floatingEligibleOffset = useMemo(
+    () =>
+      Math.max(headerChromeHeight, SOCIAL_FLOATING_FILTER_TOP_GUARD) +
+      SOCIAL_FLOATING_FILTER_OFFSET,
+    [headerChromeHeight],
   );
   const {
     data,
@@ -391,6 +434,113 @@ export default function SocialScreen() {
     },
   ]).current;
 
+  const setFloatingFiltersVisible = useCallback(
+    (visible: boolean) => {
+      if (floatingFiltersVisibleRef.current === visible) {
+        return;
+      }
+
+      floatingFiltersVisibleRef.current = visible;
+      setFloatingFiltersInteractive(visible);
+      floatingFiltersProgress.value = withTiming(visible ? 1 : 0, {
+        duration: SOCIAL_FLOATING_FILTER_ANIMATION_MS,
+      });
+    },
+    [floatingFiltersProgress],
+  );
+
+  const resetFloatingFilterDirectionTracking = useCallback(() => {
+    scrollDirectionRef.current = null;
+    scrollDirectionDeltaRef.current = 0;
+  }, []);
+
+  const handleHeaderChromeLayout = useCallback((event: LayoutChangeEvent) => {
+    const nextHeight = event.nativeEvent.layout.height;
+
+    if (Math.abs(headerChromeHeightRef.current - nextHeight) < 1) {
+      return;
+    }
+
+    headerChromeHeightRef.current = nextHeight;
+    setHeaderChromeHeight(nextHeight);
+  }, []);
+
+  const handleFeedScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const rawOffset = event.nativeEvent.contentOffset.y;
+
+      if (rawOffset < 0) {
+        previousFeedOffsetRef.current = 0;
+        resetFloatingFilterDirectionTracking();
+        setFloatingFiltersVisible(false);
+        return;
+      }
+
+      const nextOffset = Math.max(0, rawOffset);
+      const previousOffset = previousFeedOffsetRef.current;
+      const delta = nextOffset - previousOffset;
+      previousFeedOffsetRef.current = nextOffset;
+
+      if (nextOffset < floatingEligibleOffset) {
+        resetFloatingFilterDirectionTracking();
+        setFloatingFiltersVisible(false);
+        return;
+      }
+
+      if (Math.abs(delta) < 1) {
+        return;
+      }
+
+      const nextDirection = delta > 0 ? 'down' : 'up';
+      const deltaDistance = Math.abs(delta);
+
+      if (scrollDirectionRef.current !== nextDirection) {
+        scrollDirectionRef.current = nextDirection;
+        scrollDirectionDeltaRef.current = deltaDistance;
+      } else {
+        scrollDirectionDeltaRef.current += deltaDistance;
+      }
+
+      if (
+        nextDirection === 'up' &&
+        scrollDirectionDeltaRef.current >= SOCIAL_FLOATING_FILTER_SHOW_DELTA
+      ) {
+        setFloatingFiltersVisible(true);
+        return;
+      }
+
+      if (
+        nextDirection === 'down' &&
+        scrollDirectionDeltaRef.current >= SOCIAL_FLOATING_FILTER_HIDE_DELTA
+      ) {
+        setFloatingFiltersVisible(false);
+      }
+    },
+    [
+      floatingEligibleOffset,
+      resetFloatingFilterDirectionTracking,
+      setFloatingFiltersVisible,
+    ],
+  );
+
+  const handleCategoryChange = useCallback(
+    (category: SocialCategoryFilter) => {
+      clearReactionError();
+      setSelectedCategory(category);
+
+      if (previousFeedOffsetRef.current >= floatingEligibleOffset) {
+        resetFloatingFilterDirectionTracking();
+        setFloatingFiltersVisible(true);
+      }
+    },
+    [
+      clearReactionError,
+      floatingEligibleOffset,
+      resetFloatingFilterDirectionTracking,
+      setFloatingFiltersVisible,
+    ],
+  );
+
   const handleOpenComposer = () => {
     router.push('/social-compose' as any);
   };
@@ -565,69 +715,12 @@ export default function SocialScreen() {
   return (
     <AppScreen bottomInset={false} style={styles.container}>
       {alertElement}
-      <ScreenHeader
-        title={t('social.feed_title')}
-        variant="inline"
-        topInset={false}
-        style={styles.header}
-        testID="social-screen-header"
-      />
-
-      <View style={styles.filtersSection} testID="social-filters-control">
-        <SegmentedControl<SocialCategoryFilter>
-          value={selectedCategory}
-          onChange={(category) => {
-            clearReactionError();
-            setSelectedCategory(category);
-          }}
-          options={categoryOptions}
-          style={styles.filtersControl}
-          testID="social-filters-segments"
-        />
-      </View>
-
-      {backendError ? (
-        <View style={styles.stateWrap}>
-          <ScreenState
-            tone="error"
-            title={backendErrorTitle}
-            message={backendError.message}
-            actionLabel={t('common.retry')}
-            onAction={handleRetryBackendRequest}
-            testID="social-error-state"
-            actionTestID="social-error-retry"
-          />
-        </View>
-      ) : null}
-
-      {reactionError ? (
-        <View style={styles.reactionErrorCard} testID="social-reaction-error">
-          <View style={styles.reactionErrorHeader}>
-            <Text style={styles.reactionErrorTitle}>
-              {t('social.errors.reaction_title')}
-            </Text>
-            <TouchableOpacity
-              accessibilityRole="button"
-              onPress={clearReactionError}
-              style={styles.reactionErrorDismissButton}
-              testID="social-reaction-error-dismiss"
-            >
-              <Text style={styles.reactionErrorDismissLabel}>{t('common.ok')}</Text>
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.reactionErrorBody}>
-            {reactionError.message || t('social.errors.reaction_failed')}
-          </Text>
-          {reactionErrorDiagnostics ? (
-            <Text style={styles.reactionErrorMeta}>{reactionErrorDiagnostics}</Text>
-          ) : null}
-        </View>
-      ) : null}
-
       <FlashList<SocialPost>
         data={posts}
         keyExtractor={(item) => item.id}
         viewabilityConfigCallbackPairs={viewabilityConfigCallbackPairs}
+        onScroll={handleFeedScroll}
+        scrollEventThrottle={16}
         onEndReached={() => {
           if (hasNextPage && !isFetchingNextPage) {
             void fetchNextPage();
@@ -638,6 +731,71 @@ export default function SocialScreen() {
         onRefresh={handleManualRefresh}
         contentContainerStyle={styles.listContent}
         ItemSeparatorComponent={() => <View style={styles.itemSeparator} />}
+        ListHeaderComponent={
+          <>
+            <View
+              onLayout={handleHeaderChromeLayout}
+              style={styles.feedChrome}
+              testID="social-feed-chrome"
+            >
+              <ScreenHeader
+                title={t('social.feed_title')}
+                variant="inline"
+                topInset={false}
+                style={styles.header}
+                testID="social-screen-header"
+              />
+
+              <View style={styles.filtersSection} testID="social-filters-control">
+                <SegmentedControl<SocialCategoryFilter>
+                  value={selectedCategory}
+                  onChange={handleCategoryChange}
+                  options={categoryOptions}
+                  style={styles.filtersControl}
+                  testID="social-filters-segments"
+                />
+              </View>
+            </View>
+
+            {backendError ? (
+              <View style={styles.stateWrap}>
+                <ScreenState
+                  tone="error"
+                  title={backendErrorTitle}
+                  message={backendError.message}
+                  actionLabel={t('common.retry')}
+                  onAction={handleRetryBackendRequest}
+                  testID="social-error-state"
+                  actionTestID="social-error-retry"
+                />
+              </View>
+            ) : null}
+
+            {reactionError ? (
+              <View style={styles.reactionErrorCard} testID="social-reaction-error">
+                <View style={styles.reactionErrorHeader}>
+                  <Text style={styles.reactionErrorTitle}>
+                    {t('social.errors.reaction_title')}
+                  </Text>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    onPress={clearReactionError}
+                    style={styles.reactionErrorDismissButton}
+                    testID="social-reaction-error-dismiss"
+                  >
+                    <Text style={styles.reactionErrorDismissLabel}>{t('common.ok')}</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.reactionErrorBody}>
+                  {reactionError.message || t('social.errors.reaction_failed')}
+                </Text>
+                {reactionErrorDiagnostics ? (
+                  <Text style={styles.reactionErrorMeta}>{reactionErrorDiagnostics}</Text>
+                ) : null}
+              </View>
+            ) : null}
+          </>
+        }
         ListEmptyComponent={
           !isFetched ? (
             <ScreenState
@@ -700,6 +858,34 @@ export default function SocialScreen() {
         testID="social-feed-list"
       />
 
+      <Animated.View
+        accessibilityElementsHidden={!floatingFiltersInteractive}
+        importantForAccessibility={
+          floatingFiltersInteractive ? 'auto' : 'no-hide-descendants'
+        }
+        pointerEvents={floatingFiltersInteractive ? 'auto' : 'none'}
+        style={[
+          styles.floatingFiltersHost,
+          floatingFiltersAnimatedStyle,
+        ]}
+        testID="social-floating-filters"
+      >
+        <View style={styles.floatingFiltersSection}>
+          <View
+            style={styles.floatingFiltersDock}
+            testID="social-floating-filters-dock"
+          >
+            <SegmentedControl<SocialCategoryFilter>
+              value={selectedCategory}
+              onChange={handleCategoryChange}
+              options={floatingCategoryOptions}
+              style={styles.floatingFiltersControl}
+              testID="social-floating-filters-segments"
+            />
+          </View>
+        </View>
+      </Animated.View>
+
       {postActionSheetTarget ? (
         <SocialPostActionSheet
           visible
@@ -743,9 +929,19 @@ export default function SocialScreen() {
   );
 }
 
-const createStyles = (colors: any, isDark: boolean, tabBarControlBottomOffset: number) => {
+const createStyles = (
+  colors: any,
+  isDark: boolean,
+  insetsTop: number,
+  tabBarControlBottomOffset: number,
+) => {
   const chrome = getMainPageChrome(colors, isDark, 'social');
-  const topBandBackground = isDark ? colors.background : chrome.canvas;
+  const filterSurfaceBackground = isDark
+    ? withAlpha(colors.white ?? colors.primaryText, 0.045)
+    : withAlpha(colors.white ?? colors.cardBackground, 0.72);
+  const filterSurfaceBorder = isDark
+    ? withAlpha(colors.white ?? colors.primaryText, 0.07)
+    : withAlpha(colors.primaryText, 0.055);
 
   return StyleSheet.create({
     container: {
@@ -753,23 +949,61 @@ const createStyles = (colors: any, isDark: boolean, tabBarControlBottomOffset: n
       backgroundColor: chrome.canvas,
     },
     header: {
-      backgroundColor: topBandBackground,
+      backgroundColor: 'transparent',
       borderBottomWidth: 0,
-      borderBottomColor: topBandBackground,
+      borderBottomColor: 'transparent',
+    },
+    feedChrome: {
+      backgroundColor: 'transparent',
     },
     filtersSection: {
       paddingHorizontal: SPACING.page,
       paddingTop: SPACING.md,
       paddingBottom: SPACING.md,
-      backgroundColor: topBandBackground,
+      backgroundColor: 'transparent',
     },
     filtersControl: {
       width: '100%',
-      backgroundColor: chrome.mutedSurface.backgroundColor,
-      borderColor: chrome.mutedSurface.borderColor,
+      backgroundColor: filterSurfaceBackground,
+      borderColor: filterSurfaceBorder,
+    },
+    floatingFiltersHost: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      top: insetsTop + SPACING.sm,
+      zIndex: 12,
+      elevation: 12,
+    },
+    floatingFiltersSection: {
+      paddingHorizontal: SPACING.page,
+      paddingTop: SPACING.xs,
+      paddingBottom: SPACING.xs,
+      backgroundColor: 'transparent',
+    },
+    floatingFiltersDock: {
+      borderRadius: BORDER_RADIUS.full,
+      backgroundColor: withAlpha('#000000', isDark ? 0.78 : 0.68),
+      borderWidth: 1,
+      borderColor: withAlpha(colors.white, isDark ? 0.12 : 0.08),
+      padding: 4,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: isDark ? 0.12 : 0.08,
+      shadowRadius: 14,
+      elevation: 2,
+    },
+    floatingFiltersControl: {
+      width: '100%',
+      backgroundColor: 'transparent',
+      borderColor: 'transparent',
+      shadowColor: 'transparent',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0,
+      shadowRadius: 0,
+      elevation: 0,
     },
     listContent: {
-      paddingTop: SPACING.sm,
       paddingBottom: SOCIAL_FAB_SIZE + tabBarControlBottomOffset + SPACING.md,
     },
     stateWrap: {

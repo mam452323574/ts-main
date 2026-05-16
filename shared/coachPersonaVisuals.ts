@@ -12,37 +12,37 @@ export interface CoachPersonaVisual {
 const COACH_PERSONA_VISUALS: Record<CoachPersonaKey, CoachPersonaVisual> = {
   gentle_supportive: {
     imageSource: require('../assets/images/coach/gentle_supportive.webp'),
-    fallbackLabel: 'GS',
+    fallbackLabel: 'NO',
     haloTint: '#7FA9D4',
     teaserPriority: 1,
   },
   strict_tough: {
     imageSource: require('../assets/images/coach/strict_tough.webp'),
-    fallbackLabel: 'ST',
+    fallbackLabel: 'AX',
     haloTint: '#8792A7',
     teaserPriority: 5,
   },
   motivational_energetic: {
     imageSource: require('../assets/images/coach/motivational_energetic.webp'),
-    fallbackLabel: 'ME',
+    fallbackLabel: 'LE',
     haloTint: '#76A9C8',
     teaserPriority: 2,
   },
   patient_calm: {
     imageSource: require('../assets/images/coach/patient_calm.webp'),
-    fallbackLabel: 'PC',
+    fallbackLabel: 'MI',
     haloTint: '#72AFA8',
     teaserPriority: 4,
   },
   analytical_precise: {
     imageSource: require('../assets/images/coach/analytical_precise.webp'),
-    fallbackLabel: 'AP',
+    fallbackLabel: 'EL',
     haloTint: '#8D9EC8',
     teaserPriority: 3,
   },
   playful_light: {
     imageSource: require('../assets/images/coach/playful_light.webp'),
-    fallbackLabel: 'PL',
+    fallbackLabel: 'MO',
     haloTint: '#D98B86',
     teaserPriority: 6,
   },

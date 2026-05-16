@@ -1,4 +1,5 @@
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import { CoachGuidanceCard } from '@/components/coach/CoachGuidanceCard';
@@ -9,6 +10,46 @@ const LONG_BODY = [
 ].join('\n\n');
 
 describe('CoachGuidanceCard', () => {
+  it.each(['compact', 'fresh'] as const)(
+    'removes external shadow artifacts from the %s result card',
+    (variant) => {
+      render(
+        <CoachGuidanceCard
+          variant={variant}
+          eyebrow="Conseil"
+          statusLabel="Recent"
+          personaKey="gentle_supportive"
+          personaLabel="Personnalite du Coach"
+          personaValue="Noah"
+          personaAvatarFallbackLabel="NO"
+          personaAvatarHaloTint="#88A7FF"
+          title="Plan du jour"
+          body="Un seul paragraphe suffit ici."
+          disclaimerLabel="Rappel non diagnostique"
+          disclaimerPillLabel="Info, pas diagnostic"
+          disclaimer="Wellness guidance only. This is not a diagnosis or medical advice."
+          expandLabel="Lire la suite"
+          collapseLabel="Reduire"
+          continuationHintLabel="Contenu resume, touchez pour ouvrir"
+        />,
+      );
+
+      const cardStyle = StyleSheet.flatten(
+        screen.getByTestId('coach-guidance-card').props.style,
+      );
+
+      expect(cardStyle).toEqual(
+        expect.objectContaining({
+          shadowColor: 'transparent',
+          shadowOpacity: 0,
+          shadowRadius: 0,
+          shadowOffset: { width: 0, height: 0 },
+          elevation: 0,
+        }),
+      );
+    },
+  );
+
   it('renders the compact variant with a stronger continuation affordance and a lighter disclaimer', () => {
     render(
       <CoachGuidanceCard
@@ -19,8 +60,8 @@ describe('CoachGuidanceCard', () => {
         timestampLabel="18 avr. 09:30"
         personaKey="gentle_supportive"
         personaLabel="Personnalite du Coach"
-        personaValue="Doux Bienveillant"
-        personaAvatarFallbackLabel="DB"
+        personaValue="Noah"
+        personaAvatarFallbackLabel="NO"
         personaAvatarHaloTint="#88A7FF"
         title="Cap sur une semaine plus stable"
         body={LONG_BODY}
@@ -86,8 +127,8 @@ describe('CoachGuidanceCard', () => {
         statusLabel="Recent"
         personaKey="analytical_precise"
         personaLabel="Personnalite du Coach"
-        personaValue="Analytique Precis"
-        personaAvatarFallbackLabel="AP"
+        personaValue="Elias"
+        personaAvatarFallbackLabel="EL"
         personaAvatarHaloTint="#53C6BB"
         title="Gardez deux priorites claires"
         body="Un seul paragraphe suffit ici."
@@ -130,8 +171,8 @@ describe('CoachGuidanceCard', () => {
         statusLabel="Enregistre"
         personaKey="strict_tough"
         personaLabel="Personnalite du Coach"
-        personaValue="Analytique Precis"
-        personaAvatarFallbackLabel="AP"
+        personaValue="Elias"
+        personaAvatarFallbackLabel="EL"
         personaAvatarHaloTint="#53C6BB"
         title="Gardez deux priorites claires"
         body="Texte court."
@@ -161,8 +202,8 @@ describe('CoachGuidanceCard', () => {
         statusLabel="Recent"
         personaKey="strict_tough"
         personaLabel="Personnalite du Coach"
-        personaValue="Strict Exigeant"
-        personaAvatarFallbackLabel="ST"
+        personaValue="Axel"
+        personaAvatarFallbackLabel="AX"
         personaAvatarHaloTint="#D6A94A"
         title="Priorite claire"
         body="Fallback body."
@@ -222,8 +263,8 @@ describe('CoachGuidanceCard', () => {
         statusLabel="Recent"
         personaKey="patient_calm"
         personaLabel="Personnalite du Coach"
-        personaValue="Patient Calme"
-        personaAvatarFallbackLabel="PC"
+        personaValue="Mira"
+        personaAvatarFallbackLabel="MI"
         personaAvatarHaloTint="#7BC6D8"
         title="Pauses eau"
         body="Prenons un moment."
@@ -288,8 +329,8 @@ describe('CoachGuidanceCard', () => {
         statusLabel="Recent"
         personaKey="gentle_supportive"
         personaLabel="Personnalite du Coach"
-        personaValue="Doux Bienveillant"
-        personaAvatarFallbackLabel="DB"
+        personaValue="Noah"
+        personaAvatarFallbackLabel="NO"
         personaAvatarHaloTint="#88A7FF"
         title="Petit reset tout doux"
         body={[
@@ -401,8 +442,8 @@ describe('CoachGuidanceCard', () => {
         statusLabel="Recent"
         personaKey="motivational_energetic"
         personaLabel="Personnalite du Coach"
-        personaValue="Motivant"
-        personaAvatarFallbackLabel="MO"
+        personaValue="Leo"
+        personaAvatarFallbackLabel="LE"
         personaAvatarHaloTint="#FF9F3E"
         title="Ton fuel du jour"
         body="Fallback body."

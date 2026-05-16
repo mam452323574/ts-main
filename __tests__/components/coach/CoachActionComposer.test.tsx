@@ -59,7 +59,6 @@ describe('CoachActionComposer', () => {
         <CoachActionComposer
           personaTitle="Coach"
           promptTitle="Plan"
-          statusLabel="Disponible"
           actionLabel="Demander"
           actionA11yLabel="Demander conseil"
           personaVisual={visual}
@@ -85,6 +84,71 @@ describe('CoachActionComposer', () => {
       ).toBeGreaterThanOrEqual(4.5);
     },
   );
+
+  it.each(CONTRAST_CASES)(
+    'uses denser surfaces for the dock and CTA for $personaKey in $themeName mode',
+    ({ personaKey, themeName }) => {
+      mockThemeState.colors = themeName === 'dark' ? DARK_COLORS : LIGHT_COLORS;
+      mockThemeState.isDark = themeName === 'dark';
+      const visual = getCoachPersonaVisual(personaKey);
+
+      render(
+        <CoachActionComposer
+          personaTitle="Coach"
+          promptTitle="Plan"
+          actionLabel="Demander"
+          actionA11yLabel="Demander conseil"
+          personaVisual={visual}
+          onPress={jest.fn()}
+          actionTestID="coach-action-primary"
+        />,
+      );
+
+      const composerStyle = StyleSheet.flatten(
+        screen.getByTestId('coach-action-composer').props.style,
+      );
+      const actionButtonStyle = StyleSheet.flatten(
+        typeof screen.getByTestId('coach-action-primary').props.style === 'function'
+          ? screen.getByTestId('coach-action-primary').props.style({ pressed: false })
+          : screen.getByTestId('coach-action-primary').props.style,
+      );
+
+      expect(hasStrongSurfaceOpacity(composerStyle.backgroundColor, 0.94)).toBe(true);
+      expect(hasStrongSurfaceOpacity(actionButtonStyle.backgroundColor, 0.94)).toBe(true);
+      expect(composerStyle.shadowColor).toBe('transparent');
+      expect(composerStyle.shadowOpacity).toBe(0);
+      expect(composerStyle.shadowRadius).toBe(0);
+      expect(composerStyle.shadowOffset).toEqual({ width: 0, height: 0 });
+      expect(composerStyle.elevation).toBe(0);
+      expect(actionButtonStyle.shadowOpacity).toBeLessThanOrEqual(0.035);
+    },
+  );
+
+  it('shows only the selected coach name in the sticky metadata line', () => {
+    const visual = getCoachPersonaVisual('patient_calm');
+
+    render(
+      <CoachActionComposer
+        personaTitle="Mira"
+        promptTitle="Question au coach"
+        actionLabel="Demander"
+        actionA11yLabel="Demander conseil"
+        personaVisual={visual}
+        onPress={jest.fn()}
+        actionTestID="coach-action-primary"
+      />,
+    );
+
+    expect(screen.getByTestId('coach-action-composer-prompt-title').props.children).toBe(
+      'Question au coach',
+    );
+    expect(screen.getByTestId('coach-action-composer-persona-title').props.children).toBe(
+      'Mira',
+    );
+    expect(screen.getByText('Demander')).toBeTruthy();
+    expect(screen.queryByText(/·/)).toBeNull();
+    expect(screen.queryByText('Disponible')).toBeNull();
+  });
 });
 
 function getContrast(colorA: string, colorB: string) {
@@ -115,4 +179,20 @@ function toLinearChannel(channel: number) {
   return normalized <= 0.03928
     ? normalized / 12.92
     : ((normalized + 0.055) / 1.055) ** 2.4;
+}
+
+function hasStrongSurfaceOpacity(color: string, minimumAlpha: number) {
+  if (color.startsWith('#')) {
+    return true;
+  }
+
+  const rgbaMatch = color.match(
+    /^rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*([0-9]*\.?[0-9]+)\s*\)$/i,
+  );
+
+  if (!rgbaMatch) {
+    return false;
+  }
+
+  return Number.parseFloat(rgbaMatch[1]) >= minimumAlpha;
 }

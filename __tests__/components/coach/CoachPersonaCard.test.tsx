@@ -28,8 +28,8 @@ describe('CoachPersonaCard', () => {
 
     render(
       <CoachPersonaCard
-        title="Strict Tough"
-        subtitle="Direct accountability"
+        title="Axel"
+        subtitle="Direct and demanding"
         avatarImageSource={visual.imageSource}
         avatarFallbackLabel={visual.fallbackLabel}
         avatarHaloTint={visual.haloTint}
@@ -57,8 +57,8 @@ describe('CoachPersonaCard', () => {
 
     render(
       <CoachPersonaCard
-        title="Gentle Supportive"
-        subtitle="Warm and practical"
+        title="Noah"
+        subtitle="Warm and reassuring"
         avatarImageSource={visual.imageSource}
         avatarFallbackLabel={visual.fallbackLabel}
         avatarHaloTint={visual.haloTint}
@@ -76,8 +76,8 @@ describe('CoachPersonaCard', () => {
 
     render(
       <CoachPersonaCard
-        title="Gentle Supportive"
-        subtitle="Warm and practical"
+        title="Noah"
+        subtitle="Warm and reassuring"
         avatarImageSource={visual.imageSource}
         avatarFallbackLabel={visual.fallbackLabel}
         avatarHaloTint={visual.haloTint}
@@ -109,6 +109,6 @@ describe('CoachPersonaCard', () => {
     expect(portraitImageStyle.transform).toEqual([{ scale: 1.08 }]);
     expect(screen.getByTestId('coach-persona-card-portrait-gradient')).toBeTruthy();
     expect(screen.queryByTestId('coach-persona-card-avatar')).toBeNull();
-    expect(screen.getByText('Gentle Supportive')).toBeTruthy();
+    expect(screen.getByText('Noah')).toBeTruthy();
   });
 });
