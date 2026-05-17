@@ -19,6 +19,9 @@
       "bundleIdentifier": "com.healthscan.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
+      },
+      "runtimeVersion": {
+        "policy": "appVersion"
       }
     },
     "android": {
@@ -30,16 +33,26 @@
       },
       "package": "com.healthscan.app",
       "permissions": [
-        "CAMERA",
-        "com.android.vending.BILLING"
+        "android.permission.CAMERA",
+        "com.android.vending.BILLING",
+        "android.permission.CAMERA",
+        "android.permission.CAMERA",
+        "com.android.vending.BILLING",
+        "android.permission.CAMERA"
       ],
       "blockedPermissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.RECORD_AUDIO",
         "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_MEDIA_VIDEO",
         "android.permission.SYSTEM_ALERT_WINDOW"
-      ]
+      ],
+      "runtimeVersion": "1.0.0"
     },
     "androidNavigationBar": {
       "barStyle": "light-content",
@@ -96,6 +109,9 @@
         "projectId": "5c05cea9-b48e-4c50-aba8-bdb9855c9cd1"
       }
     },
-    "owner": "malo6002"
+    "owner": "malo6002",
+    "updates": {
+      "url": "https://u.expo.dev/5c05cea9-b48e-4c50-aba8-bdb9855c9cd1"
+    }
   }
 }
