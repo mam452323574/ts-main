@@ -94,10 +94,26 @@ Deno.serve(async (req: Request) => {
     }
 
     await ensureUserProfileExistsForAuthenticatedUser(supabase, user);
+
+    let scopedDwellMap: Record<string, number> | null = null;
+    if (requestBody.dwell_ms_by_post) {
+      const allowed = new Set(visiblePostIds);
+      const scoped: Record<string, number> = {};
+      for (const [postId, value] of Object.entries(requestBody.dwell_ms_by_post)) {
+        if (allowed.has(postId) && typeof value === 'number' && value > 0) {
+          scoped[postId] = value;
+        }
+      }
+      if (Object.keys(scoped).length > 0) {
+        scopedDwellMap = scoped;
+      }
+    }
+
     const { data, error } = await supabase.rpc('record_social_impressions', {
       p_post_ids: visiblePostIds,
       p_viewer_id: user.id,
       p_source: requestBody.source ?? 'feed',
+      p_dwell_ms_by_post: scopedDwellMap,
     });
 
     if (error) {

@@ -21,11 +21,14 @@ import {
   deleteSocialComment,
   deleteSocialPost,
   flattenSocialCommentsPages,
+  followSocialAuthor,
   getSanitizedSocialCommentCount,
+  hideSocialAuthor,
   removeSocialCommentFromPages,
   removeSocialPostFromFeedPages,
   reportSocialContent,
   setSocialCommentLike,
+  setSocialPostSave,
   setReactionOnSocialPost,
   SocialServiceError,
   updateSocialComment,
@@ -40,11 +43,14 @@ import type {
   SocialComment,
   SocialCommentsPage,
   SocialFeedPage,
+  SocialFollowAuthorResponse,
+  SocialHideAuthorResponse,
   SocialPost,
   SocialReactionState,
   SocialReportContentRequest,
   SocialSetCommentLikeResponse,
   SocialSetReactionResponse,
+  SocialSetSaveResponse,
 } from '@/types';
 
 interface CreateSocialPostDraft {
@@ -284,6 +290,91 @@ function applyServerReactionState(
   return updateSocialPostLikeState(pages, response.post_id, (post) => ({
     ...applyServerReactionStateToSocialPost(post, response),
   }));
+}
+
+function applyFollowStateToFeedPages(
+  pages: SocialFeedPage[] | undefined,
+  authorId: string,
+  following: boolean,
+): SocialFeedPage[] | null {
+  if (!pages) {
+    return null;
+  }
+
+  let didPatch = false;
+  const nextPages = pages.map((page) => {
+    let didPatchPage = false;
+    const nextItems = page.items.map((post) => {
+      if (post.author_id !== authorId) {
+        return post;
+      }
+      if (post.viewer_follows_author === following) {
+        return post;
+      }
+      didPatchPage = true;
+      didPatch = true;
+      return { ...post, viewer_follows_author: following };
+    });
+    return didPatchPage ? { ...page, items: nextItems } : page;
+  });
+
+  return didPatch ? nextPages : null;
+}
+
+function removeAuthorPostsFromFeedPages(
+  pages: SocialFeedPage[] | undefined,
+  authorId: string,
+): SocialFeedPage[] | null {
+  if (!pages) {
+    return null;
+  }
+
+  let didFilter = false;
+  const nextPages = pages.map((page) => {
+    const nextItems = page.items.filter((post) => post.author_id !== authorId);
+    if (nextItems.length === page.items.length) {
+      return page;
+    }
+    didFilter = true;
+    return { ...page, items: nextItems };
+  });
+
+  return didFilter ? nextPages : null;
+}
+
+function applySaveStateToFeedPages(
+  pages: SocialFeedPage[] | undefined,
+  postId: string,
+  saved: boolean,
+): SocialFeedPage[] | null {
+  if (!pages) {
+    return null;
+  }
+  let didPatch = false;
+  const nextPages = pages.map((page) => {
+    let didPatchPage = false;
+    const nextItems = page.items.map((post) => {
+      if (post.id !== postId) {
+        return post;
+      }
+      if (post.viewer_has_saved === saved) {
+        return post;
+      }
+      didPatchPage = true;
+      didPatch = true;
+      const nextSaveCount = Math.max(
+        0,
+        (post.save_count ?? 0) + (saved ? 1 : -1),
+      );
+      return {
+        ...post,
+        viewer_has_saved: saved,
+        save_count: nextSaveCount,
+      };
+    });
+    return didPatchPage ? { ...page, items: nextItems } : page;
+  });
+  return didPatch ? nextPages : null;
 }
 
 function buildReactionUiError(
@@ -1088,6 +1179,261 @@ export const useSocialMutations = () => {
     },
   });
 
+  const followAuthorMutation = useMutation({
+    mutationFn: ({
+      authorId,
+      action,
+    }: {
+      authorId: string;
+      action?: 'follow' | 'unfollow';
+    }) => followSocialAuthor(authorId, action),
+    onMutate: async ({ authorId, action }) => {
+      await queryClient.cancelQueries({ queryKey: ['socialFeed'] });
+      const previousSnapshots = queryClient.getQueriesData<SocialFeedInfiniteData>({
+        queryKey: ['socialFeed'],
+      });
+
+      // Optimistic state: explicit > inferred toggle from cache.
+      let optimisticFollowing: boolean | null = null;
+      if (action === 'follow') {
+        optimisticFollowing = true;
+      } else if (action === 'unfollow') {
+        optimisticFollowing = false;
+      } else {
+        for (const [, snapshot] of previousSnapshots) {
+          if (!snapshot) continue;
+          for (const page of snapshot.pages) {
+            const match = page.items.find((post) => post.author_id === authorId);
+            if (match) {
+              optimisticFollowing = !(match.viewer_follows_author === true);
+              break;
+            }
+          }
+          if (optimisticFollowing !== null) break;
+        }
+      }
+
+      if (optimisticFollowing !== null) {
+        for (const [queryKey, snapshot] of previousSnapshots) {
+          if (!snapshot) continue;
+          const nextPages = applyFollowStateToFeedPages(
+            snapshot.pages,
+            authorId,
+            optimisticFollowing,
+          );
+          if (nextPages) {
+            queryClient.setQueryData<SocialFeedInfiniteData>(queryKey, {
+              ...snapshot,
+              pages: nextPages,
+            });
+          }
+        }
+      }
+
+      return { authorId, previousSnapshots };
+    },
+    onError: (error, draft, context) => {
+      if (!context) return;
+      for (const [queryKey, snapshot] of context.previousSnapshots) {
+        queryClient.setQueryData(queryKey, snapshot);
+      }
+      trackFailureEvent('social_follow_author_failed', error, {
+        author_id: draft.authorId,
+        action: draft.action ?? 'toggle',
+      });
+    },
+    onSuccess: (response: SocialFollowAuthorResponse) => {
+      // Reconcile cache with server truth.
+      const snapshots = queryClient.getQueriesData<SocialFeedInfiniteData>({
+        queryKey: ['socialFeed'],
+      });
+      for (const [queryKey, snapshot] of snapshots) {
+        if (!snapshot) continue;
+        const nextPages = applyFollowStateToFeedPages(
+          snapshot.pages,
+          response.author_id,
+          response.following,
+        );
+        if (nextPages) {
+          queryClient.setQueryData<SocialFeedInfiniteData>(queryKey, {
+            ...snapshot,
+            pages: nextPages,
+          });
+        }
+      }
+      trackEvent('social_author_follow_toggled', {
+        author_id: response.author_id,
+        following: response.following,
+      });
+    },
+  });
+
+  const setSavePostMutation = useMutation({
+    mutationFn: ({
+      postId,
+      action,
+    }: {
+      postId: string;
+      action?: 'save' | 'unsave';
+    }) => setSocialPostSave(postId, action),
+    onMutate: async ({ postId, action }) => {
+      await queryClient.cancelQueries({ queryKey: ['socialFeed'] });
+      await queryClient.cancelQueries({
+        queryKey: SOCIAL_POST_QUERY_KEY(postId),
+        exact: true,
+      });
+      const previousSnapshots = queryClient.getQueriesData<SocialFeedInfiniteData>({
+        queryKey: ['socialFeed'],
+      });
+      const previousPostSnapshot = queryClient.getQueryData<SocialPost>(
+        SOCIAL_POST_QUERY_KEY(postId),
+      );
+
+      // Resolve optimistic state: explicit > toggle inferred from cache.
+      let nextSaved: boolean | null = null;
+      if (action === 'save') {
+        nextSaved = true;
+      } else if (action === 'unsave') {
+        nextSaved = false;
+      } else if (previousPostSnapshot) {
+        nextSaved = !(previousPostSnapshot.viewer_has_saved === true);
+      } else {
+        for (const [, snapshot] of previousSnapshots) {
+          if (!snapshot) continue;
+          for (const page of snapshot.pages) {
+            const match = page.items.find((post) => post.id === postId);
+            if (match) {
+              nextSaved = !(match.viewer_has_saved === true);
+              break;
+            }
+          }
+          if (nextSaved !== null) break;
+        }
+      }
+
+      if (nextSaved !== null) {
+        for (const [queryKey, snapshot] of previousSnapshots) {
+          if (!snapshot) continue;
+          const nextPages = applySaveStateToFeedPages(snapshot.pages, postId, nextSaved);
+          if (nextPages) {
+            queryClient.setQueryData<SocialFeedInfiniteData>(queryKey, {
+              ...snapshot,
+              pages: nextPages,
+            });
+          }
+        }
+        queryClient.setQueryData<SocialPost>(
+          SOCIAL_POST_QUERY_KEY(postId),
+          (currentPost) =>
+            currentPost
+              ? {
+                  ...currentPost,
+                  viewer_has_saved: nextSaved as boolean,
+                  save_count: Math.max(
+                    0,
+                    (currentPost.save_count ?? 0) +
+                      ((nextSaved as boolean) ? 1 : -1),
+                  ),
+                }
+              : currentPost,
+        );
+      }
+
+      return { postId, previousSnapshots, previousPostSnapshot };
+    },
+    onError: (error, draft, context) => {
+      if (!context) return;
+      for (const [queryKey, snapshot] of context.previousSnapshots) {
+        queryClient.setQueryData(queryKey, snapshot);
+      }
+      queryClient.setQueryData(
+        SOCIAL_POST_QUERY_KEY(context.postId),
+        context.previousPostSnapshot,
+      );
+      trackFailureEvent('social_post_save_failed', error, {
+        post_id: draft.postId,
+        action: draft.action ?? 'toggle',
+      });
+    },
+    onSuccess: (response: SocialSetSaveResponse) => {
+      const snapshots = queryClient.getQueriesData<SocialFeedInfiniteData>({
+        queryKey: ['socialFeed'],
+      });
+      for (const [queryKey, snapshot] of snapshots) {
+        if (!snapshot) continue;
+        const nextPages = applySaveStateToFeedPages(
+          snapshot.pages,
+          response.post_id,
+          response.saved,
+        );
+        if (nextPages) {
+          queryClient.setQueryData<SocialFeedInfiniteData>(queryKey, {
+            ...snapshot,
+            pages: nextPages,
+          });
+        }
+      }
+      trackEvent('social_post_save_toggled', {
+        post_id: response.post_id,
+        saved: response.saved,
+      });
+    },
+  });
+
+  const hideAuthorMutation = useMutation({
+    mutationFn: ({
+      authorId,
+      action,
+    }: {
+      authorId: string;
+      action?: 'hide' | 'unhide';
+    }) => hideSocialAuthor(authorId, action),
+    onMutate: async ({ authorId, action }) => {
+      await queryClient.cancelQueries({ queryKey: ['socialFeed'] });
+      const previousSnapshots = queryClient.getQueriesData<SocialFeedInfiniteData>({
+        queryKey: ['socialFeed'],
+      });
+
+      // Only remove from cache for 'hide' or toggle-into-hidden. 'unhide' has
+      // no client-side effect because the posts are not in the cache anymore.
+      const shouldRemove = action !== 'unhide';
+      if (shouldRemove) {
+        for (const [queryKey, snapshot] of previousSnapshots) {
+          if (!snapshot) continue;
+          const nextPages = removeAuthorPostsFromFeedPages(snapshot.pages, authorId);
+          if (nextPages) {
+            queryClient.setQueryData<SocialFeedInfiniteData>(queryKey, {
+              ...snapshot,
+              pages: nextPages,
+            });
+          }
+        }
+      }
+
+      return { authorId, previousSnapshots };
+    },
+    onError: (error, draft, context) => {
+      if (!context) return;
+      for (const [queryKey, snapshot] of context.previousSnapshots) {
+        queryClient.setQueryData(queryKey, snapshot);
+      }
+      trackFailureEvent('social_hide_author_failed', error, {
+        author_id: draft.authorId,
+        action: draft.action ?? 'toggle',
+      });
+    },
+    onSuccess: (response: SocialHideAuthorResponse) => {
+      // If the server confirms unhide, invalidate feed to fetch the now-visible posts.
+      if (!response.hidden) {
+        void queryClient.invalidateQueries({ queryKey: ['socialFeed'] });
+      }
+      trackEvent('social_author_hide_toggled', {
+        author_id: response.author_id,
+        hidden: response.hidden,
+      });
+    },
+  });
+
   return {
     createPostMutation,
     createCommentMutation,
@@ -1097,6 +1443,9 @@ export const useSocialMutations = () => {
     setCommentLikeMutation,
     setReactionMutation,
     reportContentMutation,
+    followAuthorMutation,
+    hideAuthorMutation,
+    setSavePostMutation,
     commentLikeError,
     reactionError,
     clearCommentLikeError,

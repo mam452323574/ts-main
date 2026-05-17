@@ -17,7 +17,9 @@ import {
   fetchSocialPostDetail,
   fetchSocialPublicProfile,
   flattenSocialCommentsPages,
+  followSocialAuthor,
   getDisplayedSocialCommentCount,
+  hideSocialAuthor,
   normalizeSocialImpressionPostIds,
   prioritizeViewerSocialComments,
   recordSocialPostImpressions,
@@ -25,6 +27,7 @@ import {
   removeSocialCommentFromThread,
   reportSocialContent,
   setSocialCommentLike,
+  setSocialPostSave,
   setReactionOnSocialPost,
   updateSocialComment,
   updateSocialCommentLikeState,
@@ -241,7 +244,7 @@ describe('social service', () => {
     expect(supabase.rpc).toHaveBeenCalledWith('get_social_feed_page', {
       p_category: null,
       p_limit: 5,
-      p_offset: 0,
+      p_cursor: null,
       p_viewer_language_code: 'fr',
       p_viewer_country_code: 'FR',
     });
@@ -2159,5 +2162,215 @@ describe('social service', () => {
       code: 'duplicate_report',
       status: 409,
     });
+  });
+
+  it('omits the action field when followSocialAuthor is called as a toggle', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      text: async () =>
+        JSON.stringify({
+          success: true,
+          author_id: 'author-1',
+          following: true,
+        }),
+    });
+
+    const response = await followSocialAuthor('author-1');
+
+    expect(response).toEqual({
+      success: true,
+      author_id: 'author-1',
+      following: true,
+    });
+
+    const sentPayload = (global.fetch as jest.Mock).mock.calls.at(-1)?.[1] as {
+      body?: string;
+    };
+    expect(JSON.parse(sentPayload.body ?? '{}')).toEqual({
+      author_id: 'author-1',
+    });
+  });
+
+  it('propagates the explicit follow action to the edge function payload', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      text: async () =>
+        JSON.stringify({
+          success: true,
+          author_id: 'author-2',
+          following: false,
+        }),
+    });
+
+    await followSocialAuthor('author-2', 'unfollow');
+
+    const sentPayload = (global.fetch as jest.Mock).mock.calls.at(-1)?.[1] as {
+      body?: string;
+    };
+    expect(JSON.parse(sentPayload.body ?? '{}')).toEqual({
+      author_id: 'author-2',
+      action: 'unfollow',
+    });
+  });
+
+  it('surfaces self-follow validation errors from the edge function', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      text: async () =>
+        JSON.stringify({
+          error: 'You cannot follow yourself',
+          code: 'social_follow_self',
+        }),
+    });
+
+    await expect(followSocialAuthor('author-self')).rejects.toMatchObject({
+      code: 'social_follow_self',
+      status: 400,
+    });
+  });
+
+  it('omits the action field when hideSocialAuthor is called as a toggle', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      text: async () =>
+        JSON.stringify({
+          success: true,
+          author_id: 'author-3',
+          hidden: true,
+        }),
+    });
+
+    const response = await hideSocialAuthor('author-3');
+
+    expect(response).toEqual({
+      success: true,
+      author_id: 'author-3',
+      hidden: true,
+    });
+
+    const sentPayload = (global.fetch as jest.Mock).mock.calls.at(-1)?.[1] as {
+      body?: string;
+    };
+    expect(JSON.parse(sentPayload.body ?? '{}')).toEqual({
+      author_id: 'author-3',
+    });
+  });
+
+  it('propagates the explicit hide action to the edge function payload', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      text: async () =>
+        JSON.stringify({
+          success: true,
+          author_id: 'author-4',
+          hidden: false,
+        }),
+    });
+
+    await hideSocialAuthor('author-4', 'unhide');
+
+    const sentPayload = (global.fetch as jest.Mock).mock.calls.at(-1)?.[1] as {
+      body?: string;
+    };
+    expect(JSON.parse(sentPayload.body ?? '{}')).toEqual({
+      author_id: 'author-4',
+      action: 'unhide',
+    });
+  });
+
+  it('surfaces self-hide validation errors from the edge function', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      text: async () =>
+        JSON.stringify({
+          error: 'You cannot hide yourself',
+          code: 'social_hide_self',
+        }),
+    });
+
+    await expect(hideSocialAuthor('author-self')).rejects.toMatchObject({
+      code: 'social_hide_self',
+      status: 400,
+    });
+  });
+
+  it('omits the action field when setSocialPostSave is called as a toggle', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      text: async () =>
+        JSON.stringify({ success: true, post_id: 'post-1', saved: true }),
+    });
+
+    const response = await setSocialPostSave('post-1');
+    expect(response).toEqual({ success: true, post_id: 'post-1', saved: true });
+
+    const sent = (global.fetch as jest.Mock).mock.calls.at(-1)?.[1] as {
+      body?: string;
+    };
+    expect(JSON.parse(sent.body ?? '{}')).toEqual({ post_id: 'post-1' });
+  });
+
+  it('propagates the explicit save action to the edge function payload', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      text: async () =>
+        JSON.stringify({ success: true, post_id: 'post-1', saved: false }),
+    });
+
+    await setSocialPostSave('post-1', 'unsave');
+    const sent = (global.fetch as jest.Mock).mock.calls.at(-1)?.[1] as {
+      body?: string;
+    };
+    expect(JSON.parse(sent.body ?? '{}')).toEqual({
+      post_id: 'post-1',
+      action: 'unsave',
+    });
+  });
+
+  it('passes a sanitized dwell_ms_by_post map when recording impressions', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      text: async () =>
+        JSON.stringify({ success: true, recorded_count: 2 }),
+    });
+
+    await recordSocialPostImpressions(['11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222'], 'feed', {
+      '11111111-1111-4111-8111-111111111111': 1200,
+      '22222222-2222-4222-8222-222222222222': 500000, // capped to 300000
+      'not-in-list-but-included': 999, // filtered out
+    });
+
+    const sent = (global.fetch as jest.Mock).mock.calls.at(-1)?.[1] as {
+      body?: string;
+    };
+    const parsed = JSON.parse(sent.body ?? '{}');
+    expect(parsed.post_ids).toEqual([
+      '11111111-1111-4111-8111-111111111111',
+      '22222222-2222-4222-8222-222222222222',
+    ]);
+    expect(parsed.dwell_ms_by_post).toEqual({
+      '11111111-1111-4111-8111-111111111111': 1200,
+      '22222222-2222-4222-8222-222222222222': 300000,
+    });
+  });
+
+  it('omits dwell_ms_by_post when no valid samples are provided', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      text: async () =>
+        JSON.stringify({ success: true, recorded_count: 1 }),
+    });
+
+    await recordSocialPostImpressions(['11111111-1111-4111-8111-111111111111'], 'feed', {
+      '11111111-1111-4111-8111-111111111111': 0,
+    });
+
+    const sent = (global.fetch as jest.Mock).mock.calls.at(-1)?.[1] as {
+      body?: string;
+    };
+    const parsed = JSON.parse(sent.body ?? '{}');
+    expect(parsed).not.toHaveProperty('dwell_ms_by_post');
   });
 });

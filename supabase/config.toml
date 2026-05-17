@@ -64,6 +64,15 @@ verify_jwt = true
 [functions.social-report-content]
 verify_jwt = true
 
+[functions.social-follow-author]
+verify_jwt = true
+
+[functions.social-hide-author]
+verify_jwt = true
+
+[functions.social-set-save]
+verify_jwt = true
+
 [functions.social-list-moderation-queue]
 verify_jwt = true
 

@@ -42,7 +42,13 @@ import type {
   SocialDeletePostResponse,
   SocialCommentsPage,
   SocialFeedPage,
+  SocialFollowAuthorRequest,
+  SocialFollowAuthorResponse,
+  SocialHideAuthorRequest,
+  SocialHideAuthorResponse,
   SocialPost,
+  SocialSetSaveRequest,
+  SocialSetSaveResponse,
   SocialPublicProfile,
   SocialReactionState,
   SocialRecordImpressionsRequest,
@@ -624,6 +630,23 @@ function readBoolean(value: unknown, fallback = false) {
   return typeof value === 'boolean' ? value : fallback;
 }
 
+const SOCIAL_REACTION_DISTRIBUTION_KEYS = ['like', 'dislike', 'laugh', 'wow', 'sad'] as const;
+
+function parseSocialReactionDistribution(value: unknown): Record<string, number> | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const result: Record<string, number> = {};
+  for (const key of SOCIAL_REACTION_DISTRIBUTION_KEYS) {
+    const raw = (value as Record<string, unknown>)[key];
+    const numeric = typeof raw === 'number' ? raw : Number(raw);
+    if (Number.isFinite(numeric) && numeric > 0) {
+      result[key] = numeric;
+    }
+  }
+  return Object.keys(result).length === 0 ? null : result;
+}
+
 function isNonNegativeFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0;
 }
@@ -631,7 +654,14 @@ function isNonNegativeFiniteNumber(value: unknown): value is number {
 function isValidSocialReactionState(
   value: unknown,
 ): value is SocialReactionState {
-  return value === 'like' || value === 'dislike' || value === 'neutral';
+  return (
+    value === 'like' ||
+    value === 'dislike' ||
+    value === 'neutral' ||
+    value === 'laugh' ||
+    value === 'wow' ||
+    value === 'sad'
+  );
 }
 
 function readRequiredCommentLikeCount(value: unknown) {
@@ -750,11 +780,16 @@ function parseSocialPostRow(row: unknown): SocialPost | null {
     like_count: readNumber(row.like_count),
     dislike_count: readNumber(row.dislike_count),
     comment_count: readNumber(row.comment_count),
+    unique_view_count: readNumber(row.unique_view_count),
+    save_count: readNumber(row.save_count),
+    reaction_distribution: parseSocialReactionDistribution(row.reaction_distribution),
     viewer_visible_comment_count: readOptionalNumber(
       row.viewer_visible_comment_count,
     ),
     viewer_reaction: viewerReaction,
     viewer_has_liked: viewerReaction === 'like' || readBoolean(row.viewer_has_liked),
+    viewer_follows_author: readBoolean(row.viewer_follows_author),
+    viewer_has_saved: readBoolean(row.viewer_has_saved),
     moderation_status: moderationStatus,
     moderation_state: readModerationStatus(row.moderation_state ?? moderationStatus),
     moderation_reason: readOptionalString(row.moderation_reason),
@@ -856,6 +891,13 @@ function parseCursor(cursor?: string | null) {
 
   const numericCursor = Number.parseInt(cursor, 10);
   return Number.isFinite(numericCursor) && numericCursor >= 0 ? numericCursor : 0;
+}
+
+function isCompositeCursor(cursor: string | null | undefined): cursor is string {
+  if (typeof cursor !== 'string' || cursor.length === 0) {
+    return false;
+  }
+  return cursor.includes(':');
 }
 
 async function invokeAuthedSocialFunction<TResponse>(
@@ -1080,16 +1122,25 @@ export async function fetchSocialFeed(
   pageSize = SOCIAL_FEED_PAGE_SIZE,
   viewerContext?: SocialFeedViewerContext,
 ): Promise<SocialFeedPage> {
-  const offset = parseCursor(cursor);
+  const useKeyset = cursor == null || isCompositeCursor(cursor);
 
   try {
-    const { data, error } = await supabase.rpc('get_social_feed_page', {
-      p_category: category === 'all' ? null : category,
-      p_limit: pageSize,
-      p_offset: offset,
-      p_viewer_language_code: viewerContext?.languageCode ?? null,
-      p_viewer_country_code: viewerContext?.countryCode ?? null,
-    });
+    const rpcArgs = useKeyset
+      ? {
+          p_category: category === 'all' ? null : category,
+          p_limit: pageSize,
+          p_cursor: cursor ?? null,
+          p_viewer_language_code: viewerContext?.languageCode ?? null,
+          p_viewer_country_code: viewerContext?.countryCode ?? null,
+        }
+      : {
+          p_category: category === 'all' ? null : category,
+          p_limit: pageSize,
+          p_offset: parseCursor(cursor),
+          p_viewer_language_code: viewerContext?.languageCode ?? null,
+          p_viewer_country_code: viewerContext?.countryCode ?? null,
+        };
+    const { data, error } = await supabase.rpc('get_social_feed_page', rpcArgs);
 
     if (error) {
       const socialError = createSocialFeedReadError(error);
@@ -1105,9 +1156,23 @@ export async function fetchSocialFeed(
       .map(parseSocialPostRow)
       .filter((item): item is SocialPost => item !== null);
 
+    let nextCursor: string | null = null;
+    if (useKeyset) {
+      // The RPC exposes `next_cursor` on every row (window LAST_VALUE).
+      const lastRow = rawRows[rawRows.length - 1] as
+        | { next_cursor?: unknown }
+        | undefined;
+      const candidate =
+        typeof lastRow?.next_cursor === 'string' ? lastRow.next_cursor : null;
+      nextCursor = rawRows.length >= pageSize ? candidate : null;
+    } else {
+      const offset = parseCursor(cursor);
+      nextCursor = rawRows.length >= pageSize ? String(offset + pageSize) : null;
+    }
+
     return {
       items,
-      next_cursor: rawRows.length >= pageSize ? String(offset + pageSize) : null,
+      next_cursor: nextCursor,
     };
   } catch (error) {
     if (error instanceof SocialServiceError) {
@@ -1714,9 +1779,33 @@ export async function setSocialCommentLike(commentId: string, liked: boolean) {
   return response;
 }
 
+const SOCIAL_DWELL_MS_PER_SAMPLE_CAP = 300_000;
+
+function sanitizeSocialDwellMap(
+  dwellMs: Record<string, number> | undefined,
+  allowedPostIds: string[],
+): Record<string, number> | undefined {
+  if (!dwellMs) {
+    return undefined;
+  }
+  const allowed = new Set(allowedPostIds);
+  const sanitized: Record<string, number> = {};
+  for (const [postId, value] of Object.entries(dwellMs)) {
+    if (!allowed.has(postId)) {
+      continue;
+    }
+    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+      continue;
+    }
+    sanitized[postId] = Math.min(Math.round(value), SOCIAL_DWELL_MS_PER_SAMPLE_CAP);
+  }
+  return Object.keys(sanitized).length > 0 ? sanitized : undefined;
+}
+
 export async function recordSocialPostImpressions(
   postIds: string[],
   source: SocialRecordImpressionsRequest['source'] = 'feed',
+  dwellMsByPost?: Record<string, number>,
 ) {
   const normalizedIds = normalizeSocialImpressionPostIds(postIds);
 
@@ -1727,13 +1816,30 @@ export async function recordSocialPostImpressions(
     } satisfies SocialRecordImpressionsResponse;
   }
 
+  const sanitizedDwell = sanitizeSocialDwellMap(dwellMsByPost, normalizedIds);
+
   const requestBody: SocialRecordImpressionsRequest = {
     post_ids: normalizedIds,
     source,
+    ...(sanitizedDwell ? { dwell_ms_by_post: sanitizedDwell } : {}),
   };
 
   return invokeAuthedSocialFunction<SocialRecordImpressionsResponse>(
     'social-record-impressions',
+    requestBody as unknown as Record<string, unknown>,
+  );
+}
+
+export async function setSocialPostSave(
+  postId: string,
+  action?: 'save' | 'unsave',
+) {
+  const requestBody: SocialSetSaveRequest = {
+    post_id: postId,
+    ...(action ? { action } : {}),
+  };
+  return invokeAuthedSocialFunction<SocialSetSaveResponse>(
+    'social-set-save',
     requestBody as unknown as Record<string, unknown>,
   );
 }
@@ -1763,6 +1869,34 @@ export async function reportSocialContent(
 ) {
   return invokeAuthedSocialFunction<SocialReportContentResponse>(
     'social-report-content',
+    requestBody as unknown as Record<string, unknown>,
+  );
+}
+
+export async function followSocialAuthor(
+  authorId: string,
+  action?: 'follow' | 'unfollow',
+) {
+  const requestBody: SocialFollowAuthorRequest = {
+    author_id: authorId,
+    ...(action ? { action } : {}),
+  };
+  return invokeAuthedSocialFunction<SocialFollowAuthorResponse>(
+    'social-follow-author',
+    requestBody as unknown as Record<string, unknown>,
+  );
+}
+
+export async function hideSocialAuthor(
+  authorId: string,
+  action?: 'hide' | 'unhide',
+) {
+  const requestBody: SocialHideAuthorRequest = {
+    author_id: authorId,
+    ...(action ? { action } : {}),
+  };
+  return invokeAuthedSocialFunction<SocialHideAuthorResponse>(
+    'social-hide-author',
     requestBody as unknown as Record<string, unknown>,
   );
 }
@@ -1818,6 +1952,9 @@ export function applyOptimisticReactionToSocialPost(
   let likeCount = post.like_count;
   let dislikeCount = post.dislike_count;
 
+  // Only 'like' and 'dislike' touch the like/dislike counters. Nuanced reactions
+  // (laugh/wow/sad) are tracked in reaction_distribution on the server; on the
+  // client we just flip viewer_reaction so the icon updates.
   if (previousReaction === 'like') {
     likeCount = Math.max(0, likeCount - 1);
   } else if (previousReaction === 'dislike') {

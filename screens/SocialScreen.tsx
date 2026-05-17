@@ -66,6 +66,7 @@ import type {
   SocialReactionState,
   SocialReportReasonCode,
 } from '@/types';
+import { Squircle } from '@/components/Squircle';
 
 const SOCIAL_FAB_SIZE = 60;
 const SOCIAL_FLOATING_FILTER_TOP_GUARD = 96;
@@ -93,6 +94,8 @@ export default function SocialScreen() {
   const queuedImpressionsRef = useRef<Set<string>>(new Set());
   const sessionImpressionsRef = useRef<Set<string>>(new Set());
   const impressionFlushTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const impressionEnteredAtRef = useRef<Map<string, number>>(new Map());
+  const queuedDwellMsRef = useRef<Record<string, number>>({});
   const queuedPostViewsRef = useRef<Set<string>>(new Set());
   const sessionPostViewsRef = useRef<Set<string>>(new Set());
   const postViewsFlushTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -172,6 +175,9 @@ export default function SocialScreen() {
     setReactionMutation,
     deletePostMutation,
     reportContentMutation,
+    followAuthorMutation,
+    hideAuthorMutation,
+    setSavePostMutation,
     reactionError,
     clearReactionError,
     isDeletePending,
@@ -236,6 +242,16 @@ export default function SocialScreen() {
       if (postViewsFlushTimeoutRef.current) {
         clearTimeout(postViewsFlushTimeoutRef.current);
       }
+      // Close any open dwell measurements so we don't lose the trailing samples.
+      const now = Date.now();
+      for (const [postId, enteredAt] of impressionEnteredAtRef.current) {
+        const dwellMs = Math.max(0, now - enteredAt);
+        if (dwellMs > 0) {
+          queuedDwellMsRef.current[postId] =
+            (queuedDwellMsRef.current[postId] ?? 0) + dwellMs;
+        }
+      }
+      impressionEnteredAtRef.current.clear();
     };
   }, []);
 
@@ -279,16 +295,33 @@ export default function SocialScreen() {
     const queuedPostIds = Array.from(queuedImpressionsRef.current);
     queuedImpressionsRef.current.clear();
 
-    if (queuedPostIds.length === 0) {
+    // Capture dwell snapshot at the same instant, reset for the next batch.
+    const dwellSnapshot = queuedDwellMsRef.current;
+    queuedDwellMsRef.current = {};
+    const dwellPayload =
+      Object.keys(dwellSnapshot).length > 0 ? dwellSnapshot : undefined;
+
+    if (queuedPostIds.length === 0 && !dwellPayload) {
       return;
     }
 
     try {
-      await recordSocialPostImpressions(queuedPostIds, 'feed');
+      // If we only have dwell-without-fresh-impressions, send the dwell map
+      // against the previously-known post ids in the dwell map itself.
+      const effectiveIds =
+        queuedPostIds.length > 0
+          ? queuedPostIds
+          : Object.keys(dwellSnapshot);
+      await recordSocialPostImpressions(effectiveIds, 'feed', dwellPayload);
     } catch (error) {
       queuedPostIds.forEach((postId) => {
         sessionImpressionsRef.current.delete(postId);
       });
+      // Put dwell samples back so we re-try on the next flush.
+      for (const [postId, ms] of Object.entries(dwellSnapshot)) {
+        queuedDwellMsRef.current[postId] =
+          (queuedDwellMsRef.current[postId] ?? 0) + ms;
+      }
       logOperationalError('[Social] Failed to record social impressions', error, {
         batch_size: queuedPostIds.length,
       });
@@ -384,6 +417,7 @@ export default function SocialScreen() {
         isViewable?: boolean | null;
       }>;
     }) => {
+      const now = Date.now();
       const visiblePostIds = viewableItems
         .filter((viewableItem) => viewableItem.isViewable)
         .map((viewableItem) => viewableItem.item?.id)
@@ -391,6 +425,25 @@ export default function SocialScreen() {
           (postId): postId is string =>
             typeof postId === 'string' && postId.length > 0,
         );
+
+      // Track entry timestamps for newly-viewable posts (dwell measurement).
+      const visibleSet = new Set(visiblePostIds);
+      for (const postId of visiblePostIds) {
+        if (!impressionEnteredAtRef.current.has(postId)) {
+          impressionEnteredAtRef.current.set(postId, now);
+        }
+      }
+      // Close dwell measurement for posts that just left the viewport.
+      for (const [postId, enteredAt] of impressionEnteredAtRef.current) {
+        if (!visibleSet.has(postId)) {
+          const dwellMs = Math.max(0, now - enteredAt);
+          if (dwellMs > 0) {
+            queuedDwellMsRef.current[postId] =
+              (queuedDwellMsRef.current[postId] ?? 0) + dwellMs;
+          }
+          impressionEnteredAtRef.current.delete(postId);
+        }
+      }
 
       queueImpressionsHandlerRef.current(visiblePostIds);
     },
@@ -686,6 +739,36 @@ export default function SocialScreen() {
     );
   };
 
+  const handleFollowToggle = (authorId: string, currentlyFollowing: boolean) => {
+    if (!authorId || authorId === userProfile?.id) {
+      return;
+    }
+    followAuthorMutation.mutate({
+      authorId,
+      action: currentlyFollowing ? 'unfollow' : 'follow',
+    });
+  };
+
+  const handleHideAuthor = (authorId: string) => {
+    if (!authorId || authorId === userProfile?.id) {
+      return;
+    }
+    hideAuthorMutation.mutate({
+      authorId,
+      action: 'hide',
+    });
+  };
+
+  const handleSavePost = (post: SocialPost) => {
+    if (!post?.id || post.author_id === userProfile?.id) {
+      return;
+    }
+    setSavePostMutation.mutate({
+      postId: post.id,
+      action: post.viewer_has_saved ? 'unsave' : 'save',
+    });
+  };
+
   const handleManualRefresh = useCallback(async () => {
     setIsManualRefreshing(true);
     try {
@@ -772,7 +855,7 @@ export default function SocialScreen() {
             ) : null}
 
             {reactionError ? (
-              <View style={styles.reactionErrorCard} testID="social-reaction-error">
+              <Squircle style={styles.reactionErrorCard} testID="social-reaction-error">
                 <View style={styles.reactionErrorHeader}>
                   <Text style={styles.reactionErrorTitle}>
                     {t('social.errors.reaction_title')}
@@ -792,7 +875,7 @@ export default function SocialScreen() {
                 {reactionErrorDiagnostics ? (
                   <Text style={styles.reactionErrorMeta}>{reactionErrorDiagnostics}</Text>
                 ) : null}
-              </View>
+              </Squircle>
             ) : null}
           </>
         }
@@ -852,6 +935,15 @@ export default function SocialScreen() {
               onReportPress={() => handleReportPost(item)}
               onSharePress={item.asset_url ? () => void handleSharePost(item) : null}
               onMorePress={() => setPostActionSheetTarget(item)}
+              onSavePress={() => handleSavePost(item)}
+              savePending={setSavePostMutation.isPending}
+              onReactionSelect={(reaction) =>
+                handleSetReaction(
+                  item,
+                  // Tap on the same reaction toggles back to neutral.
+                  item.viewer_reaction === reaction ? 'neutral' : reaction,
+                )
+              }
             />
           );
         }}
@@ -893,6 +985,9 @@ export default function SocialScreen() {
           currentUserId={userProfile?.id}
           deleteDisabled={isDeletePending(postActionSheetTarget.id)}
           reactionsDisabled={isReactionPending(postActionSheetTarget.id)}
+          isAuthorFollowed={
+            postActionSheetTarget.viewer_follows_author === true
+          }
           onClose={() => setPostActionSheetTarget(null)}
           onDeletePress={() => handleDeletePost(postActionSheetTarget)}
           onReportPress={() => handleReportPost(postActionSheetTarget)}
@@ -904,6 +999,15 @@ export default function SocialScreen() {
                 : 'dislike',
             )
           }
+          onFollowPress={() =>
+            handleFollowToggle(
+              postActionSheetTarget.author_id,
+              postActionSheetTarget.viewer_follows_author === true,
+            )
+          }
+          onHideAuthorPress={() =>
+            handleHideAuthor(postActionSheetTarget.author_id)
+          }
         />
       ) : null}
 
@@ -913,6 +1017,24 @@ export default function SocialScreen() {
           userId={profilePreviewTarget.userId}
           fallbackUsername={profilePreviewTarget.username}
           fallbackAvatarUrl={profilePreviewTarget.avatarUrl}
+          isOwnProfile={profilePreviewTarget.userId === userProfile?.id}
+          isAuthorFollowed={
+            posts.some(
+              (post) =>
+                post.author_id === profilePreviewTarget.userId &&
+                post.viewer_follows_author === true,
+            )
+          }
+          followBusy={followAuthorMutation.isPending}
+          onFollowPress={() => {
+            if (!profilePreviewTarget?.userId) return;
+            const currentlyFollowing = posts.some(
+              (post) =>
+                post.author_id === profilePreviewTarget.userId &&
+                post.viewer_follows_author === true,
+            );
+            handleFollowToggle(profilePreviewTarget.userId, currentlyFollowing);
+          }}
           onClose={() => setProfilePreviewTarget(null)}
         />
       ) : null}

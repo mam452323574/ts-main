@@ -9,7 +9,7 @@ import {
   requireAuthenticatedUser,
 } from '../_shared/phase2Auth.ts';
 import { loadPhase2FeatureFlags, requireFeatureEnabled } from '../_shared/phase2Config.ts';
-import { parseSocialSetReactionRequest } from '../_shared/phase2Contracts.ts';
+import { parseSocialFollowAuthorRequest } from '../_shared/phase2Contracts.ts';
 import {
   createPhase2DatabaseError,
   getPhase2ErrorStatus,
@@ -21,11 +21,10 @@ import {
   logPhase2Error,
   summarizeSupabaseError,
 } from '../_shared/phase2Observability.ts';
-import { assertReactableSocialPost } from '../_shared/phase2Social.ts';
 import { PHASE2_SOCIAL_REQUEST_MAX_BYTES, readJsonBody } from '../_shared/phase2Utils.ts';
-import type { SocialSetReactionResponse } from '../_shared/phase2Types.ts';
+import type { SocialFollowAuthorResponse } from '../_shared/phase2Types.ts';
 
-const rpcName = 'set_social_post_reaction';
+const rpcName = 'set_social_follow';
 
 function requirePostMethod(req: Request) {
   if (req.method !== 'POST') {
@@ -37,49 +36,27 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function isValidReactionState(
-  value: unknown,
-): value is SocialSetReactionResponse['viewer_reaction'] {
-  return (
-    value === 'like' ||
-    value === 'dislike' ||
-    value === 'neutral' ||
-    value === 'laugh' ||
-    value === 'wow' ||
-    value === 'sad'
-  );
-}
-
-function isNonNegativeFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
-}
-
-function buildSocialSetReactionResponse(
+function buildResponseBody(
   row: unknown,
-  expectedPostId: string,
-): SocialSetReactionResponse {
+  expectedAuthorId: string,
+): SocialFollowAuthorResponse {
   if (
     !isRecord(row) ||
-    typeof row.post_id !== 'string' ||
-    row.post_id.length === 0 ||
-    row.post_id !== expectedPostId ||
-    !isValidReactionState(row.viewer_reaction) ||
-    !isNonNegativeFiniteNumber(row.like_count) ||
-    !isNonNegativeFiniteNumber(row.dislike_count)
+    typeof row.author_id !== 'string' ||
+    row.author_id !== expectedAuthorId ||
+    typeof row.following !== 'boolean'
   ) {
     throw new Phase2HttpError(
       500,
-      'social_reaction_schema_mismatch',
-      'Social reaction update returned malformed data',
+      'social_follow_schema_mismatch',
+      'Social follow update returned malformed data',
     );
   }
 
   return {
     success: true,
-    post_id: row.post_id,
-    viewer_reaction: row.viewer_reaction,
-    like_count: row.like_count,
-    dislike_count: row.dislike_count,
+    author_id: row.author_id,
+    following: row.following,
   };
 }
 
@@ -103,45 +80,49 @@ Deno.serve(async (req: Request) => {
     requireFeatureEnabled(
       featureFlags.social_enabled,
       'social_disabled',
-      'Social reactions are currently disabled',
+      'Social follows are currently disabled',
     );
 
-    const requestBody = parseSocialSetReactionRequest(
+    const requestBody = parseSocialFollowAuthorRequest(
       await readJsonBody(req, { maxBytes: PHASE2_SOCIAL_REQUEST_MAX_BYTES }),
     );
-    await assertReactableSocialPost(supabase, user.id, requestBody.post_id);
+
+    if (requestBody.author_id === user.id) {
+      throw new Phase2HttpError(
+        400,
+        'social_follow_self',
+        'You cannot follow yourself',
+      );
+    }
+
     await ensureUserProfileExistsForAuthenticatedUser(supabase, user);
 
     const { data, error } = await supabase.rpc(rpcName, {
-      p_post_id: requestBody.post_id,
-      p_user_id: user.id,
-      p_reaction: requestBody.reaction,
+      p_author_id: requestBody.author_id,
+      p_action: requestBody.action ?? null,
     });
 
     if (error) {
-      logPhase2Error('[social-set-reaction] RPC failed', error, {
+      logPhase2Error('[social-follow-author] RPC failed', error, {
         request_id: requestId,
         rpc_name: rpcName,
         ...(summarizeSupabaseError(error) ?? {}),
       });
 
       throw createPhase2DatabaseError(error, {
-        contextLabel: 'Social reaction update',
-        fallbackCode: 'social_reaction_update_failed',
-        fallbackMessage: 'Failed to update the social reaction',
+        contextLabel: 'Social follow update',
+        fallbackCode: 'social_follow_update_failed',
+        fallbackMessage: 'Failed to update the social follow state',
         rpcName,
       });
     }
 
     const row = Array.isArray(data) ? data[0] : data;
-    const responseBody = buildSocialSetReactionResponse(
-      row,
-      requestBody.post_id,
-    );
+    const responseBody = buildResponseBody(row, requestBody.author_id);
 
     return jsonResponse(req, responseBody);
   } catch (error) {
-    logPhase2Error('[social-set-reaction] Request failed', error, {
+    logPhase2Error('[social-follow-author] Request failed', error, {
       request_id: requestId,
     });
     return jsonResponse(req, toPhase2ErrorPayload(error, { requestId }), {

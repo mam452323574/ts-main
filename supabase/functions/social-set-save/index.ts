@@ -9,7 +9,7 @@ import {
   requireAuthenticatedUser,
 } from '../_shared/phase2Auth.ts';
 import { loadPhase2FeatureFlags, requireFeatureEnabled } from '../_shared/phase2Config.ts';
-import { parseSocialSetReactionRequest } from '../_shared/phase2Contracts.ts';
+import { parseSocialSetSaveRequest } from '../_shared/phase2Contracts.ts';
 import {
   createPhase2DatabaseError,
   getPhase2ErrorStatus,
@@ -21,11 +21,10 @@ import {
   logPhase2Error,
   summarizeSupabaseError,
 } from '../_shared/phase2Observability.ts';
-import { assertReactableSocialPost } from '../_shared/phase2Social.ts';
 import { PHASE2_SOCIAL_REQUEST_MAX_BYTES, readJsonBody } from '../_shared/phase2Utils.ts';
-import type { SocialSetReactionResponse } from '../_shared/phase2Types.ts';
+import type { SocialSetSaveResponse } from '../_shared/phase2Types.ts';
 
-const rpcName = 'set_social_post_reaction';
+const rpcName = 'set_social_post_save';
 
 function requirePostMethod(req: Request) {
   if (req.method !== 'POST') {
@@ -37,49 +36,27 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function isValidReactionState(
-  value: unknown,
-): value is SocialSetReactionResponse['viewer_reaction'] {
-  return (
-    value === 'like' ||
-    value === 'dislike' ||
-    value === 'neutral' ||
-    value === 'laugh' ||
-    value === 'wow' ||
-    value === 'sad'
-  );
-}
-
-function isNonNegativeFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
-}
-
-function buildSocialSetReactionResponse(
+function buildResponseBody(
   row: unknown,
   expectedPostId: string,
-): SocialSetReactionResponse {
+): SocialSetSaveResponse {
   if (
     !isRecord(row) ||
     typeof row.post_id !== 'string' ||
-    row.post_id.length === 0 ||
     row.post_id !== expectedPostId ||
-    !isValidReactionState(row.viewer_reaction) ||
-    !isNonNegativeFiniteNumber(row.like_count) ||
-    !isNonNegativeFiniteNumber(row.dislike_count)
+    typeof row.saved !== 'boolean'
   ) {
     throw new Phase2HttpError(
       500,
-      'social_reaction_schema_mismatch',
-      'Social reaction update returned malformed data',
+      'social_save_schema_mismatch',
+      'Social save update returned malformed data',
     );
   }
 
   return {
     success: true,
     post_id: row.post_id,
-    viewer_reaction: row.viewer_reaction,
-    like_count: row.like_count,
-    dislike_count: row.dislike_count,
+    saved: row.saved,
   };
 }
 
@@ -103,45 +80,41 @@ Deno.serve(async (req: Request) => {
     requireFeatureEnabled(
       featureFlags.social_enabled,
       'social_disabled',
-      'Social reactions are currently disabled',
+      'Social saves are currently disabled',
     );
 
-    const requestBody = parseSocialSetReactionRequest(
+    const requestBody = parseSocialSetSaveRequest(
       await readJsonBody(req, { maxBytes: PHASE2_SOCIAL_REQUEST_MAX_BYTES }),
     );
-    await assertReactableSocialPost(supabase, user.id, requestBody.post_id);
+
     await ensureUserProfileExistsForAuthenticatedUser(supabase, user);
 
     const { data, error } = await supabase.rpc(rpcName, {
       p_post_id: requestBody.post_id,
-      p_user_id: user.id,
-      p_reaction: requestBody.reaction,
+      p_action: requestBody.action ?? null,
     });
 
     if (error) {
-      logPhase2Error('[social-set-reaction] RPC failed', error, {
+      logPhase2Error('[social-set-save] RPC failed', error, {
         request_id: requestId,
         rpc_name: rpcName,
         ...(summarizeSupabaseError(error) ?? {}),
       });
 
       throw createPhase2DatabaseError(error, {
-        contextLabel: 'Social reaction update',
-        fallbackCode: 'social_reaction_update_failed',
-        fallbackMessage: 'Failed to update the social reaction',
+        contextLabel: 'Social save update',
+        fallbackCode: 'social_save_update_failed',
+        fallbackMessage: 'Failed to update the social save state',
         rpcName,
       });
     }
 
     const row = Array.isArray(data) ? data[0] : data;
-    const responseBody = buildSocialSetReactionResponse(
-      row,
-      requestBody.post_id,
-    );
+    const responseBody = buildResponseBody(row, requestBody.post_id);
 
     return jsonResponse(req, responseBody);
   } catch (error) {
-    logPhase2Error('[social-set-reaction] Request failed', error, {
+    logPhase2Error('[social-set-save] Request failed', error, {
       request_id: requestId,
     });
     return jsonResponse(req, toPhase2ErrorPayload(error, { requestId }), {

@@ -149,6 +149,8 @@ describe('active Edge Functions parity', () => {
       'social-create-post',
       'social-delete-comment',
       'social-delete-post',
+      'social-follow-author',
+      'social-hide-author',
       'social-list-moderation-queue',
       'social-moderate-content',
       'social-reclassify-post',
@@ -158,6 +160,7 @@ describe('active Edge Functions parity', () => {
       'social-reserve-upload',
       'social-set-comment-like',
       'social-set-reaction',
+      'social-set-save',
       'social-update-comment',
     ]);
 

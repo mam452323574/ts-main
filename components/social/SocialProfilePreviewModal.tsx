@@ -5,8 +5,10 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
+import { UserMinus, UserPlus } from 'lucide-react-native';
 
 import { ModalHandle } from '@/components/ModalHandle';
 import { ProfileAvatar } from '@/components/ProfileAvatar';
@@ -26,12 +28,17 @@ import {
   formatSocialAbsoluteDate,
   formatSocialMemberSinceLabel,
 } from '@/utils/socialFormatting';
+import { SquirclePressable, Squircle } from '@/components/Squircle';
 
 interface SocialProfilePreviewModalProps {
   visible: boolean;
   userId?: string | null;
   fallbackUsername?: string | null;
   fallbackAvatarUrl?: string | null;
+  isOwnProfile?: boolean;
+  isAuthorFollowed?: boolean;
+  followBusy?: boolean;
+  onFollowPress?: (() => void) | null;
   onClose: () => void;
 }
 
@@ -40,6 +47,10 @@ export function SocialProfilePreviewModal({
   userId,
   fallbackUsername,
   fallbackAvatarUrl,
+  isOwnProfile = false,
+  isAuthorFollowed = false,
+  followBusy = false,
+  onFollowPress,
   onClose,
 }: SocialProfilePreviewModalProps) {
   const { colors } = useTheme();
@@ -58,6 +69,7 @@ export function SocialProfilePreviewModal({
   const scanCount = profile?.scan_count ?? 0;
   const isBusy = isLoading || isFetching;
   const hasProfile = !!profile;
+  const showFollowButton = !isOwnProfile && hasProfile && !!onFollowPress;
 
   return (
     <Modal
@@ -71,7 +83,7 @@ export function SocialProfilePreviewModal({
         style={styles.backdrop}
         testID="social-profile-preview-backdrop"
       >
-        <Pressable
+        <SquirclePressable
           onPress={() => undefined}
           style={styles.sheet}
           testID="social-profile-preview-modal"
@@ -98,17 +110,17 @@ export function SocialProfilePreviewModal({
             </View>
 
             {isBusy ? (
-              <View style={styles.stateCard} testID="social-profile-preview-loading">
+              <Squircle style={styles.stateCard} testID="social-profile-preview-loading">
                 <ActivityIndicator color={colors.primary} />
                 <Text style={styles.stateText}>{t('social.profile.loading')}</Text>
-              </View>
+              </Squircle>
             ) : !hasProfile ? (
-              <View style={styles.stateCard} testID="social-profile-preview-missing">
+              <Squircle style={styles.stateCard} testID="social-profile-preview-missing">
                 <Text style={styles.stateTitle}>{t('social.profile.missing_title')}</Text>
                 <Text style={styles.stateText}>{t('social.profile.missing_body')}</Text>
-              </View>
+              </Squircle>
             ) : (
-              <View style={styles.stats} testID="social-profile-preview-stats">
+              <Squircle style={styles.stats} testID="social-profile-preview-stats">
                 <View style={styles.statCell}>
                   <Text style={styles.statValue}>{scanCount}</Text>
                   <Text style={styles.statLabel}>{t('social.profile.scans_label')}</Text>
@@ -129,10 +141,40 @@ export function SocialProfilePreviewModal({
                   </Text>
                   <Text style={styles.statLabel}>{t('social.profile.created_label')}</Text>
                 </View>
-              </View>
+              </Squircle>
             )}
+
+            {showFollowButton ? (
+              <TouchableOpacity
+                accessibilityRole="button"
+                disabled={followBusy}
+                onPress={() => onFollowPress?.()}
+                style={[
+                  styles.followButton,
+                  isAuthorFollowed && styles.followButtonActive,
+                  followBusy && styles.followButtonDisabled,
+                ]}
+                testID="social-profile-follow-button"
+              >
+                {isAuthorFollowed ? (
+                  <UserMinus color={colors.primaryText} size={18} />
+                ) : (
+                  <UserPlus color={colors.background} size={18} />
+                )}
+                <Text
+                  style={[
+                    styles.followButtonLabel,
+                    isAuthorFollowed && styles.followButtonLabelActive,
+                  ]}
+                >
+                  {isAuthorFollowed
+                    ? t('social.actions.unfollow')
+                    : t('social.actions.follow')}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
-        </Pressable>
+        </SquirclePressable>
       </Pressable>
     </Modal>
   );
@@ -237,6 +279,33 @@ const createStyles = (colors: any) =>
       lineHeight: 19,
       color: colors.textMuted ?? colors.gray,
       textAlign: 'center',
+    },
+    followButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: SPACING.sm,
+      paddingVertical: SPACING.sm + 2,
+      paddingHorizontal: SPACING.lg,
+      borderRadius: BORDER_RADIUS.lg,
+      backgroundColor: colors.primary,
+      borderWidth: 1,
+      borderColor: colors.primary,
+    },
+    followButtonActive: {
+      backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.06),
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.12),
+    },
+    followButtonDisabled: {
+      opacity: 0.55,
+    },
+    followButtonLabel: {
+      fontSize: SIZES.text16,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      color: colors.background,
+    },
+    followButtonLabelActive: {
+      color: colors.primaryText,
     },
   });
 

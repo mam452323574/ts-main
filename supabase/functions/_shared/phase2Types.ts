@@ -14,7 +14,13 @@ export type Phase2SocialReportTargetType = 'post' | 'comment';
 
 export type Phase2SocialCategory = 'before_after' | 'food' | 'physique';
 
-export type Phase2SocialReactionState = 'like' | 'dislike' | 'neutral';
+export type Phase2SocialReactionState =
+  | 'like'
+  | 'dislike'
+  | 'neutral'
+  | 'laugh'
+  | 'wow'
+  | 'sad';
 
 export type Phase2SocialReportReasonCode =
   | 'harassment'
@@ -214,6 +220,7 @@ export interface SocialSetReactionResponse {
 export interface SocialRecordImpressionsRequest {
   post_ids: string[];
   source?: 'feed' | 'detail' | 'comments';
+  dwell_ms_by_post?: Record<string, number>;
 }
 
 export interface SocialRecordImpressionsResponse {
@@ -530,4 +537,37 @@ export interface Phase2UserProfileSnapshot {
   avatar_url: string | null;
   account_tier: string | null;
   country_code: string | null;
+}
+
+export interface SocialFollowAuthorRequest {
+  author_id: string;
+  action?: 'follow' | 'unfollow';
+}
+
+export interface SocialFollowAuthorResponse {
+  success: true;
+  author_id: string;
+  following: boolean;
+}
+
+export interface SocialHideAuthorRequest {
+  author_id: string;
+  action?: 'hide' | 'unhide';
+}
+
+export interface SocialHideAuthorResponse {
+  success: true;
+  author_id: string;
+  hidden: boolean;
+}
+
+export interface SocialSetSaveRequest {
+  post_id: string;
+  action?: 'save' | 'unsave';
+}
+
+export interface SocialSetSaveResponse {
+  success: true;
+  post_id: string;
+  saved: boolean;
 }

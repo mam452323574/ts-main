@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Pressable,
   StyleSheet,
@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import {
+  Bookmark,
   Flag,
   Ellipsis,
   Heart,
@@ -17,6 +18,7 @@ import {
 import { SocialCategoryPill } from './SocialCategoryPill';
 import { SocialIdentityRow } from './SocialIdentityRow';
 import { SocialModerationBadge } from './SocialModerationBadge';
+import { SocialReactionPicker } from './SocialReactionPicker';
 
 import { OptimizedImage } from '@/components/OptimizedImage';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -30,7 +32,8 @@ import {
 } from '@/constants/theme';
 import { formatSocialRelativeTimeLabel } from '@/utils/socialFormatting';
 import { normalizeTrustedImageUri } from '@/utils/urlSecurity';
-import type { SocialPost } from '@/types';
+import type { SocialPost, SocialReactionState } from '@/types';
+import { SquirclePressable } from '@/components/Squircle';
 
 interface SocialPostCardProps {
   post: SocialPost;
@@ -47,6 +50,9 @@ interface SocialPostCardProps {
   onReportPress?: (() => void) | null;
   onSharePress?: (() => void) | null;
   onMorePress?: (() => void) | null;
+  onSavePress?: (() => void) | null;
+  savePending?: boolean;
+  onReactionSelect?: ((reaction: SocialReactionState) => void) | null;
 }
 
 export function SocialPostCard({
@@ -60,8 +66,12 @@ export function SocialPostCard({
   onCommentPress,
   onSharePress,
   onMorePress,
+  onSavePress,
+  savePending = false,
+  onReactionSelect,
 }: SocialPostCardProps) {
   const { colors, isDark = false } = useTheme();
+  const [reactionPickerVisible, setReactionPickerVisible] = useState(false);
   const { t } = useLanguage();
   const styles = useMemo(
     () => createStyles(colors, Boolean(isDark)),
@@ -84,7 +94,7 @@ export function SocialPostCard({
   const shouldShowMoreButton = !!onMorePress;
 
   return (
-    <Pressable
+    <SquirclePressable
       accessibilityRole={onPress ? 'button' : undefined}
       disabled={!onPress}
       onPress={onPress ?? undefined}
@@ -129,7 +139,7 @@ export function SocialPostCard({
       ) : null}
 
       {safeImageUri ? (
-        <Pressable
+        <SquirclePressable
           disabled={!onPress}
           onPress={onPress ?? undefined}
           style={styles.imageWrap}
@@ -142,29 +152,47 @@ export function SocialPostCard({
             style={styles.postImage}
             testID={`social-post-image-${post.id}`}
           />
-        </Pressable>
+        </SquirclePressable>
       ) : null}
 
       <View style={styles.actionBar}>
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel={t('social.actions.like')}
-          accessibilityState={{
-            disabled: reactionsAreDisabled,
-            selected: post.viewer_reaction === 'like',
-          }}
-          disabled={reactionsAreDisabled}
-          onPress={onLikePress}
-          style={[styles.iconAction, reactionsAreDisabled && styles.actionButtonDisabled]}
-          testID={`social-post-like-${post.id}`}
-        >
-          <Heart
-            color={post.viewer_reaction === 'like' ? colors.error : colors.primaryText}
-            fill={post.viewer_reaction === 'like' ? colors.error : 'transparent'}
-            size={18}
+        <View style={styles.reactionAnchor}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={t('social.actions.like')}
+            accessibilityState={{
+              disabled: reactionsAreDisabled,
+              selected: post.viewer_reaction === 'like',
+            }}
+            disabled={reactionsAreDisabled}
+            onPress={onLikePress}
+            onLongPress={
+              onReactionSelect && !reactionsAreDisabled
+                ? () => setReactionPickerVisible(true)
+                : undefined
+            }
+            delayLongPress={350}
+            style={[styles.iconAction, reactionsAreDisabled && styles.actionButtonDisabled]}
+            testID={`social-post-like-${post.id}`}
+          >
+            <Heart
+              color={post.viewer_reaction === 'like' ? colors.error : colors.primaryText}
+              fill={post.viewer_reaction === 'like' ? colors.error : 'transparent'}
+              size={18}
+            />
+            <Text style={styles.actionLabel}>{post.like_count}</Text>
+          </TouchableOpacity>
+          <SocialReactionPicker
+            visible={reactionPickerVisible}
+            currentReaction={post.viewer_reaction}
+            testID={`social-reaction-picker-${post.id}`}
+            onSelect={(reaction) => {
+              setReactionPickerVisible(false);
+              onReactionSelect?.(reaction);
+            }}
+            onDismiss={() => setReactionPickerVisible(false)}
           />
-          <Text style={styles.actionLabel}>{post.like_count}</Text>
-        </TouchableOpacity>
+        </View>
 
         {commentsEnabled ? (
           <TouchableOpacity
@@ -192,6 +220,27 @@ export function SocialPostCard({
           </TouchableOpacity>
         ) : null}
 
+        {onSavePress && !isOwnPost ? (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={
+              post.viewer_has_saved
+                ? t('social.actions.unsave')
+                : t('social.actions.save')
+            }
+            disabled={savePending}
+            onPress={onSavePress}
+            style={[styles.iconAction, savePending && styles.iconActionDisabled]}
+            testID={`social-post-save-${post.id}`}
+          >
+            <Bookmark
+              color={post.viewer_has_saved ? colors.primary : colors.primaryText}
+              fill={post.viewer_has_saved ? colors.primary : 'transparent'}
+              size={18}
+            />
+          </TouchableOpacity>
+        ) : null}
+
         {post.viewer_reaction === 'dislike' ? (
           <View style={styles.feedbackBadge} testID={`social-post-disliked-${post.id}`}>
             <Flag color={colors.warning} size={14} />
@@ -201,7 +250,7 @@ export function SocialPostCard({
           </View>
         ) : null}
       </View>
-    </Pressable>
+    </SquirclePressable>
   );
 }
 
@@ -265,6 +314,12 @@ const createStyles = (colors: any, isDark: boolean) => {
       gap: SPACING.xs,
       minHeight: 32,
       paddingVertical: 2,
+    },
+    reactionAnchor: {
+      position: 'relative',
+    },
+    iconActionDisabled: {
+      opacity: 0.45,
     },
     actionButtonDisabled: {
       opacity: 0.45,

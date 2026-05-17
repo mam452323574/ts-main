@@ -7,7 +7,15 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Flag, ThumbsDown, Trash2, X } from 'lucide-react-native';
+import {
+  EyeOff,
+  Flag,
+  ThumbsDown,
+  Trash2,
+  UserMinus,
+  UserPlus,
+  X,
+} from 'lucide-react-native';
 
 import {
   BORDER_RADIUS,
@@ -19,6 +27,7 @@ import {
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { SocialPost } from '@/types';
+import { SquirclePressable, Squircle } from '@/components/Squircle';
 
 interface SocialPostActionSheetProps {
   visible: boolean;
@@ -26,10 +35,13 @@ interface SocialPostActionSheetProps {
   currentUserId?: string | null;
   deleteDisabled?: boolean;
   reactionsDisabled?: boolean;
+  isAuthorFollowed?: boolean;
   onClose: () => void;
   onDeletePress?: (() => void) | null;
   onReportPress?: (() => void) | null;
   onNotInterestedPress?: (() => void) | null;
+  onFollowPress?: (() => void) | null;
+  onHideAuthorPress?: (() => void) | null;
 }
 
 export function SocialPostActionSheet({
@@ -38,10 +50,13 @@ export function SocialPostActionSheet({
   currentUserId,
   deleteDisabled = false,
   reactionsDisabled = false,
+  isAuthorFollowed = false,
   onClose,
   onDeletePress,
   onReportPress,
   onNotInterestedPress,
+  onFollowPress,
+  onHideAuthorPress,
 }: SocialPostActionSheetProps) {
   const { colors } = useTheme();
   const { t } = useLanguage();
@@ -54,6 +69,8 @@ export function SocialPostActionSheet({
   const showNotInterested = canReactToPost && !!onNotInterestedPress;
   const showDelete = isOwnPost && !!onDeletePress;
   const showReport = !isOwnPost && !!onReportPress;
+  const showFollow = !isOwnPost && !!onFollowPress;
+  const showHideAuthor = !isOwnPost && !!onHideAuthorPress;
 
   const runAndClose = (action?: (() => void) | null) => {
     if (!action) {
@@ -77,12 +94,12 @@ export function SocialPostActionSheet({
         style={styles.backdrop}
         testID="social-post-action-sheet-backdrop"
       >
-        <Pressable
+        <SquirclePressable
           onPress={() => undefined}
           style={styles.sheet}
           testID="social-post-action-sheet"
         >
-          <View style={styles.handle} />
+          <Squircle style={styles.handle} />
 
           <View style={styles.header}>
             <View style={styles.headerCopy}>
@@ -111,9 +128,9 @@ export function SocialPostActionSheet({
                 style={[styles.actionRow, reactionsDisabled && styles.actionRowDisabled]}
                 testID="social-post-action-not-interested"
               >
-                <View style={styles.actionIcon}>
+                <Squircle style={styles.actionIcon}>
                   <ThumbsDown color={colors.primaryText} size={19} />
-                </View>
+                </Squircle>
                 <View style={styles.actionCopy}>
                   <Text style={styles.actionLabel}>
                     {post?.viewer_reaction === 'dislike'
@@ -134,13 +151,61 @@ export function SocialPostActionSheet({
                 style={styles.actionRow}
                 testID="social-post-action-report"
               >
-                <View style={styles.actionIcon}>
+                <Squircle style={styles.actionIcon}>
                   <Flag color={colors.primaryText} size={19} />
-                </View>
+                </Squircle>
                 <View style={styles.actionCopy}>
                   <Text style={styles.actionLabel}>{t('social.actions.report')}</Text>
                   <Text style={styles.actionMeta}>
                     {t('social.post_actions.report_hint')}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ) : null}
+
+            {showFollow ? (
+              <TouchableOpacity
+                accessibilityRole="button"
+                onPress={() => runAndClose(onFollowPress)}
+                style={styles.actionRow}
+                testID="social-post-action-follow"
+              >
+                <Squircle style={styles.actionIcon}>
+                  {isAuthorFollowed ? (
+                    <UserMinus color={colors.primaryText} size={19} />
+                  ) : (
+                    <UserPlus color={colors.primaryText} size={19} />
+                  )}
+                </Squircle>
+                <View style={styles.actionCopy}>
+                  <Text style={styles.actionLabel}>
+                    {isAuthorFollowed
+                      ? t('social.actions.unfollow')
+                      : t('social.actions.follow')}
+                  </Text>
+                  <Text style={styles.actionMeta}>
+                    {t('social.post_actions.follow_hint')}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ) : null}
+
+            {showHideAuthor ? (
+              <TouchableOpacity
+                accessibilityRole="button"
+                onPress={() => runAndClose(onHideAuthorPress)}
+                style={styles.actionRow}
+                testID="social-post-action-hide-author"
+              >
+                <Squircle style={styles.actionIcon}>
+                  <EyeOff color={colors.primaryText} size={19} />
+                </Squircle>
+                <View style={styles.actionCopy}>
+                  <Text style={styles.actionLabel}>
+                    {t('social.actions.hide_author')}
+                  </Text>
+                  <Text style={styles.actionMeta}>
+                    {t('social.post_actions.hide_author_hint')}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -158,9 +223,9 @@ export function SocialPostActionSheet({
                 ]}
                 testID="social-post-action-delete"
               >
-                <View style={[styles.actionIcon, styles.dangerActionIcon]}>
+                <Squircle style={[styles.actionIcon, styles.dangerActionIcon]}>
                   <Trash2 color={colors.error} size={19} />
-                </View>
+                </Squircle>
                 <View style={styles.actionCopy}>
                   <Text style={[styles.actionLabel, styles.dangerActionLabel]}>
                     {deleteDisabled
@@ -174,7 +239,7 @@ export function SocialPostActionSheet({
               </TouchableOpacity>
             ) : null}
           </View>
-        </Pressable>
+        </SquirclePressable>
       </Pressable>
     </Modal>
   );

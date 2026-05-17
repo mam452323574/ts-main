@@ -23,6 +23,9 @@ import type {
   SocialCreatePostRequest,
   SocialDeleteCommentRequest,
   SocialDeletePostRequest,
+  SocialFollowAuthorRequest,
+  SocialHideAuthorRequest,
+  SocialSetSaveRequest,
   SocialModerateContentRequest,
   SocialProcessModerationQueueRequest,
   SocialReclassifyPostRequest,
@@ -65,7 +68,14 @@ const ALLOWED_REPORT_REASON_CODES = new Set([
   'other',
 ]);
 
-const ALLOWED_REACTION_STATES = new Set(['like', 'dislike', 'neutral']);
+const ALLOWED_REACTION_STATES = new Set([
+  'like',
+  'dislike',
+  'neutral',
+  'laugh',
+  'wow',
+  'sad',
+]);
 const ALLOWED_MODERATION_ACTIONS = new Set([
   'approve',
   'flag',
@@ -134,6 +144,12 @@ const SOCIAL_CREATE_COMMENT_ALLOWED_KEYS = [
 
 const SOCIAL_DELETE_POST_ALLOWED_KEYS = ['post_id'] as const;
 
+const SOCIAL_FOLLOW_AUTHOR_ALLOWED_KEYS = ['author_id', 'action'] as const;
+const ALLOWED_FOLLOW_ACTIONS = new Set(['follow', 'unfollow']);
+
+const SOCIAL_HIDE_AUTHOR_ALLOWED_KEYS = ['author_id', 'action'] as const;
+const ALLOWED_HIDE_ACTIONS = new Set(['hide', 'unhide']);
+
 const SOCIAL_UPDATE_COMMENT_ALLOWED_KEYS = ['comment_id', 'content_text'] as const;
 
 const SOCIAL_DELETE_COMMENT_ALLOWED_KEYS = ['comment_id'] as const;
@@ -152,7 +168,16 @@ const SOCIAL_REPORT_ALLOWED_KEYS = [
   'details',
 ] as const;
 
-const SOCIAL_RECORD_IMPRESSIONS_ALLOWED_KEYS = ['post_ids', 'source'] as const;
+const SOCIAL_RECORD_IMPRESSIONS_ALLOWED_KEYS = [
+  'post_ids',
+  'source',
+  'dwell_ms_by_post',
+] as const;
+
+const SOCIAL_SET_SAVE_ALLOWED_KEYS = ['post_id', 'action'] as const;
+const ALLOWED_SAVE_ACTIONS = new Set(['save', 'unsave']);
+
+const MAX_DWELL_MS_PER_SAMPLE = 300_000;
 const SOCIAL_RECORD_POST_VIEWS_ALLOWED_KEYS = ['post_ids'] as const;
 
 const SOCIAL_MODERATE_CONTENT_ALLOWED_KEYS = [
@@ -1134,9 +1159,85 @@ export function parseSocialRecordImpressionsRequest(
     return normalizedPostId;
   });
 
+  const dedupedPostIds = Array.from(new Set(postIds));
+  const dwellRaw = payload.dwell_ms_by_post;
+  let dwellMap: Record<string, number> | undefined;
+
+  if (dwellRaw !== undefined && dwellRaw !== null) {
+    if (!isRecord(dwellRaw)) {
+      throw new Phase2HttpError(
+        400,
+        'invalid_dwell_ms_by_post',
+        'dwell_ms_by_post must be an object keyed by post id',
+      );
+    }
+    const allowedSet = new Set(dedupedPostIds);
+    const sanitized: Record<string, number> = {};
+    for (const [postId, rawValue] of Object.entries(dwellRaw)) {
+      if (!allowedSet.has(postId)) {
+        throw new Phase2HttpError(
+          400,
+          'invalid_dwell_ms_by_post',
+          'dwell_ms_by_post keys must be a subset of post_ids',
+        );
+      }
+      const numericValue =
+        typeof rawValue === 'number'
+          ? rawValue
+          : typeof rawValue === 'string' && rawValue.trim().length > 0
+            ? Number(rawValue)
+            : NaN;
+      if (!Number.isFinite(numericValue) || numericValue < 0) {
+        throw new Phase2HttpError(
+          400,
+          'invalid_dwell_ms_by_post',
+          'dwell_ms_by_post values must be non-negative finite numbers',
+        );
+      }
+      const clamped = Math.min(
+        Math.round(numericValue),
+        MAX_DWELL_MS_PER_SAMPLE,
+      );
+      if (clamped > 0) {
+        sanitized[postId] = clamped;
+      }
+    }
+    if (Object.keys(sanitized).length > 0) {
+      dwellMap = sanitized;
+    }
+  }
+
   return {
-    post_ids: Array.from(new Set(postIds)),
+    post_ids: dedupedPostIds,
     source: validateSocialImpressionSource(payload.source),
+    ...(dwellMap ? { dwell_ms_by_post: dwellMap } : {}),
+  };
+}
+
+export function parseSocialSetSaveRequest(payload: unknown): SocialSetSaveRequest {
+  if (!isRecord(payload)) {
+    throw new Phase2HttpError(400, 'invalid_payload', 'Request body must be an object');
+  }
+
+  assertNoUnknownKeys(payload, SOCIAL_SET_SAVE_ALLOWED_KEYS);
+
+  const postId = readRequiredTrimmedString(payload.post_id, 'post_id');
+  assertUuidLike(postId, 'post_id');
+
+  const rawAction = readOptionalString(payload.action);
+  if (rawAction !== null && rawAction !== undefined && !ALLOWED_SAVE_ACTIONS.has(rawAction)) {
+    throw new Phase2HttpError(
+      400,
+      'invalid_save_action',
+      'action must be save, unsave, or omitted',
+    );
+  }
+
+  return {
+    post_id: postId,
+    ...(rawAction
+      ? { action: rawAction as SocialSetSaveRequest['action'] }
+      : {}),
   };
 }
 
@@ -1548,5 +1649,63 @@ export function parseSocialReserveUploadRequest(payload: unknown) {
 
   return {
     mime_type: normalizeSocialImageMimeType(payload.mime_type),
+  };
+}
+
+export function parseSocialFollowAuthorRequest(
+  payload: unknown,
+): SocialFollowAuthorRequest {
+  if (!isRecord(payload)) {
+    throw new Phase2HttpError(400, 'invalid_payload', 'Request body must be an object');
+  }
+
+  assertNoUnknownKeys(payload, SOCIAL_FOLLOW_AUTHOR_ALLOWED_KEYS);
+
+  const authorId = readRequiredTrimmedString(payload.author_id, 'author_id');
+  assertUuidLike(authorId, 'author_id');
+
+  const rawAction = readOptionalString(payload.action);
+  if (rawAction !== null && rawAction !== undefined && !ALLOWED_FOLLOW_ACTIONS.has(rawAction)) {
+    throw new Phase2HttpError(
+      400,
+      'invalid_follow_action',
+      'action must be follow, unfollow, or omitted',
+    );
+  }
+
+  return {
+    author_id: authorId,
+    ...(rawAction
+      ? { action: rawAction as SocialFollowAuthorRequest['action'] }
+      : {}),
+  };
+}
+
+export function parseSocialHideAuthorRequest(
+  payload: unknown,
+): SocialHideAuthorRequest {
+  if (!isRecord(payload)) {
+    throw new Phase2HttpError(400, 'invalid_payload', 'Request body must be an object');
+  }
+
+  assertNoUnknownKeys(payload, SOCIAL_HIDE_AUTHOR_ALLOWED_KEYS);
+
+  const authorId = readRequiredTrimmedString(payload.author_id, 'author_id');
+  assertUuidLike(authorId, 'author_id');
+
+  const rawAction = readOptionalString(payload.action);
+  if (rawAction !== null && rawAction !== undefined && !ALLOWED_HIDE_ACTIONS.has(rawAction)) {
+    throw new Phase2HttpError(
+      400,
+      'invalid_hide_action',
+      'action must be hide, unhide, or omitted',
+    );
+  }
+
+  return {
+    author_id: authorId,
+    ...(rawAction
+      ? { action: rawAction as SocialHideAuthorRequest['action'] }
+      : {}),
   };
 }

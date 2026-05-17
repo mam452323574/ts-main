@@ -868,7 +868,13 @@ export type SocialModerationStatus = ModerationState;
 
 export type SocialReportTargetType = 'post' | 'comment';
 
-export type SocialReactionState = 'like' | 'dislike' | 'neutral';
+export type SocialReactionState =
+  | 'like'
+  | 'dislike'
+  | 'neutral'
+  | 'laugh'
+  | 'wow'
+  | 'sad';
 
 export type SocialReportReasonCode =
   | 'harassment'
@@ -1369,9 +1375,14 @@ export interface SocialPost {
   like_count: number;
   dislike_count: number;
   comment_count: number;
+  unique_view_count?: number;
+  save_count?: number;
+  reaction_distribution?: Record<string, number> | null;
   viewer_visible_comment_count?: number | null;
   viewer_reaction: SocialReactionState;
   viewer_has_liked: boolean;
+  viewer_follows_author?: boolean;
+  viewer_has_saved?: boolean;
   moderation_status: SocialModerationStatus;
   moderation_state?: ModerationState;
   moderation_reason?: string | null;
@@ -1700,9 +1711,43 @@ export interface SocialSetReactionResponse {
   dislike_count: number;
 }
 
+export interface SocialFollowAuthorRequest {
+  author_id: string;
+  action?: 'follow' | 'unfollow';
+}
+
+export interface SocialFollowAuthorResponse {
+  success: true;
+  author_id: string;
+  following: boolean;
+}
+
+export interface SocialHideAuthorRequest {
+  author_id: string;
+  action?: 'hide' | 'unhide';
+}
+
+export interface SocialHideAuthorResponse {
+  success: true;
+  author_id: string;
+  hidden: boolean;
+}
+
+export interface SocialSetSaveRequest {
+  post_id: string;
+  action?: 'save' | 'unsave';
+}
+
+export interface SocialSetSaveResponse {
+  success: true;
+  post_id: string;
+  saved: boolean;
+}
+
 export interface SocialRecordImpressionsRequest {
   post_ids: string[];
   source?: 'feed' | 'detail' | 'comments';
+  dwell_ms_by_post?: Record<string, number>;
 }
 
 export interface SocialRecordImpressionsResponse {
