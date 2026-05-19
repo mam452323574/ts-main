@@ -13,8 +13,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertCircle, Lock } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { ModalHandle } from '@/components/ModalHandle';
-import { ScreenHeader } from '@/components/ScreenHeader';
 import { RadialScoreGauge } from '@/components/RadialScoreGauge';
 import { MetricCard } from '@/components/MetricCard';
 import { ResultQuickStatCard } from '@/components/ResultQuickStatCard';
@@ -22,10 +20,12 @@ import { ResultIcon } from '@/components/ResultIcon';
 import { TrajectoryPreviewCard } from '@/components/TrajectoryPreviewCard';
 import { ResultActionRail } from '@/components/results/ResultActionRail';
 import { ScanCoachCtaCard } from '@/components/results/ScanCoachCtaCard';
+import { ScanCoachFinalCard } from '@/components/results/ScanCoachFinalCard';
 import { ResultHeroSurface } from '@/components/results/ResultHeroSurface';
 import { ResultNarrativeCard } from '@/components/results/ResultNarrativeCard';
 import { NutritionLongTextCard } from '@/components/results/NutritionLongTextCard';
 import { ResultPillBadge } from '@/components/results/ResultPillBadge';
+import { ResultSheetTopChrome } from '@/components/results/ResultSheetTopChrome';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -44,7 +44,10 @@ import {
   isSuperAnalysisType,
   tryNormalizeAnalysisResult,
 } from '@/utils/analysisNormalization';
-import { safeParseJsonRouteParam } from '@/utils/deepLinkSchemas';
+import {
+  safeParseJsonRouteParam,
+  safeReadScanImageUri,
+} from '@/utils/deepLinkSchemas';
 import { openResultShareFlow } from '@/utils/resultShareFlow';
 import { resolvePremiumRenderStateFromProfile } from '@/utils/subscription';
 import {
@@ -65,6 +68,7 @@ import {
   resolveResultItemTheme,
   resolveScanTypeTheme,
 } from '@/utils/resultVisualTheme';
+import { Squircle } from '@/components/Squircle';
 
 const parseAnalysisData = (
   value: string | string[] | undefined,
@@ -102,8 +106,8 @@ export default function ScanResultScreen() {
   );
   const insets = useSafeAreaInsets();
   const styles = useMemo(
-    () => createStyles(colors, insets, layout),
-    [colors, insets, layout],
+    () => createStyles(colors, insets, isDark, layout),
+    [colors, insets, isDark, layout],
   );
 
   const params = useLocalSearchParams();
@@ -111,7 +115,7 @@ export default function ScanResultScreen() {
     () => parseAnalysisData(params.analysisData),
     [params.analysisData],
   );
-  const imageUri = parseRouteParam(params.imageUri);
+  const imageUri = safeReadScanImageUri(params.imageUri);
   const scanId = parseRouteParam(params.scanId);
   const [isPreparingCommunityShare, setIsPreparingCommunityShare] = useState(false);
   const premiumPotentialScanType = useMemo(() => {
@@ -134,24 +138,16 @@ export default function ScanResultScreen() {
     scanId ?? null,
     !!analysisData,
   );
-  const slideAnim = useRef(new Animated.Value(50)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const sectionAnimations = useRef(
-    Array.from({ length: 6 }, () => new Animated.Value(0)),
+    Array.from({ length: 7 }, () => new Animated.Value(0)),
   ).current;
 
   useEffect(() => {
     fadeAnim.setValue(0);
-    slideAnim.setValue(50);
     sectionAnimations.forEach((value) => value.setValue(0));
 
     Animated.parallel([
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        tension: 50,
-        friction: 8,
-        useNativeDriver: true,
-      }),
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 400,
@@ -168,7 +164,7 @@ export default function ScanResultScreen() {
         ),
       ),
     ]).start();
-  }, [fadeAnim, sectionAnimations, slideAnim]);
+  }, [fadeAnim, sectionAnimations]);
 
   const getSectionAnimationStyle = (index: number) => ({
     opacity: Animated.multiply(fadeAnim, sectionAnimations[index]),
@@ -279,7 +275,7 @@ export default function ScanResultScreen() {
     });
   };
 
-  const handleCoachPress = () => {
+  const handleCoachPress = (ctaPosition: 'top' | 'final') => {
     if (!coachIntent) {
       return;
     }
@@ -292,6 +288,7 @@ export default function ScanResultScreen() {
       pathname: '/coach',
       params: {
         source: 'scan_result',
+        cta_position: ctaPosition,
         autoSubmit: '1',
         ...(scanId ? { scanId } : {}),
         ...(coachScanType ? { scanType: coachScanType } : {}),
@@ -309,60 +306,61 @@ export default function ScanResultScreen() {
     colors,
     isDark,
   });
+  const fallbackScrimGradient = fallbackBackgroundGradient.map((color, index) =>
+    withAlpha(color, index === 0 ? 0.72 : index === 1 ? 0.64 : 0.78),
+  ) as [string, string, string];
 
   if (!analysisData || !viewModel) {
     return (
       <View
-        style={[styles.container, { backgroundColor: fallbackBackgroundGradient[0] }]}
+        style={styles.container}
         testID="scan-result-screen"
       >
         <LinearGradient
-          colors={fallbackBackgroundGradient}
+          colors={fallbackScrimGradient}
           end={{ x: 1, y: 1 }}
           start={{ x: 0, y: 0 }}
           style={styles.backgroundLayer}
           testID="scan-result-background-layer"
         />
-        <ScrollView
-          contentContainerStyle={[styles.scrollContent, styles.errorScrollContent]}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.resultTopChrome} testID="scan-result-top-chrome">
-            <ModalHandle />
-            <ScreenHeader
+        <Squircle style={styles.resultSheet} testID="scan-result-sheet">
+          <ScrollView
+            alwaysBounceVertical={false}
+            bounces={false}
+            contentContainerStyle={[styles.scrollContent, styles.errorScrollContent]}
+            overScrollMode="never"
+            showsVerticalScrollIndicator={false}
+            style={styles.resultScroll}
+            testID="scan-result-scroll"
+          >
+            <ResultSheetTopChrome
+              testID="scan-result-top-chrome"
               title={t('common.results.title')}
-              onClose={handleClose}
-              centered
-              variant="inline"
-              borderless
-              topInset={false}
-              closeTestID="scan-result-close-button"
-              style={styles.resultHeader}
-              testID="scan-result-screen-header"
+              titleTestID="scan-result-screen-header"
+              variant="result"
             />
-          </View>
-
-          <View style={styles.errorContainer}>
-            <AlertCircle color={colors.error} size={48} />
-            <Text
-              {...RESULT_TEXT_PROPS}
-              style={[styles.errorText, { color: colors.gray }]}
-            >
-              {t('common.results.no_data')}
-            </Text>
-            <TouchableOpacity
-              style={[styles.errorButton, { backgroundColor: colors.primaryText }]}
-              onPress={handleClose}
-            >
+            <View style={styles.errorContainer}>
+              <AlertCircle color={colors.error} size={48} />
               <Text
                 {...RESULT_TEXT_PROPS}
-                style={[styles.errorButtonText, { color: colors.background }]}
+                style={[styles.errorText, { color: colors.gray }]}
               >
-                {t('common.home_back')}
+                {t('common.results.no_data')}
               </Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
+              <TouchableOpacity
+                style={[styles.errorButton, { backgroundColor: colors.primaryText }]}
+                onPress={handleClose}
+              >
+                <Text
+                  {...RESULT_TEXT_PROPS}
+                  style={[styles.errorButtonText, { color: colors.background }]}
+                >
+                  {t('common.home_back')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </Squircle>
       </View>
     );
   }
@@ -374,14 +372,17 @@ export default function ScanResultScreen() {
     isDark,
     accentColor,
   });
+  const scrimGradient = backgroundGradient.map((color, index) =>
+    withAlpha(color, index === 0 ? 0.72 : index === 1 ? 0.64 : 0.78),
+  ) as [string, string, string];
 
   return (
     <View
-      style={[styles.container, { backgroundColor: backgroundGradient[0] }]}
+      style={styles.container}
       testID="scan-result-screen"
     >
       <LinearGradient
-        colors={backgroundGradient}
+        colors={scrimGradient}
         end={{ x: 1, y: 1 }}
         start={{ x: 0, y: 0 }}
         style={styles.backgroundLayer}
@@ -389,34 +390,30 @@ export default function ScanResultScreen() {
       />
       {alertElement}
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.resultTopChrome} testID="scan-result-top-chrome">
-          <ModalHandle />
-          <ScreenHeader
-            title={t('common.results.title')}
-            onClose={handleClose}
-            centered
-            variant="inline"
-            borderless
-            topInset={false}
-            closeTestID="scan-result-close-button"
-            style={styles.resultHeader}
-            testID="scan-result-screen-header"
-          />
-        </View>
-
-        <Animated.View
-          style={[
-            styles.content,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }],
-            },
-          ]}
+      <Squircle style={styles.resultSheet} testID="scan-result-sheet">
+        <ScrollView
+          alwaysBounceVertical={false}
+          bounces={false}
+          contentContainerStyle={styles.scrollContent}
+          overScrollMode="never"
+          showsVerticalScrollIndicator={false}
+          style={styles.resultScroll}
+          testID="scan-result-scroll"
         >
+          <ResultSheetTopChrome
+            testID="scan-result-top-chrome"
+            title={t('common.results.title')}
+            titleTestID="scan-result-screen-header"
+            variant="result"
+          />
+          <Animated.View
+            style={[
+              styles.content,
+              {
+                opacity: fadeAnim,
+              },
+            ]}
+          >
           <Animated.View style={getSectionAnimationStyle(0)}>
             <ResultHeroSurface
               accentColor={accentColor}
@@ -497,9 +494,9 @@ export default function ScanResultScreen() {
               <ScanCoachCtaCard
                 accentColor={accentColor}
                 intent={coachIntent}
-                onPress={handleCoachPress}
+                onPress={() => handleCoachPress('top')}
                 testID="scan-result-coach-cta"
-                variant="hero"
+                variant="default"
               />
             </Animated.View>
           ) : null}
@@ -626,7 +623,18 @@ export default function ScanResultScreen() {
             </ResultNarrativeCard>
           </Animated.View>
 
-          <Animated.View style={getSectionAnimationStyle(5)}>
+          {coachIntent ? (
+            <Animated.View style={getSectionAnimationStyle(5)}>
+              <ScanCoachFinalCard
+                accentColor={accentColor}
+                intent={coachIntent}
+                onPress={() => handleCoachPress('final')}
+                testID="scan-result-coach-final-cta"
+              />
+            </Animated.View>
+          ) : null}
+
+          <Animated.View style={getSectionAnimationStyle(6)}>
             <View style={styles.actionStack}>
               <ResultActionRail
                 accentColor={accentColor}
@@ -638,8 +646,9 @@ export default function ScanResultScreen() {
               />
             </View>
           </Animated.View>
-        </Animated.View>
-      </ScrollView>
+          </Animated.View>
+        </ScrollView>
+      </Squircle>
     </View>
   );
 }
@@ -798,7 +807,7 @@ const createProportionsStyles = (
       borderRadius: layout.standardRadius,
       borderWidth: 1,
       alignItems: 'center',
-      gap: SPACING.xs,
+      gap: SPACING.xs, borderCurve: 'continuous',
     },
     iconWrap: {
       width: layout.isCompact ? 30 : 34,
@@ -807,7 +816,7 @@ const createProportionsStyles = (
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1,
-      flexShrink: 0,
+      flexShrink: 0, borderCurve: 'continuous',
     },
     itemThreeUp: {
       minWidth: 104,
@@ -845,7 +854,7 @@ const createProportionsStyles = (
       paddingVertical: 2,
       marginTop: SPACING.xs - 2,
       alignSelf: 'center',
-      maxWidth: '100%',
+      maxWidth: '100%', borderCurve: 'continuous',
     },
     statusText: {
       fontSize: SIZES.xs,
@@ -859,37 +868,49 @@ const createProportionsStyles = (
 const createStyles = (
   colors: any,
   insets: any,
+  isDark: boolean,
   layout: ReturnType<typeof getResultLayoutState>,
 ) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: 'transparent',
     },
     backgroundLayer: {
       ...StyleSheet.absoluteFillObject,
     },
-    resultHeader: {
-      backgroundColor: 'transparent',
-      borderBottomColor: 'transparent',
-      borderBottomWidth: 0,
+    resultScroll: {
+      flex: 1,
     },
     scrollContent: {
-      paddingHorizontal: SPACING.page,
-      paddingTop: 0,
-      paddingBottom: SPACING.xxxl + insets.bottom,
+      flexGrow: 1,
     },
     errorScrollContent: {
       flexGrow: 1,
     },
-    resultTopChrome: {
-      marginHorizontal: -SPACING.page,
-      paddingTop: insets.top,
-      paddingBottom: SPACING.sm,
-      backgroundColor: 'transparent',
+    resultSheet: {
+      flex: 1,
+      width: '100%',
+      alignSelf: 'stretch',
+      marginHorizontal: 0,
+      marginTop: insets.top + SPACING.md,
+      paddingHorizontal: 0,
+      paddingBottom: 0,
+      borderTopLeftRadius: layout.heroRadius,
+      borderTopRightRadius: layout.heroRadius,
+      borderBottomLeftRadius: 0,
+      borderBottomRightRadius: 0,
+      overflow: 'hidden',
+      backgroundColor: isDark
+        ? withAlpha(colors.background, 0.88)
+        : withAlpha(colors.cardBackground ?? colors.background, 0.9),
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: withAlpha(colors.primaryText, isDark ? 0.12 : 0.08), borderCurve: 'continuous',
     },
     content: {
       gap: layout.contentGap,
+      paddingHorizontal: SPACING.page,
+      paddingBottom: SPACING.lg + insets.bottom,
     },
     heroBadgeRow: {
       flexDirection: 'row',
@@ -937,6 +958,7 @@ const createStyles = (
       alignItems: 'center',
       gap: SPACING.md,
       padding: SPACING.page,
+      paddingBottom: SPACING.page + insets.bottom,
     },
     errorText: {
       fontSize: layout.bodyTextFontSize,
@@ -952,7 +974,7 @@ const createStyles = (
       marginTop: SPACING.md,
       minHeight: layout.ctaMinHeight,
       alignItems: 'center',
-      justifyContent: 'center',
+      justifyContent: 'center', borderCurve: 'continuous',
     },
     errorButtonText: {
       color: colors.background,

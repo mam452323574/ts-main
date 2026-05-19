@@ -65,6 +65,58 @@ import {
   isCoachPersonaKey,
 } from '../../../shared/coachPersonas.ts';
 
+// CO-05 (cf. SCANNER_COACH_AUDIT_2026_05.md §6) — quand un scan a flagge
+// `urgency_flag=true` (ex: high_body_fat, severe_deficiency), on injecte un
+// disclaimer medical en tete du tone_instructions du persona choisi. Le LLM
+// coach garde le persona/style demande par l'utilisateur mais doit prioriser
+// la recommandation de consultation professionnelle. C'est un override
+// strictement defensif : si le workflow n8n ignore les nouveaux flags
+// `urgency_mode` / `force_disclaimer` ajoutes au payload, le persona modifie
+// force quand meme un comportement plus prudent.
+const MEDICAL_REFERRAL_PROMPT_PREFIX =
+  'IMPORTANT MEDICAL DISCLAIMER (urgent signal): the user\'s recent scan flagged a potentially urgent health signal. ' +
+  'You MUST: (1) recommend consulting a healthcare professional as the primary action, ' +
+  '(2) avoid giving specific medical, diagnostic, or treatment advice, ' +
+  '(3) keep general wellness suggestions short and conservative, ' +
+  '(4) never minimize the signal, never claim certainty about diagnosis. ' +
+  'Begin your reply with a clear referral statement before any other content. ';
+
+function hasUrgencySignal(payload: unknown): boolean {
+  if (!payload || typeof payload !== 'object') return false;
+  const root = payload as Record<string, unknown>;
+
+  const checkScanLike = (scanLike: unknown): boolean => {
+    if (!scanLike || typeof scanLike !== 'object') return false;
+    const scan = scanLike as Record<string, unknown>;
+    const digest = scan.digest as Record<string, unknown> | undefined;
+    const metrics = digest?.metrics as Record<string, unknown> | undefined;
+    if (metrics && metrics.urgency_flag === true) return true;
+
+    const keyMetrics = scan.key_metrics as Record<string, unknown> | undefined;
+    if (keyMetrics && keyMetrics.urgency_flag === true) return true;
+
+    return false;
+  };
+
+  if (checkScanLike(root.latest_scan)) return true;
+  if (checkScanLike(root.selected_scan)) return true;
+  const recent = root.recent_scans;
+  if (Array.isArray(recent) && recent.some(checkScanLike)) return true;
+  const prior = root.prior_scans;
+  if (Array.isArray(prior) && prior.some(checkScanLike)) return true;
+  return false;
+}
+
+function applyUrgencyOverrideToPersona<
+  T extends { toneInstructions: string },
+>(persona: T, urgencyDetected: boolean): T {
+  if (!urgencyDetected) return persona;
+  return {
+    ...persona,
+    toneInstructions: `${MEDICAL_REFERRAL_PROMPT_PREFIX}${persona.toneInstructions}`,
+  };
+}
+
 interface EdgeRuntimeLike {
   waitUntil?: (promise: Promise<unknown>) => void;
 }
@@ -146,6 +198,11 @@ interface RunPendingCoachGenerationTaskOptions {
   resolvedLocale: string | null;
   persona: ReturnType<typeof getCoachPersona>;
   webhookEndpoints: Awaited<ReturnType<typeof requireCoachGenerateWebhookEndpoints>>;
+  // Quota usage event id reserved before the webhook call. When the background
+  // task ends in an error (webhook down / invalid response / too large), we
+  // refund this event so the user is not charged for an unusable response.
+  // Optional so existing tests (which never debited a quota) keep compiling.
+  usageEventId?: string | null;
 }
 
 interface CoachWebhookInvalidResponseMetadata {
@@ -525,7 +582,14 @@ export async function runPendingCoachGenerationTask(
     resolvedLocale,
     userId,
     webhookEndpoints,
+    usageEventId,
   } = options;
+
+  // CO-05 — flag observable cote n8n pour declencher un disclaimer renforce.
+  // `persona.toneInstructions` est deja override (cf. applyUrgencyOverrideToPersona)
+  // donc le LLM coach voit le prefix medical en tete du tone meme si n8n
+  // ignore les flags ci-dessous (defense en profondeur).
+  const urgencyMode = hasUrgencySignal(requestBody.payload);
 
   const webhookPayload = {
     entry_id: pendingEntry.id,
@@ -542,7 +606,9 @@ export async function runPendingCoachGenerationTask(
       style_guide: persona.styleGuide,
     },
     payload: requestBody.payload,
+    ...(urgencyMode ? { urgency_mode: true, force_disclaimer: true } : {}),
   };
+
   let usedFallback = false;
 
   let webhookResult: Awaited<
@@ -556,7 +622,111 @@ export async function runPendingCoachGenerationTask(
   }) => {
     await updateCoachEntryToError(client, pendingEntry.id, values);
     terminalEntryWritten = true;
+    // Refund the credit when the background task cannot produce useful
+    // coaching for the user. Best-effort: failure to refund must not mask the
+    // original error (the user already sees the front-end error message).
+    if (usageEventId) {
+      try {
+        await refundCoachQuotaEvent(client, {
+          usageEventId,
+          userId,
+          reason: values.error_code,
+        });
+      } catch (refundError) {
+        logPhase2Error(
+          '[coach-generate-response] Failed to refund quota after background error',
+          refundError,
+          {
+            request_id: requestId,
+            entry_id: pendingEntry.id,
+            error_code: values.error_code,
+          },
+        );
+      }
+    }
   };
+
+  // CO-07 (cf. SCANNER_COACH_AUDIT_2026_05.md §6) — borne la taille du payload
+  // OUTBOUND apres expansion serveur (la requete entrante est plafonnee a 64KB
+  // mais le handler enrichit avec persona/contracts/etc, et le payload final
+  // peut atteindre 100+ KB sur les cas pathologiques recent_scans=32 * digest
+  // complet). 50KB est confortable pour l'usage normal et borne les couts LLM.
+  const COACH_OUTBOUND_PAYLOAD_MAX_BYTES = 50 * 1024;
+  const serializedPayload = JSON.stringify(webhookPayload);
+  const serializedPayloadBytes = serializedPayload.length;
+  if (serializedPayloadBytes > COACH_OUTBOUND_PAYLOAD_MAX_BYTES) {
+    await markPendingEntryError({
+      status: 'error',
+      error_code: 'coach_payload_too_large',
+      response_payload_json: {
+        payload_bytes: serializedPayloadBytes,
+        max_bytes: COACH_OUTBOUND_PAYLOAD_MAX_BYTES,
+      },
+    });
+    throw new Phase2HttpError(
+      413,
+      'coach_payload_too_large',
+      `Coach outbound payload (${serializedPayloadBytes} bytes) exceeds the limit of ${COACH_OUTBOUND_PAYLOAD_MAX_BYTES} bytes`,
+      {
+        payload_bytes: serializedPayloadBytes,
+        max_bytes: COACH_OUTBOUND_PAYLOAD_MAX_BYTES,
+      },
+    );
+  }
+
+  // CO-04 (cf. SCANNER_COACH_AUDIT_2026_05.md §6) — quota tokens par user.
+  // Approximation 1 token ~= 4 caracteres. Le check bloque l'appel webhook si
+  // l'utilisateur a deja consomme > p_per_hour_limit (200K) ou > p_per_day_limit
+  // (1M) tokens sur les fenetres glissantes. L'estimation est volontairement
+  // optimiste (compte uniquement le payload outbound, pas la reponse LLM) — la
+  // reponse est plafonnee a 32KB cote webhook (C-03) donc le ratio req/rep est
+  // borne.
+  const estimatedTokens = Math.ceil(serializedPayloadBytes / 4);
+  const { data: tokenQuotaData, error: tokenQuotaError } = await client.rpc(
+    'record_coach_token_consumption',
+    {
+      p_user_id: userId,
+      p_estimated_tokens: estimatedTokens,
+      p_per_hour_limit: 200_000,
+      p_per_day_limit: 1_000_000,
+    },
+  );
+  if (tokenQuotaError) {
+    // Defense en profondeur : si la RPC echoue (DB down, schema mismatch),
+    // on continue sans bloquer (le rate limit appels protege deja) mais on log.
+    logPhase2Error(
+      '[coach-generate-response] Token quota check failed',
+      tokenQuotaError,
+      { request_id: requestId, entry_id: pendingEntry.id },
+    );
+  } else if (
+    tokenQuotaData &&
+    typeof tokenQuotaData === 'object' &&
+    (tokenQuotaData as Record<string, unknown>).allowed === false
+  ) {
+    const windowExceeded =
+      typeof (tokenQuotaData as Record<string, unknown>).window_exceeded ===
+      'string'
+        ? ((tokenQuotaData as Record<string, unknown>).window_exceeded as string)
+        : 'unknown';
+    await markPendingEntryError({
+      status: 'error',
+      error_code: 'coach_token_quota_exceeded',
+      response_payload_json: {
+        window_exceeded: windowExceeded,
+        estimated_tokens: estimatedTokens,
+      },
+    });
+    throw new Phase2HttpError(
+      429,
+      'coach_token_quota_exceeded',
+      `Coach token quota exceeded for window: ${windowExceeded}`,
+      {
+        window_exceeded: windowExceeded,
+        estimated_tokens: estimatedTokens,
+      },
+    );
+  }
 
   try {
   try {
@@ -807,7 +977,11 @@ export async function handleCoachGenerateResponseRequest(req: Request) {
       );
     }
 
-    const persona = getCoachPersona(requestBody.persona_key);
+    const basePersona = getCoachPersona(requestBody.persona_key);
+    // CO-05 — applique l'override "medical referral" si un scan recent flagge
+    // `urgency_flag=true` (cf. hasUrgencySignal).
+    const urgencyDetected = hasUrgencySignal(requestBody.payload);
+    const persona = applyUrgencyOverrideToPersona(basePersona, urgencyDetected);
     const resolvedLocale = normalizeCoachLocale(requestBody.locale);
     const inputHash = await buildNormalizedPayloadHash(
       resolvedLocale
@@ -962,6 +1136,7 @@ export async function handleCoachGenerateResponseRequest(req: Request) {
       resolvedLocale,
       persona,
       webhookEndpoints,
+      usageEventId: quotaReservation.usage_event_id ?? null,
     }).catch((error) => {
       logPhase2Error('[coach-generate-response] Background generation failed', error, {
         request_id: requestId,

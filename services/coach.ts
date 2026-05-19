@@ -40,6 +40,10 @@ import {
   type RenderableCoachEntry,
 } from '@/utils/coachHistory';
 import { logOperationalError } from '@/utils/observability';
+import {
+  sanitizeUntrustedAiText,
+  sanitizeUntrustedAiTextArray,
+} from '@/utils/sanitizeUntrustedAiText';
 import type {
   AnalysisResult,
   CoachComparisonToPrevious,
@@ -259,8 +263,82 @@ export interface CoachScreenSnapshot {
   requestId?: string;
 }
 
-function shouldDebugCoachService() {
-  return typeof __DEV__ !== 'undefined' && __DEV__ && process.env.NODE_ENV !== 'test';
+// C-05 of COACH_SECURITY_AUDIT_2026_05: explicit column list mirroring the
+// surface of get_coach_history_page_v2 + the few extra fields client code
+// reads on direct table reads (user_id, updated_at). Never read the internal
+// columns (request_payload_json, response_payload_json, cache_key, input_hash,
+// error_code) from the client — they are exposed only to service_role in the
+// Edge Functions.
+const COACH_ENTRY_PUBLIC_COLUMNS_SELECT = [
+  'id',
+  'user_id',
+  'status',
+  'title',
+  'body',
+  'disclaimer',
+  'persona_key',
+  'prompt_type',
+  'question_key',
+  'question_text',
+  'response_version',
+  'content_json',
+  'cta_label',
+  'cta_route',
+  'source',
+  'locale',
+  'created_at',
+  'updated_at',
+  'generated_at',
+  'expires_at',
+].join(', ');
+
+// N-G of COACH_SECURITY_AUDIT_2026_05: tighten the dev-only gate so debug
+// logs do not slip into release builds that ship with __DEV__=true (e.g. an
+// Xcode/Android Studio debug variant installed on a real device). We require
+// both __DEV__ === true AND NODE_ENV === 'development'.
+export function shouldDebugCoachService() {
+  if (typeof __DEV__ === 'undefined' || !__DEV__) return false;
+  if (process.env.NODE_ENV === 'test') return false;
+  return process.env.NODE_ENV === 'development';
+}
+
+// N-G of COACH_SECURITY_AUDIT_2026_05: strip provider-topology fields from
+// CoachServiceError details before logging. The "what failed" stays loggable
+// (message, code, status, requestId) but n8n node names, provider names, and
+// any raw provider response payload are redacted so a side-loaded debug build
+// cannot leak backend topology to an attacker.
+const COACH_DEBUG_REDACTED_DETAIL_KEYS = new Set([
+  'provider_name',
+  'provider_node_name',
+  'provider_node_type',
+  'provider_failure_stage',
+  'provider_failure_kind',
+  'provider_response',
+  'provider_response_text',
+  'webhook_url',
+  'webhook_endpoint',
+]);
+
+function redactCoachDebugDetails(value: unknown): unknown {
+  if (!isRecord(value)) return value ?? null;
+  const out: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(value)) {
+    out[key] = COACH_DEBUG_REDACTED_DETAIL_KEYS.has(key) ? '<redacted>' : val;
+  }
+  return out;
+}
+
+export function sanitizeCoachServiceErrorDebugInfo(
+  info: CoachServiceErrorDebugInfo,
+): CoachServiceErrorDebugInfo {
+  return {
+    ...info,
+    details: redactCoachDebugDetails(info.details),
+    providerFailureKind: info.providerFailureKind ? '<redacted>' : null,
+    providerFailureStage: info.providerFailureStage ? '<redacted>' : null,
+    providerNodeType: info.providerNodeType ? '<redacted>' : null,
+    providerNodeName: info.providerNodeName ? '<redacted>' : null,
+  };
 }
 
 export function getCoachServiceErrorDebugInfo(error: unknown): CoachServiceErrorDebugInfo {
@@ -809,9 +887,16 @@ function createCoachScansReadError(error: unknown) {
 }
 
 function createCoachHistoryPageReadError(error: unknown) {
-  if (isMissingCoachHistoryFunctionError(error, 'get_coach_history_page')) {
+  // C-05 of COACH_SECURITY_AUDIT_2026_05: the frontend now calls v2 of the
+  // history pagination RPC. Detect either name in error messages so the
+  // missing-function detection still works during the rollout window where
+  // v1 may have been removed but v2 not yet applied (or vice versa).
+  if (
+    isMissingCoachHistoryFunctionError(error, 'get_coach_history_page_v2') ||
+    isMissingCoachHistoryFunctionError(error, 'get_coach_history_page')
+  ) {
     return createCoachServiceError(
-      `Coach history pagination function "get_coach_history_page" is unavailable on Supabase project "${getConfiguredSupabaseProjectLabel()}".`,
+      `Coach history pagination function "get_coach_history_page_v2" is unavailable on Supabase project "${getConfiguredSupabaseProjectLabel()}".`,
       {
         code: 'coach_history_page_unavailable',
         status: 503,
@@ -1251,9 +1336,12 @@ function hasOwnKey<T extends object>(
 }
 
 function resolveFallbackText(value: unknown) {
+  // CO-01 (cf. SCANNER_COACH_AUDIT_2026_05.md §6) — tout texte libre IA
+  // résolu ici est destiné à être réinjecté dans le prompt du coach LLM.
+  // On sanitise contre la second-order prompt injection avant retour.
   const directText = readOptionalString(value);
   if (directText) {
-    return directText;
+    return sanitizeUntrustedAiText(directText);
   }
 
   if (!isRecord(value)) {
@@ -1261,7 +1349,10 @@ function resolveFallbackText(value: unknown) {
   }
 
   const localized = resolveLocalizedText(value as never, { fallback: '' }).trim();
-  return localized.length > 0 ? localized : null;
+  if (localized.length === 0) {
+    return null;
+  }
+  return sanitizeUntrustedAiText(localized);
 }
 
 function resolveFallbackTextList(value: unknown) {
@@ -1487,6 +1578,9 @@ function createCoachRichKeyMetrics(
         detected_conditions: normalized.detected_conditions,
       };
     case 'fat_distribution_scan_v2':
+      // CO-01 — `analysis_summary`, `dominant_storage_pattern`, `priority_zones`
+      // sont des champs texte libre produits par l'IA scanner et réinjectés
+      // dans le prompt du coach LLM via le digest. Sanitization défensive.
       return {
         global_body_fat_estimate_percent:
           normalized.global_body_fat_estimate_percent,
@@ -1494,11 +1588,14 @@ function createCoachRichKeyMetrics(
           normalized.global_facial_fat_estimate_percent,
         global_water_retention_estimate_percent:
           normalized.global_water_retention_estimate_percent,
-        analysis_summary: normalized.analysis_summary,
-        dominant_storage_pattern: normalized.dominant_storage_pattern,
-        priority_zones: Array.isArray(normalized.priority_zones)
-          ? normalized.priority_zones
-          : [],
+        analysis_summary:
+          sanitizeUntrustedAiText(normalized.analysis_summary) ?? '',
+        dominant_storage_pattern:
+          sanitizeUntrustedAiText(normalized.dominant_storage_pattern) ?? '',
+        priority_zones: sanitizeUntrustedAiTextArray(normalized.priority_zones, {
+          maxItems: 20,
+          maxLength: 200,
+        }),
         area_count: Array.isArray(normalized.areas_analysis)
           ? normalized.areas_analysis.length
           : 0,
@@ -1582,6 +1679,7 @@ function createCoachDigestMetrics(
           })),
       };
     case 'fat_distribution_scan_v2':
+      // CO-01 — voir createCoachRichKeyMetrics (idem)
       return {
         global_body_fat_estimate_percent:
           normalized.global_body_fat_estimate_percent,
@@ -1589,10 +1687,12 @@ function createCoachDigestMetrics(
           normalized.global_facial_fat_estimate_percent,
         global_water_retention_estimate_percent:
           normalized.global_water_retention_estimate_percent,
-        dominant_storage_pattern: normalized.dominant_storage_pattern,
-        priority_zones: Array.isArray(normalized.priority_zones)
-          ? normalized.priority_zones.slice(0, 4)
-          : [],
+        dominant_storage_pattern:
+          sanitizeUntrustedAiText(normalized.dominant_storage_pattern) ?? '',
+        priority_zones: sanitizeUntrustedAiTextArray(normalized.priority_zones, {
+          maxItems: 4,
+          maxLength: 200,
+        }),
         area_count: Array.isArray(normalized.areas_analysis)
           ? normalized.areas_analysis.length
           : 0,
@@ -4647,9 +4747,12 @@ function shouldFallbackToCachedCoachEntry(
 
 export async function fetchCoachEntries(limit?: number): Promise<CoachEntry[]> {
   try {
+    // C-05: explicit column list — no select('*') so internal columns never
+    // leak to the client over the wire (see COACH_ENTRY_PUBLIC_COLUMNS_SELECT
+    // above for the rationale).
     let query = supabase
       .from('coach_entries')
-      .select('*')
+      .select(COACH_ENTRY_PUBLIC_COLUMNS_SELECT)
       .order('updated_at', { ascending: false })
       .order('created_at', { ascending: false });
 
@@ -4714,7 +4817,12 @@ export async function fetchCoachHistoryPage(options: {
   }
 
   try {
-    const { data, error } = await supabase.rpc('get_coach_history_page', {
+    // C-05 of COACH_SECURITY_AUDIT_2026_05: use the v2 RPC that omits the
+    // internal columns (request_payload_json, response_payload_json, cache_key,
+    // input_hash, error_code). Legacy entries had their prompt_type /
+    // question_key / question_text backfilled in 20260520180300 so v2 does not
+    // need to fall back to request_payload_json anymore.
+    const { data, error } = await supabase.rpc('get_coach_history_page_v2', {
       p_limit: limit + 1,
       p_cursor_sort_at: decodedCursor?.sortAt ?? null,
       p_cursor_created_at: decodedCursor?.createdAt ?? null,
@@ -4884,9 +4992,11 @@ export async function fetchLatestReadyCoachEntry(options: {
   const normalizedLocale = normalizeCoachLocale(options.locale);
 
   try {
+    // C-05: same explicit column list as fetchCoachEntries — keep the public
+    // surface coherent so no consumer accidentally relies on an internal field.
     let baseQuery = supabase
       .from('coach_entries')
-      .select('*')
+      .select(COACH_ENTRY_PUBLIC_COLUMNS_SELECT)
       .eq('status', 'ready')
       .not('title', 'is', null)
       .not('body', 'is', null)
@@ -5146,7 +5256,7 @@ export async function generateCoachGuidance(options: {
               fallback_prompt_type: 'latest_scan',
               persona_key: personaKey,
               locale: normalizedLocale,
-              ...getCoachServiceErrorDebugInfo(error),
+              ...sanitizeCoachServiceErrorDebugInfo(getCoachServiceErrorDebugInfo(error)),
             },
           );
         }
@@ -5165,7 +5275,7 @@ export async function generateCoachGuidance(options: {
             prompt_type: options.promptType,
             persona_key: personaKey,
             locale: normalizedLocale,
-            ...getCoachServiceErrorDebugInfo(error),
+            ...sanitizeCoachServiceErrorDebugInfo(getCoachServiceErrorDebugInfo(error)),
           });
         }
 
@@ -5196,7 +5306,9 @@ export async function generateCoachGuidance(options: {
                 fallback_prompt_type: 'latest_scan',
                 persona_key: personaKey,
                 locale: normalizedLocale,
-                ...getCoachServiceErrorDebugInfo(legacyError),
+                ...sanitizeCoachServiceErrorDebugInfo(
+                  getCoachServiceErrorDebugInfo(legacyError),
+                ),
               },
             );
           }
@@ -5228,7 +5340,9 @@ export async function generateCoachGuidance(options: {
       options.promptType,
     );
     if (shouldDebugCoachService()) {
-      const errorDebugInfo = getCoachServiceErrorDebugInfo(error);
+      const errorDebugInfo = sanitizeCoachServiceErrorDebugInfo(
+        getCoachServiceErrorDebugInfo(error),
+      );
 
       console.log('[Coach] generateCoachGuidance failed', {
         prompt_type: options.promptType,

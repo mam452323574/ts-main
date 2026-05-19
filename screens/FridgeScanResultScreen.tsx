@@ -3,7 +3,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
   type StyleProp,
   type TextStyle,
@@ -23,7 +22,6 @@ import Animated, {
 } from 'react-native-reanimated';
 import {
   AlertCircle,
-  ArrowLeft,
 } from 'lucide-react-native';
 
 import { Button } from '@/components/Button';
@@ -34,8 +32,8 @@ import {
   type ChefModeTheme,
 } from '@/components/fridge/ChefResultCard';
 import { ChefModeIcon } from '@/components/fridge/ChefModeIcon';
-import { ModalHandle } from '@/components/ModalHandle';
 import { OptimizedImage } from '@/components/OptimizedImage';
+import { ResultSheetTopChrome } from '@/components/results/ResultSheetTopChrome';
 import {
   BORDER_RADIUS,
   FONT_WEIGHTS,
@@ -55,11 +53,14 @@ import {
 } from '@/types/fridgeScan';
 import {
   getResultLayoutState,
+  getResultScreenGradient,
   getResultSurfaceChrome,
   type ResultLayoutState,
 } from '@/utils/resultLayout';
+import { safeReadScanImageUri } from '@/utils/deepLinkSchemas';
 import { logOperationalInfo } from '@/utils/observability';
 import { resolvePremiumRenderStateFromProfile } from '@/utils/subscription';
+import { Squircle } from '@/components/Squircle';
 
 type RouteParamValue = string | string[] | undefined;
 
@@ -113,7 +114,7 @@ export default function FridgeScanResultScreen() {
   );
   const fridgeScanId = parseRouteParam(params.fridgeScanId);
   const selectedModeParam = parseModeParam(params.selectedMode);
-  const imageUri = parseRouteParam(params.imageUri);
+  const imageUri = safeReadScanImageUri(params.imageUri);
   const scanQuery = useFridgeScanRecord(fridgeScanId ?? null);
   const hadPendingStateRef = useRef(false);
   const lastStateLogRef = useRef<string | null>(null);
@@ -130,6 +131,16 @@ export default function FridgeScanResultScreen() {
     () => resolveChefModeTheme(selectedMode, colors, isDark),
     [colors, isDark, selectedMode],
   );
+  const scrimGradient = useMemo(() => {
+    const baseGradient = getResultScreenGradient({
+      colors,
+      isDark,
+      accentColor: modeTheme.accent,
+    });
+    return baseGradient.map((color, index) =>
+      withAlpha(color, index === 0 ? 0.72 : index === 1 ? 0.64 : 0.78),
+    ) as [string, string, string];
+  }, [colors, isDark, modeTheme.accent]);
   const styles = useMemo(
     () => createStyles(colors, insets, isDark, modeTheme, layout),
     [colors, insets, isDark, modeTheme, layout],
@@ -276,20 +287,162 @@ export default function FridgeScanResultScreen() {
 
   if (!fridgeScanId || hasFailed) {
     return (
-      <View style={styles.container}>
-        <ModalHandle />
-        <Header title={t('fridge_scan_result.title')} onClose={handleClose} />
-        <View style={styles.stateContainer}>
-          <View style={styles.stateCard}>
-            <View style={[styles.stateIcon, { backgroundColor: withAlpha(colors.error, 0.12) }]}>
-              <AlertCircle color={colors.error} size={28} strokeWidth={2.2} />
+      <View style={styles.container} testID="fridge-scan-result-screen">
+        <LinearGradient
+          colors={scrimGradient}
+          end={{ x: 1, y: 1 }}
+          start={{ x: 0, y: 0 }}
+          style={styles.backgroundLayer}
+          testID="fridge-scan-result-background-layer"
+        />
+        <Squircle style={styles.resultSheet} testID="fridge-scan-result-sheet">
+          <ScrollView
+            contentContainerStyle={[styles.scrollContent, styles.stateScrollContent]}
+            showsVerticalScrollIndicator={false}
+            style={styles.resultScroll}
+            testID="fridge-scan-result-scroll"
+          >
+            <ResultSheetTopChrome
+              onLeftAction={handleClose}
+              leftActionAccessibilityLabel={t('common.back')}
+              testID="fridge-scan-result-top-chrome"
+              title={t('fridge_scan_result.title')}
+              titleTestID="fridge-scan-result-screen-header"
+              variant="result"
+              surfaceColor="transparent"
+            />
+            <View style={styles.stateContainer} testID="fridge-scan-result-state-container">
+              <Squircle style={styles.stateCard}>
+                <Squircle style={[styles.stateIcon, { backgroundColor: withAlpha(colors.error, 0.12) }]}>
+                  <AlertCircle color={colors.error} size={28} strokeWidth={2.2} />
+                </Squircle>
+                <Text style={styles.stateTitle}>
+                  {t('fridge_scan_result.error_title')}
+                </Text>
+                <Text style={styles.stateBody}>
+                  {t('fridge_scan_result.error_body')}
+                </Text>
+                <View style={styles.actionStack}>
+                  <Button
+                    title={t('fridge_scan_result.actions.new_scan')}
+                    onPress={handleNewScan}
+                  />
+                  <Button
+                    title={t('fridge_scan_result.actions.home')}
+                    onPress={handleClose}
+                    variant="outline"
+                  />
+                </View>
+              </Squircle>
             </View>
-            <Text style={styles.stateTitle}>
-              {t('fridge_scan_result.error_title')}
-            </Text>
-            <Text style={styles.stateBody}>
-              {t('fridge_scan_result.error_body')}
-            </Text>
+          </ScrollView>
+        </Squircle>
+      </View>
+    );
+  }
+
+  if (isPendingResult || shouldHoldCompletedProgress) {
+    return (
+      <View style={styles.container} testID="fridge-scan-result-screen">
+        <LinearGradient
+          colors={scrimGradient}
+          end={{ x: 1, y: 1 }}
+          start={{ x: 0, y: 0 }}
+          style={styles.backgroundLayer}
+          testID="fridge-scan-result-background-layer"
+        />
+        <Squircle style={styles.resultSheet} testID="fridge-scan-result-sheet">
+          <ScrollView
+            contentContainerStyle={[styles.scrollContent, styles.stateScrollContent]}
+            showsVerticalScrollIndicator={false}
+            style={styles.resultScroll}
+            testID="fridge-scan-result-scroll"
+          >
+            <ResultSheetTopChrome
+              onLeftAction={handleClose}
+              leftActionAccessibilityLabel={t('common.back')}
+              testID="fridge-scan-result-top-chrome"
+              title={t('fridge_scan_result.title')}
+              titleTestID="fridge-scan-result-screen-header"
+              variant="result"
+              surfaceColor="transparent"
+            />
+            <View style={styles.stateContainer} testID="fridge-scan-result-state-container">
+              <LinearGradient
+                colors={modeTheme.gradient}
+                style={styles.pendingCard}
+                testID="fridge-scan-result-pending-card"
+              >
+                {imageUri ? (
+                  <OptimizedImage
+                    source={{ uri: imageUri }}
+                    style={styles.pendingImage}
+                    recyclingKey={imageUri}
+                    testID="fridge-scan-result-pending-image"
+                  />
+                ) : null}
+                <View style={styles.modePill}>
+                  <ChefModeIcon mode={selectedMode} color={modeTheme.accent} />
+                  <Text style={styles.modePillText}>
+                    {t(`fridge_scan.mode_labels.${selectedMode}`)}
+                  </Text>
+                </View>
+                <ChefLoadingProgress
+                  key={fridgeScanId}
+                  targetProgress={displayedProgress}
+                  accentColor={modeTheme.accent}
+                  styles={styles}
+                  onCompleteAnimationEnd={handleCompletionAnimationEnd}
+                />
+                <Text style={styles.stateTitleLight}>
+                  {t('fridge_scan_result.queued_title')}
+                </Text>
+                <Text style={styles.stateBodyLight}>
+                  {t('fridge_scan_result.queued_body')}
+                </Text>
+              </LinearGradient>
+            </View>
+          </ScrollView>
+        </Squircle>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container} testID="fridge-scan-result-screen">
+      <LinearGradient
+        colors={scrimGradient}
+        end={{ x: 1, y: 1 }}
+        start={{ x: 0, y: 0 }}
+        style={styles.backgroundLayer}
+        testID="fridge-scan-result-background-layer"
+      />
+      <Squircle style={styles.resultSheet} testID="fridge-scan-result-sheet">
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          style={styles.resultScroll}
+          testID="fridge-scan-result-scroll"
+        >
+          <ResultSheetTopChrome
+            onLeftAction={handleClose}
+            leftActionAccessibilityLabel={t('common.back')}
+            testID="fridge-scan-result-top-chrome"
+            title={t('fridge_scan_result.title')}
+            titleTestID="fridge-scan-result-screen-header"
+            variant="result"
+            surfaceColor="transparent"
+          />
+          <View style={styles.contentStack} testID="fridge-scan-result-content-stack">
+            <ChefResultCard
+              imageUri={imageUri}
+              mealResult={mealResult}
+              onPremiumPress={handlePremiumPress}
+              premiumRenderState={premiumRenderState}
+              selectedMode={selectedMode}
+              t={t}
+            />
+
             <View style={styles.actionStack}>
               <Button
                 title={t('fridge_scan_result.actions.new_scan')}
@@ -302,117 +455,8 @@ export default function FridgeScanResultScreen() {
               />
             </View>
           </View>
-        </View>
-      </View>
-    );
-  }
-
-  if (isPendingResult || shouldHoldCompletedProgress) {
-    return (
-      <View style={styles.container}>
-        <ModalHandle />
-        <Header title={t('fridge_scan_result.title')} onClose={handleClose} />
-        <View style={styles.stateContainer}>
-          <LinearGradient
-            colors={modeTheme.gradient}
-            style={styles.pendingCard}
-            testID="fridge-scan-result-pending-card"
-          >
-            {imageUri ? (
-              <OptimizedImage
-                source={{ uri: imageUri }}
-                style={styles.pendingImage}
-                recyclingKey={imageUri}
-                testID="fridge-scan-result-pending-image"
-              />
-            ) : null}
-            <View style={styles.modePill}>
-              <ChefModeIcon mode={selectedMode} color={modeTheme.accent} />
-              <Text style={styles.modePillText}>
-                {t(`fridge_scan.mode_labels.${selectedMode}`)}
-              </Text>
-            </View>
-            <ChefLoadingProgress
-              key={fridgeScanId}
-              targetProgress={displayedProgress}
-              accentColor={modeTheme.accent}
-              styles={styles}
-              onCompleteAnimationEnd={handleCompletionAnimationEnd}
-            />
-            <Text style={styles.stateTitleLight}>
-              {t('fridge_scan_result.queued_title')}
-            </Text>
-            <Text style={styles.stateBodyLight}>
-              {t('fridge_scan_result.queued_body')}
-            </Text>
-          </LinearGradient>
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.container}>
-      <ModalHandle />
-      <Header title={t('fridge_scan_result.title')} onClose={handleClose} />
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.contentStack}>
-          <ChefResultCard
-            imageUri={imageUri}
-            mealResult={mealResult}
-            onPremiumPress={handlePremiumPress}
-            premiumRenderState={premiumRenderState}
-            selectedMode={selectedMode}
-            t={t}
-          />
-
-          <View style={styles.actionStack}>
-            <Button
-              title={t('fridge_scan_result.actions.new_scan')}
-              onPress={handleNewScan}
-            />
-            <Button
-              title={t('fridge_scan_result.actions.home')}
-              onPress={handleClose}
-              variant="outline"
-            />
-          </View>
-        </View>
-      </ScrollView>
-    </View>
-  );
-}
-
-function Header({ title, onClose }: { title: string; onClose: () => void }) {
-  const { colors: themeColors, isDark } = useTheme();
-  const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
-  const layout = useMemo(() => getResultLayoutState(width), [width]);
-  const colors = useMemo(
-    () => resolveChefSurfaceColors(themeColors, isDark),
-    [isDark, themeColors],
-  );
-  const styles = useMemo(
-    () => createHeaderStyles(insets, layout, colors, isDark),
-    [colors, insets, isDark, layout],
-  );
-
-  return (
-    <View style={styles.header}>
-      <TouchableOpacity
-        accessibilityRole="button"
-        onPress={onClose}
-        style={styles.iconButton}
-      >
-        <ArrowLeft color={colors.primaryText} size={20} strokeWidth={2.2} />
-      </TouchableOpacity>
-      <Text numberOfLines={1} style={styles.headerTitle}>
-        {title}
-      </Text>
-      <View style={styles.headerSpacer} />
+        </ScrollView>
+      </Squircle>
     </View>
   );
 }
@@ -576,51 +620,9 @@ function ChefLoadingProgress({
   );
 }
 
-const createHeaderStyles = (
-  insets: { top: number },
-  layout: ResultLayoutState,
-  colors: ReturnType<typeof resolveChefSurfaceColors>,
-  isDark: boolean,
-) =>
-  StyleSheet.create({
-    header: {
-      minHeight: layout.headerMinHeight,
-      paddingTop: insets.top + SPACING.xs,
-      paddingHorizontal: SPACING.page,
-      paddingBottom: SPACING.sm,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    },
-    iconButton: {
-      width: layout.headerSlotSize,
-      height: layout.headerSlotSize,
-      borderRadius: layout.headerSlotSize / 2,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.06 : 0.04),
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: withAlpha(colors.primaryText, isDark ? 0.1 : 0.08),
-    },
-    headerTitle: {
-      flex: 1,
-      paddingHorizontal: SPACING.md,
-      textAlign: 'center',
-      color: colors.primaryText,
-      fontSize: layout.headerTitleFontSize,
-      lineHeight: layout.headerTitleLineHeight,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      includeFontPadding: false,
-    },
-    headerSpacer: {
-      width: layout.headerSlotSize,
-      height: layout.headerSlotSize,
-    },
-  });
-
 const createStyles = (
   colors: any,
-  insets: { bottom: number },
+  insets: { top: number; bottom: number },
   isDark: boolean,
   modeTheme: ChefModeTheme,
   layout: ResultLayoutState,
@@ -628,15 +630,39 @@ const createStyles = (
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: 'transparent',
+    },
+    backgroundLayer: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    resultSheet: {
+      flex: 1,
+      width: '100%',
+      alignSelf: 'stretch',
+      marginTop: insets.top + SPACING.md,
+      borderTopLeftRadius: layout.heroRadius,
+      borderTopRightRadius: layout.heroRadius,
+      overflow: 'hidden',
+      backgroundColor: isDark
+        ? withAlpha(colors.background, 0.88)
+        : withAlpha(colors.cardBackground ?? colors.background, 0.9),
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: withAlpha(colors.primaryText, isDark ? 0.12 : 0.08), borderCurve: 'continuous',
+    },
+    resultScroll: {
+      flex: 1,
     },
     scrollContent: {
-      paddingHorizontal: SPACING.page,
+      flexGrow: 1,
       paddingBottom: insets.bottom + SPACING.xxxl,
-      gap: layout.contentGap,
+    },
+    stateScrollContent: {
+      flexGrow: 1,
     },
     contentStack: {
       gap: layout.contentGap,
+      paddingTop: SPACING.page,
+      paddingHorizontal: SPACING.page,
     },
     stateContainer: {
       flex: 1,
@@ -654,14 +680,14 @@ const createStyles = (
         isDark,
         kind: 'hero',
         accentColor: colors.error,
-      }),
+      }), borderCurve: 'continuous',
     },
     stateIcon: {
       width: 58,
       height: 58,
       borderRadius: 29,
       alignItems: 'center',
-      justifyContent: 'center',
+      justifyContent: 'center', borderCurve: 'continuous',
     },
     stateTitle: {
       color: colors.primaryText,
@@ -701,7 +727,7 @@ const createStyles = (
       overflow: 'hidden',
       borderWidth: 1,
       borderColor: withAlpha(modeTheme.accent, 0.22),
-      ...SHADOWS.cardHover,
+      ...SHADOWS.cardHover, borderCurve: 'continuous',
     },
     pendingImage: {
       width: layout.isCompact ? 116 : 132,
@@ -709,7 +735,7 @@ const createStyles = (
       borderRadius: layout.featureRadius,
       backgroundColor: colors.surfaceMuted,
       borderWidth: StyleSheet.hairlineWidth,
-      borderColor: withAlpha(colors.primaryText, isDark ? 0.12 : 0.08),
+      borderColor: withAlpha(colors.primaryText, isDark ? 0.12 : 0.08), borderCurve: 'continuous',
     },
     pendingProgressBlock: {
       width: '100%',
@@ -731,11 +757,11 @@ const createStyles = (
       overflow: 'hidden',
       backgroundColor: withAlpha(colors.primaryText, isDark ? 0.12 : 0.08),
       borderWidth: StyleSheet.hairlineWidth,
-      borderColor: withAlpha(colors.primaryText, isDark ? 0.16 : 0.12),
+      borderColor: withAlpha(colors.primaryText, isDark ? 0.16 : 0.12), borderCurve: 'continuous',
     },
     pendingProgressFill: {
       height: '100%',
-      borderRadius: BORDER_RADIUS.full,
+      borderRadius: BORDER_RADIUS.full, borderCurve: 'continuous',
     },
     modePill: {
       flexDirection: 'row',
@@ -746,7 +772,7 @@ const createStyles = (
       borderRadius: BORDER_RADIUS.full,
       backgroundColor: withAlpha(colors.primaryText, isDark ? 0.08 : 0.06),
       borderWidth: 1,
-      borderColor: withAlpha(colors.primaryText, isDark ? 0.12 : 0.1),
+      borderColor: withAlpha(colors.primaryText, isDark ? 0.12 : 0.1), borderCurve: 'continuous',
     },
     modePillText: {
       color: colors.primaryText,

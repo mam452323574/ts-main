@@ -49,6 +49,43 @@ const FRIDGE_SCAN_MAX_IMAGE_BYTES = 6 * 1024 * 1024;
 const FRIDGE_SCAN_MAX_REQUEST_BYTES = 8 * 1024 * 1024;
 const FRIDGE_SCAN_DEFAULT_LOCALE = 'fr';
 
+// SC-01 — meme rate limit que check-and-record-scan (10/min, 60/h, 200/jour).
+const SCAN_CREATION_RATE_LIMIT_PER_MINUTE = 10;
+const SCAN_CREATION_RATE_LIMIT_PER_HOUR = 60;
+const SCAN_CREATION_RATE_LIMIT_PER_DAY = 200;
+const SCAN_CREATION_RATE_LIMIT_ERROR_CODE = 'scan_creation_rate_limit_exceeded';
+
+async function enforceFridgeScanCreationRateLimit(
+  client: ReturnType<typeof createServiceRoleClient>,
+  userId: string,
+) {
+  const { data, error } = await client.rpc('record_scan_creation_attempt', {
+    p_user_id: userId,
+    p_per_minute: SCAN_CREATION_RATE_LIMIT_PER_MINUTE,
+    p_per_hour: SCAN_CREATION_RATE_LIMIT_PER_HOUR,
+    p_per_day: SCAN_CREATION_RATE_LIMIT_PER_DAY,
+  });
+
+  if (error) {
+    throw new Phase2HttpError(
+      500,
+      'scan_creation_rate_limit_check_failed',
+      'Failed to evaluate scan creation rate limit',
+    );
+  }
+
+  if (isRecord(data) && data.allowed === false) {
+    const windowExceeded =
+      typeof data.window_exceeded === 'string' ? data.window_exceeded : 'unknown';
+    throw new Phase2HttpError(
+      429,
+      SCAN_CREATION_RATE_LIMIT_ERROR_CODE,
+      `Scan creation rate limit exceeded for window: ${windowExceeded}`,
+      { window_exceeded: windowExceeded },
+    );
+  }
+}
+
 type ParsedFridgeScanRequest =
   | {
       checkOnly: true;
@@ -466,6 +503,10 @@ Deno.serve(async (req: Request) => {
 
     const client = createServiceRoleClient();
     const user = await requireAuthenticatedUser(client, req);
+
+    // SC-01 — partage la table scan_creation_attempts avec check-and-record-scan.
+    await enforceFridgeScanCreationRateLimit(client, user.id);
+
     const requestBody = parseFridgeScanSubmitRequest(
       await readJsonBody(req, { maxBytes: FRIDGE_SCAN_MAX_REQUEST_BYTES }),
     );
