@@ -1,7 +1,8 @@
 import { useEffect, useRef, useMemo } from 'react';
-import { View, StyleSheet, Animated } from 'react-native';
+import { StyleSheet, Animated } from 'react-native';
 import { SPACING } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
+import { Squircle } from '@/components/Squircle';
 
 export function ModalHandle() {
   const { isDark } = useTheme();
@@ -19,7 +20,7 @@ export function ModalHandle() {
 
   return (
     <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
-      <View style={styles.handle} />
+      <Squircle style={styles.handle} />
     </Animated.View>
   );
 }
@@ -35,6 +36,6 @@ const createStyles = (isDark: boolean) => StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)',
+    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)', borderCurve: 'continuous',
   },
 });

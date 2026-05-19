@@ -47,7 +47,7 @@ export function AuthShell({
   backTestID,
 }: AuthShellProps) {
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const { colors, isDark } = useTheme();
   const palette = useAuthPalette();
   const onboardingPalette = useMemo(
@@ -56,6 +56,7 @@ export function AuthShell({
   );
   const isCompactAndroidLayout =
     Platform.OS === 'android' && windowHeight < 780;
+  const isLandscape = windowWidth > windowHeight;
   const backgroundGradient = useMemo(
     () =>
       getVisualMoodGradient(
@@ -75,8 +76,9 @@ export function AuthShell({
         insets,
         isCompactAndroidLayout,
         isDark,
+        isLandscape,
       ),
-    [colors, palette, onboardingPalette, insets, isCompactAndroidLayout, isDark]
+    [colors, palette, onboardingPalette, insets, isCompactAndroidLayout, isDark, isLandscape]
   );
 
   return (
@@ -139,6 +141,7 @@ const createStyles = (
   insets: any,
   isCompactAndroidLayout: boolean,
   isDark: boolean,
+  isLandscape: boolean,
 ) =>
   StyleSheet.create({
     root: {
@@ -156,7 +159,7 @@ const createStyles = (
       height: 210,
       borderBottomLeftRadius: 68,
       borderBottomRightRadius: 68,
-      opacity: 0.95,
+      opacity: 0.95, borderCurve: 'continuous',
     },
     bottomWash: {
       position: 'absolute',
@@ -166,7 +169,7 @@ const createStyles = (
       height: 220,
       borderTopLeftRadius: 72,
       borderTopRightRadius: 72,
-      opacity: 0.9,
+      opacity: 0.9, borderCurve: 'continuous',
     },
     primaryGlow: {
       position: 'absolute',
@@ -175,7 +178,7 @@ const createStyles = (
       width: 240,
       height: 240,
       borderRadius: 999,
-      backgroundColor: palette.heroGlowPrimary,
+      backgroundColor: palette.heroGlowPrimary, borderCurve: 'continuous',
     },
     secondaryGlow: {
       position: 'absolute',
@@ -184,7 +187,7 @@ const createStyles = (
       width: 280,
       height: 280,
       borderRadius: 999,
-      backgroundColor: palette.heroGlowSecondary,
+      backgroundColor: palette.heroGlowSecondary, borderCurve: 'continuous',
     },
     backButton: {
       position: 'absolute',
@@ -195,7 +198,7 @@ const createStyles = (
       borderRadius: BORDER_RADIUS.full,
       backgroundColor: withAlpha(palette.surfaceStrong, isDark ? 0.82 : 0.92),
       borderWidth: 1,
-      borderColor: palette.heroBorder,
+      borderColor: palette.heroBorder, borderCurve: 'continuous',
     },
     languageContainer: {
       position: 'absolute',
@@ -203,7 +206,7 @@ const createStyles = (
       right: SPACING.lg,
       zIndex: 10,
       borderRadius: BORDER_RADIUS.full,
-      overflow: 'hidden',
+      overflow: 'hidden', borderCurve: 'continuous',
     },
     content: {
       flexGrow: 1,
@@ -218,7 +221,11 @@ const createStyles = (
           : SPACING.xxxl + SPACING.lg),
       paddingBottom:
         getMinimumBottomInsetPadding(insets.bottom, SPACING.sm) +
-        (isCompactAndroidLayout ? SPACING.lg : SPACING.xl),
+        (isLandscape
+          ? SPACING.md
+          : isCompactAndroidLayout
+            ? SPACING.lg
+            : SPACING.xl),
       gap: isCompactAndroidLayout ? SPACING.lg : SPACING.xl,
       justifyContent: isCompactAndroidLayout ? 'flex-start' : 'center',
       borderRadius: BORDER_RADIUS.hero,
@@ -231,6 +238,6 @@ const createStyles = (
       shadowRadius: isDark ? 28 : 18,
       shadowOffset: { width: 0, height: isDark ? 16 : 10 },
       elevation: 4,
-      overflow: 'hidden',
+      overflow: 'hidden', borderCurve: 'continuous',
     },
   });

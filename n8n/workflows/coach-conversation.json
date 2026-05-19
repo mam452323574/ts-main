@@ -20,7 +20,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Verify HMAC signature on the incoming Coach webhook.\n// Phase E (C-04) of COACH_SECURITY_AUDIT_2026_05.\n//\n// Dual-mode by default: log violations but accept the request. Flip the n8n\n// env var COACH_WEBHOOK_HMAC_ENFORCE=true to switch to strict enforcement.\n//\n// Expected headers (set by supabase/functions/_shared/phase2Webhook.ts when\n// PHASE2_WEBHOOK_AUTH_MODE includes hmac):\n//   x-webhook-timestamp: ISO-8601 date\n//   x-webhook-signature: \"sha256=\" + hex(HMAC-SHA256(`${ts}.${rawBody}`, SECRET))\n\nconst crypto = require('crypto');\n\nconst ENFORCE = (process.env.COACH_WEBHOOK_HMAC_ENFORCE || '').trim().toLowerCase() === 'true';\nconst SECRET = (process.env.COACH_WEBHOOK_HMAC_SECRET || '').trim();\nconst MAX_SKEW_SECONDS = 300;\n\nfunction fail(code) {\n  if (ENFORCE) {\n    throw new Error(code);\n  }\n  console.warn('[coach-webhook-hmac] ' + code + ' (dual-mode, allowing)');\n}\n\nif (!SECRET) {\n  // Missing secret means we cannot verify anything; in enforce mode this is a\n  // hard failure. In dual-mode we log and let the request through so we don't\n  // break the workflow during the rollout window.\n  fail('coach_webhook_hmac_secret_missing');\n  return $input.all();\n}\n\nconst first = $input.first();\nconst headers = (first && first.json && first.json.headers) || (first && first.headers) || {};\nconst timestamp = headers['x-webhook-timestamp'] || headers['X-Webhook-Timestamp'];\nconst signature = headers['x-webhook-signature'] || headers['X-Webhook-Signature'];\n\nif (!timestamp || !signature) {\n  fail('coach_webhook_signature_missing');\n  return $input.all();\n}\n\nconst tsDate = new Date(String(timestamp));\nif (Number.isNaN(tsDate.getTime())) {\n  fail('coach_webhook_timestamp_invalid');\n  return $input.all();\n}\nconst skewMs = Math.abs(Date.now() - tsDate.getTime());\nif (skewMs > MAX_SKEW_SECONDS * 1000) {\n  fail('coach_webhook_timestamp_out_of_skew');\n  return $input.all();\n}\n\nconst rawBody = JSON.stringify(\n  (first && first.json && first.json.body) || (first && first.body) || (first && first.json) || {},\n);\nconst expected = 'sha256=' + crypto\n  .createHmac('sha256', SECRET)\n  .update(String(timestamp) + '.' + rawBody)\n  .digest('hex');\n\nconst expectedBuf = Buffer.from(expected, 'utf8');\nconst providedBuf = Buffer.from(String(signature), 'utf8');\nconst valid =\n  expectedBuf.length === providedBuf.length &&\n  crypto.timingSafeEqual(expectedBuf, providedBuf);\n\nif (!valid) {\n  fail('coach_webhook_signature_invalid');\n  return $input.all();\n}\n\nreturn $input.all();\n"
+        "jsCode": "// Verify HMAC signature on the incoming Coach webhook.\n// Phase E (C-04) of COACH_SECURITY_AUDIT_2026_05.\n//\n// Dual-mode by default: log violations but accept the request. Flip the n8n\n// env var COACH_WEBHOOK_HMAC_ENFORCE=true to switch to strict enforcement.\n//\n// Expected headers (set by supabase/functions/_shared/phase2Webhook.ts when\n// PHASE2_WEBHOOK_AUTH_MODE includes hmac):\n//   x-webhook-timestamp: ISO-8601 date\n//   x-webhook-signature: \"sha256=\" + hex(HMAC-SHA256(`${ts}.${rawBody}`, SECRET))\n\nconst crypto = require('crypto');\n\nconst ENFORCE = ($env.COACH_WEBHOOK_HMAC_ENFORCE || '').trim().toLowerCase() === 'true';\nconst SECRET = ($env.PHASE2_WEBHOOK_HMAC_SECRET || $env.COACH_WEBHOOK_HMAC_SECRET || '').trim();\nconst MAX_SKEW_SECONDS = 300;\n\nfunction fail(code) {\n  if (ENFORCE) {\n    throw new Error(code);\n  }\n  console.warn('[coach-webhook-hmac] ' + code + ' (dual-mode, allowing)');\n}\n\nif (!SECRET) {\n  // Missing secret means we cannot verify anything; in enforce mode this is a\n  // hard failure. In dual-mode we log and let the request through so we don't\n  // break the workflow during the rollout window.\n  fail('coach_webhook_hmac_secret_missing');\n  return $input.all();\n}\n\nconst first = $input.first();\nconst headers = (first && first.json && first.json.headers) || (first && first.headers) || {};\nconst timestamp = headers['x-webhook-timestamp'] || headers['X-Webhook-Timestamp'];\nconst signature = headers['x-webhook-signature'] || headers['X-Webhook-Signature'];\n\nif (!timestamp || !signature) {\n  fail('coach_webhook_signature_missing');\n  return $input.all();\n}\n\nconst tsDate = new Date(String(timestamp));\nif (Number.isNaN(tsDate.getTime())) {\n  fail('coach_webhook_timestamp_invalid');\n  return $input.all();\n}\nconst skewMs = Math.abs(Date.now() - tsDate.getTime());\nif (skewMs > MAX_SKEW_SECONDS * 1000) {\n  fail('coach_webhook_timestamp_out_of_skew');\n  return $input.all();\n}\n\nconst rawBody = JSON.stringify(\n  (first && first.json && first.json.body) || (first && first.body) || (first && first.json) || {},\n);\nconst expected = 'sha256=' + crypto\n  .createHmac('sha256', SECRET)\n  .update(String(timestamp) + '.' + rawBody)\n  .digest('hex');\n\nconst expectedBuf = Buffer.from(expected, 'utf8');\nconst providedBuf = Buffer.from(String(signature), 'utf8');\nconst valid =\n  expectedBuf.length === providedBuf.length &&\n  crypto.timingSafeEqual(expectedBuf, providedBuf);\n\nif (!valid) {\n  fail('coach_webhook_signature_invalid');\n  return $input.all();\n}\n\nreturn $input.all();\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -520,6 +520,19 @@
       ],
       "id": "9a3b6b62-0080-4f1e-8000-00000000c080",
       "name": "Respond Coach Conversation"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sign Webhook Response — HMAC-SHA256\n// Dual-mode: logs warning when secret is missing unless COACH_WEBHOOK_HMAC_ENFORCE=true.\n// Adds x-webhook-response-timestamp and x-webhook-response-signature headers\n// that the Supabase Edge Function verifies via verifyPhase2WebhookResponseSignature.\n\nconst crypto = require('crypto');\n\nconst ENFORCE = ($env.COACH_WEBHOOK_HMAC_ENFORCE || '').trim().toLowerCase() === 'true';\nconst SECRET = ($env.PHASE2_WEBHOOK_HMAC_SECRET || $env.COACH_WEBHOOK_HMAC_SECRET || '').trim();\n\nif (!SECRET) {\n  if (ENFORCE) {\n    throw new Error('sign_webhook_response_secret_missing');\n  }\n  console.warn('[sign-webhook-response] HMAC secret not configured (dual-mode, skipping signature)');\n  return $input.all();\n}\n\nconst rawBody = JSON.stringify($input.first().json);\nconst timestamp = new Date().toISOString();\nconst payload = timestamp + '.' + rawBody;\nconst sig = 'sha256=' + crypto.createHmac('sha256', SECRET).update(payload).digest('hex');\n\nreturn [{\n  json: $input.first().json,\n  binary: $input.first().binary,\n  headers: {\n    'x-webhook-response-timestamp': timestamp,\n    'x-webhook-response-signature': sig,\n    'Content-Type': 'application/json; charset=utf-8',\n  },\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1400,
+        0
+      ],
+      "id": "ecf01dac-d91f-46f0-a988-d0fd2b50620f",
+      "name": "Sign Webhook Response (coach-conversation)"
     }
   ],
   "connections": {
@@ -734,7 +747,7 @@
       "main": [
         [
           {
-            "node": "Respond Coach Conversation",
+            "node": "Sign Webhook Response (coach-conversation)",
             "type": "main",
             "index": 0
           }
@@ -746,6 +759,17 @@
         [
           {
             "node": "Normalize Coach Conversation Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign Webhook Response (coach-conversation)": {
+      "main": [
+        [
+          {
+            "node": "Respond Coach Conversation",
             "type": "main",
             "index": 0
           }

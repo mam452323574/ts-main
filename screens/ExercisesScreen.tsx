@@ -151,7 +151,7 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
         paddingVertical: SPACING.sm,
         borderWidth: 1,
         borderColor: chrome.mutedSurface.borderColor,
-        ...chrome.mutedSurface.shadowStyle,
+        ...chrome.mutedSurface.shadowStyle, borderCurve: 'continuous',
       },
       list: {
         padding: SPACING.page,
@@ -164,7 +164,7 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
         overflow: 'hidden' as const,
         borderWidth: 1,
         borderColor: chrome.surface.borderColor,
-        ...chrome.surface.shadowStyle,
+        ...chrome.surface.shadowStyle, borderCurve: 'continuous',
       },
       exerciseImage: {
         width: '100%' as const,
@@ -176,7 +176,7 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
         paddingVertical: SPACING.xs,
         borderRadius: BORDER_RADIUS.full,
         borderWidth: 1,
-        borderColor: chrome.chip.borderColor,
+        borderColor: chrome.chip.borderColor, borderCurve: 'continuous',
       },
     };
   })(),

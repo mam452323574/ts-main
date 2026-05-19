@@ -435,8 +435,6 @@ export const EN_TRANSLATIONS = {
       follow: 'Follow',
       unfollow: 'Unfollow',
       hide_author: 'Hide author',
-      save: 'Save',
-      unsave: 'Unsave',
     },
     empty: {
       title: 'Nothing here yet',
@@ -794,7 +792,7 @@ export const EN_TRANSLATIONS = {
     error_body_provider_unreachable:
       'Coach could not reach its response provider just now. Please try again in a moment.',
     error_body_invalid_response:
-      'Coach returned an unexpected response format. Please try again in a moment.',
+      'Tiny technical hiccup on Coach. Try again in a moment.',
     unavailable_title: 'Coach is temporarily unavailable',
     unavailable_body:
       'Coach is turned off on this server until the backend provider is configured. Your saved guidance can still appear below, but new Coach responses are unavailable for now.',
@@ -807,11 +805,11 @@ export const EN_TRANSLATIONS = {
     empty_scan_types_hint: 'Face · Body · Nutrition',
     first_scan_required_title: 'First scan required',
     first_scan_required_body:
-      'Do at least one scan so your coach has data to analyze.',
+      'Start your first scan to unlock personalized coaching. A minute is enough.',
     first_scan_required_cta: 'Do a scan',
-    no_scan_title: 'Take a scan first',
+    no_scan_title: 'Start with a scan',
     no_scan_body:
-      'Take a scan first so Coach has data to analyze.',
+      'Start with a scan to unlock personalized coaching.',
     history_title: 'Previous guidance',
     view_history_cta: 'View history',
     history_cta_count: '{{count}} previous guidance item(s)',

@@ -18,6 +18,7 @@ import {
   withAlpha,
 } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
+import { Squircle } from '@/components/Squircle';
 
 interface SettingRowProps {
   title: string;
@@ -74,7 +75,7 @@ export function SettingRow({
       ]}
     >
       {icon ? (
-        <View
+        <Squircle
           style={[
             styles.iconShell,
             {
@@ -88,7 +89,7 @@ export function SettingRow({
           ]}
         >
           {icon}
-        </View>
+        </Squircle>
       ) : null}
 
       <View style={styles.copy}>
@@ -123,7 +124,7 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: BORDER_RADIUS.lg, borderCurve: 'continuous',
   },
   iconShell: {
     width: 36,
@@ -131,7 +132,7 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.md,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
+    borderWidth: 1, borderCurve: 'continuous',
   },
   copy: {
     flex: 1,

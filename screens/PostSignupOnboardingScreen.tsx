@@ -69,6 +69,7 @@ import {
 } from '@/utils/postSignupOnboarding';
 import { entryOfferSession } from '@/utils/entryOfferSession';
 import { getMinimumBottomInsetPadding } from '@/utils/mobileLayout';
+import { Squircle } from '@/components/Squircle';
 
 const TOTAL_SLIDES = 5;
 
@@ -84,7 +85,8 @@ interface SlideContent {
 export default function PostSignupOnboardingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
+  const isLandscape = windowWidth > windowHeight;
   const { colors, isDark } = useTheme();
   const { t } = useLanguage();
   const {
@@ -123,6 +125,7 @@ export default function PostSignupOnboardingScreen() {
         onboardingPalette,
         isCompactAndroidLayout,
         windowHeight,
+        isLandscape,
       ),
     [
       colors,
@@ -131,6 +134,7 @@ export default function PostSignupOnboardingScreen() {
       isDark,
       onboardingPalette,
       windowHeight,
+      isLandscape,
     ],
   );
   const gradientColors = useMemo<[string, string, string]>(
@@ -550,9 +554,9 @@ export default function PostSignupOnboardingScreen() {
             </View>
 
             {error ? (
-              <View style={styles.errorContainer}>
+              <Squircle style={styles.errorContainer}>
                 <Text style={styles.errorText}>{error}</Text>
-              </View>
+              </Squircle>
             ) : null}
 
             {shouldShowSocialAvatarPrompt && user ? (
@@ -791,9 +795,9 @@ function ScannerPreview({ colors, isDark, palette }: PreviewProps) {
       palette={palette}
       sectionLabel="SCANNER"
     >
-      <View style={styles.heroIconWrap}>
+      <Squircle style={styles.heroIconWrap}>
         <Camera color={palette.accentStrong} size={56} strokeWidth={1.6} />
-      </View>
+      </Squircle>
       <View style={styles.chipsRow}>
         <View style={[styles.chip, styles.chipFilled]}>
           <Text style={styles.chipFilledText}>FOOD</Text>
@@ -826,23 +830,23 @@ function CoachPreview({ colors, isDark, palette }: PreviewProps) {
       palette={palette}
       sectionLabel="COACH"
     >
-      <View style={styles.coachAvatar}>
+      <Squircle style={styles.coachAvatar}>
         <CoachFeatureIcon color={palette.accentStrong} size={28} strokeWidth={1.8} />
-      </View>
-      <View style={styles.bubbleAssistant}>
-        <View style={[styles.bubbleLine, { width: '88%' }]} />
-        <View style={[styles.bubbleLine, { width: '64%' }]} />
-        <View style={[styles.bubbleLine, { width: '76%' }]} />
-      </View>
-      <View style={styles.bubbleUser}>
-        <View
+      </Squircle>
+      <Squircle style={styles.bubbleAssistant}>
+        <Squircle style={[styles.bubbleLine, { width: '88%' }]} />
+        <Squircle style={[styles.bubbleLine, { width: '64%' }]} />
+        <Squircle style={[styles.bubbleLine, { width: '76%' }]} />
+      </Squircle>
+      <Squircle style={styles.bubbleUser}>
+        <Squircle
           style={[
             styles.bubbleLine,
             styles.bubbleLineInverse,
             { width: '52%' },
           ]}
         />
-      </View>
+      </Squircle>
     </PreviewFrame>
   );
 }
@@ -859,36 +863,36 @@ function SocialPreview({ colors, isDark, palette }: PreviewProps) {
       palette={palette}
       sectionLabel="COMMUNITY"
     >
-      <View style={styles.heroIconWrap}>
+      <Squircle style={styles.heroIconWrap}>
         <Users color={palette.accentStrong} size={48} strokeWidth={1.6} />
-      </View>
+      </Squircle>
       <View style={styles.avatarsRow}>
-        <View style={[styles.communityAvatar, { left: 0 }]} />
-        <View
+        <Squircle style={[styles.communityAvatar, { left: 0 }]} />
+        <Squircle
           style={[
             styles.communityAvatar,
             styles.communityAvatarSecondary,
             { left: 22 },
           ]}
         />
-        <View
+        <Squircle
           style={[
             styles.communityAvatar,
             styles.communityAvatarTertiary,
             { left: 44 },
           ]}
         />
-        <View style={[styles.communityAvatarMore, { left: 66 }]}>
+        <Squircle style={[styles.communityAvatarMore, { left: 66 }]}>
           <Text style={styles.communityAvatarMoreText}>+8</Text>
-        </View>
+        </Squircle>
       </View>
       <View style={styles.feedRow}>
         <View style={styles.feedDot} />
-        <View style={[styles.bubbleLine, { width: '68%' }]} />
+        <Squircle style={[styles.bubbleLine, { width: '68%' }]} />
       </View>
       <View style={styles.feedRow}>
         <View style={styles.feedDot} />
-        <View style={[styles.bubbleLine, { width: '54%' }]} />
+        <Squircle style={[styles.bubbleLine, { width: '54%' }]} />
       </View>
     </PreviewFrame>
   );
@@ -917,7 +921,7 @@ function AnalyticsPreview({ colors, isDark, palette }: PreviewProps) {
           <Text style={styles.tabText}>1Y</Text>
         </View>
       </View>
-      <View style={styles.chartWrap}>
+      <Squircle style={styles.chartWrap}>
         <LineChart
           color={withAlpha(palette.textSecondary, 0.42)}
           size={64}
@@ -936,7 +940,7 @@ function AnalyticsPreview({ colors, isDark, palette }: PreviewProps) {
             />
           ))}
         </View>
-      </View>
+      </Squircle>
       <View style={styles.metricRow}>
         <Text style={styles.metricBig}>+12%</Text>
         <Text style={styles.metricSmall}>vs last week</Text>
@@ -957,14 +961,14 @@ function FridgePreview({ colors, isDark, palette }: PreviewProps) {
       palette={palette}
       sectionLabel="FRIDGE"
     >
-      <View style={styles.fridgeIllustrationShell}>
+      <Squircle style={styles.fridgeIllustrationShell}>
         <FridgeScanIllustration size={104} colors={colors} isDark={isDark} />
-      </View>
+      </Squircle>
       <View style={styles.recipeRow}>
-        <View style={styles.recipeThumb} />
+        <Squircle style={styles.recipeThumb} />
         <View style={styles.recipeBody}>
-          <View style={[styles.bubbleLine, { width: '70%' }]} />
-          <View style={[styles.bubbleLine, { width: '40%' }]} />
+          <Squircle style={[styles.bubbleLine, { width: '70%' }]} />
+          <Squircle style={[styles.bubbleLine, { width: '40%' }]} />
         </View>
       </View>
       <View style={styles.toggleRow}>
@@ -986,6 +990,7 @@ const createStyles = (
   palette: OnboardingPalette,
   isCompactAndroidLayout: boolean,
   windowHeight: number,
+  isLandscape: boolean,
 ) => {
   const contentTopPadding =
     insets.top + (isCompactAndroidLayout ? SPACING.lg : SPACING.xl);
@@ -1013,9 +1018,11 @@ const createStyles = (
     Math.round(windowHeight * (isCompactAndroidLayout ? 0.46 : 0.5)),
     availableHeroHeight,
   );
-  const promoHeroMaxHeight = Math.round(
-    windowHeight * (isCompactAndroidLayout ? 0.68 : 0.72),
-  );
+  // En paysage (iPad/tablette), la hauteur d'écran disponible est très réduite :
+  // sans cap, le hero remplit toute la fenêtre et masque le contenu lisible.
+  const promoHeroMaxHeight = isLandscape
+    ? Math.min(Math.round(windowHeight * 0.55), 320)
+    : Math.round(windowHeight * (isCompactAndroidLayout ? 0.68 : 0.72));
   const promoHeroTargetHeight = clampNumber(
     Math.round(availableHeroHeight),
     promoHeroMinHeight,
@@ -1038,7 +1045,7 @@ const createStyles = (
       height: 190,
       borderBottomLeftRadius: 56,
       borderBottomRightRadius: 56,
-      opacity: 0.95,
+      opacity: 0.95, borderCurve: 'continuous',
     },
     bottomWash: {
       position: 'absolute',
@@ -1048,7 +1055,7 @@ const createStyles = (
       height: 190,
       borderTopLeftRadius: 56,
       borderTopRightRadius: 56,
-      opacity: 0.9,
+      opacity: 0.9, borderCurve: 'continuous',
     },
     loadingContainer: {
       flex: 1,
@@ -1092,7 +1099,7 @@ const createStyles = (
       borderRadius: BORDER_RADIUS.pill,
       backgroundColor: palette.secondaryActionFill,
       borderWidth: 1,
-      borderColor: palette.secondaryActionBorder,
+      borderColor: palette.secondaryActionBorder, borderCurve: 'continuous',
     },
     skipSlidesPressed: {
       backgroundColor: palette.accentSofter,
@@ -1151,7 +1158,7 @@ const createStyles = (
       width: '76%',
       height: '58%',
       borderRadius: 999,
-      transform: [{ scaleX: 1.16 }],
+      transform: [{ scaleX: 1.16 }], borderCurve: 'continuous',
     },
     promoHeroAmbientGradient: {
       position: 'absolute',
@@ -1166,7 +1173,7 @@ const createStyles = (
       height: promoHeroTargetHeight,
       minHeight: promoHeroMinHeight,
       maxHeight: '100%',
-      borderRadius: isCompactAndroidLayout ? 18 : 22,
+      borderRadius: isCompactAndroidLayout ? 18 : 22, borderCurve: 'continuous',
     },
     promoHeroStageContent: {
       padding: 0,
@@ -1235,7 +1242,7 @@ const createStyles = (
       borderRadius: BORDER_RADIUS.pill,
       backgroundColor: withAlpha(palette.surfaceGlass, isDark ? 0.84 : 0.74),
       borderWidth: 1,
-      borderColor: withAlpha(palette.textPrimary, isDark ? 0.12 : 0.08),
+      borderColor: withAlpha(palette.textPrimary, isDark ? 0.12 : 0.08), borderCurve: 'continuous',
     },
     promoHeroBulletText: {
       fontSize: SIZES.xs,
@@ -1260,7 +1267,7 @@ const createStyles = (
       shadowOpacity: isDark ? 0.16 : 0.14,
       shadowRadius: 18,
       shadowOffset: { width: 0, height: 10 },
-      overflow: 'hidden',
+      overflow: 'hidden', borderCurve: 'continuous',
     },
     socialAvatarPromptCopy: {
       gap: SPACING.xs,
@@ -1299,13 +1306,13 @@ const createStyles = (
       borderRadius: BORDER_RADIUS.pill,
       backgroundColor: palette.secondaryActionFill,
       borderWidth: 1,
-      borderColor: palette.secondaryActionBorder,
+      borderColor: palette.secondaryActionBorder, borderCurve: 'continuous',
     },
     progressDot: {
       width: 14,
       height: 4,
       borderRadius: 999,
-      backgroundColor: palette.progressInactive,
+      backgroundColor: palette.progressInactive, borderCurve: 'continuous',
     },
     progressDotActive: {
       width: 28,
@@ -1317,7 +1324,7 @@ const createStyles = (
       borderRadius: BORDER_RADIUS.xl,
       backgroundColor: withAlpha(colors.error, 0.12),
       borderWidth: 1,
-      borderColor: withAlpha(colors.error, 0.2),
+      borderColor: withAlpha(colors.error, 0.2), borderCurve: 'continuous',
     },
     errorText: {
       color: colors.error,
@@ -1354,7 +1361,7 @@ const createPreviewStyles = (
       width: 6,
       height: 6,
       borderRadius: 999,
-      backgroundColor: palette.accent,
+      backgroundColor: palette.accent, borderCurve: 'continuous',
     },
     sectionLabel: {
       fontSize: 9,
@@ -1376,7 +1383,7 @@ const createPreviewStyles = (
       justifyContent: 'center',
       backgroundColor: palette.accentSofter,
       borderWidth: 1,
-      borderColor: palette.borderStrong,
+      borderColor: palette.borderStrong, borderCurve: 'continuous',
     },
     chipsRow: {
       flexDirection: 'row',
@@ -1390,7 +1397,7 @@ const createPreviewStyles = (
       borderRadius: 999,
       borderWidth: 1,
       borderColor: palette.border,
-      backgroundColor: withAlpha(palette.surfaceElevated, 0.72),
+      backgroundColor: withAlpha(palette.surfaceElevated, 0.72), borderCurve: 'continuous',
     },
     chipText: {
       fontSize: 8,
@@ -1420,13 +1427,13 @@ const createPreviewStyles = (
       borderColor: withAlpha(palette.accent, 0.42),
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: palette.accentSofter,
+      backgroundColor: palette.accentSofter, borderCurve: 'continuous',
     },
     captureCore: {
       width: 24,
       height: 24,
       borderRadius: 999,
-      backgroundColor: palette.accent,
+      backgroundColor: palette.accent, borderCurve: 'continuous',
     },
     coachAvatar: {
       width: 44,
@@ -1437,7 +1444,7 @@ const createPreviewStyles = (
       backgroundColor: palette.accentSecondarySoft,
       borderWidth: 1,
       borderColor: withAlpha(palette.accentSecondary, 0.34),
-      alignSelf: 'flex-start',
+      alignSelf: 'flex-start', borderCurve: 'continuous',
     },
     bubbleAssistant: {
       alignSelf: 'flex-start',
@@ -1449,7 +1456,7 @@ const createPreviewStyles = (
       backgroundColor: palette.surfaceGlass,
       borderWidth: 1,
       borderColor: palette.border,
-      gap: 4,
+      gap: 4, borderCurve: 'continuous',
     },
     bubbleUser: {
       alignSelf: 'flex-end',
@@ -1459,12 +1466,12 @@ const createPreviewStyles = (
       borderRadius: 14,
       borderTopRightRadius: 4,
       backgroundColor: palette.ctaFill,
-      gap: 4,
+      gap: 4, borderCurve: 'continuous',
     },
     bubbleLine: {
       height: 4,
       borderRadius: 4,
-      backgroundColor: withAlpha(palette.textSecondary, 0.58),
+      backgroundColor: withAlpha(palette.textSecondary, 0.58), borderCurve: 'continuous',
     },
     bubbleLineInverse: {
       backgroundColor: withAlpha(palette.textPrimary, 0.74),
@@ -1481,7 +1488,7 @@ const createPreviewStyles = (
       borderRadius: 14,
       backgroundColor: communityOne,
       borderWidth: 2,
-      borderColor: palette.surface,
+      borderColor: palette.surface, borderCurve: 'continuous',
     },
     communityAvatarSecondary: {
       backgroundColor: communityTwo,
@@ -1498,7 +1505,7 @@ const createPreviewStyles = (
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 2,
-      borderColor: palette.surface,
+      borderColor: palette.surface, borderCurve: 'continuous',
     },
     communityAvatarMoreText: {
       fontSize: 8,
@@ -1516,7 +1523,7 @@ const createPreviewStyles = (
       width: 6,
       height: 6,
       borderRadius: 999,
-      backgroundColor: palette.accent,
+      backgroundColor: palette.accent, borderCurve: 'continuous',
     },
     tabsRow: {
       flexDirection: 'row',
@@ -1529,7 +1536,7 @@ const createPreviewStyles = (
       borderRadius: 999,
       backgroundColor: withAlpha(palette.surfaceElevated, 0.5),
       borderWidth: 1,
-      borderColor: palette.border,
+      borderColor: palette.border, borderCurve: 'continuous',
     },
     tabActive: {
       backgroundColor: palette.ctaFill,
@@ -1557,7 +1564,7 @@ const createPreviewStyles = (
       padding: 8,
       position: 'relative',
       alignItems: 'flex-end',
-      justifyContent: 'flex-end',
+      justifyContent: 'flex-end', borderCurve: 'continuous',
     },
     chartIcon: {
       position: 'absolute',
@@ -1575,7 +1582,7 @@ const createPreviewStyles = (
     bar: {
       flex: 1,
       borderRadius: 3,
-      backgroundColor: withAlpha(palette.textSecondary, 0.24),
+      backgroundColor: withAlpha(palette.textSecondary, 0.24), borderCurve: 'continuous',
     },
     barActive: {
       backgroundColor: palette.accent,
@@ -1605,7 +1612,7 @@ const createPreviewStyles = (
       justifyContent: 'center',
       backgroundColor: palette.accentSofter,
       borderWidth: 1,
-      borderColor: palette.borderStrong,
+      borderColor: palette.borderStrong, borderCurve: 'continuous',
     },
     recipeRow: {
       flexDirection: 'row',
@@ -1620,7 +1627,7 @@ const createPreviewStyles = (
       borderRadius: 10,
       backgroundColor: withAlpha(colors.warning, 0.22),
       borderWidth: 1,
-      borderColor: withAlpha(colors.warning, 0.34),
+      borderColor: withAlpha(colors.warning, 0.34), borderCurve: 'continuous',
     },
     recipeBody: {
       flex: 1,
@@ -1639,7 +1646,7 @@ const createPreviewStyles = (
       borderRadius: 999,
       borderWidth: 1,
       borderColor: palette.border,
-      backgroundColor: withAlpha(palette.surfaceElevated, 0.54),
+      backgroundColor: withAlpha(palette.surfaceElevated, 0.54), borderCurve: 'continuous',
     },
     toggleChipText: {
       fontSize: 9,

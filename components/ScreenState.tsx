@@ -20,6 +20,7 @@ import {
   getThemeTokens,
 } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
+import { Squircle } from '@/components/Squircle';
 
 type ScreenStateTone = 'loading' | 'empty' | 'error' | 'success' | 'info' | 'unavailable';
 type ScreenStateLayout = 'full' | 'card' | 'inline';
@@ -124,7 +125,7 @@ export function ScreenState({
       testID={testID}
     >
       <View style={[styles.content, contentStyle]}>
-        <View
+        <Squircle
           style={[
             styles.iconShell,
             {
@@ -134,7 +135,7 @@ export function ScreenState({
           ]}
         >
           {renderIcon()}
-        </View>
+        </Squircle>
 
         {title ? (
           <Text style={[styles.title, { color: colors.primaryText }, titleStyle]}>{title}</Text>
@@ -193,7 +194,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
+    borderWidth: 1, borderCurve: 'continuous',
   },
   title: {
     fontSize: SIZES.text18,

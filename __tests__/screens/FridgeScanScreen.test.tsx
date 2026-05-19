@@ -171,6 +171,8 @@ const translations: Record<string, string> = {
   'fridge_scan.camera_unavailable_body': 'The Chef camera could not start right now. Retry or go back to Home.',
   'fridge_scan.feedback_title': 'Choose your chef',
   'fridge_scan.feedback_body': 'Choose a style, then ask for your meal.',
+  'fridge_scan.chef_selector_eyebrow': 'Your cooking style',
+  'fridge_scan.chef_selector_title': 'Which chef will it be?',
   'fridge_scan.feedback_cta': 'Retake',
   'fridge_scan.feedback_primary_cta': 'Ask the chef',
   'fridge_scan.feedback_secondary_cta': 'Retake',

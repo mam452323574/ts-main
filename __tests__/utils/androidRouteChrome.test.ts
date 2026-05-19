@@ -78,7 +78,6 @@ describe('androidRouteChrome', () => {
       '/notification-settings',
       '/social-compose',
       '/social-comments',
-      '/scan-result',
     ].forEach((route) => {
       expect(getAndroidRouteChrome(route, LIGHT_COLORS, false)).toEqual(
         expect.objectContaining({
@@ -101,22 +100,17 @@ describe('androidRouteChrome', () => {
   });
 
   it('keeps immersive scan routes on the black Android system background', () => {
-    expect(getAndroidRouteChrome('/scan-preview', DARK_COLORS, true)).toEqual(
-      expect.objectContaining({
-        systemBackgroundColor: ANDROID_SECONDARY_BACKGROUND,
-        navigationButtonStyle: 'light',
-        statusBarStyle: 'light',
-        isMainTabsRoute: false,
-      })
-    );
-
-    expect(getAndroidRouteChrome('/scan-frigo', LIGHT_COLORS, false)).toEqual(
-      expect.objectContaining({
-        systemBackgroundColor: ANDROID_SECONDARY_BACKGROUND,
-        navigationButtonStyle: 'light',
-        statusBarStyle: 'light',
-        isMainTabsRoute: false,
-      })
+    ['/scan-preview', '/scan-result', '/super-scan-result', '/scan-frigo'].forEach(
+      (route) => {
+        expect(getAndroidRouteChrome(route, LIGHT_COLORS, false)).toEqual(
+          expect.objectContaining({
+            systemBackgroundColor: ANDROID_SECONDARY_BACKGROUND,
+            navigationButtonStyle: 'light',
+            statusBarStyle: 'light',
+            isMainTabsRoute: false,
+          })
+        );
+      },
     );
   });
 

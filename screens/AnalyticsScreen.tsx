@@ -48,6 +48,7 @@ import {
 import { paywallSession } from '@/utils/paywallSession';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { hasPremiumAccessFromProfile } from '@/utils/subscription';
+import { Squircle } from '@/components/Squircle';
 
 const PERIODS: { value: AnalyticsPeriod; labelKey: string; premium: boolean }[] = [
   { value: '7days', labelKey: 'analytics.periods.days_7', premium: false },
@@ -909,7 +910,7 @@ export default function AnalyticsScreen() {
         )}
 
         {isInitialLoading && (
-          <View style={styles.emptyStateCard}>
+          <Squircle style={styles.emptyStateCard}>
             <ScreenState
               tone="loading"
               layout="inline"
@@ -917,11 +918,11 @@ export default function AnalyticsScreen() {
               surfaceVariant="inset"
               testID="analytics-loading-state"
             />
-          </View>
+          </Squircle>
         )}
 
         {!hasData && !error && !isInitialLoading && (
-          <View style={styles.emptyStateCard}>
+          <Squircle style={styles.emptyStateCard}>
             <ScreenState
               tone="empty"
               layout="inline"
@@ -929,10 +930,10 @@ export default function AnalyticsScreen() {
               surfaceVariant="inset"
               testID="analytics-empty-state"
             />
-          </View>
+          </Squircle>
         )}
 
-        <View
+        <Squircle
           style={styles.chartCard}
           accessible={true}
           accessibilityLabel={
@@ -1003,13 +1004,13 @@ export default function AnalyticsScreen() {
               xLabelsOffset={denseXAxisLayout.xLabelsOffset}
             />
           ) : (
-            <View style={styles.emptyChartContainer}>
+            <Squircle style={styles.emptyChartContainer}>
               <Text style={styles.emptyChartText}>{t('analytics.empty_state')}</Text>
-            </View>
+            </Squircle>
           )}
-        </View>
+        </Squircle>
 
-        <View
+        <Squircle
           style={styles.chartCard}
           accessible={true}
           accessibilityLabel={
@@ -1079,13 +1080,13 @@ export default function AnalyticsScreen() {
               xLabelsOffset={denseXAxisLayout.xLabelsOffset}
             />
           ) : (
-            <View style={styles.emptyChartContainer}>
+            <Squircle style={styles.emptyChartContainer}>
               <Text style={styles.emptyChartText}>{t('analytics.empty_state')}</Text>
-            </View>
+            </Squircle>
           )}
-        </View>
+        </Squircle>
 
-        <View
+        <Squircle
           style={styles.chartCard}
           accessible={true}
           accessibilityLabel={
@@ -1155,11 +1156,11 @@ export default function AnalyticsScreen() {
               xLabelsOffset={denseXAxisLayout.xLabelsOffset}
             />
           ) : (
-            <View style={styles.emptyChartContainer}>
+            <Squircle style={styles.emptyChartContainer}>
               <Text style={styles.emptyChartText}>{t('analytics.empty_state')}</Text>
-            </View>
+            </Squircle>
           )}
-        </View>
+        </Squircle>
 
         <View style={[styles.footer, { height: insets.bottom + SPACING.xl }]} />
       </ScrollView>
@@ -1213,7 +1214,7 @@ const createStyles = (colors: any, isDark: boolean) => {
     justifyContent: 'center',
     backgroundColor: colors.surfaceMuted ?? colors.cardBackground,
     borderWidth: 1,
-    borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+    borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08), borderCurve: 'continuous',
   },
   headerCopy: {
     flex: 1,
@@ -1241,7 +1242,7 @@ const createStyles = (colors: any, isDark: boolean) => {
     padding: 4,
     borderWidth: 1,
     borderColor: selectorSurface.borderColor,
-    ...selectorSurface.shadowStyle,
+    ...selectorSurface.shadowStyle, borderCurve: 'continuous',
   },
   periodButton: {
     flex: 1,
@@ -1250,7 +1251,7 @@ const createStyles = (colors: any, isDark: boolean) => {
     justifyContent: 'center',
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.xs,
-    borderRadius: BORDER_RADIUS.full,
+    borderRadius: BORDER_RADIUS.full, borderCurve: 'continuous',
   },
   periodButtonActive: {
     backgroundColor: colors.primaryText,
@@ -1287,7 +1288,7 @@ const createStyles = (colors: any, isDark: boolean) => {
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: isDark ? 0.1 : 0.04,
     shadowRadius: 16,
-    elevation: 1,
+    elevation: 1, borderCurve: 'continuous',
   },
   chartHeaderWithIcon: {
     flexDirection: 'row',
@@ -1319,7 +1320,7 @@ const createStyles = (colors: any, isDark: boolean) => {
     borderRadius: BORDER_RADIUS.full,
     backgroundColor: chrome.chip.backgroundColor,
     borderWidth: 1,
-    borderColor: chrome.chip.borderColor,
+    borderColor: chrome.chip.borderColor, borderCurve: 'continuous',
   },
   metricButtonActive: {
     backgroundColor: chrome.chipActive.backgroundColor,
@@ -1336,7 +1337,7 @@ const createStyles = (colors: any, isDark: boolean) => {
   },
   chart: {
     marginLeft: -SPACING.md,
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: BORDER_RADIUS.xl, borderCurve: 'continuous',
   },
   labelMeasurementContainer: {
     position: 'absolute',
@@ -1352,7 +1353,7 @@ const createStyles = (colors: any, isDark: boolean) => {
     marginHorizontal: SPACING.page,
     marginBottom: SPACING.lg,
     borderRadius: BORDER_RADIUS.xl,
-    overflow: 'hidden',
+    overflow: 'hidden', borderCurve: 'continuous',
   },
   errorContainer: {
     marginHorizontal: SPACING.page,
@@ -1368,7 +1369,7 @@ const createStyles = (colors: any, isDark: boolean) => {
     backgroundColor: chrome.chart.emptyBackground,
     borderRadius: BORDER_RADIUS.xl,
     borderWidth: 1,
-    borderColor: chrome.chip.borderColor,
+    borderColor: chrome.chip.borderColor, borderCurve: 'continuous',
   },
   emptyChartText: {
     fontSize: SIZES.text14,

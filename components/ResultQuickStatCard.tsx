@@ -172,7 +172,7 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: layout.quickStatCardGap,
-      justifyContent: 'flex-start',
+      justifyContent: 'flex-start', borderCurve: 'continuous',
     },
     halfWidthCard: {
       flexBasis: layout.useSingleColumnResultCards ? '100%' : '47%',
@@ -190,7 +190,7 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       alignItems: 'center',
       justifyContent: 'center',
       padding: SPACING.xs,
-      flexShrink: 0,
+      flexShrink: 0, borderCurve: 'continuous',
     },
     fullWidthIconWrap: {
       width: layout.quickStatIconSize + 2,

@@ -256,3 +256,153 @@ When adoption reaches ≥99% and you're ready to actually close AUTH-VULN-01 + 0
 | Phase 8 (cleanup) | 30 min | Week 8-12 |
 
 **Total wall-clock: 4-12 weeks.** Effort on your side: ~30 min dashboard + few hours build/submit + monitoring.
+
+---
+
+## Phase S — Social security fixes (Waves 1-3 from SOCIAL_SECURITY_AUDIT.md)
+
+> **Companion doc:** [SOCIAL_SECURITY_AUDIT.md](SOCIAL_SECURITY_AUDIT.md), [SOCIAL_FIX_PLAN.md](SOCIAL_FIX_PLAN.md).
+> **Statut:** code et migrations prêts (15 findings corrigés + 1 vérifié + 1 shadow + 1 documenté).
+> **Reste à faire:** déploiement ops + coordination n8n.
+
+### Phase S.1 — Prérequis ops (avant tout deploy)
+
+| # | Action | Qui | Notes |
+|---|--------|-----|-------|
+| S.1.1 | Configurer `N8N_RESPONSE_HMAC_SECRET` côté Supabase secrets (ou réutiliser `PHASE2_WEBHOOK_HMAC_SECRET`) | **You** | Dashboard → Edge Functions → Secrets |
+| S.1.2 | Configurer `WEBHOOK_ALLOWED_HOSTS` (déjà existant — vérifier que la liste couvre tous les hostnames n8n utilisés) | **You** | Dashboard → Edge Functions → Secrets |
+| S.1.3 | Configurer `WEBHOOK_VERIFY_RESPONSE=false` (kill-switch ON pour le déploiement initial) | **You** | Évite de casser n8n pendant la coordination |
+| S.1.4 | (Optionnel) `WEBHOOK_ALLOW_PRIVATE_IPS` — laisser absent ou explicite `false` en prod | **You** | Bypass SSRF pour dev uniquement |
+
+### Phase S.2 — Déploiement des migrations (ordre strict)
+
+À exécuter via `supabase db push` (CLI installé en Phase 1) ou Dashboard → SQL Editor :
+
+| # | Migration | Effet |
+|---|-----------|-------|
+| S.2.1 | `20260520120000_admin_idempotency_keys.sql` | `admin_audit_events.idempotency_key` UNIQUE + RPC eradicate v2 |
+| S.2.2 | `20260521120000_clamp_social_admin_reaction_adjustments.sql` | CHECK constraint + clamp RPC adjust |
+| S.2.3 | `20260522120000_weighted_report_count.sql` | `compute_weighted_report_count` + table shadow (mode shadow, trigger inchangée) |
+| S.2.4 | `20260523120000_release_pending_social_upload_reservations.sql` | RPC purge reservations logout |
+| S.2.5 | `20260524130000_social_report_threshold_shadow_logging.sql` | Trigger modifiée pour log shadow (décision toujours raw) |
+| S.2.6 | `20260525120000_harden_social_feed_cursor.sql` | Helper `is_valid_social_feed_keyset_cursor` |
+| S.2.7 | `20260601120000_social_soft_delete_retention.sql` | RPC purge soft-delete + planification pg_cron (free plan → `RAISE WARNING` attendu) |
+
+**Vérification post-migration :**
+```bash
+# Dashboard → SQL Editor
+\i scripts/verify_pg_cron_and_purge.sql
+```
+
+Sur Free plan, pg_cron est absent → la migration S.2.7 affichera un `WARNING`. C'est attendu. Voir Phase S.5 pour le fallback scheduler externe.
+
+### Phase S.3 — Déploiement des Edge Functions
+
+```powershell
+.\deploy_functions.ps1 -ProjectRef qpogulljnnacrxdjbwiz
+```
+
+Ce script lit `supabase/functions/active-edge-functions.json` (déjà mis à jour avec `admin-whoami` et `purge-soft-deleted-social-assets`) et déploie via `--use-api`. Configs `verify_jwt` dans `supabase/config.toml` également à jour.
+
+Edge Functions modifiées (re-déploiement) :
+- `social-admin-eradicate-user` (S-09 idempotency, audit log retiré côté Edge — déplacé dans la RPC)
+- `social-admin-moderate-user` (S-09 intent/outcome split)
+- `social-admin-adjust-post-reactions` (S-09 intent/outcome split)
+- `social-report-content` (S-08 caller update)
+
+Edge Functions **nouvelles** (premier déploiement) :
+- `admin-whoami` (S-07)
+- `purge-soft-deleted-social-assets` (S-18 fallback)
+
+### Phase S.4 — Smoke tests staging
+
+```powershell
+$env:SMOKE_SUPABASE_URL = 'https://<projet>.supabase.co'
+$env:SMOKE_ADMIN_JWT = '<JWT admin>'
+$env:SMOKE_USER_JWT = '<JWT non-admin>'
+$env:SMOKE_TARGET_USER_ID = '<uuid user a moderer>'
+$env:SMOKE_TARGET_POST_ID = '<uuid post pour reaction adjustment>'
+.\scripts\smoke_test_social_security.ps1
+```
+
+Couvre S-07, S-09, S-10, S-11, S-15. Tests S-08, S-12, S-18 à faire via SQL/observation.
+
+### Phase S.5 — Coordination n8n (avant retrait du kill-switch)
+
+Voir [n8n/SOCIAL_WEBHOOK_RESPONSE_SIGNING.md](n8n/SOCIAL_WEBHOOK_RESPONSE_SIGNING.md) pour le détail.
+
+| # | Action | Qui |
+|---|--------|-----|
+| S.5.1 | Configurer chaque workflow n8n qui répond à une Edge Function HMAC pour signer la réponse | **You** (n8n admin) |
+| S.5.2 | Test stub local avec curl/PowerShell pour vérifier la signature avant push n8n | **You** |
+| S.5.3 | Sur staging : `WEBHOOK_VERIFY_RESPONSE=true` + smoke test social-report-content | **You** |
+| S.5.4 | Retirer `WEBHOOK_VERIFY_RESPONSE` en prod (default = check activé quand HMAC outbound on) | **You** |
+
+### Phase S.6 — Scheduler externe pour purge storage (Free plan only)
+
+Supabase Free n'a pas pg_cron. La RPC `purge_old_soft_deleted_social_content` existe mais n'est pas planifiée. Solutions :
+
+**Option A — Task Scheduler Windows (machine locale):**
+```powershell
+$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-File C:\path\to\trigger_social_purge.ps1 -SupabaseProjectRef qpogulljnnacrxdjbwiz'
+$trigger = New-ScheduledTaskTrigger -Daily -At 3am
+Register-ScheduledTask -TaskName 'SocialSoftDeletePurge' -Action $action -Trigger $trigger
+```
+
+**Option B — GitHub Actions (recommandé en prod):**
+Workflow `.github/workflows/social-purge.yml` qui appelle l'Edge Function via fetch HMAC-signed quotidiennement.
+
+**Option C — Service cron externe (EasyCron, Cronhub, etc.)** qui ping l'Edge Function avec la signature HMAC.
+
+Le script `scripts/trigger_social_purge.ps1` est prêt et inclut le calcul de signature worker. Tester :
+```powershell
+$env:PHASE2_SOCIAL_MODERATION_WORKER_HMAC_SECRET = '<secret>'
+.\scripts\trigger_social_purge.ps1 -SupabaseProjectRef qpogulljnnacrxdjbwiz -RetentionDays 30
+```
+
+### Phase S.7 — Activation S-12 mode strict (J+7 mini)
+
+Après ≥7 jours de shadow logging (vérifié dans `social_report_threshold_shadow`) et validation produit des coefficients, déployer :
+
+```sql
+\i supabase/migrations/20260605120000_activate_weighted_social_report_thresholds.sql
+```
+
+Pré-check obligatoire (cf header de la migration) :
+```sql
+SELECT
+  COUNT(*) FILTER (WHERE raw_would_hide AND NOT weighted_would_hide) AS prevented_by_weighted,
+  COUNT(*) FILTER (WHERE NOT raw_would_hide AND weighted_would_hide) AS new_via_weighted,
+  COUNT(*) FILTER (WHERE raw_would_hide = weighted_would_hide) AS agreed,
+  COUNT(*) AS total_evaluations
+FROM public.social_report_threshold_shadow
+WHERE evaluated_at >= now() - interval '7 days';
+```
+
+Acceptable si `prevented_by_weighted + new_via_weighted < 20%` du total et que `new_via_weighted` ne crée pas une explosion de faux positifs.
+
+### Phase S — Risk assessment
+
+| Sous-phase | Risk | Mitigation |
+|---|---|---|
+| S.1 secrets | LOW | Kill-switches actifs par défaut |
+| S.2 migrations | LOW | Additive (nouvelles colonnes/RPCs/index). Pre-check anti-régression S-15 inclus |
+| S.3 deploy EF | MEDIUM | Régression possible sur les flows admin. Smoke test avant prod |
+| S.4 smoke staging | NONE | Read + idempotent ops uniquement |
+| S.5 n8n cutover | MEDIUM | Kill-switch `WEBHOOK_VERIFY_RESPONSE=false` permet rollback instant |
+| S.6 scheduler externe | LOW | Best-effort, TTL bucket en filet de sécurité |
+| S.7 S-12 activation | MEDIUM | Rollback : remettre l'ancienne version de la trigger (la shadow logging reste utile) |
+
+### Phase S — Timeline estimée
+
+| Sous-phase | Effort | When |
+|---|---|---|
+| S.1 secrets | 5 min | Now |
+| S.2 migrations | 10 min | Now |
+| S.3 deploy EF | 10 min | Now |
+| S.4 smoke staging | 30 min | Now |
+| S.5 n8n cutover | 1-3h | +1 jour (coord n8n admin) |
+| S.6 scheduler externe | 30 min | Now |
+| S.7 S-12 activation | 5 min | +7 jours mini |
+
+**Total côté ops:** ~2-4h sur 1-2 semaines, avec 7+ jours d'observation pour S-12.

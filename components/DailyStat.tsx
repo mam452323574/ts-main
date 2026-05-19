@@ -54,11 +54,11 @@ const createStyles = (colors: any) => StyleSheet.create({
     height: 6,
     backgroundColor: colors.lightGray,
     borderRadius: BORDER_RADIUS.full,
-    overflow: 'hidden',
+    overflow: 'hidden', borderCurve: 'continuous',
   },
   progressFill: {
     height: '100%',
     backgroundColor: colors.accentGreen,
-    borderRadius: BORDER_RADIUS.full,
+    borderRadius: BORDER_RADIUS.full, borderCurve: 'continuous',
   },
 });

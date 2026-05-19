@@ -1,11 +1,15 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { act, fireEvent, render } from '@testing-library/react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { LoadingMiniGame } from '@/components/loading/LoadingMiniGame';
-import { FloatDodgeGame } from '@/components/loading/FloatDodgeGame';
-import { ReflexDotsGame } from '@/components/loading/ReflexDotsGame';
-import { TapTargetsGame } from '@/components/loading/TapTargetsGame';
+import {
+  LoadingMiniGame,
+  __resetLoadingMiniGameStateForTests,
+} from '@/components/loading/LoadingMiniGame';
+import { FloatDodgeGame } from '@/components/loading/miniGames/FloatDodgeGame';
+import { ReflexDotsGame } from '@/components/loading/miniGames/ReflexDotsGame';
+import { TapTargetsGame } from '@/components/loading/miniGames/TapTargetsGame';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 
@@ -22,17 +26,15 @@ jest.mock('@/contexts/ThemeContext', () => ({
 const labels = {
   title: 'Mini-game',
   score: 'Score',
-  tapTargetsPrompt: 'Tap the signals',
-  floatDodgePrompt: 'Keep the signal afloat',
-  reflexDotsPrompt: 'Tap the right dots',
+  prompt: 'Tap the signals',
 };
 
 const translations: Record<string, string> = {
   'loading_mini_game.title': labels.title,
   'loading_mini_game.score': labels.score,
-  'loading_mini_game.tap_targets_prompt': labels.tapTargetsPrompt,
-  'loading_mini_game.float_dodge_prompt': labels.floatDodgePrompt,
-  'loading_mini_game.reflex_dots_prompt': labels.reflexDotsPrompt,
+  'loading_mini_game.prompts.tap_targets': labels.prompt,
+  'loading_mini_game.prompts.float_dodge': 'Keep the signal afloat',
+  'loading_mini_game.prompts.reflex_dots': 'Tap the right dots',
 };
 
 const themeColors = {
@@ -58,9 +60,11 @@ const gameProps = {
 };
 
 describe('LoadingMiniGame', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.useFakeTimers();
     jest.clearAllMocks();
+    __resetLoadingMiniGameStateForTests();
+    await AsyncStorage.clear();
 
     (useLanguage as jest.Mock).mockReturnValue({
       t: (key: string) => translations[key] ?? key,
@@ -87,7 +91,7 @@ describe('LoadingMiniGame', () => {
 
   it('keeps the random game stable across rerenders', () => {
     const randomSpy = jest.spyOn(Math, 'random');
-    randomSpy.mockReturnValueOnce(0.05).mockReturnValue(0.95);
+    randomSpy.mockReturnValueOnce(0.0).mockReturnValue(0.95);
 
     const rendered = render(<LoadingMiniGame active />);
 
@@ -152,7 +156,7 @@ describe('LoadingMiniGame', () => {
 
   it('propagates accentColor into the selected mini-game chrome', () => {
     const randomSpy = jest.spyOn(Math, 'random');
-    randomSpy.mockReturnValueOnce(0.05).mockReturnValue(0.5);
+    randomSpy.mockReturnValueOnce(0.0).mockReturnValue(0.5);
 
     const rendered = render(
       <LoadingMiniGame active accentColor="#FF7A33" />,
@@ -276,7 +280,7 @@ describe('LoadingMiniGame', () => {
 
   it('uses a smaller compact layout', () => {
     const rendered = render(
-      <TapTargetsGame {...gameProps} compact variant="superScan" />,
+      <TapTargetsGame {...gameProps} compact variant="scan" />,
     );
 
     const flattenedStyle = StyleSheet.flatten(
@@ -298,14 +302,15 @@ describe('LoadingMiniGame', () => {
 
   it('keeps compact score text constrained to a stable line', () => {
     const rendered = render(
-      <TapTargetsGame {...gameProps} compact variant="superScan" />,
+      <TapTargetsGame {...gameProps} compact variant="scan" />,
     );
 
     const scoreNode = rendered.getByTestId('tap-targets-score');
     const flattenedStyle = StyleSheet.flatten(scoreNode.props.style);
+    const scoreText = rendered.getByText(/^Score /);
 
-    expect(scoreNode.props.numberOfLines).toBe(1);
     expect(flattenedStyle.width).toBe(78);
+    expect(scoreText.props.numberOfLines).toBe(1);
   });
 
   it('calls onComplete after the duration hint without blocking play', () => {

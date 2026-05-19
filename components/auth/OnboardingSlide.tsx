@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { BORDER_RADIUS, FONT_FAMILIES, SIZES, SPACING } from '@/constants/theme';
 import { useOnboardingPalette, type OnboardingPalette } from './tokens';
+import { Squircle } from '@/components/Squircle';
 
 interface OnboardingSlideProps {
   eyebrow?: string;
@@ -32,8 +33,8 @@ export function OnboardingSlide({
           end={{ x: 1, y: 1 }}
           style={styles.visualStage}
         >
-          <View style={styles.visualWashTop} />
-          <View style={styles.visualWashBottom} />
+          <Squircle style={styles.visualWashTop} />
+          <Squircle style={styles.visualWashBottom} />
           {visual}
         </LinearGradient>
       </View>
@@ -79,7 +80,7 @@ const createStyles = (palette: OnboardingPalette) =>
       borderColor: palette.borderStrong,
       alignItems: 'center',
       justifyContent: 'center',
-      overflow: 'hidden',
+      overflow: 'hidden', borderCurve: 'continuous',
     },
     visualWashTop: {
       position: 'absolute',
@@ -89,7 +90,7 @@ const createStyles = (palette: OnboardingPalette) =>
       height: 84,
       borderRadius: BORDER_RADIUS.xl,
       backgroundColor: palette.glow,
-      transform: [{ rotate: '-18deg' }],
+      transform: [{ rotate: '-18deg' }], borderCurve: 'continuous',
     },
     visualWashBottom: {
       position: 'absolute',
@@ -99,7 +100,7 @@ const createStyles = (palette: OnboardingPalette) =>
       height: 92,
       borderRadius: BORDER_RADIUS.xl,
       backgroundColor: palette.glowSecondary,
-      transform: [{ rotate: '16deg' }],
+      transform: [{ rotate: '16deg' }], borderCurve: 'continuous',
     },
     copy: {
       gap: SPACING.sm,
@@ -139,13 +140,13 @@ const createStyles = (palette: OnboardingPalette) =>
       borderRadius: BORDER_RADIUS.pill,
       backgroundColor: palette.secondaryActionFill,
       borderWidth: 1,
-      borderColor: palette.secondaryActionBorder,
+      borderColor: palette.secondaryActionBorder, borderCurve: 'continuous',
     },
     bulletDot: {
       width: 5,
       height: 5,
       borderRadius: 999,
-      backgroundColor: palette.accent,
+      backgroundColor: palette.accent, borderCurve: 'continuous',
     },
     bulletText: {
       fontSize: SIZES.text12,

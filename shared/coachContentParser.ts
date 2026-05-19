@@ -45,6 +45,18 @@ function clampString(value: unknown, max: number): string {
   return `${trimmed.slice(0, Math.max(0, max - 1)).trimEnd()}…`;
 }
 
+// Strips a leading enumeration prefix that the LLM may have hallucinated inside an
+// action_step string ("01. ", "1. ", "1) ", "- ", "• ", "✓ "). The frontend already
+// numbers/bullets these items, so a textual prefix would surface a double "01." in
+// the UI. Reason: enforce a single source of numbering (the renderer, not the model).
+const LEADING_ENUMERATION_RE =
+  /^(?:\s*(?:\d{1,2}\s*[.):\-–—]|[-•*•✓✔])\s+)+/;
+
+function stripLeadingEnumerationPrefix(value: string): string {
+  if (typeof value !== 'string' || !value) return value;
+  return value.replace(LEADING_ENUMERATION_RE, '').trim();
+}
+
 function clampOptionalString(value: unknown, max: number): string | null {
   const clamped = clampString(value, max);
   return clamped.length > 0 ? clamped : null;
@@ -1670,7 +1682,7 @@ export function parseCoachStructuredContent(
     raw.action_steps,
     COACH_CONTENT_LIMITS.actionStepsMax,
     COACH_CONTENT_LIMITS.actionStep,
-  );
+  ).map(stripLeadingEnumerationPrefix).filter((s) => s.length > 0);
   const warningsList = clampStringArray(
     raw.warnings,
     COACH_CONTENT_LIMITS.warningsMax,

@@ -66,6 +66,7 @@ import {
   resolveChefFlowVisualTheme,
   resolveChefSurfaceColors,
 } from '@/utils/scanFlowVisualTheme';
+import { Squircle } from '@/components/Squircle';
 
 const CAPTURE_PICTURE_OPTIONS = {
   quality: 1,
@@ -621,10 +622,10 @@ export default function FridgeScanScreen() {
           />
         </TouchableOpacity>
 
-        <View style={styles.stateCard} testID="fridge-scan-permission-card">
-          <View style={styles.stateIconBadge}>
+        <Squircle style={styles.stateCard} testID="fridge-scan-permission-card">
+          <Squircle style={styles.stateIconBadge}>
             <Camera color={appColors.primary} size={28} strokeWidth={2.1} />
-          </View>
+          </Squircle>
           <Text style={styles.stateTitle}>{permissionTitle}</Text>
           <Text style={styles.stateBody}>{permissionBody}</Text>
           <Text style={styles.stateSupportText}>{PUBLIC_PRIVACY_POLICY_URL}</Text>
@@ -640,7 +641,7 @@ export default function FridgeScanScreen() {
               onPress={handleRequestPermission}
             />
           </View>
-        </View>
+        </Squircle>
       </View>
     );
   }
@@ -663,10 +664,10 @@ export default function FridgeScanScreen() {
           />
         </TouchableOpacity>
 
-        <View style={styles.stateCard} testID="fridge-scan-error-card">
-          <View style={styles.stateIconBadge}>
+        <Squircle style={styles.stateCard} testID="fridge-scan-error-card">
+          <Squircle style={styles.stateIconBadge}>
             <RefreshCw color={appColors.warning} size={28} strokeWidth={2.1} />
-          </View>
+          </Squircle>
           <Text style={styles.stateTitle}>
             {t('fridge_scan.camera_unavailable_title')}
           </Text>
@@ -680,7 +681,7 @@ export default function FridgeScanScreen() {
               variant="outline"
             />
           </View>
-        </View>
+        </Squircle>
       </View>
     );
   }
@@ -717,7 +718,7 @@ export default function FridgeScanScreen() {
 
       {!review ? (
         <View style={styles.overlayContainer} pointerEvents="none">
-          <View
+          <Squircle
             style={[
               styles.overlayFrame,
               { width: frameWidth, height: frameHeight },
@@ -727,7 +728,7 @@ export default function FridgeScanScreen() {
             <View style={styles.overlayShelfLineTop} />
             <View style={styles.overlayShelfLineMiddle} />
             <View style={styles.overlayShelfLineBottom} />
-          </View>
+          </Squircle>
 
           <Text style={styles.overlayHint}>{t('fridge_scan.overlay_hint')}</Text>
         </View>
@@ -753,9 +754,9 @@ export default function FridgeScanScreen() {
           style={styles.captureButton}
           testID="fridge-scan-capture-button"
         >
-          <View style={styles.captureButtonOuter}>
-            <View style={styles.captureButtonInner} />
-          </View>
+          <Squircle style={styles.captureButtonOuter}>
+            <Squircle style={styles.captureButtonInner} />
+          </Squircle>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -791,7 +792,7 @@ export default function FridgeScanScreen() {
             <Text style={styles.feedbackBackButtonText}>{t('common.back')}</Text>
           </TouchableOpacity>
 
-          <View style={styles.feedbackCard} testID="fridge-scan-feedback-card">
+          <Squircle style={styles.feedbackCard} testID="fridge-scan-feedback-card">
             <LinearGradient
               colors={chefFlowTheme.reviewCardGradient}
               start={{ x: 0, y: 0 }}
@@ -806,13 +807,13 @@ export default function FridgeScanScreen() {
               contentContainerStyle={styles.feedbackScrollContent}
             >
               <View style={styles.feedbackHeader}>
-                <View style={styles.feedbackHeaderIcon}>
+                <Squircle style={styles.feedbackHeaderIcon}>
                   <ChefHat
                     color={chefFlowTheme.warmAccent}
                     size={20}
                     strokeWidth={2.2}
                   />
-                </View>
+                </Squircle>
                 <View style={styles.feedbackHeaderCopy}>
                   <Text style={styles.feedbackEyebrow}>{t('fridge_scan.title')}</Text>
                   <Text style={styles.feedbackTitle}>
@@ -830,7 +831,7 @@ export default function FridgeScanScreen() {
                   end={{ x: 1, y: 1 }}
                   style={styles.feedbackImageBorder}
                 >
-                  <View style={styles.feedbackImageFrame}>
+                  <Squircle style={styles.feedbackImageFrame}>
                     <OptimizedImage
                       source={{ uri: review.imageUri }}
                       contentFit="cover"
@@ -870,7 +871,7 @@ export default function FridgeScanScreen() {
                             : t('fridge_scan.feedback_gallery_badge')}
                       </Text>
                     </View>
-                  </View>
+                  </Squircle>
                 </LinearGradient>
               </View>
 
@@ -884,22 +885,31 @@ export default function FridgeScanScreen() {
               </Text>
 
               {!submission ? (
-                <View style={styles.chefSelector} testID="fridge-scan-chef-selector">
-                  {FRIDGE_CHEF_PERSONAS.map((persona) => (
-                    <FridgeChefPersonaCard
-                      key={persona.mode}
-                      persona={persona}
-                      title={t(persona.nameTranslationKey)}
-                      label={t(persona.labelTranslationKey)}
-                      description={t(persona.descriptionTranslationKey)}
-                      selected={selectedMode === persona.mode}
-                      disabled={isSubmitting}
-                      compact
-                      onPress={() => setSelectedMode(persona.mode)}
-                      testID={`fridge-scan-chef-${persona.testIdSuffix}`}
-                    />
-                  ))}
-                </View>
+                <>
+                  <View style={styles.chefSelectorHeader}>
+                    <Text style={styles.chefSelectorEyebrow}>
+                      {t('fridge_scan.chef_selector_eyebrow')}
+                    </Text>
+                    <Text style={styles.chefSelectorTitle}>
+                      {t('fridge_scan.chef_selector_title')}
+                    </Text>
+                  </View>
+                  <View style={styles.chefSelector} testID="fridge-scan-chef-selector">
+                    {FRIDGE_CHEF_PERSONAS.map((persona) => (
+                      <FridgeChefPersonaCard
+                        key={persona.mode}
+                        persona={persona}
+                        title={t(persona.nameTranslationKey)}
+                        label={t(persona.labelTranslationKey)}
+                        description={t(persona.descriptionTranslationKey)}
+                        selected={selectedMode === persona.mode}
+                        disabled={isSubmitting}
+                        onPress={() => setSelectedMode(persona.mode)}
+                        testID={`fridge-scan-chef-${persona.testIdSuffix}`}
+                      />
+                    ))}
+                  </View>
+                </>
               ) : null}
             </ScrollView>
 
@@ -958,7 +968,7 @@ export default function FridgeScanScreen() {
                 </View>
               )}
             </View>
-          </View>
+          </Squircle>
         </View>
       ) : null}
 
@@ -1043,7 +1053,7 @@ const createStyles = (
       borderWidth: 1,
       borderColor: chefFlowTheme.chromeButtonBorder,
       alignItems: 'center',
-      justifyContent: 'center',
+      justifyContent: 'center', borderCurve: 'continuous',
     },
     overlayContainer: {
       ...StyleSheet.absoluteFillObject,
@@ -1057,7 +1067,7 @@ const createStyles = (
       borderColor: overlayFrameBorderColor,
       backgroundColor: overlayFrameBackgroundColor,
       overflow: 'hidden',
-      ...overlayFrameChrome,
+      ...overlayFrameChrome, borderCurve: 'continuous',
     },
     overlayShelfLineTop: {
       position: 'absolute',
@@ -1110,7 +1120,7 @@ const createStyles = (
       justifyContent: 'center',
       backgroundColor: chefFlowTheme.chromeButtonBackground,
       borderWidth: 1,
-      borderColor: chefFlowTheme.chromeButtonBorder,
+      borderColor: chefFlowTheme.chromeButtonBorder, borderCurve: 'continuous',
     },
     captureButton: {
       alignItems: 'center',
@@ -1124,13 +1134,13 @@ const createStyles = (
       borderColor: chefFlowTheme.textInverse,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: 'rgba(255, 255, 255, 0.08)',
+      backgroundColor: 'rgba(255, 255, 255, 0.08)', borderCurve: 'continuous',
     },
     captureButtonInner: {
       width: 66,
       height: 66,
       borderRadius: 33,
-      backgroundColor: chefFlowTheme.textInverse,
+      backgroundColor: chefFlowTheme.textInverse, borderCurve: 'continuous',
     },
     feedbackOverlay: {
       ...StyleSheet.absoluteFillObject,
@@ -1158,7 +1168,7 @@ const createStyles = (
       gap: SPACING.xs,
       backgroundColor: chefFlowTheme.chromeButtonBackground,
       borderWidth: 1,
-      borderColor: chefFlowTheme.chromeButtonBorder,
+      borderColor: chefFlowTheme.chromeButtonBorder, borderCurve: 'continuous',
     },
     feedbackBackButtonText: {
       fontSize: SIZES.text14,
@@ -1180,7 +1190,7 @@ const createStyles = (
       shadowColor: mixColors(chefFlowTheme.warmAccent, colors.primary, 0.18),
       shadowOpacity: isDark ? 0.28 : 0.12,
       shadowRadius: 30,
-      shadowOffset: { width: 0, height: 16 },
+      shadowOffset: { width: 0, height: 16 }, borderCurve: 'continuous',
     },
     feedbackCardGradient: {
       ...StyleSheet.absoluteFillObject,
@@ -1210,7 +1220,7 @@ const createStyles = (
       justifyContent: 'center',
       backgroundColor: chefFlowTheme.warmAccentSoft,
       borderWidth: 1,
-      borderColor: withAlpha(chefFlowTheme.warmAccent, isDark ? 0.36 : 0.28),
+      borderColor: withAlpha(chefFlowTheme.warmAccent, isDark ? 0.36 : 0.28), borderCurve: 'continuous',
     },
     feedbackHeaderCopy: {
       flex: 1,
@@ -1243,20 +1253,20 @@ const createStyles = (
     feedbackImageBorder: {
       width: '100%',
       padding: 1.5,
-      borderRadius: 28,
+      borderRadius: 28, borderCurve: 'continuous',
     },
     feedbackImageFrame: {
       width: '100%',
       borderRadius: 26,
       overflow: 'hidden',
-      backgroundColor: chefFlowTheme.imageBackground,
+      backgroundColor: chefFlowTheme.imageBackground, borderCurve: 'continuous',
     },
     feedbackImage: {
       width: '100%',
     },
     feedbackImageVignette: {
       ...StyleSheet.absoluteFillObject,
-      borderRadius: 26,
+      borderRadius: 26, borderCurve: 'continuous',
     },
     feedbackBadge: {
       position: 'absolute',
@@ -1270,7 +1280,7 @@ const createStyles = (
       borderRadius: BORDER_RADIUS.full,
       backgroundColor: chefFlowTheme.imageBadgeBackground,
       borderWidth: 1,
-      borderColor: chefFlowTheme.imageBadgeBorder,
+      borderColor: chefFlowTheme.imageBadgeBorder, borderCurve: 'continuous',
     },
     feedbackBadgeSuccess: {
       backgroundColor: isDark
@@ -1327,9 +1337,32 @@ const createStyles = (
       flex: 0,
       width: '100%',
     },
+    chefSelectorHeader: {
+      width: '100%',
+      marginTop: SPACING.md + 2,
+      marginBottom: SPACING.sm,
+      gap: 6,
+      alignItems: 'flex-start',
+    },
+    chefSelectorEyebrow: {
+      fontSize: SIZES.text10,
+      letterSpacing: 1.6,
+      fontWeight: FONT_WEIGHTS.bold,
+      textTransform: 'uppercase',
+      color: isDark
+        ? withAlpha(colors.white, 0.45)
+        : withAlpha(colors.primaryText, 0.5),
+    },
+    chefSelectorTitle: {
+      fontSize: 22,
+      lineHeight: 26,
+      fontWeight: FONT_WEIGHTS.bold,
+      color: colors.primaryText,
+      letterSpacing: -0.3,
+    },
     chefSelector: {
       width: '100%',
-      gap: SPACING.sm,
+      gap: SPACING.sm + 2,
       marginTop: SPACING.xs,
     },
     stateScreen: {
@@ -1349,7 +1382,7 @@ const createStyles = (
       borderWidth: 1,
       borderColor: chefFlowTheme.chromeButtonBorder,
       alignItems: 'center',
-      justifyContent: 'center',
+      justifyContent: 'center', borderCurve: 'continuous',
     },
     stateCard: {
       borderRadius: 28,
@@ -1364,7 +1397,7 @@ const createStyles = (
       shadowColor: isDark ? '#000000' : mixColors(colors.gray, chefFlowTheme.warmAccent, 0.26),
       shadowOpacity: isDark ? 0.32 : 0.12,
       shadowRadius: 24,
-      shadowOffset: { width: 0, height: 14 },
+      shadowOffset: { width: 0, height: 14 }, borderCurve: 'continuous',
     },
     stateIconBadge: {
       width: 64,
@@ -1374,7 +1407,7 @@ const createStyles = (
       borderWidth: 1,
       borderColor: withAlpha(chefFlowTheme.warmAccent, 0.24),
       alignItems: 'center',
-      justifyContent: 'center',
+      justifyContent: 'center', borderCurve: 'continuous',
     },
     stateTitle: {
       fontSize: SIZES.text20,

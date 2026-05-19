@@ -1376,13 +1376,11 @@ export interface SocialPost {
   dislike_count: number;
   comment_count: number;
   unique_view_count?: number;
-  save_count?: number;
   reaction_distribution?: Record<string, number> | null;
   viewer_visible_comment_count?: number | null;
   viewer_reaction: SocialReactionState;
   viewer_has_liked: boolean;
   viewer_follows_author?: boolean;
-  viewer_has_saved?: boolean;
   moderation_status: SocialModerationStatus;
   moderation_state?: ModerationState;
   moderation_reason?: string | null;
@@ -1731,17 +1729,6 @@ export interface SocialHideAuthorResponse {
   success: true;
   author_id: string;
   hidden: boolean;
-}
-
-export interface SocialSetSaveRequest {
-  post_id: string;
-  action?: 'save' | 'unsave';
-}
-
-export interface SocialSetSaveResponse {
-  success: true;
-  post_id: string;
-  saved: boolean;
 }
 
 export interface SocialRecordImpressionsRequest {

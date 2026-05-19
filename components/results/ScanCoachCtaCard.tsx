@@ -6,7 +6,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { ArrowRight, MessageCircle } from 'lucide-react-native';
+import { ArrowRight, Compass } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import {
@@ -25,6 +25,7 @@ import {
   getResultLayoutState,
   getResultSurfaceChrome,
 } from '@/utils/resultLayout';
+import { Squircle } from '@/components/Squircle';
 
 interface ScanCoachCtaCardProps {
   intent: ScanCoachIntent;
@@ -96,14 +97,14 @@ export function ScanCoachCtaCard({
             isHero ? styles.iconShellHero : null,
             {
               backgroundColor: iconBackground,
-              borderColor: withAlpha(accentColor, isDark ? 0.34 : 0.22),
+              borderColor: withAlpha(accentColor, isDark ? 0.22 : 0.12),
             },
           ]}
         >
-          <MessageCircle
+          <Compass
             color={accentColor}
             size={isHero ? 22 : 20}
-            strokeWidth={2.2}
+            strokeWidth={1.8}
           />
         </View>
 
@@ -158,7 +159,7 @@ export function ScanCoachCtaCard({
       </Text>
 
       {isHero ? (
-        <View
+        <Squircle
           style={[
             styles.questionCard,
             {
@@ -182,7 +183,7 @@ export function ScanCoachCtaCard({
           >
             {intent.question_text}
           </Text>
-        </View>
+        </Squircle>
       ) : null}
 
       <View style={[styles.footer, isHero ? styles.footerHero : null]}>
@@ -245,7 +246,7 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       borderRadius: layout.featureRadius,
       borderWidth: 1,
       padding: layout.blockPadding,
-      gap: SPACING.sm,
+      gap: SPACING.sm, borderCurve: 'continuous',
     },
     cardHero: {
       padding: layout.largeBlockPadding,
@@ -269,12 +270,12 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       borderRadius: BORDER_RADIUS.md,
       borderWidth: 1,
       alignItems: 'center',
-      justifyContent: 'center',
+      justifyContent: 'center', borderCurve: 'continuous',
     },
     iconShellHero: {
       width: 48,
       height: 48,
-      borderRadius: BORDER_RADIUS.lg,
+      borderRadius: BORDER_RADIUS.lg, borderCurve: 'continuous',
     },
     copy: {
       flex: 1,
@@ -312,7 +313,7 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       borderRadius: 999,
       borderWidth: 1,
       paddingHorizontal: SPACING.md,
-      paddingVertical: SPACING.xs,
+      paddingVertical: SPACING.xs, borderCurve: 'continuous',
     },
     priorityText: {
       fontSize: layout.heroBadgeFontSize,
@@ -325,7 +326,7 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       borderWidth: 1,
       paddingHorizontal: layout.blockPadding,
       paddingVertical: layout.blockPadding,
-      gap: SPACING.xs,
+      gap: SPACING.xs, borderCurve: 'continuous',
     },
     questionEyebrow: {
       fontSize: layout.heroBadgeFontSize,
@@ -351,7 +352,7 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
     actionButtonShell: {
       borderRadius: layout.ctaRadius,
       maxWidth: '100%',
-      overflow: 'hidden',
+      overflow: 'hidden', borderCurve: 'continuous',
     },
     actionButtonShellHero: {
       alignSelf: 'stretch',
@@ -367,10 +368,10 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       minHeight: layout.ctaMinHeight,
       paddingHorizontal: layout.blockPadding,
       paddingVertical: SPACING.md,
-      shadowOffset: { width: 0, height: 10 },
-      shadowOpacity: 0.16,
-      shadowRadius: 22,
-      elevation: 3,
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.10,
+      shadowRadius: 14,
+      elevation: 2, borderCurve: 'continuous',
     },
     actionText: {
       fontSize: layout.bodyTextFontSize,

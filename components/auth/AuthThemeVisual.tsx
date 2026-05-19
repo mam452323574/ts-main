@@ -58,7 +58,7 @@ const createStyles = (
       borderRadius: size / 2,
       alignItems: 'center',
       justifyContent: 'center',
-      borderWidth: 1,
+      borderWidth: 1, borderCurve: 'continuous',
     },
     badgeDark: {
       borderColor: palette.heroBorder,

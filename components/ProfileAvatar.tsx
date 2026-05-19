@@ -39,7 +39,7 @@ export function ProfileAvatar({
       width: size,
       height: size,
       borderRadius: size / 2,
-      overflow: 'hidden' as const,
+      overflow: 'hidden' as const, borderCurve: 'continuous',
     }),
     [size],
   );

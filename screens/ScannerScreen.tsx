@@ -14,12 +14,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
-import {
-  CameraView,
-  CameraType,
-  useCameraPermissions,
-  type CameraPictureOptions,
-} from 'expo-camera';
+import { CameraType, type CameraPictureOptions } from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -83,6 +78,10 @@ import {
   resolveScanCaptureVisualTheme,
   resolveScanFlowAccentTheme,
 } from '@/utils/scanFlowVisualTheme';
+import {
+  SCAN_FLOW_OVERLAY_PATHNAMES,
+  useScannerCameraSession,
+} from '@/contexts/ScannerCameraSessionContext';
 
 const getCapturePictureOptions = (): CameraPictureOptions => ({
   quality: 1,
@@ -124,19 +123,6 @@ const SCAN_ICON_TOKENS = {
   body: 'body',
   nutrition: 'nutrition',
 } as const;
-const MAIN_TABS_PATHNAMES = new Set([
-  '/',
-  '/index',
-  '/coach',
-  '/scanner',
-  '/social',
-  '/(tabs)',
-  '/(tabs)/index',
-  '/(tabs)/coach',
-  '/(tabs)/scanner',
-  '/(tabs)/social',
-]);
-
 const getScannerDockMetrics = (
   bottomInset: number,
   isCompactVerticalLayout: boolean,
@@ -173,8 +159,12 @@ export default function ScannerScreen() {
   const { playValidationFeedback } = useScanValidationFeedback();
   const isScannerFocused = useIsFocused();
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
-  const isCompactVerticalLayout = windowHeight < 760;
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
+  const isLandscape = windowWidth > windowHeight;
+  // Le paysage (iPad/tablette) impose les mêmes contraintes verticales qu'un
+  // écran compact : on factorise les deux conditions pour réutiliser le layout
+  // dock compact existant sans dupliquer la logique.
+  const isCompactVerticalLayout = windowHeight < 760 || isLandscape;
   const dockMetrics = useMemo(
     () => getScannerDockMetrics(insets.bottom, isCompactVerticalLayout),
     [insets.bottom, isCompactVerticalLayout],
@@ -194,16 +184,21 @@ export default function ScannerScreen() {
     () => resolveScanFlowAccentTheme(colors, isDark, 'health'),
     [colors, isDark],
   );
-  const [facing, setFacing] = useState<CameraType>('back');
-  const [permission, requestPermission] = useCameraPermissions();
+  const {
+    permission,
+    requestPermission,
+    isReady: isCameraPreviewReady,
+    facing,
+    setFacing,
+    cameraRef,
+    setAutofocusEnabled,
+  } = useScannerCameraSession();
   const [selectedScanType, setSelectedScanType] = useState<ScanType | null>(null);
   const [checkingEligibility, setCheckingEligibility] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
   const [showConnectivityBanner, setShowConnectivityBanner] = useState(false);
   const [captureSequenceActive, setCaptureSequenceActive] = useState(false);
   const [openingPreview, setOpeningPreview] = useState(false);
-  const [isCameraPreviewReady, setIsCameraPreviewReady] = useState(false);
-  const cameraRef = useRef<CameraView>(null);
   const captureSequenceActiveRef = useRef(false);
   const gallerySelectionActiveRef = useRef(false);
   const completedRechargeRefetchKeysRef = useRef<Set<string>>(new Set());
@@ -226,8 +221,9 @@ export default function ScannerScreen() {
         isCompactVerticalLayout,
         captureTheme,
         accentTheme,
+        isLandscape,
       ),
-    [accentTheme, captureTheme, colors, insets, isCompactVerticalLayout, isDark],
+    [accentTheme, captureTheme, colors, insets, isCompactVerticalLayout, isDark, isLandscape],
   );
 
   const {
@@ -263,7 +259,10 @@ export default function ScannerScreen() {
     !isScannerFocused ||
     !isCameraPreviewReady;
   const shouldShowConnectivityBanner = showConnectivityBanner || isRetrying;
-  const shouldMountCamera = permission?.granted && MAIN_TABS_PATHNAMES.has(pathname);
+  const isScanFlowOverlayRoute = SCAN_FLOW_OVERLAY_PATHNAMES.has(pathname);
+  const shouldRenderScannerChrome = !isScanFlowOverlayRoute;
+  const shouldRenderInteractiveScannerChrome =
+    shouldRenderScannerChrome && isCameraPreviewReady;
 
   useEffect(() => {
     if (hasConnectivityError) {
@@ -284,10 +283,8 @@ export default function ScannerScreen() {
   }, [hasConnectivityError]);
 
   useEffect(() => {
-    if (!shouldMountCamera) {
-      setIsCameraPreviewReady(false);
-    }
-  }, [shouldMountCamera]);
+    setAutofocusEnabled(captureSequenceActive);
+  }, [captureSequenceActive, setAutofocusEnabled]);
 
   useEffect(() => {
     return () => {
@@ -295,10 +292,6 @@ export default function ScannerScreen() {
         clearTimeout(connectivityBannerTimeoutRef.current);
       }
     };
-  }, []);
-
-  const handleCameraReady = useCallback(() => {
-    setIsCameraPreviewReady(true);
   }, []);
 
   useFocusEffect(
@@ -813,6 +806,8 @@ export default function ScannerScreen() {
         ? chipTheme.chipText
         : captureTheme.chromeText;
 
+    const isPendingReady = !isCameraPreviewReady;
+
     return (
       <View key={scanType} style={styles.scanChipContainer}>
         <TouchableOpacity
@@ -837,6 +832,7 @@ export default function ScannerScreen() {
                   : chipTheme.completionGlow
                 : 'transparent',
             },
+            !isSelected && isPendingReady ? styles.scanChipPendingReady : null,
             isSelected ? styles.scanChipSelected : null,
             isQuotaEmpty && !isSelected ? styles.scanChipDimmed : null,
           ]}
@@ -861,6 +857,7 @@ export default function ScannerScreen() {
                     ? chipTheme.vignetteFrameBorder
                     : withAlpha(colors.white, 0.08),
               },
+              !isSelected && isPendingReady ? styles.scanChipIconWrapPendingReady : null,
             ]}
           >
             {scanType === 'super' ? (
@@ -931,6 +928,7 @@ export default function ScannerScreen() {
     warningColor: accentTheme.guideWarning,
     successColor: accentTheme.guideSuccess,
   };
+
   if (!permission) {
     return <LoadingSpinner />;
   }
@@ -957,113 +955,134 @@ export default function ScannerScreen() {
       {alertElement}
 
       <View style={styles.cameraShell}>
-        {shouldMountCamera ? (
-          <CameraView
-            ref={cameraRef}
-            style={styles.camera}
-            facing={facing}
-            autofocus={captureSequenceActive ? 'on' : 'off'}
-            animateShutter={false}
-            mirror={false}
-            onCameraReady={handleCameraReady}
-            testID="scanner-camera-view"
-          />
-        ) : null}
-
-        <View
-          style={styles.cameraInteractionLayer}
-          pointerEvents="none"
-          testID="scanner-focus-overlay"
-        >
-          <CameraGuide
-            scanType={selectedScanType}
-            visible={!!selectedScanType}
-            accentColor={accentTheme.guideStroke}
-            tone={guideTone}
-            viewportInsets={cameraGuideViewportInsets}
-          />
-        </View>
-
-        <LinearGradient
-          colors={captureTheme.topScrimGradient}
-          pointerEvents="none"
-          style={styles.topScrim}
-        />
-        <LinearGradient
-          colors={captureTheme.bottomScrimGradient}
-          pointerEvents="none"
-          style={styles.bottomScrim}
-        />
-
-        <View style={styles.topBand} testID="scanner-top-band">
-          {shouldShowConnectivityBanner ? (
-            <TouchableOpacity
-              style={styles.networkErrorBanner}
-              onPress={handleManualRetry}
-              disabled={isRetrying}
-              activeOpacity={0.84}
-              testID="scanner-network-banner"
-            >
-              {isRetrying ? (
-                <RefreshCw color={colors.warning} size={15} strokeWidth={2} />
-              ) : (
-                <WifiOff color={colors.warning} size={15} strokeWidth={2} />
-              )}
-              <Text style={styles.networkErrorText}>
-                {isRetrying
-                  ? t('super_scan_features.connection_reconnecting')
-                  : t('super_scan_features.connection_unstable')}
-              </Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
-
-        <View style={styles.bottomDock} testID="scanner-controls-overlay">
-          <View style={styles.scanTypeSelector} testID="scanner-scan-type-selector">
-            {renderScanTypeChip('health')}
-            {renderScanTypeChip('body')}
-            {renderScanTypeChip('nutrition')}
-            {renderScanTypeChip('super')}
-          </View>
-
-          <View style={styles.controlsRow}>
-            <TouchableOpacity
-              style={styles.sideButton}
-              onPress={pickImage}
-              activeOpacity={0.78}
-              disabled={interactionsLocked}
-              testID="scanner-gallery-button"
-            >
-              <ImageIcon color={captureTheme.chromeText} size={24} strokeWidth={2} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.captureButton}
-              onPress={takePicture}
-              activeOpacity={0.82}
-              disabled={interactionsLocked}
-              testID="scanner-capture-button"
-            >
-              <View style={styles.captureButtonOuter} testID="scanner-capture-button-outer">
-                <View style={styles.captureButtonInner} testID="scanner-capture-button-inner" />
+        {shouldRenderScannerChrome ? (
+          <>
+            {shouldRenderInteractiveScannerChrome ? (
+              <View
+                style={styles.cameraInteractionLayer}
+                pointerEvents="none"
+                testID="scanner-focus-overlay"
+              >
+                <CameraGuide
+                  scanType={selectedScanType}
+                  visible={!!selectedScanType}
+                  accentColor={accentTheme.guideStroke}
+                  tone={guideTone}
+                  viewportInsets={cameraGuideViewportInsets}
+                />
               </View>
-            </TouchableOpacity>
+            ) : null}
 
-            <TouchableOpacity
-              style={styles.sideButton}
-              onPress={toggleCameraFacing}
-              activeOpacity={0.78}
-              disabled={interactionsLocked}
-              testID="scanner-flip-camera-button"
-            >
-              <CameraFlipIcon
-                size={28}
-                color={captureTheme.chromeText}
-                strokeWidth={2}
+            {shouldRenderInteractiveScannerChrome ? (
+              <LinearGradient
+                colors={captureTheme.topScrimGradient}
+                pointerEvents="none"
+                style={styles.topScrim}
               />
-            </TouchableOpacity>
-          </View>
-        </View>
+            ) : null}
+            {shouldRenderInteractiveScannerChrome ? (
+              <LinearGradient
+                colors={captureTheme.bottomScrimGradient}
+                pointerEvents="none"
+                style={styles.bottomScrim}
+              />
+            ) : null}
+
+            <View style={styles.topBand} testID="scanner-top-band">
+              {shouldShowConnectivityBanner ? (
+                <TouchableOpacity
+                  style={styles.networkErrorBanner}
+                  onPress={handleManualRetry}
+                  disabled={isRetrying}
+                  activeOpacity={0.84}
+                  testID="scanner-network-banner"
+                >
+                  {isRetrying ? (
+                    <RefreshCw color={colors.warning} size={15} strokeWidth={2} />
+                  ) : (
+                    <WifiOff color={colors.warning} size={15} strokeWidth={2} />
+                  )}
+                  <Text style={styles.networkErrorText}>
+                    {isRetrying
+                      ? t('super_scan_features.connection_reconnecting')
+                      : t('super_scan_features.connection_unstable')}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            <View
+              style={[
+                styles.bottomDock,
+                !isCameraPreviewReady ? styles.bottomDockPendingReady : null,
+              ]}
+              testID="scanner-controls-overlay"
+            >
+              <View style={styles.scanTypeSelector} testID="scanner-scan-type-selector">
+                {renderScanTypeChip('health')}
+                {renderScanTypeChip('body')}
+                {renderScanTypeChip('nutrition')}
+                {renderScanTypeChip('super')}
+              </View>
+
+              <View style={styles.controlsRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.sideButton,
+                    !isCameraPreviewReady ? styles.sideButtonPendingReady : null,
+                  ]}
+                  onPress={pickImage}
+                  activeOpacity={0.78}
+                  disabled={interactionsLocked}
+                  testID="scanner-gallery-button"
+                >
+                  <ImageIcon color={captureTheme.chromeText} size={24} strokeWidth={2} />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.captureButton}
+                  onPress={takePicture}
+                  activeOpacity={0.82}
+                  disabled={interactionsLocked}
+                  testID="scanner-capture-button"
+                >
+                  <View
+                    style={[
+                      styles.captureButtonOuter,
+                      !isCameraPreviewReady ? styles.captureButtonOuterPendingReady : null,
+                    ]}
+                    testID="scanner-capture-button-outer"
+                  >
+                    <View
+                      style={[
+                        styles.captureButtonInner,
+                        !isCameraPreviewReady ? styles.captureButtonInnerPendingReady : null,
+                      ]}
+                      testID="scanner-capture-button-inner"
+                    />
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.sideButton,
+                    !isCameraPreviewReady ? styles.sideButtonPendingReady : null,
+                  ]}
+                  onPress={toggleCameraFacing}
+                  activeOpacity={0.78}
+                  disabled={interactionsLocked}
+                  testID="scanner-flip-camera-button"
+                >
+                  <CameraFlipIcon
+                    size={28}
+                    color={captureTheme.chromeText}
+                    strokeWidth={2}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </>
+        ) : null}
       </View>
 
       <ContextualPaywall
@@ -1088,20 +1107,18 @@ const createStyles = (
   isCompactVerticalLayout: boolean,
   captureTheme: ReturnType<typeof resolveScanCaptureVisualTheme>,
   accentTheme: ReturnType<typeof resolveScanFlowAccentTheme>,
+  isLandscape: boolean,
 ) => {
   const dockMetrics = getScannerDockMetrics(insets.bottom, isCompactVerticalLayout);
 
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: captureTheme.screenBackground,
+      backgroundColor: 'transparent',
     },
     cameraShell: {
       flex: 1,
-      backgroundColor: captureTheme.screenBackground,
-    },
-    camera: {
-      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'transparent',
     },
     cameraInteractionLayer: {
       ...StyleSheet.absoluteFillObject,
@@ -1111,14 +1128,14 @@ const createStyles = (
       top: 0,
       left: 0,
       right: 0,
-      height: isCompactVerticalLayout ? 160 : 184,
+      height: isLandscape ? 80 : isCompactVerticalLayout ? 160 : 184,
     },
     bottomScrim: {
       position: 'absolute',
       left: 0,
       right: 0,
       bottom: 0,
-      height: isCompactVerticalLayout ? 292 : 340,
+      height: isLandscape ? 140 : isCompactVerticalLayout ? 292 : 340,
     },
     topBand: {
       position: 'absolute',
@@ -1138,7 +1155,7 @@ const createStyles = (
       borderRadius: BORDER_RADIUS.pill,
       gap: SPACING.sm,
       borderWidth: 1,
-      borderColor: withAlpha(colors.warning, 0.2),
+      borderColor: withAlpha(colors.warning, 0.2), borderCurve: 'continuous',
     },
     networkErrorText: {
       fontSize: SIZES.text12,
@@ -1154,6 +1171,9 @@ const createStyles = (
       paddingHorizontal: SPACING.page,
       alignItems: 'center',
       gap: dockMetrics.dockGap,
+    },
+    bottomDockPendingReady: {
+      opacity: 0.94,
     },
     scanTypeSelector: {
       flexDirection: 'row',
@@ -1178,7 +1198,7 @@ const createStyles = (
       borderWidth: 1,
       alignItems: 'center',
       justifyContent: 'space-between',
-      gap: SPACING.xs,
+      gap: SPACING.xs, borderCurve: 'continuous',
     },
     scanChipSelected: {
       shadowOffset: { width: 0, height: 0 },
@@ -1192,13 +1212,21 @@ const createStyles = (
     scanChipDimmed: {
       opacity: 0.78,
     },
+    scanChipPendingReady: {
+      backgroundColor: withAlpha('#0C1720', 0.92),
+      borderColor: withAlpha(colors.white, 0.12),
+    },
     scanChipIconWrap: {
       width: 32,
       height: 32,
       borderRadius: 16,
       alignItems: 'center',
       justifyContent: 'center',
-      borderWidth: 1,
+      borderWidth: 1, borderCurve: 'continuous',
+    },
+    scanChipIconWrapPendingReady: {
+      backgroundColor: withAlpha(colors.white, 0.06),
+      borderColor: withAlpha(colors.white, 0.1),
     },
     scanChipText: {
       fontSize: 11,
@@ -1225,12 +1253,12 @@ const createStyles = (
       backgroundColor: withAlpha(colors.white, 0.06),
       alignItems: 'center',
       justifyContent: 'center',
-      flexDirection: 'row',
+      flexDirection: 'row', borderCurve: 'continuous',
     },
     scanChipIndicatorDot: {
       width: 6,
       height: 6,
-      borderRadius: 9999,
+      borderRadius: 9999, borderCurve: 'continuous',
     },
     scanChipIndicatorDotMuted: {
       backgroundColor: withAlpha(colors.white, 0.18),
@@ -1259,7 +1287,11 @@ const createStyles = (
       justifyContent: 'center',
       alignItems: 'center',
       borderWidth: 1,
-      borderColor: captureTheme.secondaryButtonBorder,
+      borderColor: captureTheme.secondaryButtonBorder, borderCurve: 'continuous',
+    },
+    sideButtonPendingReady: {
+      backgroundColor: withAlpha('#0C1720', 0.94),
+      borderColor: withAlpha(colors.white, 0.12),
     },
     captureButton: {
       justifyContent: 'center',
@@ -1278,7 +1310,14 @@ const createStyles = (
       shadowOffset: { width: 0, height: 0 },
       shadowOpacity: 0.38,
       shadowRadius: 24,
-      elevation: 8,
+      elevation: 8, borderCurve: 'continuous',
+    },
+    captureButtonOuterPendingReady: {
+      backgroundColor: withAlpha('#0B151D', 0.88),
+      borderColor: withAlpha(captureTheme.shutterOuter, 0.48),
+      shadowOpacity: 0.18,
+      shadowRadius: 18,
+      elevation: 4,
     },
     captureButtonInner: {
       width: isCompactVerticalLayout ? 60 : 64,
@@ -1286,7 +1325,11 @@ const createStyles = (
       borderRadius: isCompactVerticalLayout ? 30 : 32,
       backgroundColor: captureTheme.shutterInner,
       borderWidth: 1,
-      borderColor: withAlpha(captureTheme.shutterInner, 0.16),
+      borderColor: withAlpha(captureTheme.shutterInner, 0.16), borderCurve: 'continuous',
+    },
+    captureButtonInnerPendingReady: {
+      backgroundColor: withAlpha(captureTheme.shutterInner, 0.18),
+      borderColor: withAlpha(captureTheme.shutterInner, 0.12),
     },
   });
 };

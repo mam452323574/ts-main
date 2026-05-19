@@ -23,6 +23,7 @@ import {
 } from '@/utils/resultLayout';
 import { PremiumRenderState } from '@/utils/subscription';
 import type { ResolvedResultItemTheme } from '@/utils/resultVisualTheme';
+import { Squircle } from '@/components/Squircle';
 
 interface MetricCardProps {
   title: string;
@@ -140,7 +141,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
       ]}
     >
       <View style={styles.mainRow}>
-        <View
+        <Squircle
           testID="metric-card-icon-wrap"
           style={[
             styles.iconWrap,
@@ -156,7 +157,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
           ]}
         >
           {renderIcon()}
-        </View>
+        </Squircle>
 
         <View style={styles.content}>
           <Text
@@ -191,7 +192,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
             </Text>
           ) : (
             <View style={styles.lockedRow}>
-              <View
+              <Squircle
                 testID={
                   isLoading
                     ? 'metric-card-loading-overlay'
@@ -221,14 +222,14 @@ export const MetricCard: React.FC<MetricCardProps> = ({
                     },
                   ]}
                 />
-              </View>
+              </Squircle>
 
               {isLockedState ? (
-                <View
+                <Squircle
                   style={[styles.lockBadge, { backgroundColor: colors.gold }]}
                 >
                   <Lock color={colors.background} size={12} />
-                </View>
+                </Squircle>
               ) : null}
             </View>
           )}
@@ -310,7 +311,7 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       flexDirection: 'row',
       flexWrap: 'wrap',
       alignItems: 'center',
-      gap: layout.metricCardGap,
+      gap: layout.metricCardGap, borderCurve: 'continuous',
     },
     mainRow: {
       flexDirection: 'row',
@@ -328,7 +329,7 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       alignItems: 'center',
       justifyContent: 'center',
       padding: SPACING.xs,
-      flexShrink: 0,
+      flexShrink: 0, borderCurve: 'continuous',
     },
     iconText: {
       fontSize: layout.metricCardIconGlyphSize,
@@ -387,12 +388,12 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       paddingHorizontal: SPACING.sm,
       paddingVertical: layout.isCompact ? 2 : 3,
       borderRadius: layout.standardRadius,
-      justifyContent: 'center',
+      justifyContent: 'center', borderCurve: 'continuous',
     },
     lockedPlaceholder: {
       width: layout.isCompact ? 62 : 72,
       height: layout.isCompact ? 10 : 11,
-      borderRadius: 9999,
+      borderRadius: 9999, borderCurve: 'continuous',
     },
     lockBadge: {
       width: 20,
@@ -400,7 +401,7 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       borderRadius: 10,
       alignItems: 'center',
       justifyContent: 'center',
-      flexShrink: 0,
+      flexShrink: 0, borderCurve: 'continuous',
     },
     statusTag: {
       maxWidth: 96,
@@ -411,7 +412,7 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       justifyContent: 'center',
       alignItems: 'center',
       alignSelf: 'flex-start',
-      flexShrink: 0,
+      flexShrink: 0, borderCurve: 'continuous',
     },
     statusTagCompactRow: {
       flexBasis: '100%',

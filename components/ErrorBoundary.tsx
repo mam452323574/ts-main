@@ -5,6 +5,7 @@ import { i18n } from '@/i18n/translations';
 import { supabase } from '@/services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logOperationalError } from '@/utils/observability';
+import { Squircle } from '@/components/Squircle';
 
 interface Props {
   children: ReactNode;
@@ -84,15 +85,15 @@ export class ErrorBoundary extends Component<Props, State> {
 
       return (
         <View style={styles.container}>
-          <View style={styles.content}>
+          <Squircle style={styles.content}>
             <Text style={styles.title}>{title}</Text>
             <Text style={styles.message}>{message}</Text>
             {__DEV__ && this.state.error && (
-              <View style={styles.errorDetails}>
+              <Squircle style={styles.errorDetails}>
                 <Text style={styles.errorText}>
                   {this.state.error.toString()}
                 </Text>
-              </View>
+              </Squircle>
             )}
             <View style={styles.buttonContainer}>
               <TouchableOpacity
@@ -108,7 +109,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 <Text style={styles.buttonText}>{logoutLabel}</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </Squircle>
         </View>
       );
     }
@@ -131,7 +132,7 @@ const styles = StyleSheet.create({
     padding: SPACING.xl,
     alignItems: 'center',
     maxWidth: 400,
-    width: '100%',
+    width: '100%', borderCurve: 'continuous',
   },
   title: {
     fontSize: SIZES.xxxl,
@@ -150,7 +151,7 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.md,
     padding: SPACING.md,
     marginBottom: SPACING.lg,
-    width: '100%',
+    width: '100%', borderCurve: 'continuous',
   },
   errorText: {
     fontSize: SIZES.sm,
@@ -169,7 +170,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.xl,
     flex: 1,
-    alignItems: 'center',
+    alignItems: 'center', borderCurve: 'continuous',
   },
   logoutButton: {
     backgroundColor: COLORS.error,

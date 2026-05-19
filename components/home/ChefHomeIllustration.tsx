@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -23,6 +23,7 @@ import {
   mixColors,
   withAlpha,
 } from '@/constants/theme';
+import { Squircle } from '@/components/Squircle';
 
 interface ChefHomeIllustrationProps {
   size: number;
@@ -103,7 +104,7 @@ export function ChefHomeIllustration({
   }));
 
   return (
-    <View
+    <Squircle
       style={[styles.container, { width: size, height: size }]}
       accessible={false}
       pointerEvents="none"
@@ -239,7 +240,7 @@ export function ChefHomeIllustration({
           strokeWidth={1}
         />
       </Svg>
-    </View>
+    </Squircle>
   );
 }
 
@@ -247,7 +248,7 @@ const styles = StyleSheet.create({
   container: {
     position: 'relative',
     overflow: 'hidden',
-    borderRadius: BORDER_RADIUS.lg + 10,
+    borderRadius: BORDER_RADIUS.lg + 10, borderCurve: 'continuous',
   },
   backplate: {
     ...StyleSheet.absoluteFillObject,

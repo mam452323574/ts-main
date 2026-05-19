@@ -22,9 +22,11 @@ import {
   SHADOWS,
   SIZES,
   SPACING,
+  withAlpha,
 } from '@/constants/theme';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { Squircle } from '@/components/Squircle';
 
 const CHEF_HOME_GROUP_IMAGE = require('../../assets/images/chef/chef-home-group.webp');
 
@@ -62,7 +64,7 @@ export function ChefHomeCard({ onPress }: ChefHomeCardProps) {
       style={styles.shell}
       testID="home-fridge-scan-card"
     >
-      <View style={styles.surface} testID="home-fridge-scan-surface">
+      <Squircle style={styles.surface} testID="home-fridge-scan-surface">
         <LinearGradient
           colors={palette.backgroundGradient}
           start={{ x: 0, y: 0 }}
@@ -75,13 +77,6 @@ export function ChefHomeCard({ onPress }: ChefHomeCardProps) {
           end={{ x: 0.5, y: 1 }}
           style={styles.bottomScrim}
         />
-        <LinearGradient
-          colors={palette.copyScrimGradient}
-          start={{ x: 0, y: 0.35 }}
-          end={{ x: 1, y: 0.35 }}
-          style={styles.copyScrim}
-        />
-
         <View
           pointerEvents="none"
           style={styles.visualStage}
@@ -104,6 +99,11 @@ export function ChefHomeCard({ onPress }: ChefHomeCardProps) {
 
         <View style={styles.content}>
           <View style={styles.copyColumn}>
+            <Squircle
+              pointerEvents="none"
+              style={styles.copyPlate}
+              testID="home-fridge-scan-copy-plate"
+            />
             <View style={styles.eyebrowPill}>
               <Crown
                 color={palette.eyebrowText}
@@ -119,14 +119,14 @@ export function ChefHomeCard({ onPress }: ChefHomeCardProps) {
             <Text style={styles.title}>{t('home.fridge_scan.title')}</Text>
             <Text style={styles.subtitle}>{t('home.fridge_scan.body')}</Text>
 
-            <View style={styles.metaPanel} testID="home-fridge-scan-quota">
-              <View style={styles.metaIconTile}>
+            <Squircle style={styles.metaPanel} testID="home-fridge-scan-quota">
+              <Squircle style={styles.metaIconTile}>
                 <ChefHat
                   color={palette.accent}
                   size={18}
                   strokeWidth={2.3}
                 />
-              </View>
+              </Squircle>
               <View style={styles.metaTextColumn}>
                 <Text style={styles.metaPrimary}>
                   {t('home.fridge_scan.limit_primary')}
@@ -135,7 +135,7 @@ export function ChefHomeCard({ onPress }: ChefHomeCardProps) {
                   {t('home.fridge_scan.limit_secondary')}
                 </Text>
               </View>
-            </View>
+            </Squircle>
           </View>
 
           <View style={styles.footer}>
@@ -149,21 +149,21 @@ export function ChefHomeCard({ onPress }: ChefHomeCardProps) {
             </View>
           </View>
         </View>
-      </View>
+      </Squircle>
     </TouchableOpacity>
   );
 }
 
 const createStyles = (
-  _colors: any,
+  colors: any,
   isDark: boolean,
   metrics: ReturnType<typeof getPremiumHealthResponsiveCardMetrics>,
   palette: ReturnType<typeof getChefPalette>,
 ) => {
-  const visualStageHeight = metrics.isTablet ? 286 : metrics.isCompact ? 226 : 254;
+  const visualStageHeight = metrics.isTablet ? 340 : metrics.isCompact ? 270 : 300;
   const visualStageWidth = metrics.isTablet ? 272 : metrics.isCompact ? 204 : 232;
-  const imageWidth = metrics.isTablet ? 298 : metrics.isCompact ? 232 : 260;
-  const imageHeight = metrics.isTablet ? 298 : metrics.isCompact ? 232 : 260;
+  const imageWidth = metrics.isTablet ? 360 : metrics.isCompact ? 286 : 320;
+  const imageHeight = metrics.isTablet ? 360 : metrics.isCompact ? 286 : 320;
   const footerHeight = metrics.ctaHeight + SPACING.md;
   const subtitleWidth = metrics.isTablet ? metrics.copyWidth : metrics.isCompact ? 164 : 176;
 
@@ -174,7 +174,7 @@ const createStyles = (
       shadowOpacity: isDark ? 0.16 : 0.08,
       shadowRadius: isDark ? 18 : 14,
       shadowOffset: { width: 0, height: isDark ? 11 : 9 },
-      elevation: 6,
+      elevation: 6, borderCurve: 'continuous',
     },
     surface: {
       minHeight: metrics.cardMinHeight,
@@ -184,7 +184,7 @@ const createStyles = (
       backgroundColor: palette.surfaceBackground,
       borderWidth: 1,
       borderColor: palette.surfaceBorder,
-      position: 'relative',
+      position: 'relative', borderCurve: 'continuous',
     },
     backgroundGradient: {
       ...StyleSheet.absoluteFillObject,
@@ -194,18 +194,7 @@ const createStyles = (
       left: 0,
       right: 0,
       bottom: 0,
-      height: '44%',
-      zIndex: 2,
-    },
-    copyScrim: {
-      position: 'absolute',
-      top: 0,
-      bottom: 0,
-      left: 0,
-      width: Math.min(
-        metrics.copyWidth + metrics.horizontalPadding * 2 + 12,
-        360,
-      ),
+      height: metrics.isCompact ? '32%' : '30%',
       zIndex: 3,
     },
     visualStage: {
@@ -213,16 +202,16 @@ const createStyles = (
       width: visualStageWidth,
       height: visualStageHeight,
       right: metrics.isTablet ? 16 : metrics.isCompact ? -34 : -30,
-      top: metrics.isTablet ? 64 : metrics.isCompact ? 98 : 96,
-      zIndex: 2,
+      bottom: 0,
+      zIndex: 4,
       alignItems: 'center',
-      justifyContent: 'center',
+      justifyContent: 'flex-end',
     },
     visualGlow: {
       position: 'absolute',
       inset: 20,
       borderRadius: 999,
-      opacity: isDark ? 0.36 : 0.42,
+      opacity: isDark ? 0.36 : 0.42, borderCurve: 'continuous',
     },
     chefGroupImage: {
       width: imageWidth,
@@ -241,7 +230,22 @@ const createStyles = (
     copyColumn: {
       width: metrics.copyWidth,
       alignItems: 'flex-start',
+      position: 'relative',
       zIndex: 4,
+    },
+    copyPlate: {
+      position: 'absolute',
+      top: -12,
+      left: -12,
+      right: metrics.isCompact ? -4 : -16,
+      bottom: -14,
+      borderRadius: 26,
+      backgroundColor: isDark
+        ? withAlpha(colors.background, 0.5)
+        : withAlpha(colors.cardBackground ?? colors.background, 0.64),
+      borderWidth: 1,
+      borderColor: withAlpha(palette.accent, isDark ? 0.09 : 0.08),
+      zIndex: 0, borderCurve: 'continuous',
     },
     eyebrowPill: {
       flexDirection: 'row',
@@ -253,6 +257,7 @@ const createStyles = (
       backgroundColor: palette.eyebrowBackground,
       borderWidth: 1,
       borderColor: palette.eyebrowBorder,
+      zIndex: 1, borderCurve: 'continuous',
     },
     eyebrow: {
       color: palette.eyebrowText,
@@ -270,6 +275,7 @@ const createStyles = (
       fontWeight: FONT_WEIGHTS.bold,
       letterSpacing: 0,
       fontFamily: FONT_FAMILIES.display,
+      zIndex: 1,
     },
     subtitle: {
       marginTop: SPACING.sm,
@@ -278,6 +284,7 @@ const createStyles = (
       lineHeight: metrics.bodyLineHeight,
       fontWeight: FONT_WEIGHTS.medium,
       maxWidth: subtitleWidth,
+      zIndex: 1,
     },
     metaPanel: {
       marginTop: SPACING.lg,
@@ -292,6 +299,7 @@ const createStyles = (
       borderWidth: 1,
       borderColor: palette.metaPanelBorder,
       maxWidth: metrics.copyWidth,
+      zIndex: 1, borderCurve: 'continuous',
     },
     metaIconTile: {
       width: 36,
@@ -301,7 +309,7 @@ const createStyles = (
       borderWidth: 1,
       borderColor: palette.metaIconTileBorder,
       alignItems: 'center',
-      justifyContent: 'center',
+      justifyContent: 'center', borderCurve: 'continuous',
     },
     metaTextColumn: {
       flexShrink: 1,
@@ -347,7 +355,7 @@ const createStyles = (
       shadowColor: palette.ctaShadowColor,
       shadowOpacity: isDark ? 0.12 : 0.06,
       shadowRadius: isDark ? 10 : 8,
-      shadowOffset: { width: 0, height: isDark ? 6 : 4 },
+      shadowOffset: { width: 0, height: isDark ? 6 : 4 }, borderCurve: 'continuous',
     },
     ctaText: {
       color: palette.ctaText,

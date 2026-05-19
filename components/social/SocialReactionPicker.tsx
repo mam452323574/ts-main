@@ -137,14 +137,14 @@ const createStyles = (colors: any) =>
       backgroundColor: colors.cardBackground,
       borderWidth: 1,
       borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.1),
-      ...SHADOWS.card,
+      ...SHADOWS.card, borderCurve: 'continuous',
     },
     option: {
       width: 40,
       height: 40,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: 20,
+      borderRadius: 20, borderCurve: 'continuous',
     },
     optionActive: {
       backgroundColor: withAlpha(colors.primary, 0.12),

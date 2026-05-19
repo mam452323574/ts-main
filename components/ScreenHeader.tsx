@@ -83,6 +83,8 @@ export function ScreenHeader({
           paddingTop: topInset
             ? insets.top + (isInline ? SPACING.lg : SPACING.sm)
             : (isInline ? SPACING.md : SPACING.sm),
+          paddingLeft: Math.max(insets.left, SPACING.page),
+          paddingRight: Math.max(insets.right, SPACING.page),
           backgroundColor: useTransparentChrome
             ? 'transparent'
             : withAlpha(tokens.screen.background, isDark ? 0.96 : 1),
@@ -165,7 +167,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.md,
-    paddingHorizontal: SPACING.page,
   },
   headerBar: {
     paddingBottom: SPACING.md,
@@ -215,6 +216,6 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.full,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
+    borderWidth: 1, borderCurve: 'continuous',
   },
 });

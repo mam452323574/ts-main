@@ -7,7 +7,6 @@ import {
   View,
 } from 'react-native';
 import {
-  Bookmark,
   Flag,
   Ellipsis,
   Heart,
@@ -50,8 +49,6 @@ interface SocialPostCardProps {
   onReportPress?: (() => void) | null;
   onSharePress?: (() => void) | null;
   onMorePress?: (() => void) | null;
-  onSavePress?: (() => void) | null;
-  savePending?: boolean;
   onReactionSelect?: ((reaction: SocialReactionState) => void) | null;
 }
 
@@ -66,8 +63,6 @@ export function SocialPostCard({
   onCommentPress,
   onSharePress,
   onMorePress,
-  onSavePress,
-  savePending = false,
   onReactionSelect,
 }: SocialPostCardProps) {
   const { colors, isDark = false } = useTheme();
@@ -220,27 +215,6 @@ export function SocialPostCard({
           </TouchableOpacity>
         ) : null}
 
-        {onSavePress && !isOwnPost ? (
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel={
-              post.viewer_has_saved
-                ? t('social.actions.unsave')
-                : t('social.actions.save')
-            }
-            disabled={savePending}
-            onPress={onSavePress}
-            style={[styles.iconAction, savePending && styles.iconActionDisabled]}
-            testID={`social-post-save-${post.id}`}
-          >
-            <Bookmark
-              color={post.viewer_has_saved ? colors.primary : colors.primaryText}
-              fill={post.viewer_has_saved ? colors.primary : 'transparent'}
-              size={18}
-            />
-          </TouchableOpacity>
-        ) : null}
-
         {post.viewer_reaction === 'dislike' ? (
           <View style={styles.feedbackBadge} testID={`social-post-disliked-${post.id}`}>
             <Flag color={colors.warning} size={14} />
@@ -272,7 +246,7 @@ const createStyles = (colors: any, isDark: boolean) => {
       shadowOpacity: 0,
       shadowRadius: 0,
       shadowOffset: { width: 0, height: 0 },
-      elevation: 0,
+      elevation: 0, borderCurve: 'continuous',
     },
     header: {
       paddingHorizontal: SPACING.lg,
@@ -294,7 +268,7 @@ const createStyles = (colors: any, isDark: boolean) => {
       overflow: 'hidden',
       backgroundColor: neutralMutedSurface,
       borderWidth: 1,
-      borderColor: neutralBorder,
+      borderColor: neutralBorder, borderCurve: 'continuous',
     },
     postImage: {
       width: '100%',
@@ -317,9 +291,6 @@ const createStyles = (colors: any, isDark: boolean) => {
     },
     reactionAnchor: {
       position: 'relative',
-    },
-    iconActionDisabled: {
-      opacity: 0.45,
     },
     actionButtonDisabled: {
       opacity: 0.45,
@@ -345,7 +316,7 @@ const createStyles = (colors: any, isDark: boolean) => {
       justifyContent: 'center',
       backgroundColor: neutralMutedSurface,
       borderWidth: 1,
-      borderColor: neutralBorder,
+      borderColor: neutralBorder, borderCurve: 'continuous',
     },
     feedbackBadge: {
       flexDirection: 'row',
@@ -356,7 +327,7 @@ const createStyles = (colors: any, isDark: boolean) => {
       borderRadius: BORDER_RADIUS.full,
       backgroundColor: withAlpha(colors.warning, 0.12),
       borderWidth: 1,
-      borderColor: withAlpha(colors.warning, 0.24),
+      borderColor: withAlpha(colors.warning, 0.24), borderCurve: 'continuous',
     },
     feedbackBadgeLabel: {
       fontSize: SIZES.text12,

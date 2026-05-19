@@ -368,7 +368,7 @@ describe('ScanPreviewScreen', () => {
     expect(progressCardStyle).toEqual(
       expect.objectContaining({
         minHeight: 0,
-        paddingVertical: 14,
+        paddingVertical: 12,
         paddingHorizontal: 18,
       }),
     );
@@ -427,8 +427,8 @@ describe('ScanPreviewScreen', () => {
     );
     expect(progressCardStyle).toEqual(
       expect.objectContaining({
-        minHeight: 304,
-        paddingVertical: 20,
+        minHeight: 0,
+        paddingVertical: 16,
       }),
     );
     expect(percentageStyle).toEqual(
@@ -484,7 +484,7 @@ describe('ScanPreviewScreen', () => {
     );
     expect(progressCardStyle).toEqual(
       expect.objectContaining({
-        paddingVertical: 14,
+        paddingVertical: 12,
       }),
     );
     expect(percentageStyle).toEqual(
@@ -498,9 +498,6 @@ describe('ScanPreviewScreen', () => {
     expect(screen.getByTestId('scan-preview-step-upload')).toBeTruthy();
     expect(screen.getByTestId('scan-preview-step-analysis')).toBeTruthy();
     expect(screen.getByTestId('scan-preview-step-preparing')).toBeTruthy();
-    expect(screen.getByTestId('scan-preview-trust-line')).toBeTruthy();
-    expect(screen.getByText('Indicateurs en cours')).toBeTruthy();
-    expect(screen.getByText('Hydratation')).toBeTruthy();
   });
 
   it('uses the ScrollView fallback only on ultra-tight heights', async () => {
@@ -550,7 +547,7 @@ describe('ScanPreviewScreen', () => {
     );
     expect(progressCardStyle).toEqual(
       expect.objectContaining({
-        paddingVertical: 12,
+        paddingVertical: 10,
       }),
     );
     expect(percentageStyle).toEqual(
@@ -613,8 +610,8 @@ describe('ScanPreviewScreen', () => {
     );
     expect(progressCardStyle).toEqual(
       expect.objectContaining({
-        minHeight: 356,
-        paddingVertical: 28,
+        minHeight: 0,
+        paddingVertical: 20,
       }),
     );
     expect(percentageStyle).toEqual(
@@ -624,7 +621,7 @@ describe('ScanPreviewScreen', () => {
     );
   });
 
-  it('renders the editorial loading state with health insight chips', async () => {
+  it('renders the editorial loading state with the live progress percentage', async () => {
     mockCreateScanWithAnalysis.mockImplementation(() => new Promise(() => {}));
 
     render(<ScanPreviewScreen />);
@@ -635,81 +632,16 @@ describe('ScanPreviewScreen', () => {
       expect(screen.getByTestId('scan-preview-loading-overlay')).toBeTruthy();
     });
 
-    expect(screen.getByTestId('scan-preview-loading-phase-eyebrow').props.children).toBe(
-      'Lecture du visage',
-    );
-    expect(screen.getByTestId('scan-preview-loading-phase-headline').props.children).toBe(
-      'Vérification de la photo',
-    );
     expect(screen.getByTestId('scan-preview-loading-percentage').props.children).toBe(
       '0%',
     );
-    expect(screen.getByText('Hydratation')).toBeTruthy();
-    expect(screen.getByText('Symétrie')).toBeTruthy();
-    expect(screen.getByText('Éclat')).toBeTruthy();
+    expect(screen.queryByTestId('scan-preview-loading-phase-eyebrow')).toBeNull();
+    expect(screen.queryByTestId('scan-preview-loading-phase-headline')).toBeNull();
+    expect(screen.queryByTestId('scan-preview-trust-line')).toBeNull();
   });
 
-  it.each([
-    ['body', 'Lecture du corps', 'Posture'],
-    ['nutrition', 'Lecture nutrition', 'Calories'],
-    ['super', 'Synthèse premium', 'Score global'],
-  ] as const)(
-    'shows scan-type specific loading vocabulary for %s scans',
-    async (scanType, eyebrow, chipLabel) => {
-      mockUseLocalSearchParams.mockReturnValue({
-        imageUri: 'file:///test-image.jpg',
-        scanType,
-      });
-      mockCreateScanWithAnalysis.mockImplementation(() => new Promise(() => {}));
-
-      render(<ScanPreviewScreen />);
-
-      fireEvent.press(screen.getByTestId('confirm-button'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('scan-preview-loading-overlay')).toBeTruthy();
-      });
-
-      expect(
-        screen.getByTestId('scan-preview-loading-phase-eyebrow').props.children,
-      ).toBe(eyebrow);
-      expect(screen.getByText(chipLabel)).toBeTruthy();
-    },
-  );
-
-  it('shows a compact mini-game only while the super scan is waiting', async () => {
-    mockUseLocalSearchParams.mockReturnValue({
-      imageUri: 'file:///test-image.jpg',
-      scanType: 'super',
-    });
-    mockCreateScanWithAnalysis.mockImplementation(() => new Promise(() => {}));
-
-    render(<ScanPreviewScreen />);
-
-    fireEvent.press(screen.getByTestId('confirm-button'));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('loading-mini-game')).toBeTruthy();
-    });
-
-    const miniGameSlot = screen.getByTestId('scan-preview-super-scan-mini-game-slot');
-    const miniGameSlotStyle = StyleSheet.flatten(miniGameSlot.props.style);
-
-    expect(miniGameSlot).toBeTruthy();
-    expect(miniGameSlotStyle.height).toBe(160);
-    expect(mockLoadingMiniGame).toHaveBeenCalledWith(
-      expect.objectContaining({
-        active: true,
-        compact: true,
-        durationHintMs: 10000,
-        variant: 'superScan',
-      }),
-    );
-    expect(mockLoadingMiniGame.mock.calls[0][0]).not.toHaveProperty('onComplete');
-  });
-
-  it.each(['health', 'body', 'nutrition'] as const)(
-    'does not show the loading mini-game for %s scans',
+  it.each(['health', 'body', 'nutrition', 'super'] as const)(
+    'shows a compact mini-game while the %s scan is waiting',
     async (scanType) => {
       mockUseLocalSearchParams.mockReturnValue({
         imageUri: 'file:///test-image.jpg',
@@ -722,52 +654,71 @@ describe('ScanPreviewScreen', () => {
       fireEvent.press(screen.getByTestId('confirm-button'));
 
       await waitFor(() => {
-        expect(screen.getByTestId('scan-preview-loading-overlay')).toBeTruthy();
+        expect(screen.getByTestId('loading-mini-game')).toBeTruthy();
+      });
+
+      const miniGameSlot = screen.getByTestId('scan-preview-mini-game-slot');
+      const miniGameSlotStyle = StyleSheet.flatten(miniGameSlot.props.style);
+
+      expect(miniGameSlot).toBeTruthy();
+      expect(miniGameSlotStyle.height).toBe(490);
+
+      const callArgs = mockLoadingMiniGame.mock.calls[0][0];
+      expect(callArgs).toEqual(
+        expect.objectContaining({
+          active: true,
+          compact: true,
+          durationHintMs: 10000,
+          variant: 'scan',
+          cardHeight: 490,
+        }),
+      );
+      expect(typeof callArgs.accentColor).toBe('string');
+      expect(callArgs.accentColor.length).toBeGreaterThan(0);
+      expect(callArgs).not.toHaveProperty('onComplete');
+    },
+  );
+
+  it.each(['health', 'body', 'nutrition', 'super'] as const)(
+    'hides the loading mini-game on ultra-tight layouts for %s scans',
+    async (scanType) => {
+      Object.defineProperty(Platform, 'OS', {
+        value: 'ios',
+        configurable: true,
+      });
+      useWindowDimensionsSpy.mockReturnValue({
+        width: 320,
+        height: 568,
+        scale: 2,
+        fontScale: 1,
+      });
+      mockUseSafeAreaInsets.mockReturnValue({
+        top: 20,
+        bottom: 0,
+        left: 0,
+        right: 0,
+      });
+      mockUseLocalSearchParams.mockReturnValue({
+        imageUri: 'file:///test-image.jpg',
+        scanType,
+      });
+      mockCreateScanWithAnalysis.mockImplementation(() => new Promise(() => {}));
+
+      render(<ScanPreviewScreen />);
+
+      fireEvent.press(screen.getByTestId('confirm-button'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('scan-preview-loading-scroll-view')).toBeTruthy();
       });
 
       expect(screen.queryByTestId('loading-mini-game')).toBeNull();
-      expect(screen.queryByTestId('scan-preview-super-scan-mini-game-slot')).toBeNull();
+      expect(screen.queryByTestId('scan-preview-mini-game-slot')).toBeNull();
       expect(mockLoadingMiniGame).not.toHaveBeenCalled();
     },
   );
 
-  it('hides the super scan mini-game on ultra-tight loading layouts', async () => {
-    Object.defineProperty(Platform, 'OS', {
-      value: 'ios',
-      configurable: true,
-    });
-    useWindowDimensionsSpy.mockReturnValue({
-      width: 320,
-      height: 568,
-      scale: 2,
-      fontScale: 1,
-    });
-    mockUseSafeAreaInsets.mockReturnValue({
-      top: 20,
-      bottom: 0,
-      left: 0,
-      right: 0,
-    });
-    mockUseLocalSearchParams.mockReturnValue({
-      imageUri: 'file:///test-image.jpg',
-      scanType: 'super',
-    });
-    mockCreateScanWithAnalysis.mockImplementation(() => new Promise(() => {}));
-
-    render(<ScanPreviewScreen />);
-
-    fireEvent.press(screen.getByTestId('confirm-button'));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('scan-preview-loading-scroll-view')).toBeTruthy();
-    });
-
-    expect(screen.queryByTestId('loading-mini-game')).toBeNull();
-    expect(screen.queryByTestId('scan-preview-super-scan-mini-game-slot')).toBeNull();
-    expect(mockLoadingMiniGame).not.toHaveBeenCalled();
-  });
-
-  it('removes the super scan mini-game once the result is ready and before navigation', async () => {
+  it('removes the scan mini-game once the result is ready and before navigation', async () => {
     mockUseLocalSearchParams.mockReturnValue({
       imageUri: 'file:///test-image.jpg',
       scanType: 'super',
@@ -804,7 +755,7 @@ describe('ScanPreviewScreen', () => {
     });
 
     expect(screen.queryByTestId('loading-mini-game')).toBeNull();
-    expect(screen.getByTestId('scan-preview-super-scan-mini-game-slot')).toBeTruthy();
+    expect(screen.getByTestId('scan-preview-mini-game-slot')).toBeTruthy();
     expect(mockReplace).not.toHaveBeenCalled();
   });
 
@@ -1153,9 +1104,6 @@ describe('ScanPreviewScreen', () => {
       expect(screen.getByTestId('scan-preview-loading-percentage').props.children).toBe(
         '100%',
       );
-      expect(
-        screen.getByTestId('scan-preview-loading-phase-headline').props.children,
-      ).toBe('Préparation du résultat');
       expect(mockReplace).not.toHaveBeenCalled();
     });
 

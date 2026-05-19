@@ -47,8 +47,6 @@ import type {
   SocialHideAuthorRequest,
   SocialHideAuthorResponse,
   SocialPost,
-  SocialSetSaveRequest,
-  SocialSetSaveResponse,
   SocialPublicProfile,
   SocialReactionState,
   SocialRecordImpressionsRequest,
@@ -781,7 +779,6 @@ function parseSocialPostRow(row: unknown): SocialPost | null {
     dislike_count: readNumber(row.dislike_count),
     comment_count: readNumber(row.comment_count),
     unique_view_count: readNumber(row.unique_view_count),
-    save_count: readNumber(row.save_count),
     reaction_distribution: parseSocialReactionDistribution(row.reaction_distribution),
     viewer_visible_comment_count: readOptionalNumber(
       row.viewer_visible_comment_count,
@@ -789,7 +786,6 @@ function parseSocialPostRow(row: unknown): SocialPost | null {
     viewer_reaction: viewerReaction,
     viewer_has_liked: viewerReaction === 'like' || readBoolean(row.viewer_has_liked),
     viewer_follows_author: readBoolean(row.viewer_follows_author),
-    viewer_has_saved: readBoolean(row.viewer_has_saved),
     moderation_status: moderationStatus,
     moderation_state: readModerationStatus(row.moderation_state ?? moderationStatus),
     moderation_reason: readOptionalString(row.moderation_reason),
@@ -1122,25 +1118,20 @@ export async function fetchSocialFeed(
   pageSize = SOCIAL_FEED_PAGE_SIZE,
   viewerContext?: SocialFeedViewerContext,
 ): Promise<SocialFeedPage> {
-  const useKeyset = cursor == null || isCompositeCursor(cursor);
+  // Keyset cursor temporarily disabled: PostgREST doesn't support function
+  // overloading, so we keep the legacy offset-based signature live and route
+  // every call through it. Re-enable when the cursor signature is brought back
+  // (e.g. via a renamed RPC) and the client is shipped accordingly.
+  const offset = parseCursor(cursor);
 
   try {
-    const rpcArgs = useKeyset
-      ? {
-          p_category: category === 'all' ? null : category,
-          p_limit: pageSize,
-          p_cursor: cursor ?? null,
-          p_viewer_language_code: viewerContext?.languageCode ?? null,
-          p_viewer_country_code: viewerContext?.countryCode ?? null,
-        }
-      : {
-          p_category: category === 'all' ? null : category,
-          p_limit: pageSize,
-          p_offset: parseCursor(cursor),
-          p_viewer_language_code: viewerContext?.languageCode ?? null,
-          p_viewer_country_code: viewerContext?.countryCode ?? null,
-        };
-    const { data, error } = await supabase.rpc('get_social_feed_page', rpcArgs);
+    const { data, error } = await supabase.rpc('get_social_feed_page', {
+      p_category: category === 'all' ? null : category,
+      p_limit: pageSize,
+      p_offset: offset,
+      p_viewer_language_code: viewerContext?.languageCode ?? null,
+      p_viewer_country_code: viewerContext?.countryCode ?? null,
+    });
 
     if (error) {
       const socialError = createSocialFeedReadError(error);
@@ -1156,23 +1147,9 @@ export async function fetchSocialFeed(
       .map(parseSocialPostRow)
       .filter((item): item is SocialPost => item !== null);
 
-    let nextCursor: string | null = null;
-    if (useKeyset) {
-      // The RPC exposes `next_cursor` on every row (window LAST_VALUE).
-      const lastRow = rawRows[rawRows.length - 1] as
-        | { next_cursor?: unknown }
-        | undefined;
-      const candidate =
-        typeof lastRow?.next_cursor === 'string' ? lastRow.next_cursor : null;
-      nextCursor = rawRows.length >= pageSize ? candidate : null;
-    } else {
-      const offset = parseCursor(cursor);
-      nextCursor = rawRows.length >= pageSize ? String(offset + pageSize) : null;
-    }
-
     return {
       items,
-      next_cursor: nextCursor,
+      next_cursor: rawRows.length >= pageSize ? String(offset + pageSize) : null,
     };
   } catch (error) {
     if (error instanceof SocialServiceError) {
@@ -1826,20 +1803,6 @@ export async function recordSocialPostImpressions(
 
   return invokeAuthedSocialFunction<SocialRecordImpressionsResponse>(
     'social-record-impressions',
-    requestBody as unknown as Record<string, unknown>,
-  );
-}
-
-export async function setSocialPostSave(
-  postId: string,
-  action?: 'save' | 'unsave',
-) {
-  const requestBody: SocialSetSaveRequest = {
-    post_id: postId,
-    ...(action ? { action } : {}),
-  };
-  return invokeAuthedSocialFunction<SocialSetSaveResponse>(
-    'social-set-save',
     requestBody as unknown as Record<string, unknown>,
   );
 }

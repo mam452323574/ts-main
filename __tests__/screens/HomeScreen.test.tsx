@@ -123,6 +123,8 @@ jest.mock('@/contexts/LanguageContext', () => ({
           return `${options.count} scans`;
         case 'home.fox_evolution.stage_label':
           return `Level ${options.stage}`;
+        case 'home.fox_evolution.next_stage_label':
+          return `Next evolution: Level ${options.stage}`;
         case 'home.fox_evolution.stage_range':
           return `${options.start} to ${options.end} scans`;
         case 'home.fox_evolution.stage_range_max':
@@ -131,6 +133,16 @@ jest.mock('@/contexts/LanguageContext', () => ({
           return `${options.current} / ${options.total}`;
         case 'home.fox_evolution.scans_remaining':
           return `${options.count} scans before the next evolution`;
+        case 'home.fox_evolution.scans_remaining_short':
+          return `${options.count} scans left`;
+        case 'home.fox_evolution.total_progress':
+          return `${options.current} / ${options.total} scans total`;
+        case 'home.fox_evolution.total_final':
+          return `${options.count} scans total`;
+        case 'home.fox_evolution.progress_start_label':
+          return `Level ${options.stage} · ${options.count} scans`;
+        case 'home.fox_evolution.progress_goal_label':
+          return `Goal ${options.count} scans`;
         case 'home.fox_evolution.max_stage':
           return 'Final evolution reached';
         case 'home.analytics_card_eyebrow':
@@ -1097,14 +1109,21 @@ describe('HomeScreen', () => {
     render(<HomeScreen />);
 
     expect(screen.getByTestId('fox-evolution-hero')).toBeTruthy();
-    expect(screen.getByText('Level 0')).toBeTruthy();
+    expect(screen.getByTestId('fox-evolution-companion-pill')).toBeTruthy();
+    expect(screen.getAllByText('Companion')).toHaveLength(1);
+    expect(screen.getAllByText('Level 0')).toHaveLength(1);
     expect(screen.queryByText('Evolves with your scans')).toBeNull();
     expect(screen.queryByText('Fox evolution')).toBeNull();
     expect(screen.queryByText('0 scans')).toBeNull();
     expect(screen.queryByTestId('fox-evolution-supporting-text')).toBeNull();
+    expect(screen.queryByTestId('fox-evolution-next-stage')).toBeNull();
+    expect(screen.queryByTestId('fox-evolution-stage-progress')).toBeNull();
     expect(screen.queryByText('1 scans before the next evolution')).toBeNull();
-    expect(screen.getByText('0 to 1 scans')).toBeTruthy();
-    expect(screen.getByText('0 / 1')).toBeTruthy();
+    expect(screen.queryByText('Next evolution: Level 1')).toBeNull();
+    expect(screen.getByText('1 scans left')).toBeTruthy();
+    expect(screen.queryByText('0 / 1 scans total')).toBeNull();
+    expect(screen.queryByText('Level 0 · 0 scans')).toBeNull();
+    expect(screen.getByText('Goal 1 scans')).toBeTruthy();
     expect(
       screen.getByTestId('fox-evolution-progress-fill').props.style,
     ).toEqual(expect.arrayContaining([{ width: '0%' }]));
@@ -1113,9 +1132,9 @@ describe('HomeScreen', () => {
     );
   });
 
-  it('uses the higher local scan count when backend gamification lags behind', () => {
+  it('uses the higher local scan count when backend gamification lags behind and keeps companion copy compact', () => {
     mockUseGamification.mockReturnValue({
-      scanCount: 30,
+      scanCount: 42,
       setScanCount: jest.fn(),
       incrementScanCount: jest.fn(),
       resetInMemoryStateOnUserChange: jest.fn(),
@@ -1142,7 +1161,17 @@ describe('HomeScreen', () => {
     render(<HomeScreen />);
 
     expect(screen.getByTestId('fox-evolution-hero')).toBeTruthy();
-    expect(screen.getByText('Level 6')).toBeTruthy();
+    expect(screen.getByTestId('fox-evolution-companion-pill')).toBeTruthy();
+    expect(screen.getAllByText('Companion')).toHaveLength(1);
+    expect(screen.getAllByText('Level 6')).toHaveLength(1);
+    expect(screen.getByText('8 scans left')).toBeTruthy();
+    expect(screen.getByText('Goal 50 scans')).toBeTruthy();
+    expect(screen.queryByText('Next evolution: Level 7')).toBeNull();
+    expect(screen.queryByText('42 / 50 scans total')).toBeNull();
+    expect(screen.queryByText('Level 6 · 30 scans')).toBeNull();
+    expect(
+      screen.getByTestId('fox-evolution-progress-fill').props.style,
+    ).toEqual(expect.arrayContaining([{ width: '60%' }]));
     expect(screen.getByTestId('fox-evolution-mascot-image').props.source).toBe(
       getGamificationAssetSource('stade_6.png'),
     );
@@ -1169,11 +1198,16 @@ describe('HomeScreen', () => {
 
     render(<HomeScreen />);
 
-    expect(screen.getByText('Level 8')).toBeTruthy();
+    expect(screen.getAllByText('Level 8')).toHaveLength(1);
     expect(screen.queryByTestId('fox-evolution-supporting-text')).toBeNull();
+    expect(screen.queryByTestId('fox-evolution-next-stage')).toBeNull();
+    expect(screen.queryByTestId('fox-evolution-stage-progress')).toBeNull();
     expect(screen.queryByText('47 scans before the next evolution')).toBeNull();
-    expect(screen.getByText('100 to 150 scans')).toBeTruthy();
-    expect(screen.getByText('3 / 50')).toBeTruthy();
+    expect(screen.queryByText('Next evolution: Level 9')).toBeNull();
+    expect(screen.getByText('47 scans left')).toBeTruthy();
+    expect(screen.queryByText('103 / 150 scans total')).toBeNull();
+    expect(screen.queryByText('Level 8 · 100 scans')).toBeNull();
+    expect(screen.getByText('Goal 150 scans')).toBeTruthy();
     expect(
       screen.getByTestId('fox-evolution-progress-fill').props.style,
     ).toEqual(expect.arrayContaining([{ width: '6%' }]));
@@ -1203,10 +1237,14 @@ describe('HomeScreen', () => {
 
     render(<HomeScreen />);
 
-    expect(screen.getByText('Level 10')).toBeTruthy();
+    expect(screen.getAllByText('Level 10')).toHaveLength(1);
     expect(screen.getByText('Final evolution reached')).toBeTruthy();
-    expect(screen.getByTestId('fox-evolution-supporting-text')).toBeTruthy();
+    expect(screen.getByTestId('fox-evolution-final-stage')).toBeTruthy();
+    expect(screen.queryByTestId('fox-evolution-supporting-text')).toBeNull();
+    expect(screen.queryByText('240 scans total')).toBeNull();
+    expect(screen.queryByText('Level 10 · 200 scans')).toBeNull();
     expect(screen.getByText('200+ scans')).toBeTruthy();
+    expect(screen.queryByTestId('fox-evolution-scans-remaining')).toBeNull();
     expect(screen.queryByTestId('fox-evolution-stage-progress')).toBeNull();
     expect(
       screen.getByTestId('fox-evolution-progress-fill').props.style,
@@ -1253,16 +1291,16 @@ describe('HomeScreen', () => {
     expect(mascotShellStyles).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          width: 182,
-          height: 182,
+          width: 256,
+          height: 256,
         }),
       ]),
     );
     expect(mascotImageStyles).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          width: 164,
-          height: 164,
+          width: 240,
+          height: 240,
         }),
       ]),
     );
@@ -1304,16 +1342,16 @@ describe('HomeScreen', () => {
     expect(mascotShellStyles).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          width: 208,
-          height: 208,
+          width: 296,
+          height: 296,
         }),
       ]),
     );
     expect(mascotImageStyles).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          width: 190,
-          height: 190,
+          width: 280,
+          height: 280,
         }),
       ]),
     );
@@ -1357,16 +1395,16 @@ describe('HomeScreen', () => {
     expect(mascotShellStyles).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          width: 236,
-          height: 236,
+          width: 336,
+          height: 336,
         }),
       ]),
     );
     expect(mascotImageStyles).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          width: 220,
-          height: 220,
+          width: 320,
+          height: 320,
         }),
       ]),
     );
@@ -1418,6 +1456,7 @@ describe('HomeScreen', () => {
     expect(screen.getByTestId('home-analytics-scan-label').props.children).toBe(
       'scans analyzed',
     );
+    expect(screen.queryByText('12 scans analyzed')).toBeNull();
     expect(screen.getByTestId('home-analytics-coach-image').props.contentFit).toBe(
       'contain',
     );
@@ -1500,6 +1539,13 @@ describe('HomeScreen', () => {
     );
     const chefTitle = screen.getByText('Chef');
 
+    expect(screen.getByTestId('home-chef-group-image')).toBeTruthy();
+    expect(screen.getByTestId('home-fridge-scan-copy-plate')).toBeTruthy();
+    expect(screen.getAllByText('Premium').length).toBeGreaterThan(0);
+    expect(screen.getByText('Our chefs prepare the meal you want.')).toBeTruthy();
+    expect(screen.getByText('5 Chef requests')).toBeTruthy();
+    expect(screen.getByText('per day')).toBeTruthy();
+    expect(screen.getByText('Open Chef')).toBeTruthy();
     expect(chefSurfaceStyles).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

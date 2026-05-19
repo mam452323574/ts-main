@@ -1,0 +1,36 @@
+{
+  "persona": "analytical_precise",
+  "tests": [
+    {
+      "message": "donne un plan sur 2 jours de récup",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": "high",
+      "respects_factual_cap": "n/a",
+      "notes": "R2 forces dashes only under Jour 1/Jour 2 headers, killing the analytical 'Diagnostic 1.2.3. / Actions 1.2.3.' reflex. R4 explicitly enumerates the synonym escapes ('rétablir l hydratation', 'hydratation tout au long de la journée') that v2 left open; a literal follower will avoid them. Residual ~10% risk if model treats 'sommeil' as recovery-topical rather than reflex."
+    },
+    {
+      "message": "j ai mal au dos",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": "high",
+      "respects_factual_cap": "n/a",
+      "notes": "R5 explicitly forbids purely interrogative replies for physical symptoms and mandates >=1 concrete action first. v2 left analytical model free to open with 'précise: durée? intensité? localisation?'. R5 closes this. Anti-reflex + R4 prevents the 'hydrate-toi' detour even dressed as 'veiller à l hydratation pour le disque intervertébral'."
+    },
+    {
+      "message": "c est quoi la capitale de l Italie ?",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": "high",
+      "respects_factual_cap": "high",
+      "notes": "R3 hard-caps factual questions at 1-2 sentences and forbids structure/routine/relance. Analytical tone's pull toward 'Rome. Population ~2.8M. Capitale depuis 1871. Note: ...' is bounded by the explicit 1-2 sentence rule. Expected output: 'Rome.' or 'Rome, capitale de l Italie.' Residual risk only if model treats 'précise' tone as license to exceed cap, but R3 is unambiguous."
+    }
+  ],
+  "overall_verdict": "PASS",
+  "remaining_loopholes": [
+    "R4 lists synonyms as examples but doesn't enumerate every possible analytical-precise reformulation (e.g., 'optimiser le bilan hydrique', 'régulation du sommeil profond'); a strict literal follower stays safe but a clever paraphrase could slip through",
+    "R3 says 1-2 sentences but doesn't ban parenthetical add-ons; analytical model may produce 'Rome (capitale depuis 1871).' which is 1 sentence but extends factual scope",
+    "R2 forbids numbered lists under period headers but doesn't forbid sub-headers like 'Jour 1 - Diagnostic :' followed by dashes, which could re-introduce the Diagnostic/Actions split through naming rather than numbering"
+  ],
+  "comparison_to_v2": "better"
+}

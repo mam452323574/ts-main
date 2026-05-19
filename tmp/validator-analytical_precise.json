@@ -1,0 +1,39 @@
+{
+  "persona": "analytical_precise",
+  "tests": [
+    {
+      "q": "donne un plan sur 2 jours de recup",
+      "simulated_response": "Objectif : restaurer la capacite de recuperation sur 48h via charge mecanique faible et regulation du systeme nerveux.\n\nJour 1 :\n- Mobilite douce 10 min (hanches, thoracique, epaules) pour relacher les tensions accumulees\n- Marche en zone 1 (allure conversationnelle) 20-30 min, frequence cardiaque sous 65% FCmax\n- Etirements statiques 8 min en fin de journee, 30 sec par groupe musculaire\n- Coucher 30 min plus tot que d habitude pour augmenter le temps de sommeil profond\n\nJour 2 :\n- Auto-massage / foam roller 10 min sur quadriceps, ischios, dos\n- Activation legere : 2 series de gainage 30 sec + 10 squats au poids du corps\n- Marche exterieure 25 min, exposition lumiere naturelle le matin\n- Bilan subjectif du soir : note ta fatigue perçue de 1 a 10 pour ajuster la reprise\n\nIndicateur de reussite : fatigue perçue J2 soir inferieure a J1 matin. Si elle reste elevee, prolonge la recup d un jour.",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": "yes"
+    },
+    {
+      "q": "j ai mal au dos",
+      "simulated_response": "Pour cadrer la reponse, deux variables comptent : la zone (lombaire / dorsale / cervicale) et le declencheur (posture prolongee, port de charge, sommeil). Sans ces infos, voici les leviers a effet rapide les plus documentes.\n\nActions immediates :\n- Decompression : allonge-toi sur le dos, jambes flechies sur une chaise, 5 a 10 min, pour relacher les lombaires\n- Mobilite : chat-vache 8 repetitions lentes, puis rotations thoraciques assises 6 par cote\n- Posture : si tu travailles assis, regle l ecran a hauteur des yeux et recule le bassin au fond du siege\n- Etirement cible : psoas en fente basse, 30 sec par jambe, deux passages\n\nSi la douleur persiste au-dela de 72h, irradie dans une jambe, ou s accompagne de fourmillements ou perte de force, consulte un kine ou un medecin. Peux-tu me preciser la zone exacte et depuis quand ?",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": "yes"
+    },
+    {
+      "q": "c est quoi la capitale de l Italie ?",
+      "simulated_response": "Rome.",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": "yes"
+    }
+  ],
+  "overall_verdict": "PASS",
+  "weak_spots": [
+    "Analytical tone naturally pulls toward enumerated structures; on Q2 the model could easily produce a 'Diagnostic' numbered list followed by a 'Actions' numbered list (two 1./2./3. blocks) — the rule (3) is stated but the persona's 'structured/evidence-minded' tone fights it.",
+    "On Q2 the precise tone may prepend a clarifying question loop before any concrete action, leaving the user without anything actionable (partial answer risk).",
+    "The 'evidence-minded' tone may smuggle generic reflexes ('sommeil', 'hydratation lombaire') framed as evidence-based, which technically violates rule (4) while sounding analytical.",
+    "On Q3, the analytical persona may add unsolicited 'fun fact' / 'population' context, breaking the 'Rome. Point.' example."
+  ],
+  "suggested_prompt_patches": [
+    "Add an explicit rule: 'Pour les questions de culture generale courtes (capitale, date, definition), reponds en UNE phrase maximum, sans contexte additionnel ni question de relance.'",
+    "Reinforce rule (3) with: 'Si tu produis deux sections (ex: Diagnostic + Actions), utilise des en-tetes textuels suivis de tirets `-`, JAMAIS de 1./2./3. dans plus d une section.'",
+    "Add a counter-reflex for Q2-style symptoms: 'Si l utilisateur signale une douleur, donne au moins 2 actions concretes AVANT toute question de clarification — ne renvoie jamais une reponse composee uniquement de questions.'",
+    "Tighten rule (4) to forbid even reformulations: 'Interdit aussi: synonymes de hydratation/marche/respiration/sommeil presentes comme conseil par defaut quand la question ne porte pas dessus (ex: bois, eau, pas, respire, dors, bouge).'"
+  ]
+}

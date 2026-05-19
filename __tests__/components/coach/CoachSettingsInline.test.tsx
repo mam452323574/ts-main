@@ -48,8 +48,6 @@ const defaultProps = {
   questionMaxLength: 800,
   promptTitle: (prompt: CoachPromptType) => `Prompt ${prompt}`,
   promptSubtitle: (prompt: CoachPromptType) => `Subtitle ${prompt}`,
-  title: 'Reglages',
-  subtitle: 'Ecris ta question.',
   accentColor: '#7FA9D4',
   personaSectionLabel: 'Coach',
   modeSectionLabel: 'Question au coach',
@@ -70,6 +68,8 @@ describe('CoachSettingsInline', () => {
       screen.getByTestId('coach-settings-inline-question-input').props.placeholder,
     ).toBe('Demande ce que tu veux');
     expect(screen.queryByText('Demande ce que tu veux.')).toBeNull();
+    expect(screen.queryByText('Reglages')).toBeNull();
+    expect(screen.queryByText('Ecris ta question.')).toBeNull();
   });
 
   it('shows an explicit selected badge on free text or the active preset', () => {

@@ -9,6 +9,7 @@ import {
   resolveFatDistributionSuperScanPalette,
   resolveLegacySuperScanPalette,
 } from '@/utils/superScanVisualTheme';
+import { FONT_WEIGHTS, SIZES, SPACING, withAlpha } from '@/constants/theme';
 
 const mockCanDismiss = jest.fn();
 const mockDismissAll = jest.fn();
@@ -48,14 +49,83 @@ const baseMockThemeColors = {
 const mockThemeColors = { ...baseMockThemeColors };
 let mockIsDark = false;
 
-const expectTransparentResultHeader = (style: unknown) => {
+const expectCompactResultTitle = (style: unknown) => {
   expect(StyleSheet.flatten(style)).toEqual(
     expect.objectContaining({
-      backgroundColor: 'transparent',
-      borderBottomColor: 'transparent',
-      borderBottomWidth: 0,
+      fontSize: SIZES.text20,
+      lineHeight: 24,
+      fontWeight: FONT_WEIGHTS.bold,
+      textAlign: 'center',
+      includeFontPadding: false,
     }),
   );
+};
+
+const expectCompactResultTopChrome = (
+  style: unknown,
+  _isDark: boolean,
+) => {
+  expect(StyleSheet.flatten(style)).toEqual(
+    expect.objectContaining({
+      paddingTop: SPACING.sm,
+      paddingBottom: SPACING.sm,
+      backgroundColor: '#000000',
+      borderBottomWidth: 0,
+      borderBottomColor: 'transparent',
+    }),
+  );
+};
+
+const toResultScrimGradient = (gradient: readonly [string, string, string]) =>
+  gradient.map((color, index) =>
+    withAlpha(color, index === 0 ? 0.72 : index === 1 ? 0.64 : 0.78),
+  );
+
+const expectFixedResultScrollContent = (style: unknown) => {
+  const flattened = StyleSheet.flatten(style) as any;
+
+  expect(flattened).toEqual(
+    expect.objectContaining({
+      flexGrow: 1,
+    }),
+  );
+  expect(flattened.justifyContent).toBeUndefined();
+  expect(flattened.paddingTop).toBeUndefined();
+  expect(flattened.paddingBottom).toBeUndefined();
+};
+
+const expectFixedResultSurface = (style: unknown) => {
+  const flattened = StyleSheet.flatten(style) as any;
+
+  expect(flattened).toEqual(
+    expect.objectContaining({
+      flex: 1,
+      width: '100%',
+      alignSelf: 'stretch',
+      marginHorizontal: 0,
+      paddingHorizontal: 0,
+      paddingBottom: 0,
+      borderBottomLeftRadius: 0,
+      borderBottomRightRadius: 0,
+      overflow: 'hidden',
+      borderTopWidth: StyleSheet.hairlineWidth,
+    }),
+  );
+  expect(flattened.borderRadius).toBeUndefined();
+  expect(flattened.borderWidth).toBeUndefined();
+  expect(flattened.marginTop).toBeGreaterThan(0);
+  expect(flattened.borderTopLeftRadius).toBeGreaterThan(0);
+  expect(flattened.borderTopRightRadius).toBe(flattened.borderTopLeftRadius);
+};
+
+const expectStableInternalScroll = (scroll: any) => {
+  expect(scroll.props.bounces).toBe(false);
+  expect(scroll.props.alwaysBounceVertical).toBe(false);
+  expect(scroll.props.overScrollMode).toBe('never');
+  expect(StyleSheet.flatten(scroll.props.style)).toEqual(
+    expect.objectContaining({ flex: 1 }),
+  );
+  expectFixedResultScrollContent(scroll.props.contentContainerStyle);
 };
 
 const collectTestIds = (node: any, acc: string[] = []): string[] => {
@@ -291,14 +361,19 @@ describe('SuperScanResultScreen', () => {
   it('renders fallback state when analysis data is missing', () => {
     mockParams.mockReturnValue({});
 
-    const { getByText, getByTestId } = render(<SuperScanResultScreen />);
+    const { getByText, getByTestId, queryByTestId } = render(<SuperScanResultScreen />);
 
     expect(getByTestId('super-scan-empty-state')).toBeTruthy();
-    expectTransparentResultHeader(
+    expect(getByTestId('super-scan-result-sheet')).toBeTruthy();
+    expectCompactResultTitle(
       getByTestId('super-scan-result-screen-header').props.style,
     );
-    expect(getByTestId('super-scan-result-top-chrome')).toBeTruthy();
-    expect(getByTestId('super-scan-result-close-button')).toBeTruthy();
+    expectCompactResultTopChrome(
+      getByTestId('super-scan-result-top-chrome').props.style,
+      false,
+    );
+    expect(queryByTestId('super-scan-result-top-chrome-handle')).toBeNull();
+    expect(queryByTestId('super-scan-result-close-button')).toBeNull();
     expect(getByText(i18n.t('common.results.no_data'))).toBeTruthy();
     expect(getByText(i18n.t('common.home_back'))).toBeTruthy();
   });
@@ -322,18 +397,23 @@ describe('SuperScanResultScreen', () => {
     });
 
     expect(getByTestId('super-scan-background-layer').props.colors).toEqual(
-      expectedPalette.backgroundGradient,
+      toResultScrimGradient(expectedPalette.backgroundGradient),
     );
-    expectTransparentResultHeader(
+    expect(getByTestId('super-scan-result-sheet')).toBeTruthy();
+    expectCompactResultTitle(
       getByTestId('super-scan-result-screen-header').props.style,
     );
-    expect(getByTestId('super-scan-result-top-chrome')).toBeTruthy();
-    expect(getByTestId('super-scan-result-close-button')).toBeTruthy();
+    expectCompactResultTopChrome(
+      getByTestId('super-scan-result-top-chrome').props.style,
+      false,
+    );
+    expect(queryByTestId('super-scan-result-top-chrome-handle')).toBeNull();
+    expect(queryByTestId('super-scan-result-close-button')).toBeNull();
     expect(getByTestId('result-hero-surface')).toBeTruthy();
     expect(queryByTestId('super-scan-score-card')).toBeNull();
   });
 
-  it('keeps the super result top chrome inside the scroll flow and uses a non-black dark gradient container', () => {
+  it('renders the super result top chrome inside the scroll flow over the scanner backdrop', () => {
     Object.assign(mockThemeColors, {
       background: '#000000',
       cardBackground: '#121212',
@@ -363,14 +443,31 @@ describe('SuperScanResultScreen', () => {
     const containerStyle = StyleSheet.flatten(
       rendered.getByTestId('super-scan-result-screen').props.style,
     );
+    const sheetStyle = StyleSheet.flatten(
+      rendered.getByTestId('super-scan-result-sheet').props.style,
+    );
+    const scroll = rendered.getByTestId('super-scan-result-scroll');
 
     expect(testIds.indexOf('super-scan-result-top-chrome')).toBeLessThan(
       testIds.indexOf('result-hero-surface'),
     );
-    expect(containerStyle.backgroundColor).toBe(
-      expectedPalette.backgroundGradient[0],
+    expect(testIds.indexOf('super-scan-result-scroll')).toBeLessThan(
+      testIds.indexOf('super-scan-result-top-chrome'),
     );
-    expect(containerStyle.backgroundColor).not.toBe('#000000');
+    expect(containerStyle.backgroundColor).toBe('transparent');
+    expect(rendered.getByTestId('super-scan-background-layer').props.colors).toEqual(
+      toResultScrimGradient(expectedPalette.backgroundGradient),
+    );
+    expectStableInternalScroll(scroll);
+    expectFixedResultSurface(sheetStyle);
+    expectCompactResultTopChrome(
+      rendered.getByTestId('super-scan-result-top-chrome').props.style,
+      true,
+    );
+    expectCompactResultTitle(rendered.getByTestId('super-scan-result-screen-header').props.style);
+    expect(rendered.queryByTestId('super-scan-result-top-chrome-handle')).toBeNull();
+    expect(sheetStyle.marginTop).toBe(SPACING.md);
+    expect(sheetStyle.backgroundColor).not.toBe('#000000');
   });
 
   it('applies the recovery premium palette to low-risk legacy results', () => {
@@ -392,7 +489,7 @@ describe('SuperScanResultScreen', () => {
     });
 
     expect(getByTestId('super-scan-background-layer').props.colors).toEqual(
-      expectedPalette.backgroundGradient,
+      toResultScrimGradient(expectedPalette.backgroundGradient),
     );
     expect(getByTestId('result-hero-surface')).toBeTruthy();
     expect(queryByTestId('super-scan-score-card')).toBeNull();
@@ -586,7 +683,7 @@ describe('SuperScanResultScreen', () => {
     );
 
     expect(getByTestId('super-scan-background-layer').props.colors).toEqual(
-      expectedPalette.backgroundGradient,
+      toResultScrimGradient(expectedPalette.backgroundGradient),
     );
     expect(waterMetricStyle.backgroundColor).toBe(
       expectedMetricTheme.cardBackgroundColor,
@@ -629,7 +726,7 @@ describe('SuperScanResultScreen', () => {
     );
 
     expect(getByTestId('super-scan-background-layer').props.colors).toEqual(
-      expectedPalette.backgroundGradient,
+      toResultScrimGradient(expectedPalette.backgroundGradient),
     );
     expect(bodyFatMetricStyle.backgroundColor).toBe(
       expectedMetricTheme.cardBackgroundColor,

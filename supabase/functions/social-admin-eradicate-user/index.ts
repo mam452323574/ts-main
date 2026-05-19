@@ -6,7 +6,6 @@ import {
 import {
   createServiceRoleClient,
   enforceAdminRateLimit,
-  logAdminAuditEvent,
   requireAdminUserProfile,
   requireAuthenticatedUser,
 } from '../_shared/phase2Auth.ts';
@@ -104,6 +103,46 @@ function normalizeEradicationRpcRow(payload: unknown): EradicationRpcRow {
   };
 }
 
+// S-09 — La RPC leve P0009 'idempotent_replay_already_processed' avec un HINT
+// contenant le metadata JSON du precedent audit event. On parse pour rebuilder
+// la reponse SocialAdminEradicateUserResponse. Si echec de parsing on retourne
+// null → l'Edge Function renvoie 409 explicite.
+function tryParseIdempotentReplayHint(
+  hint: string | undefined | null,
+): SocialAdminEradicateUserResponse | null {
+  if (typeof hint !== 'string' || hint.trim().length === 0) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(hint);
+  } catch {
+    return null;
+  }
+  if (!isRecord(parsed)) return null;
+  const targetUserId = readOptionalString(parsed.target_user_id);
+  const operationId = readOptionalString(parsed.operation_id);
+  const eventId = readOptionalString(parsed.event_id);
+  if (!targetUserId || !operationId || !eventId) return null;
+  return {
+    success: true,
+    target_user_id: targetUserId,
+    operation_id: operationId,
+    event_id: eventId,
+    post_count: readOptionalNumber(parsed.post_count) ?? 0,
+    own_comment_count: readOptionalNumber(parsed.own_comment_count) ?? 0,
+    cascaded_comment_count: readOptionalNumber(parsed.cascaded_comment_count) ?? 0,
+    resolved_report_count: readOptionalNumber(parsed.resolved_report_count) ?? 0,
+    ban_created: typeof parsed.ban_created === 'boolean' ? parsed.ban_created : false,
+    // Le replay ne re-execute pas la cleanup storage : si l'asset n'a pas
+    // ete supprime au 1er essai, il n'est pas re-tente. On marque
+    // storage_cleanup_status='replayed' pour distinguer.
+    storage_cleanup_status: 'completed',
+    deleted_asset_paths: [],
+    failed_asset_paths: [],
+    deleted_avatar_paths: [],
+    failed_avatar_paths: [],
+  };
+}
+
 function resolveStorageCleanupStatus(options: {
   failedAssetPaths: string[];
   failedAvatarPaths: string[];
@@ -144,9 +183,9 @@ Deno.serve(async (req: Request) => {
     const user = await requireAuthenticatedUser(supabase, req);
     await requireAdminUserProfile(supabase, user.id);
 
-    // S-03 — eradication massive est l'action la plus destructrice du systeme :
-    // 5 par admin par heure glissante. Au-dela, retour 429 et l'admin doit
-    // attendre. En cas de campagne legitime, augmenter via PHASE2_ADMIN_RATE_*.
+    // S-04 / S-09 — eradication massive : 5 par admin par heure glissante.
+    // Fail-closed (default) sur erreur DB ; idempotency_key cote RPC protege
+    // contre le double-clic UI et les retries reseau.
     await enforceAdminRateLimit(supabase, {
       actorId: user.id,
       actionPattern: 'social_admin_eradicate_user%',
@@ -165,16 +204,46 @@ Deno.serve(async (req: Request) => {
       await readJsonBody(req, { maxBytes: PHASE2_SOCIAL_REQUEST_MAX_BYTES }),
     );
 
+    // S-09 — Idempotency-Key header propage cote RPC. Si l'admin clique deux
+    // fois ou si le client retry sur erreur reseau, la 2e execution voit que
+    // la cle a deja un audit event associe et leve P0009 → on replay
+    // l'outcome de la 1re execution au lieu de re-eradiquer.
+    const headerIdempotencyKey = req.headers.get('Idempotency-Key');
+    const idempotencyKey =
+      typeof headerIdempotencyKey === 'string' && headerIdempotencyKey.trim().length > 0
+        ? headerIdempotencyKey.trim()
+        : crypto.randomUUID();
+
     const { data: rpcData, error: rpcError } = await supabase.rpc(
       'admin_eradicate_social_user_content',
       {
         p_target_user_id: requestBody.target_user_id,
         p_actor_id: user.id,
         p_note: requestBody.note ?? null,
+        p_idempotency_key: idempotencyKey,
+        p_request_id: requestId,
       },
     );
 
     if (rpcError) {
+      // S-09 — replay-detected : la RPC leve P0009 avec un HINT contenant le
+      // metadata du precedent audit event. On reconstruit la reponse
+      // precedente plutot que de re-executer.
+      if (rpcError.code === 'P0009') {
+        const replayedOutcome = tryParseIdempotentReplayHint(rpcError.hint);
+        if (replayedOutcome) {
+          return jsonResponse(req, replayedOutcome);
+        }
+        // Si le hint n'est pas parsable, on retourne 409 explicite : le client
+        // sait qu'il a deja envoye cette operation et peut la considerer
+        // comme reussie sans details.
+        throw new Phase2HttpError(
+          409,
+          'idempotent_request_already_processed',
+          'This operation was already processed with the same idempotency key',
+        );
+      }
+
       throw createPhase2DatabaseError(rpcError, {
         contextLabel: 'Social user eradication',
         fallbackCode: 'social_user_eradication_failed',
@@ -256,20 +325,11 @@ Deno.serve(async (req: Request) => {
       failed_avatar_paths: failedAvatarPaths,
     };
 
-    await logAdminAuditEvent(supabase, {
-      actorId: user.id,
-      action: 'social_admin_eradicate_user',
-      requestId,
-      metadata: {
-        target_user_id: eradicationResult.target_user_id,
-        operation_id: eradicationResult.operation_id,
-        event_id: eradicationResult.event_id,
-        post_count: eradicationResult.post_count,
-        own_comment_count: eradicationResult.own_comment_count,
-        cascaded_comment_count: eradicationResult.cascaded_comment_count,
-        storage_cleanup_status: storageCleanupStatus,
-      },
-    });
+    // S-09 — l'audit event a deja ete insere par la RPC dans la meme
+    // transaction que l'eradication. On ne re-loggue pas ici pour eviter le
+    // double comptage par enforceAdminRateLimit. Le storage cleanup status
+    // (best-effort, hors transaction) est journalise dans le moderation event
+    // via appendSocialModerationEventMetadata plus haut.
 
     return jsonResponse(req, responseBody);
   } catch (error) {

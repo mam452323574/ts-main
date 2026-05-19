@@ -1,5 +1,5 @@
 import { memo, useMemo, useEffect } from 'react';
-import { TouchableOpacity, StyleSheet, View, Text } from 'react-native';
+import { TouchableOpacity, StyleSheet, Text } from 'react-native';
 import { Bell } from 'lucide-react-native';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -10,6 +10,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { navigationService } from '@/services/navigation';
 import { NOTIFICATIONS_QUERY_KEY, fetchNotifications } from '@/hooks/queries/useNotifications';
 import { SIZES, FONT_WEIGHTS } from '@/constants/theme';
+import { Squircle } from '@/components/Squircle';
 
 
 
@@ -44,11 +45,11 @@ export const NotificationBell = memo(function NotificationBell() {
     >
       <Bell color={colors.primaryText} size={24} strokeWidth={2} />
       {notificationCount > 0 && (
-        <View style={styles.badge}>
+        <Squircle style={styles.badge}>
           <Text style={styles.badgeText}>
             {notificationCount > 9 ? '9+' : notificationCount}
           </Text>
-        </View>
+        </Squircle>
       )}
     </TouchableOpacity>
   );
@@ -72,7 +73,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: colors.cardBackground,
+    borderColor: colors.cardBackground, borderCurve: 'continuous',
   },
   badgeText: {
     fontSize: SIZES.text10,

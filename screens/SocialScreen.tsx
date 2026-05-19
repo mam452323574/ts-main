@@ -177,7 +177,6 @@ export default function SocialScreen() {
     reportContentMutation,
     followAuthorMutation,
     hideAuthorMutation,
-    setSavePostMutation,
     reactionError,
     clearReactionError,
     isDeletePending,
@@ -759,16 +758,6 @@ export default function SocialScreen() {
     });
   };
 
-  const handleSavePost = (post: SocialPost) => {
-    if (!post?.id || post.author_id === userProfile?.id) {
-      return;
-    }
-    setSavePostMutation.mutate({
-      postId: post.id,
-      action: post.viewer_has_saved ? 'unsave' : 'save',
-    });
-  };
-
   const handleManualRefresh = useCallback(async () => {
     setIsManualRefreshing(true);
     try {
@@ -935,8 +924,6 @@ export default function SocialScreen() {
               onReportPress={() => handleReportPost(item)}
               onSharePress={item.asset_url ? () => void handleSharePost(item) : null}
               onMorePress={() => setPostActionSheetTarget(item)}
-              onSavePress={() => handleSavePost(item)}
-              savePending={setSavePostMutation.isPending}
               onReactionSelect={(reaction) =>
                 handleSetReaction(
                   item,
@@ -1113,7 +1100,7 @@ const createStyles = (
       shadowOffset: { width: 0, height: 6 },
       shadowOpacity: isDark ? 0.12 : 0.08,
       shadowRadius: 14,
-      elevation: 2,
+      elevation: 2, borderCurve: 'continuous',
     },
     floatingFiltersControl: {
       width: '100%',
@@ -1144,7 +1131,7 @@ const createStyles = (
       borderWidth: 1,
       borderColor: withAlpha(colors.error, 0.2),
       gap: SPACING.sm,
-      ...chrome.elevatedSurface.shadowStyle,
+      ...chrome.elevatedSurface.shadowStyle, borderCurve: 'continuous',
     },
     errorTitle: {
       fontSize: SIZES.text16,
@@ -1163,7 +1150,7 @@ const createStyles = (
       borderRadius: BORDER_RADIUS.full,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: withAlpha(colors.primary, 0.12),
+      backgroundColor: withAlpha(colors.primary, 0.12), borderCurve: 'continuous',
     },
     errorButtonLabel: {
       fontSize: SIZES.text14,
@@ -1179,7 +1166,7 @@ const createStyles = (
       borderWidth: 1,
       borderColor: withAlpha(colors.warning, 0.22),
       gap: SPACING.xs,
-      ...chrome.elevatedSurface.shadowStyle,
+      ...chrome.elevatedSurface.shadowStyle, borderCurve: 'continuous',
     },
     reactionErrorHeader: {
       flexDirection: 'row',
@@ -1201,7 +1188,7 @@ const createStyles = (
       justifyContent: 'center',
       backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.06),
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08), borderCurve: 'continuous',
     },
     reactionErrorDismissLabel: {
       fontSize: SIZES.text12,
@@ -1256,7 +1243,7 @@ const createStyles = (
       shadowRadius: 22,
       elevation: 6,
       borderWidth: 1,
-      borderColor: chrome.ctaPrimary.borderColor,
+      borderColor: chrome.ctaPrimary.borderColor, borderCurve: 'continuous',
     },
   });
 };

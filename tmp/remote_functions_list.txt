@@ -1,0 +1,56 @@
+
+  
+   ID                                   | NAME                               | SLUG                               | STATUS | VERSION | UPDATED_AT (UTC)    
+  --------------------------------------|------------------------------------|------------------------------------|--------|---------|---------------------
+   2e1fd796-6569-4689-94a6-732063399b31 | check-and-record-scan              | check-and-record-scan              | ACTIVE | 72      | 2026-05-18 19:28:40 
+   f00095d8-4e6d-4563-905d-676b09dfa0e3 | verify-email-code                  | verify-email-code                  | ACTIVE | 55      | 2026-05-18 19:31:25 
+   6139b3b3-e7f9-4263-aa70-f64ce299c5f0 | cleanup-orphan-user                | cleanup-orphan-user                | ACTIVE | 54      | 2026-05-18 19:31:28 
+   56f034ae-9bca-4660-b2f6-a08443b47638 | check-ip-signup                    | check-ip-signup                    | ACTIVE | 49      | 2026-05-18 19:31:05 
+   ce21d3bd-f71a-43d8-b503-1f46c46d70b9 | social-create-post                 | social-create-post                 | ACTIVE | 52      | 2026-05-18 19:29:37 
+   f112afde-643c-4cf6-9360-9a803d8e5af8 | social-create-comment              | social-create-comment              | ACTIVE | 51      | 2026-05-18 19:29:46 
+   c441a06e-3afe-4562-b9d2-2d1f94a7d655 | social-record-impressions          | social-record-impressions          | ACTIVE | 49      | 2026-05-18 19:30:09 
+   80c4082d-d2b2-435f-a491-7d2a28e64c8b | social-report-content              | social-report-content              | ACTIVE | 48      | 2026-05-18 19:30:25 
+   1b1f63e1-8315-4fd6-a718-35c65d4ea88e | social-reserve-upload              | social-reserve-upload              | ACTIVE | 49      | 2026-05-18 19:29:33 
+   05251c99-697f-46d9-84a9-8c4825a6ec3b | social-set-reaction                | social-set-reaction                | ACTIVE | 48      | 2026-05-18 19:29:58 
+   2fa264b5-be1f-45c7-a233-8395a38099b1 | coach-generate-response            | coach-generate-response            | ACTIVE | 57      | 2026-05-18 19:29:07 
+   97d416e5-6a38-4e3b-a281-7b0aaac4373f | cancel-scan-reservation            | cancel-scan-reservation            | ACTIVE | 48      | 2026-05-18 19:28:46 
+   dc0e944c-6c08-402f-8afc-268e80245482 | analyze-scan                       | analyze-scan                       | ACTIVE | 53      | 2026-05-18 19:28:51 
+   bab56879-934b-45d5-ab0d-4ec59b17f2f2 | revenuecat-webhook                 | revenuecat-webhook                 | ACTIVE | 52      | 2026-05-18 19:31:02 
+   5f9acec6-00d5-4d3c-9d5b-0e88331ea60e | sync-subscription-status           | sync-subscription-status           | ACTIVE | 51      | 2026-05-18 19:30:58 
+   f830ff4c-9f95-48bd-b389-3bf07a3e8e10 | send-verification-email            | send-verification-email            | ACTIVE | 53      | 2026-05-18 19:31:22 
+   6c19a2e9-0277-446b-abef-6bf58abd1720 | social-list-moderation-queue       | social-list-moderation-queue       | ACTIVE | 48      | 2026-05-18 19:30:42 
+   2c46b693-3793-4248-aa04-a4ed31df9089 | social-moderate-content            | social-moderate-content            | ACTIVE | 45      | 2026-05-18 19:30:48 
+   9accdaab-11ea-406b-831c-59e77ed7c7a1 | social-process-moderation-queue    | social-process-moderation-queue    | ACTIVE | 45      | 2026-05-18 19:30:55 
+   0b5ba6e7-0415-44e8-853a-a1fe23297d5c | social-set-comment-like            | social-set-comment-like            | ACTIVE | 44      | 2026-05-18 19:30:04 
+   e4f730db-d790-4286-830e-8779ab1b981b | social-delete-post                 | social-delete-post                 | ACTIVE | 44      | 2026-05-18 19:29:42 
+   975a7c3d-805a-4cd8-bde9-fb0a6f553830 | social-update-comment              | social-update-comment              | ACTIVE | 45      | 2026-05-18 19:29:49 
+   88d450f9-51c9-4607-a53e-a4d731e12a5f | social-delete-comment              | social-delete-comment              | ACTIVE | 44      | 2026-05-18 19:29:54 
+   e60ae097-80ad-4d2f-92b8-8ddbf991b48d | social-reclassify-post             | social-reclassify-post             | ACTIVE | 43      | 2026-05-18 19:30:52 
+   e1522fd5-efdd-4140-b289-098a6da174b3 | social-admin-moderate-user         | social-admin-moderate-user         | ACTIVE | 45      | 2026-05-18 19:31:32 
+   f3cdde7b-bd24-4934-9ff4-53583459e6d7 | social-record-post-views           | social-record-post-views           | ACTIVE | 43      | 2026-05-18 19:30:12 
+   742bf5dc-481a-41b8-b0bd-ab7730422310 | social-admin-eradicate-user        | social-admin-eradicate-user        | ACTIVE | 43      | 2026-05-18 19:31:35 
+   2ec05a19-0990-4c8b-aa5f-9ec017e7c482 | social-admin-adjust-post-reactions | social-admin-adjust-post-reactions | ACTIVE | 43      | 2026-05-18 19:31:41 
+   45799741-1bb1-4daf-b916-f4c195419050 | fridge-scan-submit                 | fridge-scan-submit                 | ACTIVE | 41      | 2026-05-18 19:28:54 
+   c3f0bcc6-8466-412a-9798-d1d31ac774ba | fridge-scan-complete               | fridge-scan-complete               | ACTIVE | 46      | 2026-05-18 19:28:57 
+   e037e621-6899-4d81-bf8b-b99025058022 | check-signup-eligibility           | check-signup-eligibility           | ACTIVE | 18      | 2026-05-18 19:31:07 
+   2efeafd9-0b3c-4987-9c78-5cfbffa709e5 | reserve-avatar-upload              | reserve-avatar-upload              | ACTIVE | 9       | 2026-04-26 11:45:08 
+   8facce69-4a91-41db-8c45-27674c3d7451 | delete-scan                        | delete-scan                        | ACTIVE | 16      | 2026-05-18 19:28:48 
+   bcb373fa-8bff-42ad-a41e-70f592d8aad2 | before-user-created                | before-user-created                | ACTIVE | 9       | 2026-05-02 10:56:10 
+   93deef74-5f4a-48b0-8510-483b814cadc7 | coach-quota-status                 | coach-quota-status                 | ACTIVE | 17      | 2026-05-18 19:29:00 
+   b5f28cf6-df9a-43dc-9ec3-b4fa43f7c7e4 | auth-pre-login                     | auth-pre-login                     | ACTIVE | 5       | 2026-05-18 19:31:16 
+   1b67b823-4f81-4df8-a013-52c79a33a834 | secure-signup                      | secure-signup                      | ACTIVE | 8       | 2026-05-18 19:31:12 
+   d7b31384-0eaf-4164-b82b-38f471e74551 | secure-login                       | secure-login                       | ACTIVE | 5       | 2026-05-18 19:31:19 
+   189a4395-72c0-40a5-b6bd-ca27e79193b0 | coach-sync-profile-memory          | coach-sync-profile-memory          | ACTIVE | 6       | 2026-05-18 19:29:09 
+   337fded4-4c26-4cbf-b109-ff4f702a7050 | check-scan-eligibility-batch       | check-scan-eligibility-batch       | ACTIVE | 6       | 2026-05-18 19:28:43 
+   f96fd20e-5264-4f6d-a9ec-c0e6aa6a407b | coach-screen-snapshot              | coach-screen-snapshot              | ACTIVE | 6       | 2026-05-18 19:29:03 
+   5a35a604-a92e-4723-ae0e-bcd2ef117ab8 | social-follow-author               | social-follow-author               | ACTIVE | 4       | 2026-05-18 19:30:35 
+   d9a0cb10-e9f4-4bfc-853f-9516bd0562b8 | social-hide-author                 | social-hide-author                 | ACTIVE | 4       | 2026-05-18 19:30:39 
+   68f4f351-6999-4994-8436-484fbd0854ca | social-set-save                    | social-set-save                    | ACTIVE | 2       | 2026-05-17 17:17:39 
+   f1ffe146-9b35-49c1-8a51-80cb95b10abc | coach-start-conversation           | coach-start-conversation           | ACTIVE | 5       | 2026-05-18 19:29:12 
+   32685c37-40f9-46e9-8930-16c9a402a26d | coach-send-message                 | coach-send-message                 | ACTIVE | 8       | 2026-05-18 19:29:15 
+   8094965c-9dcf-4942-84a3-ebf589accda7 | coach-end-conversation             | coach-end-conversation             | ACTIVE | 5       | 2026-05-18 19:29:19 
+   5dffc0d1-d3af-4c67-a8ea-63bc4e9b13ce | coach-archive-conversation         | coach-archive-conversation         | ACTIVE | 5       | 2026-05-18 19:29:23 
+   fe7f84f9-4b37-48b5-8786-8af583d7c653 | coach-conversation-quota-status    | coach-conversation-quota-status    | ACTIVE | 5       | 2026-05-18 19:29:26 
+   1216e4b1-cdf6-41f7-8023-8e3c6f506a7d | coach-conversations-list           | coach-conversations-list           | ACTIVE | 5       | 2026-05-18 19:29:29 
+
+<claude-code-hint v="1" type="plugin" value="supabase@claude-plugins-official" />

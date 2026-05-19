@@ -12,6 +12,7 @@ import { OptimizedImage } from '@/components/OptimizedImage';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ShareStoryMetric, ShareStoryPayload } from '@/types';
 import { RESULT_TEXT_PROPS, getResultScaledRadius } from '@/utils/resultLayout';
+import { Squircle } from '@/components/Squircle';
 
 interface ShareStoryCardProps {
   payload: ShareStoryPayload;
@@ -181,17 +182,17 @@ function createStyles(scale: number) {
       height: '100%',
       overflow: 'hidden',
       borderRadius: heroRadius,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: '#FFFFFF', borderCurve: 'continuous',
     },
     cardInnerStroke: {
       ...StyleSheet.absoluteFillObject,
       borderRadius: heroRadius,
-      borderWidth: StyleSheet.hairlineWidth,
+      borderWidth: StyleSheet.hairlineWidth, borderCurve: 'continuous',
     },
     glowOrb: {
       position: 'absolute',
       borderRadius: 999,
-      opacity: 0.64,
+      opacity: 0.64, borderCurve: 'continuous',
     },
     glowOrbTop: {
       width: '64%',
@@ -232,7 +233,7 @@ function createStyles(scale: number) {
       borderWidth: StyleSheet.hairlineWidth,
       borderRadius: 9999,
       paddingHorizontal: round(14 * scale),
-      paddingVertical: round(8 * scale),
+      paddingVertical: round(8 * scale), borderCurve: 'continuous',
     },
     variantBadgeText: {
       fontSize: round(12 * scale),
@@ -249,7 +250,7 @@ function createStyles(scale: number) {
       borderWidth: StyleSheet.hairlineWidth,
       borderRadius: 9999,
       paddingHorizontal: round(12 * scale),
-      paddingVertical: round(8 * scale),
+      paddingVertical: round(8 * scale), borderCurve: 'continuous',
     },
     statusBadgeText: {
       fontSize: round(11 * scale),
@@ -283,7 +284,7 @@ function createStyles(scale: number) {
       justifyContent: 'center',
       overflow: 'hidden',
       borderWidth: Math.max(1, round(2 * scale)),
-      borderRadius: 9999,
+      borderRadius: 9999, borderCurve: 'continuous',
     },
     heroImage: {
       width: '100%',
@@ -344,7 +345,7 @@ function createStyles(scale: number) {
       alignItems: 'stretch',
       borderRadius: featureRadius,
       overflow: 'hidden',
-      borderWidth: StyleSheet.hairlineWidth,
+      borderWidth: StyleSheet.hairlineWidth, borderCurve: 'continuous',
     },
     metricColumn: {
       flex: 1,
@@ -449,14 +450,14 @@ export function ShareStoryCard({
   );
 
   return (
-    <View style={styles.card} testID={testID}>
+    <Squircle style={styles.card} testID={testID}>
       <LinearGradient
         colors={[palette.backgroundTop, palette.backgroundBottom]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFillObject}
       />
-      <View pointerEvents="none" style={[styles.cardInnerStroke, { borderColor: palette.border }]} />
+      <Squircle pointerEvents="none" style={[styles.cardInnerStroke, { borderColor: palette.border }]} />
 
       <View
         pointerEvents="none"
@@ -619,7 +620,7 @@ export function ShareStoryCard({
             </View>
           </View>
 
-          <View
+          <Squircle
             style={[
               styles.metricsRow,
               {
@@ -712,7 +713,7 @@ export function ShareStoryCard({
                 </View>
               );
             })}
-          </View>
+          </Squircle>
         </View>
 
         <View style={styles.footerBlock} testID="share-story-footer">
@@ -726,7 +727,7 @@ export function ShareStoryCard({
           </Text>
         </View>
       </View>
-    </View>
+    </Squircle>
   );
 }
 

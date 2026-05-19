@@ -205,6 +205,27 @@ export function parseSignedIntegerInput(value: string) {
   return Number.parseInt(normalizedValue, 10);
 }
 
+// S-15 — Bornes hardcoded sur les ajustements admin des compteurs de reactions.
+// Doivent matcher SOCIAL_ADMIN_REACTION_ADJUSTMENT_MIN/MAX cote Edge Function
+// (phase2Contracts.ts) et la CHECK constraint social_posts_admin_*_adjustment_range
+// (migration 20260521120000_clamp_social_admin_reaction_adjustments.sql).
+// Cote frontend on valide pour donner un feedback immediat a l'admin ;
+// la verite finale est la CHECK constraint SQL.
+export const SOCIAL_ADMIN_REACTION_ADJUSTMENT_MIN = -10_000;
+export const SOCIAL_ADMIN_REACTION_ADJUSTMENT_MAX = 10_000;
+
+export function parseAdminReactionAdjustmentInput(value: string): number | null {
+  const parsed = parseSignedIntegerInput(value);
+  if (parsed === null) {
+    return null;
+  }
+  if (parsed < SOCIAL_ADMIN_REACTION_ADJUSTMENT_MIN ||
+      parsed > SOCIAL_ADMIN_REACTION_ADJUSTMENT_MAX) {
+    return null;
+  }
+  return parsed;
+}
+
 export function computeEffectiveReactionCount(
   rawCount: number,
   adminAdjustment: number,

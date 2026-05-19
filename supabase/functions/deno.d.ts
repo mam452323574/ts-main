@@ -9,6 +9,13 @@ declare namespace Deno {
         name: string,
         fn: () => void | Promise<void>,
     ): void;
+    // S-02 — DNS resolution utilisee par webhookHostAllowlist pour bloquer
+    // les hostnames qui resolvent vers des IPs privees (defense SSRF).
+    export function resolveDns(
+        query: string,
+        recordType: 'A' | 'AAAA' | 'CNAME' | 'MX' | 'NS' | 'PTR' | 'TXT',
+        options?: { signal?: AbortSignal },
+    ): Promise<string[]>;
 }
 
 // Mock for Google APIs

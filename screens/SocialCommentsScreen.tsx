@@ -62,6 +62,7 @@ import type {
   SocialPost,
   SocialReportReasonCode,
 } from '@/types';
+import { Squircle } from '@/components/Squircle';
 
 const COMMENT_AUTOSCROLL_BOTTOM_THRESHOLD = 2;
 const FOOTER_COMPACT_TOP_PADDING = SPACING.sm;
@@ -924,7 +925,7 @@ export default function SocialCommentsScreen() {
 
         <View style={styles.contentArea}>
           {visibleCommentLikeError ? (
-            <View
+            <Squircle
               style={styles.reactionErrorCard}
               testID="social-comment-like-error"
             >
@@ -951,7 +952,7 @@ export default function SocialCommentsScreen() {
                   {commentLikeErrorDiagnostics}
                 </Text>
               ) : null}
-            </View>
+            </Squircle>
           ) : null}
 
           {threadUnavailable ? (
@@ -1114,7 +1115,7 @@ export default function SocialCommentsScreen() {
                   isCommentLikePending(item.id);
 
                 return (
-                  <View
+                  <Squircle
                     style={styles.commentCard}
                     testID={`social-comment-card-${item.id}`}
                   >
@@ -1201,7 +1202,7 @@ export default function SocialCommentsScreen() {
                         </TouchableOpacity>
                       ) : null}
                     </View>
-                  </View>
+                  </Squircle>
                 );
               }}
               showsVerticalScrollIndicator={false}
@@ -1222,7 +1223,7 @@ export default function SocialCommentsScreen() {
           testID="social-comments-footer"
         >
           {shouldShowReadOnlyComposer ? (
-            <View style={styles.readOnlyComposer} testID="social-comments-read-only">
+            <Squircle style={styles.readOnlyComposer} testID="social-comments-read-only">
               {resolvedPostModerationStatus ? (
                 <SocialModerationBadge moderationState={resolvedPostModerationStatus} />
               ) : null}
@@ -1234,11 +1235,11 @@ export default function SocialCommentsScreen() {
                   {t('social.comments.read_only_body')}
                 </Text>
               </View>
-            </View>
+            </Squircle>
           ) : (
-            <View style={styles.composerContent}>
+            <Squircle style={styles.composerContent}>
               {isEditingComment ? (
-                <View
+                <Squircle
                   style={styles.editingBanner}
                   testID="social-comments-editing-banner"
                 >
@@ -1250,14 +1251,11 @@ export default function SocialCommentsScreen() {
                       {t('social.comments.editing_body')}
                     </Text>
                   </View>
-                </View>
+                </Squircle>
               ) : null}
 
               {!isEditingComment ? (
                 <View style={styles.composerSocialPrompts}>
-                  <Text style={styles.guidelineText}>
-                    {t('social.comments.guideline')}
-                  </Text>
                   <View style={styles.quickEmojiRow} testID="social-comments-emoji-row">
                     {COMMENT_REACTION_EMOJIS.map((emoji, index) => (
                       <TouchableOpacity
@@ -1356,7 +1354,7 @@ export default function SocialCommentsScreen() {
                   )}
                 </TouchableOpacity>
               </View>
-            </View>
+            </Squircle>
           )}
         </View>
 
@@ -1417,7 +1415,7 @@ const createStyles = (colors: any) =>
       justifyContent: 'center',
       backgroundColor: colors.cardBackground,
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08), borderCurve: 'continuous',
     },
     headerText: {
       flex: 1,
@@ -1467,7 +1465,7 @@ const createStyles = (colors: any) =>
       borderWidth: 1,
       borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
       minHeight: 34,
-      justifyContent: 'center',
+      justifyContent: 'center', borderCurve: 'continuous',
     },
     loadMoreButtonLabel: {
       fontSize: SIZES.text14,
@@ -1490,7 +1488,7 @@ const createStyles = (colors: any) =>
       shadowOffset: { width: 0, height: 8 },
       shadowOpacity: 0.06,
       shadowRadius: 14,
-      elevation: 1,
+      elevation: 1, borderCurve: 'continuous',
     },
     commentBody: {
       fontSize: SIZES.text14,
@@ -1512,7 +1510,7 @@ const createStyles = (colors: any) =>
       minHeight: 30,
       paddingHorizontal: SPACING.xs,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: 'transparent',
+      backgroundColor: 'transparent', borderCurve: 'continuous',
     },
     commentActionButtonActive: {
       backgroundColor: withAlpha(colors.primary, 0.1),
@@ -1538,7 +1536,7 @@ const createStyles = (colors: any) =>
       backgroundColor: colors.cardBackground,
       borderWidth: 1,
       borderColor: withAlpha(colors.primary, 0.18),
-      gap: SPACING.xs,
+      gap: SPACING.xs, borderCurve: 'continuous',
     },
     reactionErrorHeader: {
       flexDirection: 'row',
@@ -1560,7 +1558,7 @@ const createStyles = (colors: any) =>
       justifyContent: 'center',
       backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.06),
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08), borderCurve: 'continuous',
     },
     reactionErrorDismissLabel: {
       fontSize: SIZES.text12,
@@ -1608,7 +1606,7 @@ const createStyles = (colors: any) =>
       borderRadius: BORDER_RADIUS.full,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: withAlpha(colors.primary, 0.12),
+      backgroundColor: withAlpha(colors.primary, 0.12), borderCurve: 'continuous',
     },
     retryButtonLabel: {
       fontSize: SIZES.text14,
@@ -1628,16 +1626,10 @@ const createStyles = (colors: any) =>
       borderRadius: BORDER_RADIUS.card,
       backgroundColor: colors.surfaceElevated ?? colors.cardBackground,
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08), borderCurve: 'continuous',
     },
     composerSocialPrompts: {
       gap: SPACING.sm,
-    },
-    guidelineText: {
-      fontSize: SIZES.text12,
-      lineHeight: 17,
-      color: colors.textMuted ?? colors.gray,
-      textAlign: 'center',
     },
     quickEmojiRow: {
       flexDirection: 'row',
@@ -1653,7 +1645,7 @@ const createStyles = (colors: any) =>
       borderRadius: 18,
       backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.05),
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08), borderCurve: 'continuous',
     },
     quickEmojiLabel: {
       fontSize: SIZES.text20,
@@ -1672,7 +1664,7 @@ const createStyles = (colors: any) =>
       borderRadius: BORDER_RADIUS.lg,
       backgroundColor: colors.surfaceElevated ?? colors.cardBackground,
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08), borderCurve: 'continuous',
     },
     readOnlyCopy: {
       gap: SPACING.xs,
@@ -1697,7 +1689,7 @@ const createStyles = (colors: any) =>
       borderRadius: BORDER_RADIUS.lg,
       backgroundColor: withAlpha(colors.primary, 0.08),
       borderWidth: 1,
-      borderColor: withAlpha(colors.primary, 0.14),
+      borderColor: withAlpha(colors.primary, 0.14), borderCurve: 'continuous',
     },
     editingBannerCopy: {
       flex: 1,
@@ -1726,7 +1718,7 @@ const createStyles = (colors: any) =>
       borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
       color: colors.primaryText,
       fontSize: SIZES.text14,
-      textAlignVertical: 'top',
+      textAlignVertical: 'top', borderCurve: 'continuous',
     },
     secondaryComposerButton: {
       minHeight: 44,
@@ -1736,7 +1728,7 @@ const createStyles = (colors: any) =>
       justifyContent: 'center',
       backgroundColor: colors.surfaceMuted ?? colors.cardBackground,
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08), borderCurve: 'continuous',
     },
     secondaryComposerButtonLabel: {
       fontSize: SIZES.text14,
@@ -1751,7 +1743,7 @@ const createStyles = (colors: any) =>
       justifyContent: 'center',
       backgroundColor: withAlpha(colors.primary, 0.12),
       borderWidth: 1,
-      borderColor: withAlpha(colors.primary, 0.18),
+      borderColor: withAlpha(colors.primary, 0.18), borderCurve: 'continuous',
     },
     sendButtonWide: {
       width: 'auto',

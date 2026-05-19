@@ -66,12 +66,14 @@ Deno.serve(async (req: Request) => {
     const user = await requireAuthenticatedUser(supabase, req);
     await requireAdminUserProfile(supabase, user.id);
 
-    // S-03 — moderation user (ban/revoke/remove_avatar) : 30 par admin par
+    // S-04 — moderation user (ban/revoke/remove_avatar) : 30 par admin par
     // heure glissante. Plus permissif que eradicate car operation reversible
-    // (sauf remove_avatar) et moins destructrice.
+    // (sauf remove_avatar) et moins destructrice. Fail-closed sur erreur DB.
+    // S-09 — on compte uniquement les .intent rows pour ne pas doubler avec
+    // les .outcome (best-effort).
     await enforceAdminRateLimit(supabase, {
       actorId: user.id,
-      actionPattern: 'social_admin_moderate_user%',
+      actionPattern: 'social_admin_moderate_user%.intent',
       maxActions: 30,
       windowMs: 60 * 60 * 1000,
     });
@@ -88,6 +90,34 @@ Deno.serve(async (req: Request) => {
     );
 
     const targetUserId = requestBody.target_user_id;
+
+    // S-09 — Idempotency-Key + audit log INSERT BEFORE l'action destructive.
+    // La UNIQUE constraint sur admin_audit_events.idempotency_key bloque les
+    // retries simultanes (logAdminAuditEvent leve 409). Si l'INSERT passe,
+    // on procede a l'action ; le caller verra 409 sur retry et saura que
+    // l'operation a deja ete traitee.
+    const headerIdempotencyKey = req.headers.get('Idempotency-Key');
+    const idempotencyKey =
+      typeof headerIdempotencyKey === 'string' && headerIdempotencyKey.trim().length > 0
+        ? headerIdempotencyKey.trim()
+        : crypto.randomUUID();
+
+    await logAdminAuditEvent(supabase, {
+      actorId: user.id,
+      action: `social_admin_moderate_user_${requestBody.action}.intent`,
+      requestId,
+      idempotencyKey,
+      metadata: {
+        target_user_id: targetUserId,
+        action: requestBody.action,
+        scope: requestBody.scope ?? null,
+        duration_hours: requestBody.duration_hours ?? null,
+        reason: requestBody.reason ?? null,
+        phase: 'intent',
+      },
+      critical: true,
+    });
+
     let eventId: string | null = null;
 
     if (requestBody.action === 'ban_user') {
@@ -193,16 +223,21 @@ Deno.serve(async (req: Request) => {
       event_id: eventId,
     };
 
+    // S-09 — Outcome log (best-effort, sans idempotency_key pour ne pas
+    // collisionner avec le .intent precedent). Si l'INSERT echoue,
+    // l'evenement de moderation reste tracable via social_moderation_events.
     await logAdminAuditEvent(supabase, {
       actorId: user.id,
-      action: `social_admin_moderate_user_${requestBody.action}`,
+      action: `social_admin_moderate_user_${requestBody.action}.outcome`,
       requestId,
       metadata: {
         target_user_id: targetUserId,
         event_id: eventId,
         scope: requestBody.scope ?? null,
         duration_hours: requestBody.duration_hours ?? null,
+        phase: 'completed',
       },
+      critical: false,
     });
 
     return jsonResponse(req, responseBody);

@@ -481,10 +481,16 @@ export async function requireAdminUserProfile(client: any, userId: string) {
   return profile;
 }
 
-// S-04 — audit trail des actions admin destructrices.
+// S-05 — audit trail des actions admin destructrices.
 // Chaque appel d'une Edge Function social-admin-* loggue un evenement dans
 // public.admin_audit_events (table cree par 20260425143000). Le service_role
 // est le seul GRANT INSERT, donc seuls les Edge Functions ecrivent dedans.
+//
+// Defaut : critical=true → si l'insertion echoue, on leve. Justification :
+// laisser une action destructrice s'executer sans trace audit defait la chaine
+// de responsabilite et empeche la reconstitution post-incident. Pour les
+// actions non-destructrices (approve, dismiss_reports) passer critical=false
+// explicitement pour conserver le comportement best-effort historique.
 export async function logAdminAuditEvent(
   client: any,
   options: {
@@ -492,29 +498,67 @@ export async function logAdminAuditEvent(
     action: string;
     requestId?: string | null;
     metadata?: Record<string, unknown>;
+    idempotencyKey?: string | null;
+    critical?: boolean;
   },
 ): Promise<void> {
+  const isCritical = options.critical !== false; // default true
   try {
-    await client.from('admin_audit_events').insert({
+    const insertPayload: Record<string, unknown> = {
       actor_id: options.actorId,
       action: options.action,
       request_id: options.requestId ?? null,
       metadata: options.metadata ?? {},
-    });
+    };
+    // S-09 — idempotency_key UNIQUE pour bloquer les double-execution
+    // (retry reseau, double-clic UI). Colonne ajoutee par 20260520120000.
+    if (typeof options.idempotencyKey === 'string' && options.idempotencyKey.length > 0) {
+      insertPayload.idempotency_key = options.idempotencyKey;
+    }
+    const { error } = await client.from('admin_audit_events').insert(insertPayload);
+    if (error) {
+      throw error;
+    }
   } catch (error) {
-    // Audit log failures must not break the underlying admin action — they
-    // surface in observability (logPhase2Error) instead. The DB row is best
-    // effort; a missing row triggers an alert in the audit dashboard.
+    // S-09 — Cas particulier : UNIQUE violation sur idempotency_key signifie
+    // que cette operation a deja ete traitee. On surface comme 409 pour que
+    // l'Edge Function caller puisse l'intercepter et la transformer en
+    // "idempotent replay" plutot qu'en 503 generique.
+    const errorCode =
+      error && typeof error === 'object' && 'code' in error
+        ? (error as { code?: string }).code
+        : null;
+    if (errorCode === '23505' && options.idempotencyKey) {
+      throw new Phase2HttpError(
+        409,
+        'idempotent_request_already_processed',
+        'This operation was already processed with the same idempotency key',
+        { idempotency_key: options.idempotencyKey },
+      );
+    }
+
     // eslint-disable-next-line no-console
     console.error('[phase2Auth] Failed to write admin_audit_events row', error);
+    if (isCritical) {
+      throw new Phase2HttpError(
+        503,
+        'admin_audit_log_unavailable',
+        'Admin audit log cannot be written; admin action refused.',
+      );
+    }
   }
 }
 
-// S-03 — rate limit glissant pour les Edge Functions admin destructrices.
+// S-04 — rate limit glissant pour les Edge Functions admin destructrices.
 // Compte les actions du meme actor_id sur les `windowMs` derniers ms et
 // refuse si le seuil est atteint. Stockage = admin_audit_events (deja cree).
 // Les actions whitelistees sont uniquement celles passees via `actionPattern`
 // pour ne pas bloquer un admin legitime qui modere de la queue (action='approve').
+//
+// Defaut : failOpenOnError=false → fail-closed sur erreur DB. Justification :
+// un admin compromis associe a une BDD degradee echappe simultanement au
+// compteur et a l'audit log (S-05). Pour preserver l'admin legitime sur une
+// action non-destructrice, passer failOpenOnError=true explicitement.
 export async function enforceAdminRateLimit(
   client: any,
   options: {
@@ -522,6 +566,7 @@ export async function enforceAdminRateLimit(
     actionPattern: string;
     maxActions: number;
     windowMs: number;
+    failOpenOnError?: boolean;
   },
 ): Promise<void> {
   const since = new Date(Date.now() - options.windowMs).toISOString();
@@ -534,12 +579,17 @@ export async function enforceAdminRateLimit(
     .gte('created_at', since);
 
   if (error) {
-    // En cas d'echec de la lecture du compteur, on log et on laisse passer
-    // l'action (fail-open). Bloquer un admin legitime sur un probleme reseau
-    // serait pire que d'autoriser N+1 actions.
     // eslint-disable-next-line no-console
     console.error('[phase2Auth] Failed to read admin_audit_events for rate limit', error);
-    return;
+    if (options.failOpenOnError === true) {
+      // Caller a explicitement autorise le fail-open (action non-destructrice).
+      return;
+    }
+    throw new Phase2HttpError(
+      503,
+      'admin_rate_limit_unavailable',
+      'Admin rate limit cannot be evaluated; retry in a moment.',
+    );
   }
 
   if ((count ?? 0) >= options.maxActions) {

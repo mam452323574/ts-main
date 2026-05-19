@@ -45,4 +45,23 @@ describe('routes privacy policy access', () => {
     expect(isProtectedRoute('share-story')).toBe(true);
     expect(SCREEN_OPTIONS['share-story']).toEqual({ presentation: 'modal' });
   });
+
+  it('treats scan result routes as transparent scan-flow modals', () => {
+    expect(isProtectedRoute('scan-preview')).toBe(true);
+    expect(isProtectedRoute('scan-result')).toBe(true);
+    expect(isProtectedRoute('super-scan-result')).toBe(true);
+    expect(SCREEN_OPTIONS['scan-preview']).toEqual({
+      presentation: 'fullScreenModal',
+    });
+    expect(SCREEN_OPTIONS['scan-result']).toEqual({
+      presentation: 'transparentModal',
+      gestureEnabled: false,
+      fullScreenGestureEnabled: false,
+    });
+    expect(SCREEN_OPTIONS['super-scan-result']).toEqual({
+      presentation: 'transparentModal',
+      gestureEnabled: false,
+      fullScreenGestureEnabled: false,
+    });
+  });
 });

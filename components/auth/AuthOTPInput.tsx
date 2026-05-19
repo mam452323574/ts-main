@@ -137,7 +137,7 @@ const createStyles = (
       textAlign: 'center',
       fontSize: SIZES.xl,
       fontWeight: '700',
-      color: colors.primaryText,
+      color: colors.primaryText, borderCurve: 'continuous',
     },
     cellFilled: {
       borderColor: palette.accentRing,

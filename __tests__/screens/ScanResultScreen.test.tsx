@@ -11,6 +11,7 @@ import {
   resolveResultItemTheme,
   resolveScanTypeTheme,
 } from '@/utils/resultVisualTheme';
+import { FONT_WEIGHTS, SIZES, SPACING, withAlpha } from '@/constants/theme';
 
 const baseMockThemeColors = {
   primary: '#007AFF',
@@ -34,14 +35,83 @@ const baseMockThemeColors = {
 const mockThemeColors = { ...baseMockThemeColors };
 let mockIsDark = false;
 
-const expectTransparentResultHeader = (style: unknown) => {
+const expectCompactResultTitle = (style: unknown) => {
   expect(StyleSheet.flatten(style)).toEqual(
     expect.objectContaining({
-      backgroundColor: 'transparent',
-      borderBottomColor: 'transparent',
-      borderBottomWidth: 0,
+      fontSize: SIZES.text20,
+      lineHeight: 24,
+      fontWeight: FONT_WEIGHTS.bold,
+      textAlign: 'center',
+      includeFontPadding: false,
     }),
   );
+};
+
+const expectCompactResultTopChrome = (
+  style: unknown,
+  _isDark: boolean,
+) => {
+  expect(StyleSheet.flatten(style)).toEqual(
+    expect.objectContaining({
+      paddingTop: SPACING.sm,
+      paddingBottom: SPACING.sm,
+      backgroundColor: '#000000',
+      borderBottomWidth: 0,
+      borderBottomColor: 'transparent',
+    }),
+  );
+};
+
+const toResultScrimGradient = (gradient: readonly [string, string, string]) =>
+  gradient.map((color, index) =>
+    withAlpha(color, index === 0 ? 0.72 : index === 1 ? 0.64 : 0.78),
+  );
+
+const expectFixedResultScrollContent = (style: unknown) => {
+  const flattened = StyleSheet.flatten(style) as any;
+
+  expect(flattened).toEqual(
+    expect.objectContaining({
+      flexGrow: 1,
+    }),
+  );
+  expect(flattened.justifyContent).toBeUndefined();
+  expect(flattened.paddingTop).toBeUndefined();
+  expect(flattened.paddingBottom).toBeUndefined();
+};
+
+const expectFixedResultSurface = (style: unknown) => {
+  const flattened = StyleSheet.flatten(style) as any;
+
+  expect(flattened).toEqual(
+    expect.objectContaining({
+      flex: 1,
+      width: '100%',
+      alignSelf: 'stretch',
+      marginHorizontal: 0,
+      paddingHorizontal: 0,
+      paddingBottom: 0,
+      borderBottomLeftRadius: 0,
+      borderBottomRightRadius: 0,
+      overflow: 'hidden',
+      borderTopWidth: StyleSheet.hairlineWidth,
+    }),
+  );
+  expect(flattened.borderRadius).toBeUndefined();
+  expect(flattened.borderWidth).toBeUndefined();
+  expect(flattened.marginTop).toBeGreaterThan(0);
+  expect(flattened.borderTopLeftRadius).toBeGreaterThan(0);
+  expect(flattened.borderTopRightRadius).toBe(flattened.borderTopLeftRadius);
+};
+
+const expectStableInternalScroll = (scroll: any) => {
+  expect(scroll.props.bounces).toBe(false);
+  expect(scroll.props.alwaysBounceVertical).toBe(false);
+  expect(scroll.props.overScrollMode).toBe('never');
+  expect(StyleSheet.flatten(scroll.props.style)).toEqual(
+    expect.objectContaining({ flex: 1 }),
+  );
+  expectFixedResultScrollContent(scroll.props.contentContainerStyle);
 };
 
 type ResultSegmentIndex = {
@@ -348,20 +418,24 @@ describe('ScanResultScreen', () => {
 
     expect(getByText(i18n.t('common.results.no_data'))).toBeTruthy();
     expect(getByTestId('scan-result-background-layer').props.colors).toEqual(
-      getResultScreenGradient({
-        colors: mockThemeColors as any,
-        isDark: false,
-      }),
+      toResultScrimGradient(
+        getResultScreenGradient({
+          colors: mockThemeColors as any,
+          isDark: false,
+        }),
+      ),
     );
-    expectTransparentResultHeader(
+    expect(getByTestId('scan-result-sheet')).toBeTruthy();
+    expectCompactResultTitle(
       getByTestId('scan-result-screen-header').props.style,
     );
     expect(getByTestId('scan-result-top-chrome')).toBeTruthy();
-    expect(getByTestId('scan-result-close-button')).toBeTruthy();
+    expect(queryByTestId('scan-result-top-chrome-handle')).toBeNull();
+    expect(queryByTestId('scan-result-close-button')).toBeNull();
     expect(queryByTestId('trajectory-preview-card')).toBeNull();
   });
 
-  it('keeps the result header transparent inside the scrollable result top chrome', () => {
+  it('renders the compact result top chrome inside the scroll flow', () => {
     mockParams.mockReturnValue({
       analysisData: JSON.stringify(makeFaceResult()),
     });
@@ -369,17 +443,24 @@ describe('ScanResultScreen', () => {
     const rendered = render(<ScanResultScreen />);
     const testIds = collectTestIds(rendered.toJSON());
 
-    expectTransparentResultHeader(
+    expectCompactResultTitle(
       rendered.getByTestId('scan-result-screen-header').props.style,
     );
-    expect(rendered.getByTestId('scan-result-top-chrome')).toBeTruthy();
-    expect(rendered.getByTestId('scan-result-close-button')).toBeTruthy();
+    expectCompactResultTopChrome(
+      rendered.getByTestId('scan-result-top-chrome').props.style,
+      false,
+    );
+    expect(rendered.queryByTestId('scan-result-top-chrome-handle')).toBeNull();
+    expect(rendered.queryByTestId('scan-result-close-button')).toBeNull();
+    expect(testIds.indexOf('scan-result-scroll')).toBeLessThan(
+      testIds.indexOf('scan-result-top-chrome'),
+    );
     expect(testIds.indexOf('scan-result-top-chrome')).toBeLessThan(
       testIds.indexOf('result-hero-surface'),
     );
   });
 
-  it('uses the result gradient as the visible dark container background', () => {
+  it('uses a transparent container, translucent scrim, and sheet over the scanner backdrop', () => {
     Object.assign(mockThemeColors, {
       background: '#000000',
       cardBackground: '#121212',
@@ -399,13 +480,29 @@ describe('ScanResultScreen', () => {
       accentColor: faceTheme.accentColor,
     });
 
-    const { getByTestId } = render(<ScanResultScreen />);
+    const { getByTestId, queryByTestId } = render(<ScanResultScreen />);
     const containerStyle = StyleSheet.flatten(
       getByTestId('scan-result-screen').props.style,
     );
+    const sheetStyle = StyleSheet.flatten(
+      getByTestId('scan-result-sheet').props.style,
+    );
+    const scroll = getByTestId('scan-result-scroll');
 
-    expect(containerStyle.backgroundColor).toBe(expectedGradient[0]);
-    expect(containerStyle.backgroundColor).not.toBe('#000000');
+    expect(containerStyle.backgroundColor).toBe('transparent');
+    expect(getByTestId('scan-result-background-layer').props.colors).toEqual(
+      toResultScrimGradient(expectedGradient),
+    );
+    expectStableInternalScroll(scroll);
+    expectFixedResultSurface(sheetStyle);
+    expectCompactResultTopChrome(
+      getByTestId('scan-result-top-chrome').props.style,
+      true,
+    );
+    expect(queryByTestId('scan-result-top-chrome-handle')).toBeNull();
+    expectCompactResultTitle(getByTestId('scan-result-screen-header').props.style);
+    expect(sheetStyle.marginTop).toBe(SPACING.md);
+    expect(sheetStyle.backgroundColor).not.toBe('#000000');
   });
 
   it('shows the locked trajectory card for free results', () => {
@@ -432,12 +529,15 @@ describe('ScanResultScreen', () => {
     const rendered = render(<ScanResultScreen />);
     const testIds = collectTestIds(rendered.toJSON());
 
-    expect(rendered.getByTestId('scan-result-coach-cta-question-preview')).toBeTruthy();
+    expect(rendered.getByTestId('scan-result-coach-final-cta-question-preview')).toBeTruthy();
     expect(testIds).toContain('trajectory-preview-card');
     expect(testIds.indexOf('scan-result-coach-cta')).toBeGreaterThan(
       testIds.indexOf('result-hero-surface'),
     );
     expect(testIds.indexOf('scan-result-coach-cta')).toBeLessThan(
+      testIds.indexOf('trajectory-preview-card'),
+    );
+    expect(testIds.indexOf('scan-result-coach-final-cta')).toBeGreaterThan(
       testIds.indexOf('trajectory-preview-card'),
     );
 

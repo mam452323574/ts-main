@@ -7,11 +7,20 @@ import { ApiError } from '@/services/api';
 import { DARK_COLORS, LIGHT_COLORS, SPACING } from '@/constants/theme';
 import { getMainTabBarMetrics } from '@/utils/mainTabBarMetrics';
 
-// Mock expo-camera
 const mockUseCameraPermissions = jest.fn();
 const mockTakePictureAsync = jest.fn();
 const mockCameraViewProps: { current: Record<string, any> | null } = { current: null };
 let mockAutoCameraReady = true;
+let mockCameraFacing: 'back' | 'front' = 'back';
+let mockCameraSessionMounted = true;
+let mockCameraSessionVisible = true;
+let mockCameraSessionKey = 0;
+let mockAutofocusEnabled = false;
+const mockCameraRef = {
+  current: {
+    takePictureAsync: (...args: any[]) => mockTakePictureAsync(...args),
+  },
+};
 const mockCameraGuideProps: { current: Record<string, any> | null } = { current: null };
 const mockManipulateAsync = jest.fn();
 const mockShowAlert = jest.fn();
@@ -30,31 +39,56 @@ jest.mock('@react-navigation/native', () => ({
   useIsFocused: () => mockUseIsFocused(),
 }));
 
-jest.mock('expo-camera', () => ({
-  CameraView: (() => {
+jest.mock('@/contexts/ScannerCameraSessionContext', () => ({
+  SCAN_FLOW_OVERLAY_PATHNAMES: new Set([
+    '/scan-preview',
+    '/scan-result',
+    '/super-scan-result',
+  ]),
+  useScannerCameraSession: () => {
     const React = require('react');
-    const { View } = require('react-native');
+    const [permission, requestPermission] = mockUseCameraPermissions();
+    const [facing, setFacingState] = React.useState(mockCameraFacing);
+    const [isReady, setIsReadyState] = React.useState(mockAutoCameraReady);
+    const autofocusEnabled = mockAutofocusEnabled;
 
-    const MockCameraView = React.forwardRef((props: any, ref: any) => {
-      mockCameraViewProps.current = props;
-      React.useImperativeHandle(ref, () => ({
-        takePictureAsync: mockTakePictureAsync,
-      }));
+    const setFacing = (nextValue: any) => {
+      setFacingState((current: 'back' | 'front') => {
+        const resolved =
+          typeof nextValue === 'function' ? nextValue(current) : nextValue;
+        mockCameraFacing = resolved;
+        return resolved;
+      });
+    };
 
-      React.useEffect(() => {
-        if (mockAutoCameraReady) {
-          props.onCameraReady?.();
-        }
-      }, [props.onCameraReady, props.facing]);
+    const setAutofocusEnabled = (nextValue: any) => {
+      mockAutofocusEnabled =
+        typeof nextValue === 'function'
+          ? nextValue(mockAutofocusEnabled)
+          : nextValue;
+    };
 
-      return React.createElement(View, { testID: 'mock-camera-view' });
-    });
+    mockCameraViewProps.current = {
+      facing,
+      mirror: false,
+      autofocus: autofocusEnabled ? 'on' : 'off',
+      onCameraReady: () => setIsReadyState(true),
+    };
 
-    MockCameraView.displayName = 'MockCameraView';
-    return MockCameraView;
-  })(),
-  CameraType: {},
-  useCameraPermissions: () => mockUseCameraPermissions(),
+    return {
+      permission,
+      requestPermission,
+      isReady,
+      facing,
+      setFacing,
+      cameraRef: mockCameraRef,
+      isMounted: mockCameraSessionMounted,
+      isVisible: mockCameraSessionVisible,
+      sessionKey: mockCameraSessionKey,
+      autofocusEnabled,
+      setAutofocusEnabled,
+    };
+  },
 }));
 
 // Mock expo-image-picker
@@ -282,6 +316,11 @@ describe('ScannerScreen', () => {
     mockManipulateAsync.mockResolvedValue({ uri: 'file:///mirrored-photo.jpg', width: 100, height: 200 });
     mockCameraViewProps.current = null;
     mockAutoCameraReady = true;
+    mockCameraFacing = 'back';
+    mockCameraSessionMounted = true;
+    mockCameraSessionVisible = true;
+    mockCameraSessionKey = 0;
+    mockAutofocusEnabled = false;
     mockCameraGuideProps.current = null;
     mockNextScanTimerProps.length = 0;
     mockUseIsFocused.mockReturnValue(true);
@@ -874,83 +913,61 @@ describe('ScannerScreen', () => {
       ]);
     });
 
-    it('renders the camera immediately without the deferred placeholder', () => {
-      render(<ScannerScreen />);
-
-      expect(screen.getByTestId('mock-camera-view')).toBeTruthy();
-      expect(
-        screen.queryByTestId('scanner-camera-deferred-placeholder'),
-      ).toBeNull();
-      expect(mockCameraViewProps.current?.onCameraReady).toEqual(expect.any(Function));
-    });
-
-    it('preloads the camera on main tabs even when the scanner tab is not focused', () => {
-      mockUseIsFocused.mockReturnValue(false);
-      mockUsePathname.mockReturnValue('/');
-
-      render(<ScannerScreen />);
-
-      expect(screen.getByTestId('mock-camera-view')).toBeTruthy();
-
-      fireEvent.press(screen.getByTestId('scanner-capture-button'));
-      fireEvent.press(screen.getByTestId('scanner-flip-camera-button'));
-
-      expect(mockShowAlert).not.toHaveBeenCalled();
-      expect(mockCameraViewProps.current?.facing).toBe('back');
-    });
-
-    it('uses an already warmed camera as soon as the scanner tab receives focus', () => {
-      mockUseIsFocused.mockReturnValue(false);
-      mockUsePathname.mockReturnValue('/');
-      mockAutoCameraReady = false;
-
-      const { rerender } = render(<ScannerScreen />);
-
-      act(() => {
-        mockCameraViewProps.current?.onCameraReady?.();
-      });
-
-      fireEvent.press(screen.getByTestId('scanner-capture-button'));
-      expect(mockShowAlert).not.toHaveBeenCalled();
-
-      mockUseIsFocused.mockReturnValue(true);
-      mockUsePathname.mockReturnValue('/scanner');
-      rerender(<ScannerScreen />);
-
-      fireEvent.press(screen.getByTestId('scanner-capture-button'));
-      expect(mockShowAlert).toHaveBeenCalledWith(
-        'Type de scan requis',
-        'Veuillez sélectionner un type de scan.',
-        undefined,
-        undefined,
-        expect.objectContaining({ variant: 'info' }),
-      );
-    });
-
-    it('unmounts the warmed camera when navigation leaves the main tabs', () => {
-      mockUsePathname.mockReturnValue('/scan-preview');
-
+    it('renders scanner chrome immediately without mounting a local CameraView', async () => {
       render(<ScannerScreen />);
 
       expect(screen.queryByTestId('mock-camera-view')).toBeNull();
+      expect(mockCameraViewProps.current?.onCameraReady).toEqual(expect.any(Function));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('scanner-controls-overlay')).toBeTruthy();
+      });
     });
 
-    it('keeps camera actions locked until the preview reports ready', () => {
+    it.each(['/scan-preview', '/scan-result', '/super-scan-result'])(
+      'hides scanner chrome behind %s while the shared camera session stays external',
+      (pathname) => {
+        mockUseIsFocused.mockReturnValue(false);
+        mockUsePathname.mockReturnValue(pathname);
+
+        render(<ScannerScreen />);
+
+        expect(screen.queryByTestId('scanner-controls-overlay')).toBeNull();
+        expect(screen.queryByTestId('scanner-focus-overlay')).toBeNull();
+      },
+    );
+
+    it('keeps controls visible but non-interactive until the shared preview reports ready', async () => {
       const ImagePicker = require('expo-image-picker');
       mockAutoCameraReady = false;
 
       render(<ScannerScreen />);
 
-      fireEvent.press(screen.getByTestId('scanner-capture-button'));
-      fireEvent.press(screen.getByTestId('scanner-gallery-button'));
-      fireEvent.press(screen.getByTestId('scanner-flip-camera-button'));
+      expect(screen.queryByTestId('scanner-camera-warmup-overlay')).toBeNull();
+      expect(screen.queryByTestId('scanner-camera-warmup-stage')).toBeNull();
+      expect(screen.queryByTestId('scanner-camera-warmup-pill')).toBeNull();
+      expect(screen.queryByTestId('scanner-focus-overlay')).toBeNull();
+      expect(screen.getByTestId('scanner-controls-overlay')).toBeTruthy();
+      expect(screen.getByTestId('scanner-scan-type-selector')).toBeTruthy();
+      expect(screen.getByTestId('scanner-capture-button')).toBeTruthy();
+      expect(screen.getByTestId('scanner-gallery-button')).toBeTruthy();
+      expect(screen.getByTestId('scanner-flip-camera-button')).toBeTruthy();
 
       expect(mockShowAlert).not.toHaveBeenCalled();
       expect(ImagePicker.launchImageLibraryAsync).not.toHaveBeenCalled();
+      expect(mockCameraGuideProps.current).toBeNull();
       expect(mockCameraViewProps.current?.facing).toBe('back');
 
       act(() => {
         mockCameraViewProps.current?.onCameraReady?.();
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('scanner-controls-overlay')).toBeTruthy();
+        expect(screen.getByTestId('scanner-focus-overlay')).toBeTruthy();
+        expect(screen.getByTestId('scanner-capture-button')).toBeTruthy();
+        expect(screen.getByTestId('scanner-gallery-button')).toBeTruthy();
+        expect(screen.getByTestId('scanner-flip-camera-button')).toBeTruthy();
       });
 
       fireEvent.press(screen.getByTestId('scanner-capture-button'));
@@ -966,11 +983,11 @@ describe('ScannerScreen', () => {
       expect(mockCameraViewProps.current?.facing).toBe('front');
     });
 
-    it('passes mirror false to CameraView', async () => {
+    it('keeps mirror disabled on the shared camera session', async () => {
       render(<ScannerScreen />);
 
       await waitFor(() => {
-        expect(screen.getByTestId('mock-camera-view')).toBeTruthy();
+        expect(screen.getByTestId('scanner-controls-overlay')).toBeTruthy();
       });
 
       expect(mockCameraViewProps.current?.mirror).toBe(false);
@@ -1003,6 +1020,29 @@ describe('ScannerScreen', () => {
         })
       );
       expect(screen.getByTestId('scanner-focus-overlay').props.pointerEvents).toBe('none');
+    });
+
+    it('shows the interactive guide immediately when the shared camera session is already ready', async () => {
+      mockAutoCameraReady = true;
+
+      render(<ScannerScreen />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Visage/)).toBeTruthy();
+      });
+
+      fireEvent.press(screen.getByText(/Visage/));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('scanner-focus-overlay')).toBeTruthy();
+      });
+
+      expect(mockCameraGuideProps.current).toEqual(
+        expect.objectContaining({
+          scanType: 'health',
+          visible: true,
+        }),
+      );
     });
 
     it('keeps every selected scan mode immersive without a redundant close/reset button', async () => {

@@ -5,6 +5,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { SIZES, SPACING, FONT_WEIGHTS } from '@/constants/theme';
 import { NextScanTimer } from '@/components/NextScanTimer';
+import { Squircle } from '@/components/Squircle';
 
 interface ScanLimitIndicatorProps {
   eligibility?: ScanEligibilityResponse;
@@ -72,7 +73,7 @@ export function ScanLimitIndicator({
       ) : null}
 
       <View style={styles.progressContainer}>
-        <View style={styles.progressBar}>
+        <Squircle style={styles.progressBar}>
           <View
             style={[
               styles.progressFill,
@@ -80,7 +81,7 @@ export function ScanLimitIndicator({
               isLimitReached && styles.progressFillDisabled,
             ]}
           />
-        </View>
+        </Squircle>
       </View>
 
       {showRechargeTimer ? (
@@ -153,12 +154,12 @@ const createStyles = (colors: any) => StyleSheet.create({
     height: 4,
     backgroundColor: colors.lightGray,
     borderRadius: 2,
-    overflow: 'hidden',
+    overflow: 'hidden', borderCurve: 'continuous',
   },
   progressFill: {
     height: '100%',
     backgroundColor: colors.primary,
-    borderRadius: 2,
+    borderRadius: 2, borderCurve: 'continuous',
   },
   progressFillDisabled: {
     backgroundColor: colors.grayMedium,

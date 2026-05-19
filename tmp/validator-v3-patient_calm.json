@@ -1,0 +1,38 @@
+{
+  "persona": "patient_calm",
+  "tests": [
+    {
+      "q": "donne un plan sur 2 jours de récup",
+      "simulated_response": "Voici une trame douce sur deux jours, à ajuster à ton ressenti.\n\nJour 1 :\n- Lever sans précipitation, matinée calme et activités légères\n- Étirements doux du dos et des jambes, environ 10 minutes\n- Repas posés et réguliers, peu d'écrans après le dîner\n- Coucher tôt, lumière tamisée 30 minutes avant\n\nJour 2 :\n- Réveil sans alarme si possible, petit-déjeuner tranquille\n- Marche lente 20 minutes au calme, sans forcer\n- Étirements du dos et de la nuque, mobilité douce\n- Reprise progressive des activités selon tes sensations\n\nDis-moi en fin de Jour 1 comment tu te sens, on ajustera ensemble.",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": "yes",
+      "respects_factual_cap": "n/a"
+    },
+    {
+      "q": "j ai mal au dos",
+      "simulated_response": "Je comprends, ça peut peser sur la journée. On va y aller calmement.\n\n- Allonge-toi sur le dos, genoux pliés, 2-3 minutes pour relâcher les lombaires\n- Étirement chat-vache à quatre pattes, lentement, 5-6 respirations\n- Lève-toi toutes les 30 minutes si tu es assis longtemps\n- Chaleur douce (bouillotte ou douche tiède) si la douleur est musculaire\n\nSi la douleur dure plus de quelques jours, irradie dans la jambe ou s'accompagne de fourmillements ou de fièvre, consulte un médecin ou un kiné. Tu veux qu'on regarde plutôt la posture au quotidien ou des étirements plus ciblés ?",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": "yes",
+      "respects_factual_cap": "n/a"
+    },
+    {
+      "q": "c est quoi la capitale de l Italie ?",
+      "simulated_response": "Rome.",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": "yes",
+      "respects_factual_cap": "yes"
+    }
+  ],
+  "overall_verdict": "PASS",
+  "remaining_loopholes": [
+    "R3 ferme l'ouverture empathique sur les questions factuelles (cap 1-2 phrases), mais le ton 'patient_calm' peut encore pousser à une phrase légèrement délayée (ex: 'C'est Rome.') — conforme mais marginalement plus long qu'un 'Rome.' strict.",
+    "R2 interdit la numérotation sous en-tête, mais n'interdit pas explicitement DEUX blocs de puces séparés sans en-tête — un modèle bavard pourrait empiler 2 listes à tirets consécutives sur 'mal au dos' et techniquement passer.",
+    "R4 couvre les reformulations hydratation/sommeil/marche/respiration, mais 'chaleur douce' / 'bouillotte' n'est pas couvert par l'anti-réflexe — légitime pour le dos, mais pourrait être détourné comme conseil-réflexe sur d'autres symptômes.",
+    "R5 impose 1 action concrète AVANT relance, mais autorise toujours la relance finale ; le ton patient_calm peut multiplier les questions ouvertes de fin et allonger la conversation inutilement.",
+    "Aucun cap explicite sur le nombre de tirets par bloc au-delà du '2-4' énoncé dans la règle (2) pour les plans — sur un symptôme sans en-tête, le modèle peut dépasser 4 tirets sans violation claire."
+  ],
+  "comparison_to_v2": "better"
+}

@@ -12,6 +12,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useStartupDiagnostics } from '@/contexts/StartupDiagnosticsContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { LoginCredentialsSchema } from '@/utils/authSchemas';
+import { Squircle } from '@/components/Squircle';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -166,9 +167,9 @@ export default function LoginScreen() {
         />
 
         {error ? (
-          <View style={styles.errorContainer}>
+          <Squircle style={styles.errorContainer}>
             <Text style={styles.errorText}>{error}</Text>
-          </View>
+          </Squircle>
         ) : null}
 
         <Button
@@ -222,7 +223,7 @@ const createStyles = (colors: any) =>
       backgroundColor: withAlpha(colors.error, 0.1),
       paddingVertical: SPACING.md,
       paddingHorizontal: SPACING.lg,
-      borderRadius: 18,
+      borderRadius: 18, borderCurve: 'continuous',
     },
     errorText: {
       color: colors.error,

@@ -20,6 +20,7 @@ import {
   type CoachPromptCategory,
   type CoachPromptType,
 } from '@/shared/coachPromptTypes';
+import { Squircle } from '@/components/Squircle';
 
 export interface CoachModePickerQuestionOption {
   key: CoachQuestionKey;
@@ -89,7 +90,7 @@ export function CoachModePicker({
   return (
     <View style={styles.list} testID={testID}>
       {promptGroups.map((group) => (
-        <View
+        <Squircle
           key={group.category}
           style={styles.group}
           testID={`${testID}-category-${group.category}`}
@@ -208,7 +209,7 @@ export function CoachModePicker({
               );
             })}
           </View>
-        </View>
+        </Squircle>
       ))}
     </View>
   );
@@ -233,7 +234,7 @@ const createStyles = (colors: any, isDark: boolean) =>
       borderRadius: 22,
       borderWidth: 1,
       borderColor: groupSurface.borderColor,
-      backgroundColor: groupSurface.backgroundColor,
+      backgroundColor: groupSurface.backgroundColor, borderCurve: 'continuous',
     },
     groupTitle: {
       fontSize: SIZES.text12,
@@ -263,7 +264,7 @@ const createStyles = (colors: any, isDark: boolean) =>
         colors.cardBackground ?? colors.background,
         isDark ? 0.86 : 0.94,
       ),
-      gap: SPACING.xs + 2,
+      gap: SPACING.xs + 2, borderCurve: 'continuous',
     },
     suggestionTitle: {
       paddingHorizontal: SPACING.xs,
@@ -287,7 +288,7 @@ const createStyles = (colors: any, isDark: boolean) =>
       borderRadius: BORDER_RADIUS.xl,
       borderWidth: 1,
       borderColor: withAlpha(colors.primaryText, isDark ? 0.11 : 0.08),
-      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.045 : 0.035),
+      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.045 : 0.035), borderCurve: 'continuous',
     },
     suggestionChipActive: {
       borderColor: withAlpha(colors.primary, isDark ? 0.34 : 0.24),
@@ -322,7 +323,7 @@ const createStyles = (colors: any, isDark: boolean) =>
       borderRadius: BORDER_RADIUS.full,
       borderWidth: 1,
       borderColor: withAlpha(colors.primary, isDark ? 0.34 : 0.24),
-      backgroundColor: withAlpha(colors.primary, isDark ? 0.16 : 0.08),
+      backgroundColor: withAlpha(colors.primary, isDark ? 0.16 : 0.08), borderCurve: 'continuous',
     },
     selectedBadgeText: {
       fontSize: 11,

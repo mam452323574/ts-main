@@ -18,6 +18,7 @@ import {
 } from '@/constants/theme';
 import { NextScanTimer } from '@/components/NextScanTimer';
 import { ScanEligibilityResponse } from '@/types';
+import { Squircle } from '@/components/Squircle';
 
 interface SuperScanIndicatorProps {
   isPremium: boolean;
@@ -91,11 +92,11 @@ export function SuperScanIndicator({ isPremium, eligibility, onLockedPress }: Su
       style={[styles.shell, isPremium ? styles.shellPremium : styles.shellLocked]}
       testID="super-scan-shell"
     >
-      <View
+      <Squircle
         style={[styles.surface, isPremium ? styles.surfacePremium : styles.surfaceLocked]}
         testID="super-scan-surface"
       >
-        <View style={[styles.backgroundGlow, isPremium ? styles.backgroundGlowPremium : styles.backgroundGlowLocked]} />
+        <Squircle style={[styles.backgroundGlow, isPremium ? styles.backgroundGlowPremium : styles.backgroundGlowLocked]} />
 
         <View style={styles.content}>
           <View style={[styles.iconWrapper, !isPremium && styles.iconWrapperLocked]}>
@@ -111,7 +112,7 @@ export function SuperScanIndicator({ isPremium, eligibility, onLockedPress }: Su
                 strokeWidth={2.5}
               />
             </LinearGradient>
-            {isAvailable && <View style={[styles.availableDot, styles.availableDotPremium]} />}
+            {isAvailable && <Squircle style={[styles.availableDot, styles.availableDotPremium]} />}
           </View>
 
           <View style={styles.textContainer}>
@@ -120,10 +121,10 @@ export function SuperScanIndicator({ isPremium, eligibility, onLockedPress }: Su
                 {t('components.super_scan.title')}
               </Text>
               {!isPremium && (
-                <View style={styles.premiumBadge}>
+                <Squircle style={styles.premiumBadge}>
                   <Crown color={colors.gold} size={10} fill={colors.gold} />
                   <Text style={styles.premiumBadgeText}>{t('components.feature_list.premium')}</Text>
-                </View>
+                </Squircle>
               )}
             </View>
             <Text style={styles.subtitle} numberOfLines={2}>
@@ -137,18 +138,18 @@ export function SuperScanIndicator({ isPremium, eligibility, onLockedPress }: Su
 
           <View style={styles.statusContainer}>
             {!isPremium ? (
-              <View style={styles.lockedBadge}>
+              <Squircle style={styles.lockedBadge}>
                 <Lock color={colors.gray} size={14} />
-              </View>
+              </Squircle>
             ) : hasRemainingScans ? (
-              <View style={styles.availableBadge}>
+              <Squircle style={styles.availableBadge}>
                 <Zap color={colors.gold} size={14} fill={colors.gold} />
                 <Text style={styles.availableText}>{`${resolvedRemaining}/${resolvedLimit}`}</Text>
-              </View>
+              </Squircle>
             ) : showRechargeTimer ? null : (
-              <View style={styles.usedBadge}>
+              <Squircle style={styles.usedBadge}>
                 <Text style={styles.usedText}>{t('scan_limit.limit_reached')}</Text>
-              </View>
+              </Squircle>
             )}
           </View>
         </View>
@@ -184,7 +185,7 @@ export function SuperScanIndicator({ isPremium, eligibility, onLockedPress }: Su
             </View>
           )}
         </View>
-      </View>
+      </Squircle>
     </Container>
   );
 }
@@ -249,7 +250,7 @@ const createStyles = (colors: any, isDark: boolean) => {
   return StyleSheet.create({
     shell: {
       borderRadius: BORDER_RADIUS.xl,
-      minWidth: 0,
+      minWidth: 0, borderCurve: 'continuous',
     },
     shellPremium: {
       ...premiumSurface.shadowStyle,
@@ -262,7 +263,7 @@ const createStyles = (colors: any, isDark: boolean) => {
       padding: SPACING.lg,
       overflow: 'hidden',
       minWidth: 0,
-      borderWidth: 1,
+      borderWidth: 1, borderCurve: 'continuous',
     },
     surfacePremium: {
       backgroundColor: premiumSurface.backgroundColor,
@@ -278,7 +279,7 @@ const createStyles = (colors: any, isDark: boolean) => {
       right: isAndroidLight ? -24 : -50,
       width: isAndroidLight ? 96 : 120,
       height: isAndroidLight ? 96 : 120,
-      borderRadius: isAndroidLight ? 48 : 60,
+      borderRadius: isAndroidLight ? 48 : 60, borderCurve: 'continuous',
     },
     backgroundGlowPremium: {
       backgroundColor: premiumSurface.overlayColor,
@@ -302,7 +303,7 @@ const createStyles = (colors: any, isDark: boolean) => {
       height: 48,
       borderRadius: 24,
       justifyContent: 'center',
-      alignItems: 'center',
+      alignItems: 'center', borderCurve: 'continuous',
     },
     iconGradientPremium: {
       ...premiumIconShadow,
@@ -318,7 +319,7 @@ const createStyles = (colors: any, isDark: boolean) => {
       height: 12,
       borderRadius: 6,
       backgroundColor: colors.success,
-      borderWidth: 2,
+      borderWidth: 2, borderCurve: 'continuous',
     },
     availableDotPremium: {
       borderColor: premiumSurface.backgroundColor,
@@ -357,7 +358,7 @@ const createStyles = (colors: any, isDark: boolean) => {
       paddingHorizontal: SPACING.sm,
       paddingVertical: 2,
       borderRadius: BORDER_RADIUS.sm,
-      gap: 3,
+      gap: 3, borderCurve: 'continuous',
     },
     premiumBadgeText: {
       fontSize: SIZES.text10,
@@ -374,7 +375,7 @@ const createStyles = (colors: any, isDark: boolean) => {
       borderRadius: 18,
       backgroundColor: withAlpha(colors.gray, isDark ? 0.16 : 0.12),
       justifyContent: 'center',
-      alignItems: 'center',
+      alignItems: 'center', borderCurve: 'continuous',
     },
     availableBadge: {
       minWidth: 36,
@@ -385,7 +386,7 @@ const createStyles = (colors: any, isDark: boolean) => {
       alignItems: 'center',
       flexDirection: 'row',
       paddingHorizontal: 6,
-      gap: 3,
+      gap: 3, borderCurve: 'continuous',
     },
     availableText: {
       fontSize: SIZES.text10,
@@ -399,7 +400,7 @@ const createStyles = (colors: any, isDark: boolean) => {
       backgroundColor: withAlpha(colors.gray, isDark ? 0.16 : 0.12),
       justifyContent: 'center',
       alignItems: 'center',
-      paddingHorizontal: 6,
+      paddingHorizontal: 6, borderCurve: 'continuous',
     },
     usedText: {
       fontSize: SIZES.text10,
@@ -414,14 +415,14 @@ const createStyles = (colors: any, isDark: boolean) => {
       height: 6,
       backgroundColor: withAlpha(colors.gold, isDark ? 0.15 : 0.18),
       borderRadius: 3,
-      overflow: 'hidden',
+      overflow: 'hidden', borderCurve: 'continuous',
     },
     progressBarLocked: {
       backgroundColor: withAlpha(colors.gray, isDark ? 0.18 : 0.14),
     },
     progressFill: {
       height: '100%',
-      borderRadius: 3,
+      borderRadius: 3, borderCurve: 'continuous',
     },
     progressLabel: {
       fontSize: SIZES.text10,

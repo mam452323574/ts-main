@@ -1,0 +1,40 @@
+{
+  "persona": "playful_light",
+  "tests": [
+    {
+      "q": "donne un plan sur 2 jours de recup",
+      "simulated_response": "Allez, mode cocon enclenche ! Voici ton mini-plan recup, version peinard :\n\nJour 1 :\n- Reveil tranquille, etirements doux 5-10 min (dos, hanches, nuque)\n- Balade easy 20-30 min en exterieur, rythme conversation\n- Sieste courte ou pause lecture l'apres-midi\n- Diner leger et coucher tot, ecrans off 30 min avant\n\nJour 2 :\n- Mobilite 10 min au reveil, focus epaules et bas du dos\n- Activite plaisir non-sportive (cuisine, musique, ami)\n- Mini-session yoga ou foam roller 15 min\n- Bilan du soir : energie de 1 a 10, et au lit a heure raisonnable\n\nObjectif : recharger sans culpabiliser. On garde le sourire !",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": "yes"
+    },
+    {
+      "q": "j ai mal au dos",
+      "simulated_response": "Aie, le dos qui rale, classique mais relou. On apaise ca tranquille :\n\n- Pose-toi 2 min, evite les positions assises tordues\n- Etirement chat-vache lent, 8-10 cycles, respiration ample\n- Genoux-poitrine au sol, 30 sec par cote, sans forcer\n- Marche douce 5-10 min pour degourdir, le dos aime le mouvement leger\n\nSi la douleur est vive, irradie dans la jambe, ou traine plus de quelques jours, file voir un kine ou un medecin, pas de heros la-dessus. Sinon, chaleur sur la zone le soir et nuit reparatrice, ca aide souvent.",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": "yes"
+    },
+    {
+      "q": "c est quoi la capitale de l Italie ?",
+      "simulated_response": "Rome ! La ville des pates, du Colisee et des scooters un peu fous. Buon viaggio mental !",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": "yes"
+    }
+  ],
+  "overall_verdict": "PASS",
+  "weak_spots": [
+    "Playful tone encourages filler/quips ('Buon viaggio mental', 'mode cocon') that risk slipping in soft hydration jokes ('un petit verre d'eau, ca pique pas') under (4) anti-reflex — borderline acceptable but easy slope.",
+    "On the 2-day plan, a lazy LLM might output 'Jour 1 :' then '1. action 2. action' and 'Jour 2 :' then '1. action 2. action' — producing TWO numbered restarts, directly violating rule (3). Current example below the explicit anti-pattern in the prompt, but the rule wording 'Ne redemarre PAS la numerotation' is buried in (2) while (3) talks about consecutive blocks — ambiguous.",
+    "Rule (3) says 'une seule liste numerotee' but the few-shot 'BON' example uses dashes only. A playful coach may still add a numbered 'Bonus : 1. ... 2. ...' tail for fun, sneaking in a second numbered list.",
+    "'Action concrete' rule (6) + playful tone may push the model to append a cheeky 'Action du jour : bois un grand verre d'eau et souris !' — exactly the anti-pattern."
+  ],
+  "suggested_prompt_patches": [
+    "Move 'Ne redemarre PAS la numerotation entre periodes' out of (2) into rule (3) and rephrase (3) as: 'ZERO liste numerotee si tu utilises des en-tetes Jour 1/Jour 2. Tirets uniquement.' to remove any ambiguity for plan-style answers.",
+    "Add an explicit playful-specific guardrail: 'Le ton playful n'autorise PAS les vannes hydratation/sommeil/sport comme chute. Pas de PS, pas de bonus, pas d action du jour generique.'",
+    "Add a hard cap on the final line: 'Interdit de finir par une phrase commencant par Action, Bonus, Astuce, PS, ou Petit plus si ce n est pas explicitement demande.'",
+    "Reinforce (5) with: 'Question de culture generale = reponse en 1 phrase max, aucune action, aucun pivot bien-etre, meme deguise en blague.'",
+    "Add a self-check instruction at the end: 'Avant d envoyer, compte les sequences 1./2./3. dans ta reponse. Si > 1, convertis tout en tirets.'"
+  ]
+}

@@ -65,6 +65,7 @@ import {
   resolveScanPreviewLoadingContent,
   type ScanPreviewLoadingPhaseKey,
 } from '@/utils/scanPreviewLoadingConfig';
+import { Squircle } from '@/components/Squircle';
 
 const EXPECTED_SCAN_ERROR_TYPES: ReadonlySet<ApiErrorType> = new Set([
   'VALIDATION',
@@ -73,7 +74,20 @@ const EXPECTED_SCAN_ERROR_TYPES: ReadonlySet<ApiErrorType> = new Set([
 ]);
 
 const VALID_SCAN_TYPES: ScanType[] = ['body', 'health', 'nutrition', 'super'];
-const SUPER_SCAN_MINI_GAME_DURATION_HINT_MS = 10000;
+const SCAN_MINI_GAME_DURATION_HINT_MS = 10000;
+
+function resolveScanMiniGameSlotHeight(
+  density: ScanPreviewLoadingDensity,
+): number {
+  const base = resolveLoadingMiniGameHeight(true, 'scan');
+  const extra =
+    density === 'regular'
+      ? 330
+      : density === 'compact'
+        ? 270
+        : 84;
+  return base + extra;
+}
 
 function renderScanTypeIcon(scanType: ScanType, color: string, size: number) {
   if (scanType === 'super') {
@@ -109,14 +123,6 @@ function getLocalizedPreviewStepLabels(
     analysis: 'Analysis',
     preparing: 'Results',
   };
-}
-
-function getPreviewTrustLine(locale: string) {
-  if (locale.startsWith('fr')) {
-    return 'Photo chiffrée et analysée dans un flux sécurisé.';
-  }
-
-  return 'Encrypted photo handling with a secure analysis pipeline.';
 }
 
 type ScanPreviewLoadingDensity = 'regular' | 'compact' | 'tight' | 'ultraTight';
@@ -195,9 +201,9 @@ const SCAN_PREVIEW_LOADING_DENSITY_METRICS: Record<
     metaIconGlyphSize: 16,
     metaTextSize: SIZES.text14,
     progressMaxWidth: 420,
-    progressMinHeight: 356,
+    progressMinHeight: 0,
     progressRadius: 36,
-    progressPaddingVertical: 28,
+    progressPaddingVertical: 20,
     progressPaddingHorizontal: 28,
     eyebrowSize: SIZES.text12,
     eyebrowMarginBottom: SPACING.sm,
@@ -212,9 +218,9 @@ const SCAN_PREVIEW_LOADING_DENSITY_METRICS: Record<
     subtextPaddingHorizontal: SPACING.lg,
     subtextMarginBottom: SPACING.lg,
     progressBarHeight: 8,
-    progressBarMarginBottom: SPACING.lg,
+    progressBarMarginBottom: SPACING.md,
     stepsGap: SPACING.sm,
-    stepsMarginBottom: SPACING.lg,
+    stepsMarginBottom: 0,
     stepPillGap: 8,
     stepPillPaddingHorizontal: SPACING.sm + 2,
     stepPillPaddingVertical: SPACING.sm,
@@ -249,9 +255,9 @@ const SCAN_PREVIEW_LOADING_DENSITY_METRICS: Record<
     metaIconGlyphSize: 15,
     metaTextSize: 13,
     progressMaxWidth: 390,
-    progressMinHeight: 304,
+    progressMinHeight: 0,
     progressRadius: 32,
-    progressPaddingVertical: 20,
+    progressPaddingVertical: 16,
     progressPaddingHorizontal: 22,
     eyebrowSize: SIZES.text12,
     eyebrowMarginBottom: 6,
@@ -266,9 +272,9 @@ const SCAN_PREVIEW_LOADING_DENSITY_METRICS: Record<
     subtextPaddingHorizontal: SPACING.sm,
     subtextMarginBottom: SPACING.md,
     progressBarHeight: 7,
-    progressBarMarginBottom: SPACING.md,
+    progressBarMarginBottom: SPACING.sm,
     stepsGap: 7,
-    stepsMarginBottom: SPACING.md,
+    stepsMarginBottom: 0,
     stepPillGap: 7,
     stepPillPaddingHorizontal: 9,
     stepPillPaddingVertical: 6,
@@ -305,7 +311,7 @@ const SCAN_PREVIEW_LOADING_DENSITY_METRICS: Record<
     progressMaxWidth: 360,
     progressMinHeight: 0,
     progressRadius: 28,
-    progressPaddingVertical: 14,
+    progressPaddingVertical: 12,
     progressPaddingHorizontal: 18,
     eyebrowSize: 11,
     eyebrowMarginBottom: 4,
@@ -320,9 +326,9 @@ const SCAN_PREVIEW_LOADING_DENSITY_METRICS: Record<
     subtextPaddingHorizontal: 0,
     subtextMarginBottom: SPACING.sm,
     progressBarHeight: 6,
-    progressBarMarginBottom: SPACING.sm,
+    progressBarMarginBottom: 6,
     stepsGap: 6,
-    stepsMarginBottom: SPACING.sm,
+    stepsMarginBottom: 0,
     stepPillGap: 6,
     stepPillPaddingHorizontal: 8,
     stepPillPaddingVertical: 5,
@@ -359,7 +365,7 @@ const SCAN_PREVIEW_LOADING_DENSITY_METRICS: Record<
     progressMaxWidth: 344,
     progressMinHeight: 0,
     progressRadius: 24,
-    progressPaddingVertical: 12,
+    progressPaddingVertical: 10,
     progressPaddingHorizontal: 16,
     eyebrowSize: 10,
     eyebrowMarginBottom: 3,
@@ -374,9 +380,9 @@ const SCAN_PREVIEW_LOADING_DENSITY_METRICS: Record<
     subtextPaddingHorizontal: 0,
     subtextMarginBottom: 6,
     progressBarHeight: 5,
-    progressBarMarginBottom: 6,
+    progressBarMarginBottom: 5,
     stepsGap: 5,
-    stepsMarginBottom: 6,
+    stepsMarginBottom: 0,
     stepPillGap: 5,
     stepPillPaddingHorizontal: 7,
     stepPillPaddingVertical: 4,
@@ -487,11 +493,6 @@ export default function ScanPreviewScreen() {
     () => getLocalizedPreviewStepLabels(resolvedLocale),
     [resolvedLocale],
   );
-  const trustLine = useMemo(
-    () => getPreviewTrustLine(resolvedLocale),
-    [resolvedLocale],
-  );
-
   const [isApiComplete, setIsApiComplete] = useState(false);
   const [displayProgress, setDisplayProgress] = useState(0);
   const progressAnim = useRef(new Animated.Value(0)).current;
@@ -501,10 +502,10 @@ export default function ScanPreviewScreen() {
     () => resolveScanPreviewLoadingContent(resolvedScanType, resolvedProgress),
     [resolvedProgress, resolvedScanType],
   );
-  const shouldReserveSuperScanMiniGameSlot =
-    loading && resolvedScanType === 'super' && loadingDensity !== 'ultraTight';
-  const shouldShowSuperScanMiniGame =
-    shouldReserveSuperScanMiniGameSlot && !isApiComplete;
+  const shouldReserveScanMiniGameSlot =
+    loading && loadingDensity !== 'ultraTight';
+  const shouldShowScanMiniGame =
+    shouldReserveScanMiniGameSlot && !isApiComplete;
 
   useEffect(() => {
     const listenerId = progressAnim.addListener(({ value }) => {
@@ -825,7 +826,7 @@ export default function ScanPreviewScreen() {
       </View>
 
       <View style={styles.imageContainer} testID="scan-preview-image-container">
-        <View style={styles.imageFrame}>
+        <Squircle style={styles.imageFrame}>
           <OptimizedImage
             source={{ uri: imageUri }}
             style={styles.image}
@@ -841,7 +842,7 @@ export default function ScanPreviewScreen() {
               },
             ]}
           >
-            <View
+            <Squircle
               style={[
                 styles.previewHeroMetaIcon,
                 {
@@ -851,7 +852,7 @@ export default function ScanPreviewScreen() {
               ]}
             >
               {renderScanTypeIcon(resolvedScanType, accentTheme.accentColor, 16)}
-            </View>
+            </Squircle>
             <Text
               style={[
                 styles.previewHeroMetaText,
@@ -861,7 +862,7 @@ export default function ScanPreviewScreen() {
               {scanTypeLabel}
             </Text>
           </View>
-        </View>
+        </Squircle>
       </View>
 
       <BlurView
@@ -871,7 +872,7 @@ export default function ScanPreviewScreen() {
         testID="scan-preview-action-panel"
       >
         <View style={styles.buttonsContent}>
-          <View style={styles.infoCard}>
+          <Squircle style={styles.infoCard}>
             <View style={styles.infoPillRow}>
               <View
                 style={[
@@ -882,7 +883,7 @@ export default function ScanPreviewScreen() {
                   },
                 ]}
               >
-                <View
+                <Squircle
                   style={[
                     styles.infoPillIcon,
                     {
@@ -896,7 +897,7 @@ export default function ScanPreviewScreen() {
                     accentTheme.accentColor,
                     14,
                   )}
-                </View>
+                </Squircle>
                 <Text
                   style={[styles.infoPillText, { color: accentTheme.chipText }]}
                 >
@@ -931,7 +932,7 @@ export default function ScanPreviewScreen() {
                 ? "On n'envoie la photo qu'au moment de confirmer l'analyse."
                 : 'The photo is only uploaded once you confirm the analysis.'}
             </Text>
-          </View>
+          </Squircle>
 
           <TouchableOpacity
             style={[styles.actionButton, styles.primaryButton]}
@@ -992,7 +993,7 @@ export default function ScanPreviewScreen() {
                 ]}
               />
 
-              <View
+              <Squircle
                 style={[
                   styles.loadingVignetteFrame,
                   {
@@ -1019,7 +1020,7 @@ export default function ScanPreviewScreen() {
                     },
                   ]}
                 >
-                  <View
+                  <Squircle
                     style={[
                       styles.loadingVignetteMetaIcon,
                       {
@@ -1033,39 +1034,21 @@ export default function ScanPreviewScreen() {
                       accentTheme.accentColor,
                       loadingMetrics.metaIconGlyphSize,
                     )}
-                  </View>
+                  </Squircle>
                   <Text style={styles.loadingVignetteMetaText}>
                     {scanTypeLabel}
                   </Text>
                 </View>
-              </View>
+              </Squircle>
             </View>
 
             <View style={styles.progressCardFrame}>
-              <View style={styles.progressContainer} testID="scan-preview-progress-card">
-                <Text
-                  testID="scan-preview-loading-phase-eyebrow"
-                  style={styles.loadingEyebrow}
-                >
-                  {t(loadingContent.phaseEyebrowKey)}
-                </Text>
-
+              <Squircle style={styles.progressContainer} testID="scan-preview-progress-card">
                 <Text
                   testID="scan-preview-loading-percentage"
                   style={styles.progressDisplayValue}
                 >
                   {`${resolvedProgress}%`}
-                </Text>
-
-                <Text
-                  testID="scan-preview-loading-phase-headline"
-                  style={styles.loadingPhaseHeadline}
-                >
-                  {t(loadingContent.phaseHeadlineKey)}
-                </Text>
-
-                <Text style={styles.loadingSubtext}>
-                  {t(loadingContent.phaseSubtextKey)}
                 </Text>
 
                 <View style={styles.progressBarWrapper}>
@@ -1141,71 +1124,26 @@ export default function ScanPreviewScreen() {
                   })}
                 </View>
 
-                <View
-                  style={[
-                    styles.loadingTrustLine,
-                    {
-                      backgroundColor: previewTheme.loadingTrustLineBackground,
-                      borderColor: previewTheme.loadingTrustLineBorder,
-                    },
-                  ]}
-                  testID="scan-preview-trust-line"
-                >
-                  <ShieldCheck
-                    color={accentTheme.trustLineAccent}
-                    size={loadingMetrics.trustIconSize}
-                    strokeWidth={2.1}
-                  />
-                  <Text style={styles.loadingTrustLineText}>{trustLine}</Text>
-                </View>
-
-                <Text style={styles.loadingInsightsLabel}>
-                  {t('scan_preview.loading.insights_label')}
-                </Text>
-
-                <View style={styles.loadingChipsRow}>
-                  {loadingContent.insightChipKeys.map((chipKey) => (
-                    <View
-                      key={chipKey}
-                      style={[
-                        styles.loadingChip,
-                        {
-                          backgroundColor: accentTheme.chipBackground,
-                          borderColor: accentTheme.chipBorder,
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.loadingChipText,
-                          { color: accentTheme.chipText },
-                        ]}
-                      >
-                        {t(chipKey)}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
+              </Squircle>
             </View>
 
-            {shouldReserveSuperScanMiniGameSlot ? (
+            {shouldReserveScanMiniGameSlot ? (
               <View
-                pointerEvents={shouldShowSuperScanMiniGame ? 'auto' : 'none'}
+                pointerEvents={shouldShowScanMiniGame ? 'auto' : 'none'}
                 style={[
-                  styles.superScanMiniGameSlot,
-                  !shouldShowSuperScanMiniGame &&
-                    styles.superScanMiniGameSlotHidden,
+                  styles.scanMiniGameSlot,
+                  !shouldShowScanMiniGame && styles.scanMiniGameSlotHidden,
                 ]}
-                testID="scan-preview-super-scan-mini-game-slot"
+                testID="scan-preview-mini-game-slot"
               >
-                {shouldShowSuperScanMiniGame ? (
+                {shouldShowScanMiniGame ? (
                   <LoadingMiniGame
                     accentColor={accentTheme.accentColor}
                     active
                     compact
-                    durationHintMs={SUPER_SCAN_MINI_GAME_DURATION_HINT_MS}
-                    variant="superScan"
+                    durationHintMs={SCAN_MINI_GAME_DURATION_HINT_MS}
+                    variant="scan"
+                    cardHeight={resolveScanMiniGameSlotHeight(loadingDensity)}
                   />
                 ) : null}
               </View>
@@ -1261,7 +1199,7 @@ const createStyles = (
       justifyContent: 'center',
       alignItems: 'center',
       borderWidth: 1,
-      borderColor: previewTheme.closeButtonBorder,
+      borderColor: previewTheme.closeButtonBorder, borderCurve: 'continuous',
     },
     imageContainer: {
       flex: 1,
@@ -1280,7 +1218,7 @@ const createStyles = (
       shadowOffset: { width: 0, height: 20 },
       shadowOpacity: 0.24,
       shadowRadius: 40,
-      elevation: 16,
+      elevation: 16, borderCurve: 'continuous',
     },
     image: {
       width: '100%',
@@ -1297,7 +1235,7 @@ const createStyles = (
       paddingHorizontal: SPACING.md,
       paddingVertical: SPACING.sm,
       borderRadius: BORDER_RADIUS.pill,
-      borderWidth: 1,
+      borderWidth: 1, borderCurve: 'continuous',
     },
     previewHeroMetaIcon: {
       width: 30,
@@ -1305,7 +1243,7 @@ const createStyles = (
       borderRadius: 15,
       alignItems: 'center',
       justifyContent: 'center',
-      borderWidth: 1,
+      borderWidth: 1, borderCurve: 'continuous',
     },
     previewHeroMetaText: {
       fontSize: SIZES.text14,
@@ -1327,7 +1265,7 @@ const createStyles = (
       shadowRadius: 22,
       elevation: 8,
       borderTopWidth: 1,
-      borderColor: withAlpha(colors.white, 0.08),
+      borderColor: withAlpha(colors.white, 0.08), borderCurve: 'continuous',
     },
     buttonsContent: {
       paddingHorizontal: isCompactVerticalLayout ? SPACING.lg : SPACING.xl,
@@ -1344,7 +1282,7 @@ const createStyles = (
       borderColor: previewTheme.loadingTrustLineBorder,
       backgroundColor: withAlpha(colors.white, 0.03),
       marginBottom: SPACING.xl,
-      gap: SPACING.xs,
+      gap: SPACING.xs, borderCurve: 'continuous',
     },
     infoPillRow: {
       flexDirection: 'row',
@@ -1360,7 +1298,7 @@ const createStyles = (
       paddingHorizontal: SPACING.sm + 2,
       paddingVertical: SPACING.sm,
       borderRadius: BORDER_RADIUS.pill,
-      borderWidth: 1,
+      borderWidth: 1, borderCurve: 'continuous',
     },
     infoPillIcon: {
       width: 24,
@@ -1368,7 +1306,7 @@ const createStyles = (
       borderRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
-      borderWidth: 1,
+      borderWidth: 1, borderCurve: 'continuous',
     },
     infoPillText: {
       fontSize: SIZES.text12,
@@ -1408,7 +1346,7 @@ const createStyles = (
       borderRadius: 28,
       justifyContent: 'center',
       alignItems: 'center',
-      marginBottom: SPACING.md,
+      marginBottom: SPACING.md, borderCurve: 'continuous',
     },
     primaryButton: {
       backgroundColor: captureTheme.primaryButtonBackground,
@@ -1478,7 +1416,7 @@ const createStyles = (
       shadowOffset: { width: 0, height: 18 },
       shadowOpacity: 0.22,
       shadowRadius: 30,
-      elevation: 18,
+      elevation: 18, borderCurve: 'continuous',
     },
     loadingVignetteImage: {
       width: '100%',
@@ -1494,7 +1432,7 @@ const createStyles = (
       paddingHorizontal: loadingMetrics.metaPaddingHorizontal,
       paddingVertical: loadingMetrics.metaPaddingVertical,
       borderRadius: BORDER_RADIUS.pill,
-      borderWidth: 1,
+      borderWidth: 1, borderCurve: 'continuous',
     },
     loadingVignetteMetaIcon: {
       width: loadingMetrics.metaIconSize,
@@ -1502,7 +1440,7 @@ const createStyles = (
       borderRadius: loadingMetrics.metaIconSize / 2,
       justifyContent: 'center',
       alignItems: 'center',
-      borderWidth: 1,
+      borderWidth: 1, borderCurve: 'continuous',
     },
     loadingVignetteMetaText: {
       color: previewTheme.loadingVignetteMetaText,
@@ -1514,14 +1452,14 @@ const createStyles = (
       width: '100%',
       maxWidth: loadingMetrics.progressMaxWidth,
     },
-    superScanMiniGameSlot: {
+    scanMiniGameSlot: {
       width: '100%',
       maxWidth: loadingMetrics.progressMaxWidth,
-      height: resolveLoadingMiniGameHeight(true, 'superScan'),
+      height: resolveScanMiniGameSlotHeight(loadingDensity),
       marginTop: loadingDensity === 'tight' ? SPACING.sm : SPACING.md,
       overflow: 'hidden',
     },
-    superScanMiniGameSlotHidden: {
+    scanMiniGameSlotHidden: {
       opacity: 0,
     },
     completionGlow: {
@@ -1531,7 +1469,7 @@ const createStyles = (
       bottom: -12,
       left: -12,
       borderRadius: 44,
-      borderWidth: 1,
+      borderWidth: 1, borderCurve: 'continuous',
     },
     progressContainer: {
       alignItems: 'center',
@@ -1549,17 +1487,7 @@ const createStyles = (
       shadowOffset: { width: 0, height: 18 },
       shadowOpacity: 0.2,
       shadowRadius: 34,
-      elevation: 30,
-    },
-    loadingEyebrow: {
-      fontSize: loadingMetrics.eyebrowSize,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      fontFamily: FONTS.accent,
-      letterSpacing: 0,
-      textTransform: 'uppercase',
-      color: previewTheme.loadingPhaseEyebrow,
-      textAlign: 'center',
-      marginBottom: loadingMetrics.eyebrowMarginBottom,
+      elevation: 30, borderCurve: 'continuous',
     },
     progressDisplayValue: {
       fontSize: loadingMetrics.percentageSize,
@@ -1570,24 +1498,6 @@ const createStyles = (
       textAlign: 'center',
       letterSpacing: 0,
       marginBottom: loadingMetrics.percentageMarginBottom,
-    },
-    loadingPhaseHeadline: {
-      fontSize: loadingMetrics.headlineSize,
-      lineHeight: loadingMetrics.headlineLineHeight,
-      fontWeight: FONT_WEIGHTS.bold,
-      fontFamily: FONTS.display,
-      color: previewTheme.loadingStepText,
-      textAlign: 'center',
-      marginBottom: loadingMetrics.headlineMarginBottom,
-      letterSpacing: 0,
-    },
-    loadingSubtext: {
-      fontSize: loadingMetrics.subtextSize,
-      color: previewTheme.loadingSubtext,
-      textAlign: 'center',
-      paddingHorizontal: loadingMetrics.subtextPaddingHorizontal,
-      marginBottom: loadingMetrics.subtextMarginBottom,
-      lineHeight: loadingMetrics.subtextLineHeight,
     },
     progressBarWrapper: {
       width: '100%',
@@ -1600,16 +1510,16 @@ const createStyles = (
       borderRadius: 999,
       overflow: 'hidden',
       borderWidth: StyleSheet.hairlineWidth,
-      borderColor: previewTheme.progressTrackBorder,
+      borderColor: previewTheme.progressTrackBorder, borderCurve: 'continuous',
     },
     progressBarFillContainer: {
       height: '100%',
       borderRadius: 999,
-      overflow: 'hidden',
+      overflow: 'hidden', borderCurve: 'continuous',
     },
     progressBarGradient: {
       flex: 1,
-      borderRadius: 999,
+      borderRadius: 999, borderCurve: 'continuous',
     },
     loadingStepsRow: {
       width: '100%',
@@ -1626,62 +1536,16 @@ const createStyles = (
       paddingHorizontal: loadingMetrics.stepPillPaddingHorizontal,
       paddingVertical: loadingMetrics.stepPillPaddingVertical,
       borderRadius: BORDER_RADIUS.pill,
-      borderWidth: 1,
+      borderWidth: 1, borderCurve: 'continuous',
     },
     loadingStepDot: {
       width: 7,
       height: 7,
-      borderRadius: 999,
+      borderRadius: 999, borderCurve: 'continuous',
     },
     loadingStepText: {
       fontSize: loadingMetrics.stepTextSize,
       fontWeight: FONT_WEIGHTS.semiBold,
-      fontFamily: FONTS.display,
-      letterSpacing: 0,
-    },
-    loadingTrustLine: {
-      width: '100%',
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: loadingMetrics.trustLineGap,
-      paddingHorizontal: loadingMetrics.trustLinePaddingHorizontal,
-      paddingVertical: loadingMetrics.trustLinePaddingVertical,
-      borderRadius: loadingMetrics.trustLineRadius,
-      borderWidth: 1,
-      marginBottom: loadingMetrics.trustLineMarginBottom,
-    },
-    loadingTrustLineText: {
-      flex: 1,
-      fontSize: loadingMetrics.trustTextSize,
-      lineHeight: loadingMetrics.trustTextLineHeight,
-      color: previewTheme.loadingTrustLineText,
-      fontWeight: FONT_WEIGHTS.medium,
-    },
-    loadingInsightsLabel: {
-      fontSize: loadingMetrics.insightsLabelSize,
-      fontWeight: FONT_WEIGHTS.medium,
-      fontFamily: FONTS.accent,
-      letterSpacing: 0,
-      textTransform: 'uppercase',
-      color: previewTheme.loadingInsightsLabel,
-      textAlign: 'center',
-      marginBottom: loadingMetrics.insightsLabelMarginBottom,
-    },
-    loadingChipsRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      justifyContent: 'center',
-      gap: loadingMetrics.chipsGap,
-    },
-    loadingChip: {
-      borderRadius: BORDER_RADIUS.pill,
-      borderWidth: 1,
-      paddingHorizontal: loadingMetrics.chipPaddingHorizontal,
-      paddingVertical: loadingMetrics.chipPaddingVertical,
-    },
-    loadingChipText: {
-      fontSize: loadingMetrics.chipTextSize,
-      fontWeight: FONT_WEIGHTS.medium,
       fontFamily: FONTS.display,
       letterSpacing: 0,
     },

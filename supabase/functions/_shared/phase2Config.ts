@@ -6,6 +6,7 @@ export const DEFAULT_PHASE2_FEATURE_FLAGS: Phase2FeatureFlags = {
   scope: 'mobile',
   social_enabled: false,
   coach_enabled: false,
+  coach_chat_enabled: false,
   entry_offer_enabled: false,
   social_comments_enabled: false,
   moderation_enabled: false,
@@ -32,6 +33,9 @@ export function normalizePhase2FeatureFlags(payload: unknown): Phase2FeatureFlag
     coach_enabled:
       readOptionalBoolean(payload.coach_enabled) ??
       DEFAULT_PHASE2_FEATURE_FLAGS.coach_enabled,
+    coach_chat_enabled:
+      readOptionalBoolean(payload.coach_chat_enabled) ??
+      DEFAULT_PHASE2_FEATURE_FLAGS.coach_chat_enabled,
     entry_offer_enabled:
       readOptionalBoolean(payload.entry_offer_enabled) ??
       DEFAULT_PHASE2_FEATURE_FLAGS.entry_offer_enabled,

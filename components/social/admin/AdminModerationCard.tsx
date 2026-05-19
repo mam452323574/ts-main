@@ -536,7 +536,7 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.full,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
+    borderWidth: 1, borderCurve: 'continuous',
   },
   typeChipLabel: {
     fontSize: 11,
@@ -548,7 +548,7 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.full,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
+    borderWidth: 1, borderCurve: 'continuous',
   },
   stateBadgeLabel: {
     fontSize: 11,
@@ -561,7 +561,7 @@ const styles = StyleSheet.create({
     gap: SPACING.xs - 1,
     paddingHorizontal: SPACING.sm,
     borderRadius: BORDER_RADIUS.full,
-    borderWidth: 1,
+    borderWidth: 1, borderCurve: 'continuous',
   },
   signalChipLabel: {
     fontSize: 11,
@@ -597,7 +597,7 @@ const createStyles = (
       width: 140,
       height: 140,
       borderRadius: 70,
-      opacity: 0.85,
+      opacity: 0.85, borderCurve: 'continuous',
     },
     cardFrame: {
       overflow: 'hidden',
@@ -609,7 +609,7 @@ const createStyles = (
       shadowOffset: { width: 0, height: 14 },
       shadowOpacity: 0.3,
       shadowRadius: 28,
-      elevation: 8,
+      elevation: 8, borderCurve: 'continuous',
     },
     cardRail: {
       position: 'absolute',
@@ -618,7 +618,7 @@ const createStyles = (
       left: 0,
       width: 3,
       borderTopRightRadius: BORDER_RADIUS.full,
-      borderBottomRightRadius: BORDER_RADIUS.full,
+      borderBottomRightRadius: BORDER_RADIUS.full, borderCurve: 'continuous',
     },
     card: {
       gap: SPACING.md,
@@ -634,7 +634,7 @@ const createStyles = (
       paddingVertical: SPACING.xs + 2,
       backgroundColor: chrome.dangerAccentSoft,
       borderWidth: 1,
-      borderColor: chrome.dangerAccentBorder,
+      borderColor: chrome.dangerAccentBorder, borderCurve: 'continuous',
     },
     errorBannerText: {
       flex: 1,
@@ -659,7 +659,7 @@ const createStyles = (
       gap: SPACING.xs - 1,
       backgroundColor: chrome.dangerAccentSoft,
       borderWidth: 1,
-      borderColor: chrome.dangerAccentBorder,
+      borderColor: chrome.dangerAccentBorder, borderCurve: 'continuous',
     },
     banBadgeLabel: {
       fontSize: 10,
@@ -684,7 +684,7 @@ const createStyles = (
       borderRadius: BORDER_RADIUS.full,
       alignItems: 'center',
       justifyContent: 'center',
-      borderWidth: 1,
+      borderWidth: 1, borderCurve: 'continuous',
     },
     actionButtonDisabled: {
       opacity: 0.52,
@@ -697,7 +697,7 @@ const createStyles = (
       justifyContent: 'center',
       borderWidth: 1,
       borderColor: tone.accentBorder,
-      backgroundColor: chrome.surfaceMuted,
+      backgroundColor: chrome.surfaceMuted, borderCurve: 'continuous',
     },
     selectionCheckboxSelected: {
       backgroundColor: tone.accent,
@@ -712,7 +712,7 @@ const createStyles = (
       borderRadius: BORDER_RADIUS.full,
       borderWidth: 1,
       borderColor: chrome.borderSubtle,
-      backgroundColor: chrome.surfaceMuted,
+      backgroundColor: chrome.surfaceMuted, borderCurve: 'continuous',
     },
     moreButtonLabel: {
       fontSize: 11,
@@ -728,7 +728,7 @@ const createStyles = (
       paddingVertical: SPACING.xs + 2,
       backgroundColor: chrome.trustAccentSoft,
       borderWidth: 1,
-      borderColor: chrome.trustAccentBorder,
+      borderColor: chrome.trustAccentBorder, borderCurve: 'continuous',
     },
     pendingCardLabel: {
       flex: 1,
@@ -742,7 +742,7 @@ const createStyles = (
       padding: SPACING.sm + 2,
       backgroundColor: tone.proofSurface,
       borderWidth: 1,
-      borderColor: tone.proofBorder,
+      borderColor: tone.proofBorder, borderCurve: 'continuous',
     },
     bodyText: {
       fontSize: SIZES.text14,
@@ -755,7 +755,7 @@ const createStyles = (
       borderRadius: BORDER_RADIUS.xl,
       backgroundColor: chrome.surfaceStrong,
       borderWidth: 1,
-      borderColor: chrome.borderSubtle,
+      borderColor: chrome.borderSubtle, borderCurve: 'continuous',
     },
     reasonWrap: {
       flexDirection: 'row',
@@ -768,7 +768,7 @@ const createStyles = (
       borderRadius: BORDER_RADIUS.full,
       backgroundColor: tone.summarySurface,
       borderWidth: 1,
-      borderColor: tone.summaryBorder,
+      borderColor: tone.summaryBorder, borderCurve: 'continuous',
     },
     reasonChipLabel: {
       fontSize: 10,
@@ -792,7 +792,7 @@ const createStyles = (
       borderRadius: BORDER_RADIUS.full,
       backgroundColor: tone.subtleSurface,
       borderWidth: 1,
-      borderColor: tone.subtleBorder,
+      borderColor: tone.subtleBorder, borderCurve: 'continuous',
     },
     detailsToggleLabel: {
       fontSize: 11,
@@ -805,7 +805,7 @@ const createStyles = (
       gap: SPACING.xs,
       backgroundColor: chrome.surfaceMuted,
       borderWidth: 1,
-      borderColor: chrome.borderSubtle,
+      borderColor: chrome.borderSubtle, borderCurve: 'continuous',
     },
     detailLine: {
       color: chrome.textSecondary,

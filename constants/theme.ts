@@ -80,11 +80,26 @@ const SYSTEM_FONT_FAMILY = Platform.select({
   default: 'System',
 }) as string;
 
+const SERIF_FONT_FAMILY = Platform.select({
+  ios: 'Georgia',
+  android: 'serif',
+  web: 'Georgia, "Times New Roman", serif',
+  default: 'serif',
+}) as string;
+
+const MONO_FONT_FAMILY = Platform.select({
+  ios: 'Menlo',
+  android: 'monospace',
+  web: '"SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
+  default: 'monospace',
+}) as string;
+
 export const FONT_FAMILIES = {
   body: SYSTEM_FONT_FAMILY,
   display: SYSTEM_FONT_FAMILY,
   accent: SYSTEM_FONT_FAMILY,
-  mono: 'monospace',
+  serif: SERIF_FONT_FAMILY,
+  mono: MONO_FONT_FAMILY,
 };
 
 export const FONTS = {
@@ -113,9 +128,14 @@ export const SIZES = {
   text10: 10,
   text12: 12,
   text14: 14,
+  text15: 15,
   text16: 16,
   text18: 18,
   text20: 20,
+  text22: 22,
+  text24: 24,
+  text26: 26,
+  text28: 28,
   scoreNumber: 48,
   scoreSub: 14,
 };
@@ -146,6 +166,14 @@ export const BORDER_RADIUS = {
   tag: 9999,
   full: 9999,
 };
+
+export const SQUIRCLE_SMOOTHING = {
+  default: 0.6,
+  soft: 0.5,
+  sharp: 0.7,
+} as const;
+
+export const SQUIRCLE_PILL_THRESHOLD = 999;
 
 export const SCANNER_TOKENS = {
   captureLightInner: '#FFFFFF',
@@ -321,7 +349,7 @@ export const THEME_TOKENS = {
     },
     premium: {
       accent: LIGHT_COLORS.gold,
-      foreground: '#4B3517',
+      foreground: '#3F2914',
       background: LIGHT_COLORS.goldLight,
       border: 'rgba(201, 164, 106, 0.34)',
       glow: 'rgba(201, 164, 106, 0.18)',
@@ -1219,4 +1247,46 @@ export function getMainPageChrome(
         : withAlpha(colors.primaryText, 0.035),
     },
   };
+}
+
+/**
+ * Coach card "paper" surface tokens.
+ * Iteration 5 — re-aligned on the app's native palette (no parchment cream).
+ * Light surfaces are pure white / off-white in the spirit of Opal; dark
+ * surfaces match the app's warm dark canvas so the coach card stays homogeneous
+ * with HomeScreen, ScannerScreen and result screens.
+ */
+export const COACH_PAPER_PALETTE = {
+  light: {
+    canvas: '#FFFFFF',
+    raised: '#F6F6F3',
+    border: 'rgba(28, 28, 30, 0.08)',
+    hairline: 'rgba(28, 28, 30, 0.06)',
+    ink: '#1C1C1E',
+    inkMuted: '#63666D',
+    inkSubtle: 'rgba(28, 28, 30, 0.42)',
+  },
+  dark: {
+    canvas: '#121212',
+    raised: '#1B1B1B',
+    border: 'rgba(255, 255, 255, 0.08)',
+    hairline: 'rgba(255, 255, 255, 0.06)',
+    ink: '#F7F7F7',
+    inkMuted: '#8E8E93',
+    inkSubtle: 'rgba(247, 247, 247, 0.5)',
+  },
+} as const;
+
+export interface CoachPaperSurface {
+  canvas: string;
+  raised: string;
+  border: string;
+  hairline: string;
+  ink: string;
+  inkMuted: string;
+  inkSubtle: string;
+}
+
+export function getCoachPaperSurface(isDark: boolean): CoachPaperSurface {
+  return isDark ? COACH_PAPER_PALETTE.dark : COACH_PAPER_PALETTE.light;
 }

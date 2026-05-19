@@ -1,5 +1,8 @@
 import { DARK_COLORS, LIGHT_COLORS, withAlpha } from '@/constants/theme';
-import { resolveScanFlowAccentTheme } from '@/utils/scanFlowVisualTheme';
+import {
+  resolveScanCaptureVisualTheme,
+  resolveScanFlowAccentTheme,
+} from '@/utils/scanFlowVisualTheme';
 
 describe('scan flow accent themes', () => {
   it('keeps body, health, and nutrition distinct with softer light backgrounds', () => {
@@ -24,5 +27,14 @@ describe('scan flow accent themes', () => {
       withAlpha(scanner.accentStrongColor, 0.24),
     );
     expect(scanner.completionGlowSoft).toBe(withAlpha(scanner.accentColor, 0.12));
+  });
+
+  it('keeps scanner capture chrome focused on live camera overlays without warm-up tokens', () => {
+    const capture = resolveScanCaptureVisualTheme(LIGHT_COLORS, false);
+
+    expect(capture.overlayTint).toBe('transparent');
+    expect(capture.topScrimGradient).toHaveLength(2);
+    expect(capture.bottomScrimGradient).toHaveLength(3);
+    expect(capture).not.toHaveProperty('warmupGradient');
   });
 });

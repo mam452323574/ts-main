@@ -1,4 +1,5 @@
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import SettingsScreen from '@/app/settings';
@@ -41,6 +42,7 @@ jest.mock('lucide-react-native', () => ({
   ShieldAlert: 'ShieldAlert',
   LogOut: 'LogOut',
   Bell: 'Bell',
+  ArrowLeft: 'ArrowLeft',
   ChevronLeft: 'ChevronLeft',
   AlertTriangle: 'AlertTriangle',
   Settings: 'Settings',
@@ -202,6 +204,27 @@ const buildUserProfile = (
   ...overrides,
 });
 
+function collectTestIds(node: any, acc: string[] = []): string[] {
+  if (!node) {
+    return acc;
+  }
+
+  if (Array.isArray(node)) {
+    node.forEach((child) => collectTestIds(child, acc));
+    return acc;
+  }
+
+  if (node.props?.testID) {
+    acc.push(node.props.testID);
+  }
+
+  if (node.children) {
+    collectTestIds(node.children, acc);
+  }
+
+  return acc;
+}
+
 describe('SettingsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -230,6 +253,38 @@ describe('SettingsScreen', () => {
     expect(screen.getByTestId('settings-quota-summary')).toBeTruthy();
     expect(screen.getAllByText('20/20')).toHaveLength(4);
     expect(screen.queryByText('...')).toBeNull();
+  });
+
+  it('renders the settings chrome inside the scroll flow before the page content', () => {
+    const rendered = render(<SettingsScreen />);
+    const testIds = collectTestIds(rendered.toJSON());
+    const topChromeStyle = StyleSheet.flatten(
+      screen.getByTestId('settings-top-chrome').props.style,
+    );
+
+    expect(screen.getByTestId('settings-scroll')).toBeTruthy();
+    expect(screen.getByTestId('settings-top-chrome')).toBeTruthy();
+    expect(screen.queryByTestId('settings-top-chrome-handle')).toBeNull();
+    expect(screen.getByTestId('settings-top-chrome-left-action')).toBeTruthy();
+    expect(screen.getByTestId('settings-screen-header')).toBeTruthy();
+    expect(testIds.indexOf('settings-scroll')).toBeLessThan(
+      testIds.indexOf('settings-top-chrome'),
+    );
+    expect(testIds.indexOf('settings-top-chrome')).toBeLessThan(
+      testIds.indexOf('settings-profile-header'),
+    );
+    expect(topChromeStyle.backgroundColor).toBe('#000000');
+    expect(topChromeStyle.borderBottomWidth).toBe(0);
+    expect(topChromeStyle.borderBottomColor).toBe('transparent');
+    expect(screen.getByTestId('settings-quota-summary')).toBeTruthy();
+  });
+
+  it('routes the settings chrome back action through router.back', () => {
+    render(<SettingsScreen />);
+
+    fireEvent.press(screen.getByTestId('settings-top-chrome-left-action'));
+
+    expect(mockRouterBack).toHaveBeenCalledTimes(1);
   });
 
   it('renders explicit loading text for unresolved quota rows', () => {

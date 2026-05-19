@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -16,6 +17,7 @@ import { ModalHandle } from '@/components/ModalHandle';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ScreenState } from '@/components/ScreenState';
 import { CoachHistoryCard } from '@/components/coach/CoachHistoryCard';
+import { CoachConversationsList } from '@/components/coach/CoachConversationsList';
 import {
   BORDER_RADIUS,
   FONT_WEIGHTS,
@@ -34,6 +36,14 @@ import {
   resolveCoachUserFacingErrorMessage,
 } from '@/utils/coachLocalization';
 import { resolveCoachCtaRoute } from '@/utils/coachRoutes';
+import { Squircle } from '@/components/Squircle';
+
+type CoachHistoryTab = 'requests' | 'conversations';
+
+const TAB_COPY = {
+  requests: 'Demandes',
+  conversations: 'Conversations',
+};
 
 const RECENT_HISTORY_WINDOW_MS = 24 * 60 * 60 * 1000;
 
@@ -64,6 +74,8 @@ export default function CoachHistoryScreen() {
     null,
   );
   const hasInitializedExpandedHistoryEntry = useRef(false);
+  const [activeTab, setActiveTab] = useState<CoachHistoryTab>('requests');
+  const [includeArchivedConversations, setIncludeArchivedConversations] = useState(false);
   const excludeEntryId = Array.isArray(excludeEntryIdParam)
     ? excludeEntryIdParam[0] ?? null
     : excludeEntryIdParam ?? null;
@@ -149,10 +161,10 @@ export default function CoachHistoryScreen() {
 
     if (loadError && historyEntries.length > 0) {
       return (
-        <View style={styles.footerStateCard} testID="coach-history-footer-error-state">
+        <Squircle style={styles.footerStateCard} testID="coach-history-footer-error-state">
           <Text style={styles.footerErrorText}>{loadErrorBody}</Text>
           <Button title={t('common.retry')} onPress={handleRetry} />
-        </View>
+        </Squircle>
       );
     }
 
@@ -201,13 +213,42 @@ export default function CoachHistoryScreen() {
           backTestID="coach-history-back-button"
         />
 
-        {showLoadingState ? (
+        <View style={styles.tabSelectorRow} testID="coach-history-tab-selector">
+          {(['requests', 'conversations'] as CoachHistoryTab[]).map((tab) => {
+            const isActive = activeTab === tab;
+            return (
+              <Pressable
+                key={tab}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isActive }}
+                onPress={() => setActiveTab(tab)}
+                style={[styles.tabPill, isActive ? styles.tabPillActive : null]}
+                testID={`coach-history-tab-${tab}`}
+              >
+                <Text style={[styles.tabPillLabel, isActive ? styles.tabPillLabelActive : null]}>
+                  {TAB_COPY[tab]}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {activeTab === 'conversations' ? (
+          <CoachConversationsList
+            includeArchived={includeArchivedConversations}
+            onToggleArchived={setIncludeArchivedConversations}
+            onStartNew={handleStartNewAdvice}
+            testID="coach-conversations-list"
+          />
+        ) : null}
+
+        {activeTab === 'requests' && showLoadingState ? (
           <View style={styles.stateContainer}>
             <ScreenState tone="loading" testID="coach-history-loading-state" />
           </View>
         ) : null}
 
-        {showErrorState ? (
+        {activeTab === 'requests' && showErrorState ? (
           <View style={styles.stateContainer}>
             <ScreenState
               tone="error"
@@ -220,7 +261,7 @@ export default function CoachHistoryScreen() {
           </View>
         ) : null}
 
-        {!showLoadingState && !showErrorState ? (
+        {activeTab === 'requests' && !showLoadingState && !showErrorState ? (
           <FlatList
             data={historyEntries}
             keyExtractor={(item) => item.id}
@@ -356,6 +397,35 @@ const createStyles = (colors: any, insets: { bottom: number }) =>
       flex: 1,
       backgroundColor: colors.background,
     },
+    tabSelectorRow: {
+      flexDirection: 'row',
+      gap: SPACING.xs,
+      paddingHorizontal: SPACING.page,
+      paddingBottom: SPACING.sm,
+    },
+    tabPill: {
+      flex: 1,
+      paddingVertical: SPACING.sm + 2,
+      paddingHorizontal: SPACING.md,
+      borderRadius: BORDER_RADIUS.pill,
+      borderWidth: 1,
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      backgroundColor: colors.cardBackground,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    tabPillActive: {
+      backgroundColor: withAlpha(colors.primary, 0.12),
+      borderColor: withAlpha(colors.primary, 0.32),
+    },
+    tabPillLabel: {
+      fontSize: SIZES.text14,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      color: withAlpha(colors.primaryText, 0.65),
+    },
+    tabPillLabelActive: {
+      color: colors.primary,
+    },
     header: {
       flexDirection: 'row',
       alignItems: 'flex-start',
@@ -371,7 +441,7 @@ const createStyles = (colors: any, insets: { bottom: number }) =>
       justifyContent: 'center',
       backgroundColor: colors.cardBackground,
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.06),
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.06), borderCurve: 'continuous',
     },
     headerCopy: {
       flex: 1,
@@ -418,7 +488,7 @@ const createStyles = (colors: any, insets: { bottom: number }) =>
       alignItems: 'center',
       justifyContent: 'center',
       gap: SPACING.xs,
-      paddingHorizontal: SPACING.md,
+      paddingHorizontal: SPACING.md, borderCurve: 'continuous',
     },
     loadMoreButtonDisabled: {
       opacity: 0.7,
@@ -436,7 +506,7 @@ const createStyles = (colors: any, insets: { bottom: number }) =>
       borderWidth: 1,
       borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.07),
       backgroundColor: colors.cardBackground,
-      gap: SPACING.sm,
+      gap: SPACING.sm, borderCurve: 'continuous',
     },
     footerErrorText: {
       fontSize: SIZES.text12,
@@ -452,7 +522,7 @@ const createStyles = (colors: any, insets: { bottom: number }) =>
       borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.07),
       gap: SPACING.sm,
       alignItems: 'flex-start',
-      justifyContent: 'flex-start',
+      justifyContent: 'flex-start', borderCurve: 'continuous',
     },
     stateCardCentered: {
       alignItems: 'center',

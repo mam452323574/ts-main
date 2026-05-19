@@ -23,6 +23,7 @@ import {
   normalizeUsernameInput,
   validateCanonicalUsername,
 } from '@/utils/username';
+import { Squircle } from '@/components/Squircle';
 
 type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'invalid';
 
@@ -276,9 +277,9 @@ export default function UsernameSetupScreen() {
         )}
 
         {error ? (
-          <View style={styles.errorContainer}>
+          <Squircle style={styles.errorContainer}>
             <Text style={styles.errorText}>{error}</Text>
-          </View>
+          </Squircle>
         ) : null}
 
         <Button
@@ -311,7 +312,7 @@ const createStyles = (colors: any) =>
       backgroundColor: withAlpha(colors.error, 0.10),
       paddingVertical: SPACING.md,
       paddingHorizontal: SPACING.lg,
-      borderRadius: BORDER_RADIUS.xl,
+      borderRadius: BORDER_RADIUS.xl, borderCurve: 'continuous',
     },
     errorText: {
       color: colors.error,

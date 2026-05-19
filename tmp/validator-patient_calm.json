@@ -1,0 +1,41 @@
+{
+  "persona": "patient_calm",
+  "tests": [
+    {
+      "q": "donne un plan sur 2 jours de récup",
+      "simulated_response": "Prenons les choses doucement, je te propose un découpage simple sur deux jours.\n\nJour 1 :\n- Repos prolongé, lever sans précipitation et écoute des sensations\n- Étirements doux des jambes et du dos, environ 10 minutes\n- Repas légers et réguliers, peu d'écrans en soirée\n- Coucher tôt, lumière tamisée 30 min avant de dormir\n\nJour 2 :\n- Réveil sans alarme si possible, petit-déjeuner posé\n- Marche tranquille de 20 minutes au calme\n- Étirements du dos et nuque, respiration lente quelques minutes\n- Reprise progressive des activités selon ton ressenti\n\nDis-moi comment tu te sens à la fin du Jour 1, on ajustera si besoin.",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": "yes"
+    },
+    {
+      "q": "j ai mal au dos",
+      "simulated_response": "Je comprends, le mal de dos peut vraiment peser sur la journée. On va y aller calmement.\n\nQuelques pistes douces à essayer :\n- Allonge-toi sur le dos, genoux pliés, et reste 2-3 minutes le temps de relâcher les lombaires\n- Étirement chat-vache à quatre pattes, lentement, sur 5-6 respirations\n- Évite les positions assises prolongées, lève-toi toutes les 30 minutes\n- Applique une source de chaleur (bouillotte, douche tiède) si la douleur est musculaire\n\nSi la douleur dure plus de quelques jours, irradie dans la jambe, ou s'accompagne de fourmillements ou de fièvre, consulte un médecin ou un kiné. Tu veux qu'on regarde plutôt la posture au quotidien ou des étirements plus ciblés ?",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": "yes"
+    },
+    {
+      "q": "c est quoi la capitale de l Italie ?",
+      "simulated_response": "Rome.",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": "yes"
+    }
+  ],
+  "overall_verdict": "PASS",
+  "weak_spots": [
+    "Le ton 'patient_calm' (low pressure, empathique) peut pousser le LLM à ajouter une phrase d'ouverture empathique avant la structure Jour 1/Jour 2 — risque marginal de délayage mais ne viole pas les règles.",
+    "Sur 'j ai mal au dos', le ton calme peut inciter à proposer trop de pistes (4+ tirets) ou à glisser une suggestion 'hydrate-toi' en queue de liste sous prétexte de 'bien-être global' — la règle (4) doit rester saillante.",
+    "Le prompt n'interdit pas explicitement de poser une question de relance, ce qui est cohérent avec le ton patient mais peut allonger inutilement la réponse à une question factuelle.",
+    "La règle (3) 'une seule liste numérotée' n'interdit pas explicitement DEUX listes à puces — le modèle pourrait empiler deux blocs de tirets séparés et techniquement passer la règle ; à clarifier si on veut limiter aussi les puces multiples.",
+    "Aucune contrainte explicite sur la longueur d'une réponse à une question factuelle (capitale) : un modèle bavard peut ajouter 'Rome, la Ville Éternelle, sur le Tibre…' au lieu de 'Rome.' strict."
+  ],
+  "suggested_prompt_patches": [
+    "Ajouter une règle (8) : 'QUESTION FACTUELLE COURTE (capitale, date, définition simple) → réponse en 1 à 8 mots, pas de phrase d'accroche, pas de relance.'",
+    "Renforcer la règle (4) en listant explicitement 'pas d hydratation en bonus' même en fin de liste, sauf si la question porte sur la soif/déshydratation.",
+    "Préciser dans (3) : 'pas plus d UNE liste à puces non plus quand une seule suffit ; regrouper les actions sous un même bloc'.",
+    "Pour le ton patient_calm, ajouter 'reste bref : l empathie tient en UNE phrase d ouverture maximum, le reste est concret.'",
+    "Ajouter un garde-fou anti-relance : 'Ne pose une question de relance que si une info essentielle manque réellement. Pas de relance sur une demande factuelle ou déjà claire.'"
+  ]
+}

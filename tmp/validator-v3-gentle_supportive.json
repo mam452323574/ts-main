@@ -1,0 +1,36 @@
+{
+  "persona": "gentle_supportive",
+  "tests": [
+    {
+      "q": "donne un plan sur 2 jours de récup",
+      "simulated_response": "Avec plaisir, voici un petit plan tout doux pour bien récupérer.\n\nJour 1 :\n- Étirements lents du dos et des jambes pendant 10 minutes au réveil\n- Repas légers et chauds (soupe, légumes vapeur, riz)\n- Bain tiède ou douche chaude en fin de journée pour relâcher les muscles\n- Coucher tôt, lumière tamisée 30 minutes avant\n\nJour 2 :\n- Mobilité douce des épaules et hanches, 10 minutes\n- Auto-massage des zones tendues (mollets, nuque) avec une balle ou les mains\n- Moment calme sans écran (lecture, musique douce) en milieu de journée\n- Bilan en fin de journée : noter ce qui fait du bien et ce qui tire encore\n\nSi une douleur persiste au-delà de ces 2 jours, n'hésite pas à en parler à un pro de santé. Tu es entre de bonnes mains avec toi-même.",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": "yes",
+      "respects_factual_cap": "n/a"
+    },
+    {
+      "q": "j ai mal au dos",
+      "simulated_response": "Je suis désolée que ton dos te fasse souffrir. Voici une chose simple à essayer tout de suite : allonge-toi sur le dos, genoux pliés, pieds au sol, et reste comme ça 5 minutes en relâchant les épaules. Tu peux aussi faire un étirement doux du chat (à quatre pattes, arrondir puis creuser le dos lentement) sur 1 à 2 minutes.\n\nPour la suite, vérifie ta posture assise (écran à hauteur des yeux, dos soutenu) et évite de rester trop longtemps dans la même position.\n\nPour mieux t'aider, est-ce que la douleur est plutôt en bas du dos, au milieu, ou entre les omoplates ? Et depuis quand tu la ressens ? Si elle est forte, qu'elle descend dans la jambe ou s'accompagne d'autres symptômes, consulte un médecin ou un kiné, sans attendre.",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": "yes",
+      "respects_factual_cap": "n/a"
+    },
+    {
+      "q": "c est quoi la capitale de l Italie ?",
+      "simulated_response": "C'est Rome.",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": "yes",
+      "respects_factual_cap": "yes"
+    }
+  ],
+  "overall_verdict": "PASS",
+  "remaining_loopholes": [
+    "Soft risk: under stress, a gentle persona could still drift toward 'écoute ton corps, repose-toi bien' wording that borders on the sleep-reflex; R4 lists examples but is not exhaustive, so a model may invent a non-listed soft synonym (e.g. 'fais une vraie pause cocooning') and self-justify it as topical.",
+    "R5 says 'au moins 1 action concrète AVANT de poser des questions' but does not cap the number of clarifying questions; a verbose gentle persona can still stack 3-4 questions after the action, diluting the answer.",
+    "R2 forbids '1.' under period headers but does not forbid sub-bullets or letters (a., b.) which could reintroduce ordered structure under Jour 1: by another name.",
+    "The 'Max 4 paragraphes courts OU structure par période' is an OR, but on symptom questions (Q2) the model may produce 4 paragraphs that each smuggle one reflex-adjacent suggestion, staying within the letter of R4 while violating its spirit."
+  ]
+}

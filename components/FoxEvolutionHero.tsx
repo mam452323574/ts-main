@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -25,10 +26,19 @@ import {
   withAlpha,
 } from '@/constants/theme';
 import type { GamificationData } from '@/types';
+import { Squircle } from '@/components/Squircle';
 
 interface FoxEvolutionHeroProps {
   gamification: GamificationData;
   progress: GamificationStageProgress;
+}
+
+interface MascotSizes {
+  isCompact: boolean;
+  isTablet: boolean;
+  mascotImageSize: number;
+  mascotShellSize: number;
+  haloSize: number;
 }
 
 export function FoxEvolutionHero({
@@ -43,10 +53,33 @@ export function FoxEvolutionHero({
     [colors, isDark],
   );
 
+  const sizes = useMemo<MascotSizes>(() => {
+    const isCompact = windowWidth < 390;
+    const isTablet = windowWidth >= 768;
+    const mascotImageSize = isTablet ? 320 : isCompact ? 240 : 280;
+    const mascotShellSize = mascotImageSize + 16;
+    const haloSize = Math.round(mascotImageSize * 1.5);
+    return { isCompact, isTablet, mascotImageSize, mascotShellSize, haloSize };
+  }, [windowWidth]);
+
   const styles = useMemo(
-    () => createStyles(colors, isDark, premiumHealth, windowWidth),
-    [colors, isDark, premiumHealth, windowWidth],
+    () => createStyles(colors, isDark, premiumHealth, sizes),
+    [colors, isDark, premiumHealth, sizes],
   );
+
+  const haloColors = useMemo(
+    () => ({
+      inner: mixColors(
+        premiumHealth.trustAccent,
+        premiumHealth.premiumAccent,
+        0.35,
+      ),
+      mid: premiumHealth.trustAccent,
+      outer: premiumHealth.trustAccent,
+    }),
+    [premiumHealth],
+  );
+
   const backgroundGradientColors = useMemo(
     () => premiumHealth.moduleGradient,
     [premiumHealth],
@@ -58,44 +91,59 @@ export function FoxEvolutionHero({
   const progressWidth: `${number}%` = progress.isFinalStage
     ? '100%'
     : `${Number(progress.progressPercent.toFixed(2))}%`;
-  const stageSpan = progress.isFinalStage
-    ? 0
-    : Math.max(
-        (progress.nextStageMinScans ?? progress.currentStageMinScans) -
-          progress.currentStageMinScans,
-        0,
-      );
 
   return (
-    <View style={styles.shell} testID="fox-evolution-hero">
+    <Squircle style={styles.shell} testID="fox-evolution-hero">
       <LinearGradient
         colors={backgroundGradientColors}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.backgroundGradient}
       />
-      <View style={[styles.glow, styles.glowPrimary]} />
-      <View style={[styles.glow, styles.glowSecondary]} />
 
-      <View style={styles.headerRow}>
-        <View style={styles.copyColumn}>
-          <Text style={styles.stageLabel} testID="fox-evolution-stage-label">
-            {t('home.fox_evolution.stage_label', {
-              stage: progress.currentStage,
-            })}
-          </Text>
-          {progress.isFinalStage ? (
-            <Text
-              style={styles.supportingText}
-              testID="fox-evolution-supporting-text"
-            >
-              {t('home.fox_evolution.max_stage')}
-            </Text>
-          ) : null}
-        </View>
+      <View
+        style={styles.companionPill}
+        testID="fox-evolution-companion-pill"
+      >
+        <Text style={styles.companionPillText}>
+          {t('home.companion_title')}
+        </Text>
+      </View>
 
+      <View style={styles.heroBlock}>
         <View style={styles.mascotShell} testID="fox-evolution-mascot-shell">
-          <View style={styles.mascotHalo} />
+          <Svg
+            width={sizes.haloSize}
+            height={sizes.haloSize}
+            style={styles.mascotHaloSvg}
+            pointerEvents="none"
+          >
+            <Defs>
+              <RadialGradient id="foxHalo" cx="50%" cy="50%" r="50%">
+                <Stop
+                  offset="0%"
+                  stopColor={haloColors.inner}
+                  stopOpacity={isDark ? 0.55 : 0.42}
+                />
+                <Stop
+                  offset="45%"
+                  stopColor={haloColors.mid}
+                  stopOpacity={isDark ? 0.22 : 0.18}
+                />
+                <Stop
+                  offset="100%"
+                  stopColor={haloColors.outer}
+                  stopOpacity={0}
+                />
+              </RadialGradient>
+            </Defs>
+            <Circle
+              cx={sizes.haloSize / 2}
+              cy={sizes.haloSize / 2}
+              r={sizes.haloSize / 2}
+              fill="url(#foxHalo)"
+            />
+          </Svg>
           <ExpoImage
             source={mascotAssetSource}
             style={styles.mascotImage}
@@ -104,38 +152,49 @@ export function FoxEvolutionHero({
             accessibilityLabel={`Mascot stage ${progress.currentStage}`}
           />
         </View>
+
+        <Text style={styles.stageLabel} testID="fox-evolution-stage-label">
+          {t('home.fox_evolution.stage_label', {
+            stage: progress.currentStage,
+          })}
+        </Text>
       </View>
 
       <View style={styles.progressSection}>
         <View style={styles.progressMeta}>
-          <View style={styles.progressRangePill}>
-            <Text
-              style={styles.progressRangeText}
-              testID="fox-evolution-progress-range"
-            >
+          <View
+            style={[
+              styles.evolutionStat,
+              styles.evolutionStatAccent,
+              styles.progressMetaBadge,
+            ]}
+            testID={
+              progress.isFinalStage
+                ? 'fox-evolution-final-stage'
+                : 'fox-evolution-scans-remaining'
+            }
+          >
+            <Text style={styles.evolutionStatValue}>
               {progress.isFinalStage
-                ? t('home.fox_evolution.stage_range_max', {
-                    start: progress.currentStageMinScans,
-                  })
-                : t('home.fox_evolution.stage_range', {
-                    start: progress.currentStageMinScans,
-                    end: progress.nextStageMinScans,
+                ? t('home.fox_evolution.max_stage')
+                : t('home.fox_evolution.scans_remaining_short', {
+                    count: progress.scansRemaining,
                   })}
             </Text>
           </View>
           {!progress.isFinalStage ? (
-            <View style={styles.progressValuePill}>
-              <Text
-                style={styles.progressValueText}
-                testID="fox-evolution-stage-progress"
-              >
-                {t('home.fox_evolution.stage_progress', {
-                  current: progress.scansIntoStage,
-                  total: stageSpan,
-                })}
-              </Text>
-            </View>
-          ) : null}
+            <Text style={styles.progressValueText}>
+              {t('home.fox_evolution.progress_goal_label', {
+                count: progress.nextStageMinScans,
+              })}
+            </Text>
+          ) : (
+            <Text style={styles.progressValueText}>
+              {t('home.fox_evolution.stage_range_max', {
+                start: progress.currentStageMinScans,
+              })}
+            </Text>
+          )}
         </View>
 
         <View style={styles.progressTrack}>
@@ -148,7 +207,7 @@ export function FoxEvolutionHero({
           />
         </View>
       </View>
-    </View>
+    </Squircle>
   );
 }
 
@@ -156,14 +215,12 @@ const createStyles = (
   colors: any,
   isDark: boolean,
   premiumHealth: ReturnType<typeof buildPremiumHealthPalette>,
-  windowWidth: number,
+  sizes: MascotSizes,
 ) => {
-  const isCompact = windowWidth < 390;
-  const isTablet = windowWidth >= 768;
-  const mascotShellSize = isTablet ? 236 : isCompact ? 182 : 208;
-  const mascotImageSize = isTablet ? 220 : isCompact ? 164 : 190;
+  const { isCompact, isTablet, mascotImageSize, mascotShellSize, haloSize } =
+    sizes;
   const shellPaddingHorizontal = isTablet ? SPACING.lg : SPACING.md;
-  const shellPaddingVertical = isTablet ? SPACING.lg : SPACING.md;
+  const shellPaddingVertical = isTablet ? SPACING.xl : SPACING.lg;
 
   return StyleSheet.create({
     shell: {
@@ -187,54 +244,92 @@ const createStyles = (
             shadowRadius: 16,
             shadowOffset: { width: 0, height: 8 },
           }),
+      borderCurve: 'continuous',
     },
     backgroundGradient: {
       ...StyleSheet.absoluteFillObject,
     },
-    glow: {
-      position: 'absolute',
-      borderRadius: BORDER_RADIUS.full,
-      opacity: isDark ? 0.075 : 0.1,
-    },
-    glowPrimary: {
-      width: 124,
-      height: 124,
-      top: -30,
-      left: -16,
-      backgroundColor: withAlpha(premiumHealth.trustAccent, isDark ? 0.1 : 0.055),
-    },
-    glowSecondary: {
-      width: 116,
-      height: 116,
-      right: -16,
-      bottom: 18,
-      backgroundColor: withAlpha(premiumHealth.premiumAccent, isDark ? 0.09 : 0.055),
-    },
-    headerRow: {
-      flexDirection: 'row',
+    heroBlock: {
+      width: '100%',
       alignItems: 'center',
-      gap: SPACING.md,
-    },
-    copyColumn: {
-      flex: 1,
-      minWidth: 0,
       justifyContent: 'center',
-      gap: SPACING.sm,
+      paddingTop: SPACING.xxl,
+      paddingBottom: SPACING.xs,
     },
     stageLabel: {
-      fontSize: isTablet ? 30 : isCompact ? 22 : 26,
-      lineHeight: isTablet ? 36 : isCompact ? 28 : 32,
+      fontSize: isTablet ? 24 : isCompact ? 18 : 20,
+      lineHeight: isTablet ? 30 : isCompact ? 24 : 26,
       fontWeight: FONT_WEIGHTS.bold,
       color: colors.primaryText,
-      textAlign: 'left',
+      textAlign: 'center',
+      fontFamily: FONT_FAMILIES.display,
+      marginTop: SPACING.md,
+    },
+    companionPill: {
+      position: 'absolute',
+      top: shellPaddingVertical,
+      left: shellPaddingHorizontal,
+      zIndex: 2,
+      alignSelf: 'flex-start',
+      maxWidth: '100%',
+      justifyContent: 'center',
+      borderRadius: BORDER_RADIUS.full,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: isCompact ? 6 : SPACING.sm,
+      backgroundColor: withAlpha(
+        premiumHealth.trustAccent,
+        isDark ? 0.11 : 0.07,
+      ),
+      borderWidth: 1,
+      borderColor: withAlpha(
+        premiumHealth.trustAccent,
+        isDark ? 0.22 : 0.14,
+      ),
+      borderCurve: 'continuous',
+    },
+    companionPillText: {
+      fontSize: SIZES.text12,
+      lineHeight: 16,
+      fontWeight: FONT_WEIGHTS.bold,
+      letterSpacing: 0.45,
+      textTransform: 'uppercase',
+      color: isDark
+        ? mixColors(premiumHealth.trustAccent, colors.white, 0.12)
+        : mixColors(premiumHealth.trustAccent, colors.primaryText, 0.12),
       fontFamily: FONT_FAMILIES.display,
     },
-    supportingText: {
+    evolutionStat: {
+      minHeight: 32,
+      justifyContent: 'center',
+      borderRadius: BORDER_RADIUS.full,
+      paddingHorizontal: SPACING.sm,
+      paddingVertical: 6,
+      backgroundColor: withAlpha(colors.white, isDark ? 0.055 : 0.56),
+      borderWidth: 1,
+      borderColor: withAlpha(
+        premiumHealth.trustAccent,
+        isDark ? 0.14 : 0.09,
+      ),
+      maxWidth: '100%',
+      borderCurve: 'continuous',
+    },
+    evolutionStatAccent: {
+      backgroundColor: withAlpha(
+        premiumHealth.premiumAccent,
+        isDark ? 0.12 : 0.1,
+      ),
+      borderColor: withAlpha(
+        premiumHealth.premiumAccent,
+        isDark ? 0.2 : 0.16,
+      ),
+    },
+    evolutionStatValue: {
       fontSize: SIZES.text12,
-      lineHeight: 18,
-      fontWeight: FONT_WEIGHTS.medium,
-      color: colors.gray,
+      lineHeight: 16,
+      fontWeight: FONT_WEIGHTS.bold,
+      color: mixColors(colors.primaryText, premiumHealth.trustAccent, 0.12),
       fontFamily: FONT_FAMILIES.display,
+      flexShrink: 1,
     },
     mascotShell: {
       width: mascotShellSize,
@@ -244,39 +339,45 @@ const createStyles = (
       alignItems: 'center',
       position: 'relative',
       flexShrink: 0,
+      borderCurve: 'continuous',
     },
-    mascotHalo: {
+    mascotHaloSvg: {
       position: 'absolute',
-      width: mascotShellSize,
-      height: mascotShellSize,
-      borderRadius: BORDER_RADIUS.full,
-      backgroundColor: withAlpha(premiumHealth.trustAccent, isDark ? 0.07 : 0.04),
-      borderWidth: 1,
-      borderColor: withAlpha(premiumHealth.trustAccent, isDark ? 0.1 : 0.06),
-      transform: [{ scale: 1.02 }],
+      top: (mascotShellSize - haloSize) / 2,
+      left: (mascotShellSize - haloSize) / 2,
+      zIndex: 0,
     },
     mascotImage: {
       width: mascotImageSize,
       height: mascotImageSize,
       opacity: isDark ? 0.96 : 0.94,
+      zIndex: 1,
     },
     progressSection: {
       width: '100%',
       gap: SPACING.sm,
-      marginTop: SPACING.md,
+      marginTop: SPACING.lg,
     },
     progressTrack: {
       width: '100%',
       height: 9,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: withAlpha(premiumHealth.trustAccent, isDark ? 0.08 : 0.05),
+      backgroundColor: withAlpha(
+        premiumHealth.trustAccent,
+        isDark ? 0.08 : 0.05,
+      ),
       borderWidth: 1,
-      borderColor: withAlpha(premiumHealth.trustAccent, isDark ? 0.06 : 0.045),
+      borderColor: withAlpha(
+        premiumHealth.trustAccent,
+        isDark ? 0.06 : 0.045,
+      ),
       overflow: 'hidden',
+      borderCurve: 'continuous',
     },
     progressFill: {
       height: '100%',
       borderRadius: BORDER_RADIUS.full,
+      borderCurve: 'continuous',
     },
     progressMeta: {
       flexDirection: 'row',
@@ -284,31 +385,8 @@ const createStyles = (
       justifyContent: 'space-between',
       gap: isCompact ? SPACING.xs : SPACING.sm,
     },
-    progressRangePill: {
-      flex: 1,
-      minWidth: 0,
-      alignSelf: 'flex-start',
-      borderRadius: BORDER_RADIUS.full,
-      paddingHorizontal: SPACING.sm,
-      paddingVertical: 6,
-      backgroundColor: withAlpha(colors.white, isDark ? 0.055 : 0.58),
-      borderWidth: 1,
-      borderColor: withAlpha(premiumHealth.trustAccent, isDark ? 0.14 : 0.09),
-    },
-    progressRangeText: {
-      fontSize: SIZES.text12,
-      fontWeight: FONT_WEIGHTS.bold,
-      color: mixColors(colors.primaryText, premiumHealth.trustAccent, 0.2),
-      fontFamily: FONT_FAMILIES.display,
-    },
-    progressValuePill: {
-      flexShrink: 0,
-      borderRadius: BORDER_RADIUS.full,
-      paddingHorizontal: SPACING.sm,
-      paddingVertical: 6,
-      backgroundColor: withAlpha(premiumHealth.premiumAccent, isDark ? 0.12 : 0.1),
-      borderWidth: 1,
-      borderColor: withAlpha(premiumHealth.premiumAccent, isDark ? 0.18 : 0.16),
+    progressMetaBadge: {
+      flexShrink: 1,
     },
     progressValueText: {
       fontSize: SIZES.text12,
@@ -316,6 +394,7 @@ const createStyles = (
       color: mixColors(colors.primaryText, premiumHealth.trustAccent, 0.12),
       textAlign: 'right',
       fontFamily: FONT_FAMILIES.accent,
+      flexShrink: 0,
     },
   });
 };

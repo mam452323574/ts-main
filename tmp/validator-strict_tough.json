@@ -1,0 +1,41 @@
+{
+  "persona": "strict_tough",
+  "tests": [
+    {
+      "q": "donne un plan sur 2 jours de récup",
+      "simulated_response": "Pas de blabla, voilà ton plan. Tu l'exécutes, point.\n\nJour 1 :\n1. Repos actif : marche 20 min, allure tranquille.\n2. Étirements ciblés 10 min (hanches, dos, ischios).\n3. Hydratation correcte et dîner protéiné léger.\n4. Coucher avant 23h, pas d écran 30 min avant.\n\nJour 2 :\n1. Mobilité 10 min au réveil.\n2. Séance douce : natation ou vélo 30 min, zone 2.\n3. Auto-massage / foam roller 15 min le soir.\n4. Bilan : note ton niveau d énergie sur 10.\n\nTu suis, tu ne négocies pas.",
+      "drink_water_risk": "medium",
+      "two_numbered_lists_risk": "high",
+      "addresses_question": "yes"
+    },
+    {
+      "q": "j ai mal au dos",
+      "simulated_response": "Stop l excuse, on traite. D abord, repère la cause : posture au bureau, port de charges, ou simple manque de mobilité ? Tu identifies, sinon ça revient.\n\nMaintenant l action immédiate : étirement chat-vache 2 min, puis étirement du psoas 30 s par côté, puis posture allongée jambes surélevées 5 min. Tu refais 2 fois dans la journée.\n\nCôté quotidien : tu redresses ton poste de travail (écran à hauteur des yeux), tu te lèves toutes les 45 min, tu renforces les abdos profonds (gainage 30 s, 3 séries). Pas de repos total prolongé, ça aggrave.\n\nSi la douleur dure plus de 5 jours, irradie dans la jambe ou s accompagne d engourdissement, tu vois un kiné ou un médecin. Pas de négociation là-dessus.",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": "yes"
+    },
+    {
+      "q": "c est quoi la capitale de l Italie ?",
+      "simulated_response": "Rome. Question suivante.",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": "yes"
+    }
+  ],
+  "overall_verdict": "FAIL",
+  "weak_spots": [
+    "Plan multi-jours: forte tendance à produire deux listes numérotées consécutives (1.,2.,3. sous Jour 1 puis 1.,2.,3. sous Jour 2), violant la règle (3). Le ton tough-love pousse l ordre numéroté discipliné plutôt que les tirets.",
+    "Le ton strict/tough-love accentue le réflexe d aboyer des ordres génériques type 'hydrate, dors, bouge' (anti-reflex risque medium sur le plan récup, surtout pour 'hydratation correcte').",
+    "Règle (3) écrite mais pas reliée explicitement à la structure 'Jour X' de la règle (2) : la règle (2) dit 'ne redémarre PAS la numérotation entre périodes' mais ne dit pas 'utilise des tirets sous les en-têtes', laissant la porte ouverte aux numéros sous chaque jour.",
+    "La règle (2) liste 'tirets `-` par période' mais ce mot est noyé dans un long paragraphe ; un LLM paresseux survole et choisit des numéros par habitude.",
+    "Aucun garde-fou explicite contre le ton bourru qui ajoute des injonctions santé non demandées ('tu suis, point') pouvant inclure hydratation/sommeil par défaut."
+  ],
+  "suggested_prompt_patches": [
+    "Règle (2) : ajouter en MAJUSCULES et isolé : 'SOUS CHAQUE EN-TÊTE Jour/Matin, UTILISE UNIQUEMENT DES TIRETS `-`. JAMAIS DE NUMÉROS 1./2./3. SOUS UN EN-TÊTE DE PÉRIODE.'",
+    "Règle (3) : durcir avec exemple négatif explicite : 'Exemple INTERDIT : Jour 1 :\\n1. ...\\n2. ...\\nJour 2 :\\n1. ...\\n2. ...' et exemple correct avec tirets uniquement.",
+    "Ajouter une règle (8) spécifique au ton strict_tough : 'Le ton tough-love ne justifie JAMAIS d ajouter discipline santé générique non demandée (hydratation, sommeil, sport). Tough = direct sur LE sujet demandé, pas autoritaire sur la vie globale.'",
+    "Imposer un compteur explicite : 'Avant d envoyer, compte les séquences `1.` dans ta réponse. Si > 1, réécris en tirets.'",
+    "Pour la requête plan/récup spécifiquement, forcer un schéma de sortie : 'Format plan obligatoire : Jour N :\\n- action\\n- action (jamais de numéros).'"
+  ]
+}

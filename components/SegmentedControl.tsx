@@ -161,7 +161,7 @@ const createStyles = (isDark: boolean) =>
       borderRadius: BORDER_RADIUS.full,
       borderWidth: StyleSheet.hairlineWidth,
       padding: 4,
-      gap: 4,
+      gap: 4, borderCurve: 'continuous',
     },
     option: {
       height: 34,
@@ -172,7 +172,7 @@ const createStyles = (isDark: boolean) =>
       paddingVertical: 0,
       paddingHorizontal: SPACING.sm,
       borderRadius: BORDER_RADIUS.full,
-      borderWidth: 1,
+      borderWidth: 1, borderCurve: 'continuous',
     },
     optionFluid: {
       flex: 1,

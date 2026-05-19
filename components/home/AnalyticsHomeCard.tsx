@@ -32,6 +32,7 @@ import {
 } from '@/constants/theme';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { Squircle } from '@/components/Squircle';
 
 const ANALYST_COACH_IMAGE = require('../../assets/images/coach/analytical_precise.webp');
 
@@ -80,7 +81,7 @@ export function AnalyticsHomeCard({
       style={styles.shell}
       testID="home-analytics-card"
     >
-      <View style={styles.surface} testID="home-analytics-card-surface">
+      <Squircle style={styles.surface} testID="home-analytics-card-surface">
         <LinearGradient
           colors={palette.backgroundGradient}
           start={{ x: 0, y: 0 }}
@@ -134,14 +135,14 @@ export function AnalyticsHomeCard({
               {t('home.analytics_card_subtitle')}
             </Text>
 
-            <View style={styles.metaPanel}>
-              <View style={styles.metaIconTile}>
+            <Squircle style={styles.metaPanel}>
+              <Squircle style={styles.metaIconTile}>
                 <TrendingUp
                   color={palette.accent}
                   size={18}
                   strokeWidth={2.4}
                 />
-              </View>
+              </Squircle>
               <View style={styles.metaTextColumn}>
                 <Text
                   style={styles.metaPrimary}
@@ -156,7 +157,7 @@ export function AnalyticsHomeCard({
                   {t('home.analytics_card_scan_label')}
                 </Text>
               </View>
-            </View>
+            </Squircle>
 
             <View
               pointerEvents="none"
@@ -232,7 +233,7 @@ export function AnalyticsHomeCard({
             </View>
           </View>
         </View>
-      </View>
+      </Squircle>
     </TouchableOpacity>
   );
 }
@@ -243,10 +244,10 @@ const createStyles = (
   metrics: ReturnType<typeof getPremiumHealthResponsiveCardMetrics>,
   palette: ReturnType<typeof getAnalyticsPalette>,
 ) => {
-  const coachWidth = metrics.isTablet ? 312 : metrics.isCompact ? 212 : 248;
-  const coachHeight = metrics.isTablet ? 312 : metrics.isCompact ? 212 : 248;
-  const visualStageHeight = metrics.isTablet ? 280 : metrics.isCompact ? 210 : 238;
-  const visualStageWidth = metrics.isTablet ? 268 : metrics.isCompact ? 188 : 222;
+  const coachWidth = metrics.isTablet ? 376 : metrics.isCompact ? 256 : 300;
+  const coachHeight = metrics.isTablet ? 376 : metrics.isCompact ? 256 : 300;
+  const visualStageHeight = metrics.isTablet ? 336 : metrics.isCompact ? 252 : 286;
+  const visualStageWidth = metrics.isTablet ? 322 : metrics.isCompact ? 226 : 268;
   const footerHeight = metrics.ctaHeight + SPACING.md;
 
   return StyleSheet.create({
@@ -262,7 +263,7 @@ const createStyles = (
             shadowOpacity: isDark ? 0.16 : 0.08,
             shadowRadius: isDark ? 18 : 14,
             shadowOffset: { width: 0, height: isDark ? 11 : 9 },
-          }),
+          }), borderCurve: 'continuous',
     },
     surface: {
       minHeight: metrics.cardMinHeight,
@@ -272,7 +273,7 @@ const createStyles = (
       borderWidth: 1,
       borderColor: palette.surfaceBorder,
       overflow: 'hidden',
-      position: 'relative',
+      position: 'relative', borderCurve: 'continuous',
     },
     backgroundGradient: {
       ...StyleSheet.absoluteFillObject,
@@ -299,18 +300,18 @@ const createStyles = (
     visualStage: {
       position: 'absolute',
       right: metrics.isTablet ? 16 : metrics.isCompact ? -18 : -8,
-      top: metrics.isTablet ? 58 : metrics.isCompact ? 94 : 92,
+      bottom: 0,
       width: visualStageWidth,
       height: visualStageHeight,
       alignItems: 'center',
-      justifyContent: 'center',
+      justifyContent: 'flex-end',
       zIndex: 2,
     },
     visualGlow: {
       position: 'absolute',
       inset: 18,
       borderRadius: 999,
-      opacity: isDark ? 0.36 : 0.42,
+      opacity: isDark ? 0.36 : 0.42, borderCurve: 'continuous',
     },
     coachImage: {
       width: coachWidth,
@@ -340,7 +341,7 @@ const createStyles = (
       borderRadius: BORDER_RADIUS.full,
       backgroundColor: palette.eyebrowBackground,
       borderWidth: 1,
-      borderColor: palette.eyebrowBorder,
+      borderColor: palette.eyebrowBorder, borderCurve: 'continuous',
     },
     eyebrow: {
       fontSize: SIZES.text12,
@@ -379,7 +380,7 @@ const createStyles = (
       backgroundColor: palette.metaPanelBackground,
       borderWidth: 1,
       borderColor: palette.metaPanelBorder,
-      maxWidth: metrics.copyWidth,
+      maxWidth: metrics.copyWidth, borderCurve: 'continuous',
     },
     metaIconTile: {
       width: 36,
@@ -389,7 +390,7 @@ const createStyles = (
       borderWidth: 1,
       borderColor: palette.metaIconTileBorder,
       alignItems: 'center',
-      justifyContent: 'center',
+      justifyContent: 'center', borderCurve: 'continuous',
     },
     metaTextColumn: {
       flexShrink: 1,
@@ -443,7 +444,7 @@ const createStyles = (
       shadowColor: palette.ctaShadowColor,
       shadowOpacity: isDark ? 0.12 : 0.06,
       shadowRadius: isDark ? 10 : 8,
-      shadowOffset: { width: 0, height: isDark ? 6 : 4 },
+      shadowOffset: { width: 0, height: isDark ? 6 : 4 }, borderCurve: 'continuous',
     },
     ctaLabel: {
       fontSize: metrics.isCompact ? SIZES.text16 : SIZES.text18,

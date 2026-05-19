@@ -19,6 +19,7 @@ import { SIZES, SPACING, withAlpha } from '@/constants/theme';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { uploadAvatarFromLocalUri } from '@/services/avatar';
 import type { AvatarCropSelection } from '@/utils/avatarCrop';
+import { Squircle } from '@/components/Squircle';
 
 interface AvatarPickerProps {
   userId: string;
@@ -279,10 +280,10 @@ export function AvatarPicker({ userId, currentAvatarUrl, onAvatarSelected, size 
         onCancel={handleCropCancel}
         onConfirm={handleCropConfirm}
       />
-      <View
+      <Squircle
         style={[
           styles.halo,
-          { width: haloSize, height: haloSize, borderRadius: haloSize / 2 },
+          { width: haloSize, height: haloSize, borderRadius: haloSize / 2, borderCurve: 'continuous' },
         ]}
       >
         <TouchableOpacity
@@ -304,12 +305,12 @@ export function AvatarPicker({ userId, currentAvatarUrl, onAvatarSelected, size 
             </View>
           )}
           {!uploading && (
-            <View style={styles.editBadge}>
+            <Squircle style={styles.editBadge}>
               <Camera color={colors.background} size={16} />
-            </View>
+            </Squircle>
           )}
         </TouchableOpacity>
-      </View>
+      </Squircle>
       <Text style={styles.hint}>{t('components.avatar.hint')}</Text>
     </View>
   );
@@ -329,10 +330,10 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: withAlpha(colors.primaryText, 0.08),
-    position: 'relative',
+    position: 'relative', borderCurve: 'continuous',
   },
   avatar: {
-    borderRadius: 1000,
+    borderRadius: 1000, borderCurve: 'continuous',
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -351,7 +352,7 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: colors.background,
+    borderColor: colors.background, borderCurve: 'continuous',
   },
   hint: {
     marginTop: SPACING.md,

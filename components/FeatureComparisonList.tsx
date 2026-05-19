@@ -5,6 +5,7 @@ import { PremiumFeature } from '@/types';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { SIZES, SPACING, BORDER_RADIUS, FONT_WEIGHTS } from '@/constants/theme';
+import { Squircle } from '@/components/Squircle';
 
 interface FeatureComparisonListProps {
   features: PremiumFeature[];
@@ -35,7 +36,7 @@ export function FeatureComparisonList({ features }: FeatureComparisonListProps) 
             const featureKey = `premium_features.list.${feature.feature_key}`;
 
             return (
-              <View key={feature.id} style={styles.featureCard}>
+              <Squircle key={feature.id} style={styles.featureCard}>
                 <View style={styles.featureHeader}>
                   <Text style={styles.featureName}>
                     {t(`${featureKey}.title`, { defaultValue: feature.feature_name })}
@@ -63,7 +64,7 @@ export function FeatureComparisonList({ features }: FeatureComparisonListProps) 
 
                   <View style={styles.divider} />
 
-                  <View style={[styles.tierColumn, styles.premiumColumn]}>
+                  <Squircle style={[styles.tierColumn, styles.premiumColumn]}>
                     <View style={styles.premiumLabelContainer}>
                       <Text style={styles.premiumLabel}>{t('components.feature_list.premium')}</Text>
                       <Sparkles color={colors.primary} size={16} fill={colors.primary} />
@@ -77,9 +78,9 @@ export function FeatureComparisonList({ features }: FeatureComparisonListProps) 
                         <Check color={colors.success} size={20} strokeWidth={2} />
                       )}
                     </View>
-                  </View>
+                  </Squircle>
                 </View>
-              </View>
+              </Squircle>
             );
           })}
         </View>
@@ -109,7 +110,7 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     padding: SPACING.lg,
     marginBottom: SPACING.md,
     borderWidth: 1,
-    borderColor: colors.lightGray,
+    borderColor: colors.lightGray, borderCurve: 'continuous',
   },
   featureHeader: {
     marginBottom: SPACING.md,
@@ -136,7 +137,7 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   premiumColumn: {
     backgroundColor: isDark ? colors.primaryLight : '#F0F8FF',
     borderRadius: BORDER_RADIUS.md,
-    padding: SPACING.sm,
+    padding: SPACING.sm, borderCurve: 'continuous',
   },
   tierLabel: {
     fontSize: SIZES.text14,

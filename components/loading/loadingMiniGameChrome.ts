@@ -19,6 +19,7 @@ interface LoadingMiniGameChromeOptions {
   compact: boolean;
   isDark: boolean;
   variant: LoadingMiniGameVariant;
+  cardHeight?: number;
 }
 
 export function resolveLoadingMiniGameHeight(
@@ -29,7 +30,7 @@ export function resolveLoadingMiniGameHeight(
     return 160;
   }
 
-  return variant === 'superScan' ? 174 : 210;
+  return variant === 'scan' ? 174 : 210;
 }
 
 export function createLoadingMiniGameChrome({
@@ -38,15 +39,12 @@ export function createLoadingMiniGameChrome({
   compact,
   isDark,
   variant,
+  cardHeight,
 }: LoadingMiniGameChromeOptions) {
-  const pageChrome = getMainPageChrome(
-    colors,
-    isDark,
-    variant === 'superScan' ? 'premium' : 'coach',
-  );
+  const pageChrome = getMainPageChrome(colors, isDark, 'coach');
   const accent = accentColor ?? pageChrome.accentColor;
   const secondaryAccent =
-    variant === 'superScan'
+    variant === 'scan'
       ? mixColors(colors.warning, accent, isDark ? 0.16 : 0.1)
       : mixColors(colors.success, accent, isDark ? 0.1 : 0.06);
   const dangerAccent = colors.error;
@@ -65,21 +63,67 @@ export function createLoadingMiniGameChrome({
     : withAlpha(colors.primaryText, 0.075);
   const signalBorder = withAlpha(colors.white, isDark ? 0.54 : 0.76);
 
+  const markerHighlight = withAlpha(colors.white, isDark ? 0.42 : 0.62);
+
+  const gradients = {
+    card: [
+      withAlpha(accent, isDark ? 0.1 : 0.05),
+      'transparent',
+    ] as readonly [string, string],
+    score: [accent, secondaryAccent] as readonly [string, string],
+    playfieldAmbient: [
+      withAlpha(accent, isDark ? 0.16 : 0.08),
+      'transparent',
+      withAlpha(secondaryAccent, isDark ? 0.14 : 0.06),
+    ] as readonly [string, string, string],
+    markerPrimary: [
+      markerHighlight,
+      mixColors(accent, colors.white, isDark ? 0.08 : 0.18),
+    ] as readonly [string, string],
+    markerSecondary: [
+      markerHighlight,
+      mixColors(secondaryAccent, colors.white, isDark ? 0.08 : 0.16),
+    ] as readonly [string, string],
+    markerBonus: [
+      withAlpha(colors.white, isDark ? 0.62 : 0.78),
+      mixColors(colors.gold, colors.white, isDark ? 0.0 : 0.12),
+    ] as readonly [string, string],
+    markerDanger: [
+      withAlpha(colors.white, isDark ? 0.28 : 0.46),
+      withAlpha(dangerAccent, isDark ? 0.62 : 0.34),
+    ] as readonly [string, string],
+    obstacle: [
+      withAlpha(secondaryAccent, isDark ? 0.54 : 0.32),
+      withAlpha(secondaryAccent, isDark ? 0.2 : 0.14),
+    ] as readonly [string, string],
+    obstacleHit: [
+      withAlpha(dangerAccent, isDark ? 0.6 : 0.4),
+      withAlpha(dangerAccent, isDark ? 0.28 : 0.18),
+    ] as readonly [string, string],
+    playerHighlight: [
+      withAlpha(colors.white, isDark ? 0.42 : 0.64),
+      'transparent',
+    ] as readonly [string, string],
+  };
+
   const styles = StyleSheet.create({
     card: {
       alignSelf: 'stretch',
       backgroundColor: cardBackground,
-      borderColor: withAlpha(accent, isDark ? 0.22 : 0.13),
+      borderColor: withAlpha(accent, isDark ? 0.26 : 0.16),
       borderRadius: compact ? BORDER_RADIUS.lg : BORDER_RADIUS.xl,
       borderWidth: 1,
-      height: resolveLoadingMiniGameHeight(compact, variant),
+      height: cardHeight ?? resolveLoadingMiniGameHeight(compact, variant),
       overflow: 'hidden',
       padding: compact ? SPACING.sm : SPACING.md,
       shadowColor: accent,
-      shadowOffset: { width: 0, height: compact ? 8 : 10 },
-      shadowOpacity: isDark ? 0.14 : 0.06,
-      shadowRadius: compact ? 16 : 22,
-      elevation: compact ? 2 : 3,
+      shadowOffset: { width: 0, height: compact ? 12 : 16 },
+      shadowOpacity: isDark ? 0.26 : 0.12,
+      shadowRadius: compact ? 22 : 28,
+      elevation: compact ? 5 : 6,
+    },
+    cardGradientOverlay: {
+      ...StyleSheet.absoluteFillObject,
     },
     header: {
       alignItems: 'center',
@@ -88,6 +132,7 @@ export function createLoadingMiniGameChrome({
       justifyContent: 'space-between',
       marginBottom: compact ? SPACING.sm : SPACING.md,
       minHeight: compact ? 32 : 38,
+      zIndex: 1,
     },
     titleBlock: {
       flex: 1,
@@ -107,20 +152,32 @@ export function createLoadingMiniGameChrome({
       marginTop: 1,
     },
     score: {
-      backgroundColor: withAlpha(accent, isDark ? 0.15 : 0.08),
-      borderColor: withAlpha(accent, isDark ? 0.24 : 0.13),
       borderRadius: BORDER_RADIUS.full,
-      borderWidth: 1,
-      color: mixColors(colors.primaryText, accent, isDark ? 0.18 : 0.1),
       flexShrink: 0,
+      overflow: 'hidden',
+      shadowColor: accent,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: isDark ? 0.42 : 0.22,
+      shadowRadius: 10,
+      elevation: 4,
+      width: compact ? 78 : 92,
+    },
+    scoreGradient: {
+      ...StyleSheet.absoluteFillObject,
+      borderRadius: BORDER_RADIUS.full,
+    },
+    scoreText: {
+      color: colors.white,
       fontSize: SIZES.text10,
       fontWeight: FONT_WEIGHTS.bold,
+      letterSpacing: -0.2,
       lineHeight: 14,
-      overflow: 'hidden',
       paddingHorizontal: SPACING.xs,
-      paddingVertical: 3,
+      paddingVertical: 4,
       textAlign: 'center',
-      width: compact ? 78 : 92,
+      textShadowColor: withAlpha('#000000', 0.18),
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 1,
     },
     playfield: {
       backgroundColor: playfieldBackground,
@@ -130,26 +187,21 @@ export function createLoadingMiniGameChrome({
       flex: 1,
       overflow: 'hidden',
       position: 'relative',
+      zIndex: 1,
     },
-    trackLine: {
-      backgroundColor: withAlpha(accent, isDark ? 0.1 : 0.12),
-      height: 1,
-      left: 0,
-      position: 'absolute',
-      right: 0,
-    },
-    trackLineTop: {
-      top: '34%',
-    },
-    trackLineBottom: {
-      top: '68%',
+    playfieldAmbient: {
+      ...StyleSheet.absoluteFillObject,
     },
     marker: {
       borderWidth: 1,
+      overflow: 'hidden',
       position: 'absolute',
       shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: isDark ? 0.42 : 0.14,
-      shadowRadius: 10,
+      shadowOpacity: isDark ? 0.5 : 0.18,
+      shadowRadius: 12,
+    },
+    markerGradientFill: {
+      ...StyleSheet.absoluteFillObject,
     },
     markerPrimary: {
       backgroundColor: mixColors(accent, colors.white, isDark ? 0.14 : 0.28),
@@ -163,31 +215,50 @@ export function createLoadingMiniGameChrome({
     },
     markerBonus: {
       backgroundColor: mixColors(colors.gold, colors.white, isDark ? 0.08 : 0.2),
-      borderColor: withAlpha(colors.gold, isDark ? 0.82 : 0.54),
+      borderColor: withAlpha(colors.gold, isDark ? 0.9 : 0.6),
       borderWidth: 2,
       shadowColor: colors.gold,
-      shadowOpacity: isDark ? 0.5 : 0.2,
-      shadowRadius: 13,
+      shadowOpacity: isDark ? 0.62 : 0.28,
+      shadowRadius: 14,
     },
     markerDanger: {
       backgroundColor: withAlpha(dangerAccent, isDark ? 0.38 : 0.16),
-      borderColor: withAlpha(dangerAccent, isDark ? 0.62 : 0.32),
+      borderColor: withAlpha(dangerAccent, isDark ? 0.7 : 0.36),
       shadowColor: dangerAccent,
+      shadowOpacity: isDark ? 0.55 : 0.22,
+      shadowRadius: 12,
+    },
+    decoyPulseRing: {
+      borderColor: withAlpha(dangerAccent, isDark ? 0.9 : 0.55),
+      borderRadius: BORDER_RADIUS.full,
+      borderWidth: 2,
+      ...StyleSheet.absoluteFillObject,
     },
     player: {
-      backgroundColor: mixColors(accent, colors.white, isDark ? 0.14 : 0.28),
       borderColor: signalBorder,
       borderRadius: compact ? 9 : 11,
       borderWidth: 1,
       height: compact ? 22 : 26,
       left: '17%',
       marginTop: compact ? -11 : -13,
+      overflow: 'hidden',
       position: 'absolute',
       shadowColor: accent,
       shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: isDark ? 0.42 : 0.14,
-      shadowRadius: 10,
+      shadowOpacity: isDark ? 0.62 : 0.22,
+      shadowRadius: 16,
       width: compact ? 30 : 36,
+    },
+    playerBody: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: mixColors(accent, colors.white, isDark ? 0.16 : 0.3),
+    },
+    playerHighlight: {
+      height: '55%',
+      left: 0,
+      position: 'absolute',
+      right: 0,
+      top: 0,
     },
     obstacleColumn: {
       bottom: 0,
@@ -200,12 +271,21 @@ export function createLoadingMiniGameChrome({
       borderColor: withAlpha(colors.white, isDark ? 0.1 : 0.44),
       borderRadius: BORDER_RADIUS.full,
       borderWidth: 1,
+      overflow: 'hidden',
       position: 'absolute',
       width: '100%',
     },
     obstacleSegmentHit: {
       backgroundColor: withAlpha(dangerAccent, isDark ? 0.36 : 0.18),
-      borderColor: withAlpha(dangerAccent, isDark ? 0.52 : 0.34),
+      borderColor: withAlpha(dangerAccent, isDark ? 0.62 : 0.36),
+    },
+    obstacleGradientFill: {
+      ...StyleSheet.absoluteFillObject,
+      borderRadius: BORDER_RADIUS.full,
+    },
+    playfieldFlashOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: dangerAccent,
     },
   });
 
@@ -213,6 +293,7 @@ export function createLoadingMiniGameChrome({
     accentColor: accent,
     dangerAccentColor: dangerAccent,
     secondaryAccentColor: secondaryAccent,
+    gradients,
     styles,
   };
 }

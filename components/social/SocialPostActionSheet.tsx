@@ -262,14 +262,14 @@ const createStyles = (colors: any) =>
       borderWidth: 1,
       borderBottomWidth: 0,
       borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
-      gap: SPACING.lg,
+      gap: SPACING.lg, borderCurve: 'continuous',
     },
     handle: {
       alignSelf: 'center',
       width: 44,
       height: 4,
       borderRadius: 2,
-      backgroundColor: colors.borderStrong ?? withAlpha(colors.primaryText, 0.18),
+      backgroundColor: colors.borderStrong ?? withAlpha(colors.primaryText, 0.18), borderCurve: 'continuous',
     },
     header: {
       flexDirection: 'row',
@@ -298,7 +298,7 @@ const createStyles = (colors: any) =>
       justifyContent: 'center',
       backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.06),
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08), borderCurve: 'continuous',
     },
     actions: {
       gap: SPACING.sm,
@@ -313,7 +313,7 @@ const createStyles = (colors: any) =>
       borderRadius: BORDER_RADIUS.lg,
       backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.06),
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08), borderCurve: 'continuous',
     },
     actionRowDisabled: {
       opacity: 0.45,
@@ -328,7 +328,7 @@ const createStyles = (colors: any) =>
       borderRadius: 19,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.cardBackground,
+      backgroundColor: colors.cardBackground, borderCurve: 'continuous',
     },
     dangerActionIcon: {
       backgroundColor: withAlpha(colors.error, 0.1),

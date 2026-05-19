@@ -81,7 +81,7 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       borderRadius: layout.featureRadius,
       borderWidth: 1,
       padding: layout.blockPadding,
-      gap: SPACING.xs + 2,
+      gap: SPACING.xs + 2, borderCurve: 'continuous',
     },
     eyebrow: {
       fontSize: layout.heroBadgeFontSize,

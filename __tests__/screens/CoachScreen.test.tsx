@@ -126,6 +126,13 @@ function expectActionComposerSummary(
   ).toBe(personaTitle);
 }
 
+function getScopedConsoleCalls(
+  consoleSpy: jest.SpyInstance,
+  scope: string,
+) {
+  return consoleSpy.mock.calls.filter((call) => call[0] === scope);
+}
+
 let mockCoachEntriesState: {
   data: Record<string, unknown>[] | undefined;
   error: Error | null;
@@ -250,6 +257,14 @@ jest.mock('@/hooks/queries/useCoachScreenSnapshot', () => ({
   COACH_SCREEN_SNAPSHOT_QUERY_KEY: ['coachScreenSnapshot'],
   useCoachScreenSnapshot: (...args: unknown[]) => mockUseCoachScreenSnapshot(...args),
 }));
+jest.mock('@/hooks/queries/useCoachConversationQuota', () => ({
+  useCoachConversationQuota: () => ({
+    data: undefined,
+    isPending: false,
+    isFetching: false,
+    error: null,
+  }),
+}));
 
 jest.mock('@/services/growthExperience', () => ({
   markCoachSeen: jest.fn(),
@@ -266,21 +281,35 @@ jest.mock('@/hooks/useCustomAlert', () => ({
   }),
 }));
 
-// Stub React Native's Animated.timing to avoid the
+// Stub React Native's Animated APIs to avoid the
 // "Unable to locate attached view in the native tree" error triggered when
 // TouchableOpacity tries to animate disabled state changes during async tests.
-jest.spyOn(require('react-native').Animated, 'timing').mockImplementation(
-  (() =>
-    ({
-      start: (cb?: (result: { finished: boolean }) => void) => {
-        if (cb) {
-          cb({ finished: true });
-        }
-      },
-      stop: () => undefined,
-      reset: () => undefined,
-    }) as never),
-);
+const animatedStub = () =>
+  ({
+    start: (cb?: (result: { finished: boolean }) => void) => {
+      if (cb) {
+        cb({ finished: true });
+      }
+    },
+    stop: () => undefined,
+    reset: () => undefined,
+  }) as never;
+
+// PerfectTimingGame chains animate() recursively from the finished callback;
+// combined with the synchronous animatedStub above this blows the call stack.
+// Stub it out — the test only cares that *some* loading mini-game renders.
+jest.mock('@/components/loading/miniGames/PerfectTimingGame', () => ({
+  PerfectTimingGame: () => null,
+}));
+jest.spyOn(require('react-native').Animated, 'timing').mockImplementation(animatedStub);
+jest.spyOn(require('react-native').Animated, 'spring').mockImplementation(animatedStub);
+jest
+  .spyOn(require('react-native').Animated, 'parallel')
+  .mockImplementation(animatedStub);
+jest
+  .spyOn(require('react-native').Animated, 'sequence')
+  .mockImplementation(animatedStub);
+jest.spyOn(require('react-native').Animated, 'loop').mockImplementation(animatedStub);
 
 describe('CoachScreen', () => {
   beforeEach(() => {
@@ -648,7 +677,7 @@ describe('CoachScreen', () => {
     );
   });
 
-  it('keeps the screen header inside the scroll content and floats the action bar overlay', () => {
+  it('keeps the screen header inside the scroll content in stack variant and floats the action bar overlay', () => {
     render(<CoachScreen />);
 
     const scrollView = screen
@@ -661,6 +690,7 @@ describe('CoachScreen', () => {
 
     expect(scrollView).toBeTruthy();
 
+    expect(screen.getByTestId('coach-screen-header')).toBeTruthy();
     expect(() => scrollView?.findByProps({ testID: 'coach-screen-header' })).not.toThrow();
     expect(() => scrollView?.findByProps({ testID: 'coach-scroll-body' })).not.toThrow();
 
@@ -692,6 +722,21 @@ describe('CoachScreen', () => {
         backgroundColor: 'transparent',
       }),
     );
+  });
+
+  it('keeps the screen header inside the scroll content in tab variant', () => {
+    render(<CoachScreen variant="tab" />);
+
+    const scrollView = screen
+      .UNSAFE_getAllByType(ScrollView)
+      .find(
+        (node) =>
+          node.props.contentInsetAdjustmentBehavior === 'never' &&
+          node.props.keyboardShouldPersistTaps === 'handled',
+      );
+
+    expect(scrollView).toBeTruthy();
+    expect(() => scrollView?.findByProps({ testID: 'coach-screen-header' })).not.toThrow();
   });
 
   it('scrolls the free question field into view on focus and keeps the primary action mounted', async () => {
@@ -2050,7 +2095,7 @@ describe('CoachScreen', () => {
     }
   });
 
-  it('keeps history visible while a new generation is pending and older ready entries exist', () => {
+  it('hides the history button while a new generation is pending even if older ready entries exist', () => {
     mockCoachEntriesState = {
       data: [
         createCoachEntry({
@@ -2087,7 +2132,7 @@ describe('CoachScreen', () => {
     expect(screen.queryByTestId('coach-guidance-card')).toBeNull();
     expect(screen.queryByText('Current guidance')).toBeNull();
     expect(screen.queryByText('Stay steady this week.')).toBeNull();
-    expect(screen.getByTestId('coach-history-icon-button')).toBeTruthy();
+    expect(screen.queryByTestId('coach-history-icon-button')).toBeNull();
   });
 
   it('keeps loading active after a pending response until the tracked coach entry becomes ready', async () => {
@@ -2445,7 +2490,7 @@ describe('CoachScreen', () => {
 
       expect(
         screen.getByText(
-          'Le service Coach a renvoyé une réponse inattendue. Réessayez dans un instant.',
+          'Petit hoquet technique côté Coach. Réessaye dans un instant.',
         ),
       ).toBeTruthy();
       expect(consoleLogSpy).toHaveBeenCalledWith(
@@ -2757,7 +2802,136 @@ describe('CoachScreen', () => {
         'This older advice should only be reachable from history.',
       ),
     ).toBeNull();
-    expect(screen.getByTestId('coach-history-icon-button')).toBeTruthy();
+    expect(screen.queryByTestId('coach-history-icon-button')).toBeNull();
+  });
+
+  it('logs ui state only once across fetch rerenders until the tracked state changes', async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const consoleLogSpy = jest
+      .spyOn(console, 'log')
+      .mockImplementation(() => undefined);
+    const pendingEntry = createCoachEntry({
+      id: 'entry-log-pending',
+      title: null,
+      body: null,
+      generated_at: null,
+      created_at: '2026-04-06T09:45:00.000Z',
+      status: 'pending',
+    });
+    const olderReadyEntry = createCoachEntry({
+      id: 'entry-log-ready-behind',
+      title: 'Older ready guidance',
+      body: 'This guidance should stay hidden while the pending one loads.',
+      created_at: '2026-04-04T09:30:00.000Z',
+      generated_at: '2026-04-04T09:30:00.000Z',
+    });
+
+    (process.env as Record<string, string | undefined>).NODE_ENV =
+      'development';
+    mockCoachEntriesState = {
+      data: [pendingEntry, olderReadyEntry],
+      error: null,
+      isFetching: false,
+      refetch: jest.fn(),
+    };
+
+    try {
+      const rendered = render(<CoachScreen />);
+
+      await waitFor(() => {
+        expect(mockUseCoachScreenSnapshot).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            trackedEntryId: 'entry-log-pending',
+          }),
+        );
+      });
+      await waitFor(() => {
+        expect(
+          rendered.getByTestId('coach-generation-loading-state'),
+        ).toBeTruthy();
+      });
+      await waitFor(() => {
+        expect(getScopedConsoleCalls(consoleLogSpy, '[CoachScreen] ui state')).toEqual(
+          expect.arrayContaining([
+            expect.arrayContaining([
+              '[CoachScreen] ui state',
+              expect.objectContaining({
+                tracked_entry_id: 'entry-log-pending',
+                tracked_status: 'pending',
+                ui_state: 'generation_loading',
+              }),
+            ]),
+          ]),
+        );
+      });
+
+      consoleLogSpy.mockClear();
+
+      mockCoachEntriesState = {
+        ...mockCoachEntriesState,
+        isFetching: true,
+      };
+      await act(async () => {
+        rendered.rerender(<CoachScreen />);
+      });
+
+      mockCoachEntriesState = {
+        ...mockCoachEntriesState,
+        isFetching: false,
+      };
+      await act(async () => {
+        rendered.rerender(<CoachScreen />);
+      });
+
+      expect(getScopedConsoleCalls(consoleLogSpy, '[CoachScreen] ui state')).toHaveLength(0);
+
+      mockCoachEntriesState = {
+        ...mockCoachEntriesState,
+        data: [
+          createCoachEntry({
+            id: 'entry-log-pending',
+            title: 'Ready coach guidance',
+            body: 'Stay steady and keep the routine simple this week.',
+            created_at: '2026-04-06T09:45:00.000Z',
+            generated_at: '2026-04-06T09:47:00.000Z',
+            status: 'ready',
+          }),
+          olderReadyEntry,
+        ],
+      };
+      await act(async () => {
+        rendered.rerender(<CoachScreen />);
+      });
+
+      await waitFor(
+        () => {
+          expect(
+            rendered.queryByTestId('coach-generation-loading-state'),
+          ).toBeNull();
+        },
+        { timeout: 3000 },
+      );
+      expect(rendered.getByText('Ready coach guidance')).toBeTruthy();
+      await waitFor(() => {
+        expect(getScopedConsoleCalls(consoleLogSpy, '[CoachScreen] ui state')).toEqual(
+          expect.arrayContaining([
+            expect.arrayContaining([
+              '[CoachScreen] ui state',
+              expect.objectContaining({
+                tracked_entry_id: 'entry-log-pending',
+                tracked_status: 'ready',
+                ui_state: 'guidance',
+                displayed_guidance_source: 'tracked',
+              }),
+            ]),
+          ]),
+        );
+      });
+    } finally {
+      (process.env as Record<string, string | undefined>).NODE_ENV =
+        originalNodeEnv;
+      consoleLogSpy.mockRestore();
+    }
   });
 
   it('refreshes a stale focused snapshot only once across fetch rerenders', async () => {
@@ -3241,11 +3415,11 @@ describe('CoachScreen', () => {
 
     expect(screen.getByTestId('coach-empty-state')).toBeTruthy();
     expect(
-      screen.getByText('Fais un scan d’abord'),
+      screen.getByText('Commence par un scan'),
     ).toBeTruthy();
     expect(
       screen.getByText(
-        'Fais un scan d’abord pour que Coach ait des données à analyser.',
+        'Lance un scan pour démarrer ton coaching personnalisé.',
       ),
     ).toBeTruthy();
     expect(screen.getByText('Faire un scan')).toBeTruthy();

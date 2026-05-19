@@ -19,6 +19,7 @@ import {
   getCoachPromptVisual,
 } from '@/shared/coachPromptVisuals';
 import type { CoachPromptType } from '@/types';
+import { Squircle } from '@/components/Squircle';
 
 interface CoachPromptCardProps {
   promptType: CoachPromptType;
@@ -72,7 +73,9 @@ export function CoachPromptCard({
   const isSelector = mode === 'selector';
   const selectorContainsSelectedQuestion =
     isSelector && containsSelectedQuestion && !selected;
-  const iconGlyphColor = mixColors(colors.white, accentColor, 0.18);
+  const iconGlyphColor = isDark
+    ? mixColors(colors.white, accentColor, 0.18)
+    : mixColors(accentColor, colors.primaryText, 0.48);
   const goldColor = colors.gold ?? '#FFD700';
   const neutralSurface = colors.surfaceMuted ?? colors.cardBackground;
   const neutralBorder = colors.borderSubtle ?? colors.lightGray ?? '#E3E7EF';
@@ -185,7 +188,7 @@ export function CoachPromptCard({
           />
 
           {busy ? (
-            <View
+            <Squircle
               style={[
                 styles.selectedFloatingBadge,
                 styles.busyFloatingBadge,
@@ -201,9 +204,9 @@ export function CoachPromptCard({
                 size="small"
                 testID={testID ? `${testID}-spinner` : undefined}
               />
-            </View>
+            </Squircle>
           ) : selected ? (
-            <View
+            <Squircle
               style={[
                 styles.selectedFloatingBadge,
                 {
@@ -219,9 +222,9 @@ export function CoachPromptCard({
                 strokeWidth={3}
                 testID={testID ? `${testID}-selected-icon` : undefined}
               />
-            </View>
+            </Squircle>
           ) : selectorContainsSelectedQuestion ? (
-            <View
+            <Squircle
               style={[
                 styles.childSelectionIndicator,
                 {
@@ -239,10 +242,10 @@ export function CoachPromptCard({
                   },
                 ]}
               />
-            </View>
+            </Squircle>
           ) : null}
 
-          <View
+          <Squircle
             style={[
               styles.selectorArtworkFrame,
               isCompact
@@ -265,9 +268,9 @@ export function CoachPromptCard({
               pointerEvents="none"
               style={styles.selectorArtworkGradient}
             />
-          </View>
+          </Squircle>
 
-          <View
+          <Squircle
             style={[
               styles.selectorIconShell,
               isCompact
@@ -289,7 +292,7 @@ export function CoachPromptCard({
               strokeWidth={2.2}
               testID={testID ? `${testID}-icon-glyph` : undefined}
             />
-          </View>
+          </Squircle>
 
           <View style={styles.copySelector}>
             <Text
@@ -391,7 +394,7 @@ export function CoachPromptCard({
 
       {locked ? (
         <>
-          <View
+          <Squircle
             pointerEvents="none"
             style={[
               styles.lockScrim,
@@ -442,7 +445,7 @@ const createStyles = (colors: any, isDark: boolean) =>
       gap: SPACING.md,
       borderRadius: BORDER_RADIUS.xl + 2,
       borderWidth: 1,
-      ...SHADOWS.card,
+      ...SHADOWS.card, borderCurve: 'continuous',
     },
     cardSelector: {
       flexDirection: 'column',
@@ -485,7 +488,7 @@ const createStyles = (colors: any, isDark: boolean) =>
     },
     lockScrim: {
       ...StyleSheet.absoluteFillObject,
-      borderRadius: BORDER_RADIUS.xl,
+      borderRadius: BORDER_RADIUS.xl, borderCurve: 'continuous',
     },
     lockBadge: {
       position: 'absolute',
@@ -498,7 +501,7 @@ const createStyles = (colors: any, isDark: boolean) =>
       paddingVertical: 4,
       borderRadius: BORDER_RADIUS.full,
       borderWidth: 1,
-      zIndex: 3,
+      zIndex: 3, borderCurve: 'continuous',
     },
     lockBadgeText: {
       fontSize: 10,
@@ -512,7 +515,7 @@ const createStyles = (colors: any, isDark: boolean) =>
       position: 'absolute',
       left: SPACING.sm,
       width: 4,
-      borderRadius: BORDER_RADIUS.full,
+      borderRadius: BORDER_RADIUS.full, borderCurve: 'continuous',
     },
     accentRailSelector: {
       left: SPACING.sm + 2,
@@ -539,12 +542,12 @@ const createStyles = (colors: any, isDark: boolean) =>
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1,
-      flexShrink: 0,
+      flexShrink: 0, borderCurve: 'continuous',
     },
     iconShellCompact: {
       width: 40,
       height: 40,
-      borderRadius: BORDER_RADIUS.md,
+      borderRadius: BORDER_RADIUS.md, borderCurve: 'continuous',
     },
     iconShellSelector: {
       width: 42,
@@ -555,12 +558,12 @@ const createStyles = (colors: any, isDark: boolean) =>
       height: 36,
       borderRadius: BORDER_RADIUS.md,
       alignItems: 'center',
-      justifyContent: 'center',
+      justifyContent: 'center', borderCurve: 'continuous',
     },
     iconInnerCompact: {
       width: 30,
       height: 30,
-      borderRadius: BORDER_RADIUS.sm,
+      borderRadius: BORDER_RADIUS.sm, borderCurve: 'continuous',
     },
     iconInnerSelector: {
       width: 30,
@@ -605,12 +608,12 @@ const createStyles = (colors: any, isDark: boolean) =>
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1,
-      flexShrink: 0,
+      flexShrink: 0, borderCurve: 'continuous',
     },
     trailingCompact: {
       width: 30,
       height: 30,
-      borderRadius: 15,
+      borderRadius: 15, borderCurve: 'continuous',
     },
     selectorHeader: {
       width: '100%',
@@ -626,7 +629,7 @@ const createStyles = (colors: any, isDark: boolean) =>
       borderWidth: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      flexShrink: 0,
+      flexShrink: 0, borderCurve: 'continuous',
     },
     selectedFloatingBadge: {
       position: 'absolute',
@@ -638,7 +641,7 @@ const createStyles = (colors: any, isDark: boolean) =>
       borderWidth: 2,
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 4,
+      zIndex: 4, borderCurve: 'continuous',
     },
     childSelectionIndicator: {
       position: 'absolute',
@@ -650,17 +653,17 @@ const createStyles = (colors: any, isDark: boolean) =>
       borderWidth: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 4,
+      zIndex: 4, borderCurve: 'continuous',
     },
     childSelectionIndicatorDot: {
       width: 6,
       height: 6,
-      borderRadius: 3,
+      borderRadius: 3, borderCurve: 'continuous',
     },
     busyFloatingBadge: {
       width: 30,
       height: 30,
-      borderRadius: 15,
+      borderRadius: 15, borderCurve: 'continuous',
     },
     selectorIconShell: {
       width: 44,
@@ -672,17 +675,17 @@ const createStyles = (colors: any, isDark: boolean) =>
       marginLeft: SPACING.xs,
       borderWidth: 1,
       borderColor: withAlpha(colors.white, 0.12),
-      zIndex: 2,
+      zIndex: 2, borderCurve: 'continuous',
     },
     selectorIconShellTile: {
       width: 44,
       height: 44,
-      borderRadius: BORDER_RADIUS.lg,
+      borderRadius: BORDER_RADIUS.lg, borderCurve: 'continuous',
     },
     selectorIconShellWide: {
       width: 48,
       height: 48,
-      borderRadius: BORDER_RADIUS.xl,
+      borderRadius: BORDER_RADIUS.xl, borderCurve: 'continuous',
     },
     selectorBackdrop: {
       position: 'absolute',
@@ -700,7 +703,7 @@ const createStyles = (colors: any, isDark: boolean) =>
       borderTopRightRadius: BORDER_RADIUS.xl,
       borderBottomLeftRadius: BORDER_RADIUS.lg,
       borderBottomRightRadius: BORDER_RADIUS.lg,
-      borderWidth: 0,
+      borderWidth: 0, borderCurve: 'continuous',
     },
     selectorArtworkFrameTile: {
       height: 142,

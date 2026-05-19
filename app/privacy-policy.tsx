@@ -80,7 +80,7 @@ const createStyles = (colors: any, insets: any) => StyleSheet.create({
     marginBottom: SPACING.md,
   },
   localeSection: {
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: BORDER_RADIUS.xl, borderCurve: 'continuous',
   },
   localeBadge: {
     alignSelf: 'flex-start',
@@ -88,7 +88,7 @@ const createStyles = (colors: any, insets: any) => StyleSheet.create({
     backgroundColor: colors.primaryText,
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs,
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.md, borderCurve: 'continuous',
   },
   localeBadgeText: {
     color: colors.background,

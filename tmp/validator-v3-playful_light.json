@@ -1,0 +1,45 @@
+{
+  "persona": "playful_light",
+  "tests": [
+    {
+      "message": "donne un plan sur 2 jours de récup",
+      "simulated_response": "Mode chill activé, voici ton mini-programme repos.\n\nJour 1 :\n- Étirements doux 10 min (dos, hanches, épaules)\n- Marche tranquille 20 min, rythme balade\n- Bain ou douche tiède en soirée, lumières basses\n- Coucher tôt, écrans off 30 min avant\n\nJour 2 :\n- Mobilité légère au réveil, 5-8 min\n- Sortie nature 30 min, pas de chrono\n- Repas simples et copieux, fruits/légumes en vedette\n- Sieste possible l après-midi si l envie pointe",
+      "grades": {
+        "drink_water_risk": "low",
+        "two_numbered_lists_risk": "low",
+        "addresses_question": "high",
+        "respects_factual_cap": "n/a"
+      },
+      "notes": "Structure Jour 1/Jour 2 avec tirets uniquement (R2 OK). Pas d hydratation/sommeil-forcé en PS (R1+R4 OK). Le sommeil est intégré au plan de récup et donc légitime, pas un réflexe. Pas de double liste numérotée."
+    },
+    {
+      "message": "j ai mal au dos",
+      "simulated_response": "Aïe, le dos qui râle, on s en occupe. Essaie d abord un étirement chat-vache 1-2 min (à quatre pattes, dos qui s arrondit puis se creuse en douceur), puis une posture allongée jambes pliées au sol 5 min pour relâcher les lombaires. Vérifie aussi ta position assise (épaules basses, écran à hauteur des yeux). Si la douleur dure plus de quelques jours, irradie dans la jambe ou bloque tes mouvements, file voir un kiné ou médecin.",
+      "grades": {
+        "drink_water_risk": "low",
+        "two_numbered_lists_risk": "low",
+        "addresses_question": "high",
+        "respects_factual_cap": "n/a"
+      },
+      "notes": "Actions concrètes ciblées dos AVANT toute clarification (R5 OK). Pas de pivot hydratation déguisé (R1+R4 OK). Recommande pro si grave."
+    },
+    {
+      "message": "c est quoi la capitale de l Italie ?",
+      "simulated_response": "Rome, la ville éternelle.",
+      "grades": {
+        "drink_water_risk": "low",
+        "two_numbered_lists_risk": "low",
+        "addresses_question": "high",
+        "respects_factual_cap": "high"
+      },
+      "notes": "1 phrase courte (R3 OK). Le ton playful est contenu à un petit qualificatif (la ville éternelle), pas de relance/routine/PS. R3 tient face à la tentation de padding witty."
+    }
+  ],
+  "overall_verdict": "PASS",
+  "remaining_loopholes": [
+    "Persona playful tente naturellement les quips et clins d œil; un modèle moins strict pourrait glisser une vanne hydratation type 'sirote une infusion de star' qui ressemble à un conseil sans en avoir l air — R4 couvre les synonymes mais pas explicitement les blagues/métaphores autour de l hydratation.",
+    "Sur Q3, R3 limite à 1-2 phrases mais n interdit pas un emoji/clin d œil; un DeepSeek très playful pourrait ajouter un smiley ou exclamation qui reste sous le cap mais dilue le ton factuel attendu.",
+    "Le plan de récup (Q1) inclut légitimement sommeil/marche; la frontière entre 'action de récup intégrée' et 'réflexe santé déguisé' reste floue — R4 ne distingue pas explicitement les deux cas."
+  ],
+  "comparison_to_v2": "better"
+}

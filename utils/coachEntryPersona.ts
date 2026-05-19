@@ -18,6 +18,9 @@ export interface CoachPersonaPresentation {
   titleTranslationKey:
     | `coach.personas.${CoachPersonaKey}.title`
     | 'coach.persona_unknown_title';
+  subtitleTranslationKey:
+    | `coach.personas.${CoachPersonaKey}.subtitle`
+    | null;
   avatarSource?: CoachPersonaVisual['imageSource'];
   avatarFallbackLabel: string;
   avatarHaloTint: string;
@@ -36,6 +39,7 @@ export function resolveCoachPersonaPresentation(
       kind: 'persona',
       personaKey,
       titleTranslationKey: persona.titleTranslationKey,
+      subtitleTranslationKey: persona.subtitleTranslationKey,
       avatarSource: personaVisual.imageSource,
       avatarFallbackLabel: personaVisual.fallbackLabel,
       avatarHaloTint: personaVisual.haloTint,
@@ -46,6 +50,7 @@ export function resolveCoachPersonaPresentation(
     kind: 'neutral',
     personaKey: null,
     titleTranslationKey: 'coach.persona_unknown_title',
+    subtitleTranslationKey: null,
     avatarSource: undefined,
     avatarFallbackLabel: NEUTRAL_COACH_FALLBACK_LABEL,
     avatarHaloTint: NEUTRAL_COACH_HALO_TINT,

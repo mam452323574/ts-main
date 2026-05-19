@@ -23,6 +23,7 @@ import {
 } from '@/utils/resultLayout';
 import { resolveSuperCategoryIconToken } from '@/utils/resultIconCatalog';
 import { PremiumRenderState } from '@/utils/subscription';
+import { Squircle } from '@/components/Squircle';
 
 interface ConditionCardProps {
   condition: DetectedCondition;
@@ -245,7 +246,7 @@ export function ConditionCard({
           </View>
         </View>
 
-        <View
+        <Squircle
           testID="condition-card-probability-card"
           style={[
             styles.probabilityCard,
@@ -290,11 +291,11 @@ export function ConditionCard({
           >
             {t('common.metrics.probability')}
           </Text>
-        </View>
+        </Squircle>
       </View>
 
       <View style={styles.contentStack}>
-        <View style={styles.sectionCard}>
+        <Squircle style={styles.sectionCard}>
           <Text
             {...RESULT_TEXT_PROPS}
             numberOfLines={1}
@@ -303,9 +304,9 @@ export function ConditionCard({
             {t('common.metrics.explanation')}
           </Text>
           {renderSectionBody('explanation', explanation)}
-        </View>
+        </Squircle>
 
-        <View style={styles.sectionCard}>
+        <Squircle style={styles.sectionCard}>
           <Text
             {...RESULT_TEXT_PROPS}
             numberOfLines={1}
@@ -314,7 +315,7 @@ export function ConditionCard({
             {t('common.metrics.advice')}
           </Text>
           {renderSectionBody('advice', advice)}
-        </View>
+        </Squircle>
       </View>
     </View>
   );
@@ -331,7 +332,7 @@ const createStyles = (
       borderWidth: 1,
       padding: layout.blockPadding,
       marginBottom: SPACING.md,
-      gap: layout.blockPadding,
+      gap: layout.blockPadding, borderCurve: 'continuous',
     },
     headerRow: {
       flexDirection: layout.isCompact ? 'column' : 'row',
@@ -357,7 +358,7 @@ const createStyles = (
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1,
-      flexShrink: 0,
+      flexShrink: 0, borderCurve: 'continuous',
     },
     conditionName: {
       fontSize: layout.isCompact ? SIZES.lg : SIZES.lg + 1,
@@ -384,12 +385,12 @@ const createStyles = (
       borderRadius: 9999,
       paddingHorizontal: SPACING.sm + 2,
       paddingVertical: SPACING.xs + 1,
-      maxWidth: '100%',
+      maxWidth: '100%', borderCurve: 'continuous',
     },
     severityDot: {
       width: 7,
       height: 7,
-      borderRadius: 9999,
+      borderRadius: 9999, borderCurve: 'continuous',
     },
     severityText: {
       fontSize: SIZES.xs,
@@ -408,7 +409,7 @@ const createStyles = (
       paddingVertical: SPACING.xs + 1,
       backgroundColor: isDark
         ? withAlpha(themeColors.white, 0.08)
-        : withAlpha(themeColors.primaryText, 0.05),
+        : withAlpha(themeColors.primaryText, 0.05), borderCurve: 'continuous',
     },
     categoryText: {
       fontSize: SIZES.xs,
@@ -427,7 +428,7 @@ const createStyles = (
       paddingHorizontal: SPACING.md,
       paddingVertical: layout.isCompact ? SPACING.sm : SPACING.sm + 2,
       alignSelf: layout.isCompact ? 'flex-start' : undefined,
-      maxWidth: layout.isCompact ? '100%' : undefined,
+      maxWidth: layout.isCompact ? '100%' : undefined, borderCurve: 'continuous',
     },
     probabilityValue: {
       fontSize: layout.isCompact ? SIZES.xl : SIZES.xl + 1,
@@ -466,7 +467,7 @@ const createStyles = (
         ? withAlpha(themeColors.white, 0.05)
         : withAlpha(themeColors.primaryText, 0.06),
       gap: SPACING.xs + 2,
-      minHeight: layout.summaryMinHeight - 24,
+      minHeight: layout.summaryMinHeight - 24, borderCurve: 'continuous',
     },
     sectionTitle: {
       fontSize: SIZES.xs,
@@ -496,7 +497,7 @@ const createStyles = (
       borderColor: isDark
         ? withAlpha(themeColors.white, 0.08)
         : withAlpha(themeColors.primaryText, 0.08),
-      gap: SPACING.sm,
+      gap: SPACING.sm, borderCurve: 'continuous',
     },
     lockedHeader: {
       flexDirection: 'row',
@@ -510,7 +511,7 @@ const createStyles = (
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: themeColors.primary,
-      flexShrink: 0,
+      flexShrink: 0, borderCurve: 'continuous',
     },
     lockCtaText: {
       fontSize: SIZES.sm,

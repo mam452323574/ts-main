@@ -63,6 +63,7 @@ import type {
   SocialCategory,
   SocialComposerDraft,
 } from '@/types';
+import { Squircle } from '@/components/Squircle';
 
 const CAPTURE_WIDTH = 1080;
 const CAPTURE_HEIGHT = 1920;
@@ -590,16 +591,16 @@ export default function SocialComposerScreen() {
           </View>
 
           {isHydratingDraft ? (
-            <View style={styles.loadingCard} testID="social-compose-draft-loading">
+            <Squircle style={styles.loadingCard} testID="social-compose-draft-loading">
               <ActivityIndicator color={colors.primary} />
               <Text style={styles.helperText}>{t('social.composer.draft_loading')}</Text>
-            </View>
+            </Squircle>
           ) : null}
 
           <View style={styles.heroSection}>
             <Text style={styles.sectionLabel}>{t('social.composer.asset_label')}</Text>
             {selectedImageUri ? (
-              <View style={styles.heroCard} testID="social-compose-asset-card">
+              <Squircle style={styles.heroCard} testID="social-compose-asset-card">
                 <View style={styles.heroHeaderRow}>
                   <Text style={styles.heroTitle}>{t('social.composer.asset_ready')}</Text>
                   <TouchableOpacity
@@ -621,14 +622,14 @@ export default function SocialComposerScreen() {
                   testID="social-compose-image-preview"
                 />
                 {renderAssetButtons(true)}
-              </View>
+              </Squircle>
             ) : prefillSharePayload ? (
-              <View style={styles.heroCard} testID="social-compose-asset-card">
+              <Squircle style={styles.heroCard} testID="social-compose-asset-card">
                 <View style={styles.heroHeaderBlock}>
                   <Text style={styles.prefillLabel}>{t('social.composer.prefill_label')}</Text>
                   <Text style={styles.heroTitle}>{t('social.composer.generated_preview')}</Text>
                 </View>
-                <View
+                <Squircle
                   ref={previewCaptureRef}
                   collapsable={false}
                   style={[
@@ -645,23 +646,23 @@ export default function SocialComposerScreen() {
                     cardWidth={shareCardWidth}
                     onHeroImageLoadEnd={() => setShareCardReady(true)}
                   />
-                </View>
+                </Squircle>
                 <Text style={styles.heroHelper}>
                   {isUsingGeneratedShareCard && !shareCardReady
                     ? t('social.composer.generating_asset')
                     : t('social.composer.generated_helper')}
                 </Text>
                 {renderAssetButtons(true)}
-              </View>
+              </Squircle>
             ) : (
-              <View style={styles.heroCard} testID="social-compose-asset-card">
-                <View style={styles.heroPlaceholderIcon}>
+              <Squircle style={styles.heroCard} testID="social-compose-asset-card">
+                <Squircle style={styles.heroPlaceholderIcon}>
                   <ImagePlus color={colors.primary} size={28} />
-                </View>
+                </Squircle>
                 <Text style={styles.heroTitle}>{t('social.composer.placeholder_title')}</Text>
                 <Text style={styles.heroBody}>{t('social.composer.placeholder_body')}</Text>
                 {renderAssetButtons(false)}
-              </View>
+              </Squircle>
             )}
           </View>
 
@@ -736,10 +737,10 @@ export default function SocialComposerScreen() {
                   />
                 ))}
               </View>
-              <View style={styles.visibilityRow} testID="social-compose-visibility-row">
-                <View style={styles.visibilityIcon}>
+              <Squircle style={styles.visibilityRow} testID="social-compose-visibility-row">
+                <Squircle style={styles.visibilityIcon}>
                   <Globe2 color={colors.primaryText} size={18} />
-                </View>
+                </Squircle>
                 <View style={styles.visibilityCopy}>
                   <Text style={styles.visibilityTitle}>
                     {t('social.composer.visibility_title')}
@@ -748,7 +749,7 @@ export default function SocialComposerScreen() {
                     {t('social.composer.visibility_body')}
                   </Text>
                 </View>
-              </View>
+              </Squircle>
             </View>
           ) : null}
         </ScrollView>
@@ -813,7 +814,7 @@ const createStyles = (colors: any) =>
       justifyContent: 'center',
       backgroundColor: colors.cardBackground,
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08), borderCurve: 'continuous',
     },
     headerText: {
       flex: 1,
@@ -845,7 +846,7 @@ const createStyles = (colors: any) =>
       borderRadius: BORDER_RADIUS.xl,
       backgroundColor: colors.cardBackground,
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08), borderCurve: 'continuous',
     },
     heroSection: {
       gap: SPACING.sm,
@@ -882,7 +883,7 @@ const createStyles = (colors: any) =>
       color: colors.primaryText,
       fontSize: SIZES.text14,
       textAlignVertical: 'top',
-      lineHeight: 22,
+      lineHeight: 22, borderCurve: 'continuous',
     },
     quickToolsRow: {
       flexDirection: 'row',
@@ -899,7 +900,7 @@ const createStyles = (colors: any) =>
       borderRadius: BORDER_RADIUS.full,
       backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.06),
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08), borderCurve: 'continuous',
     },
     quickToolLabel: {
       fontSize: SIZES.text14,
@@ -916,7 +917,7 @@ const createStyles = (colors: any) =>
       borderRadius: BORDER_RADIUS.lg,
       backgroundColor: colors.cardBackground,
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.06),
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.06), borderCurve: 'continuous',
     },
     visibilityRow: {
       flexDirection: 'row',
@@ -927,7 +928,7 @@ const createStyles = (colors: any) =>
       borderRadius: BORDER_RADIUS.lg,
       backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.05),
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08), borderCurve: 'continuous',
     },
     visibilityIcon: {
       width: 38,
@@ -935,7 +936,7 @@ const createStyles = (colors: any) =>
       borderRadius: 19,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.cardBackground,
+      backgroundColor: colors.cardBackground, borderCurve: 'continuous',
     },
     visibilityCopy: {
       flex: 1,
@@ -968,7 +969,7 @@ const createStyles = (colors: any) =>
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: withAlpha(colors.primary, 0.12),
-      alignSelf: 'center',
+      alignSelf: 'center', borderCurve: 'continuous',
     },
     heroTitle: {
       fontSize: SIZES.text16,
@@ -999,7 +1000,7 @@ const createStyles = (colors: any) =>
       justifyContent: 'center',
       backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.06),
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08), borderCurve: 'continuous',
     },
     removeAssetLabel: {
       fontSize: SIZES.text12,
@@ -1009,13 +1010,13 @@ const createStyles = (colors: any) =>
     shareCardCapture: {
       alignSelf: 'center',
       overflow: 'hidden',
-      borderRadius: BORDER_RADIUS.xl,
+      borderRadius: BORDER_RADIUS.xl, borderCurve: 'continuous',
     },
     heroImagePreview: {
       width: '100%',
       aspectRatio: 4 / 5,
       borderRadius: BORDER_RADIUS.xl,
-      backgroundColor: withAlpha(colors.primaryText, 0.04),
+      backgroundColor: withAlpha(colors.primaryText, 0.04), borderCurve: 'continuous',
     },
     heroAssetActions: {
       gap: SPACING.sm,
@@ -1039,7 +1040,7 @@ const createStyles = (colors: any) =>
       shadowOffset: { width: 0, height: 8 },
       shadowOpacity: 0.18,
       shadowRadius: 18,
-      elevation: 4,
+      elevation: 4, borderCurve: 'continuous',
     },
     compactPrimaryButton: {
       flex: 1,
@@ -1050,7 +1051,7 @@ const createStyles = (colors: any) =>
       alignItems: 'center',
       justifyContent: 'center',
       gap: SPACING.sm,
-      paddingHorizontal: SPACING.md,
+      paddingHorizontal: SPACING.md, borderCurve: 'continuous',
     },
     heroPrimaryButtonLabel: {
       fontSize: SIZES.text16,
@@ -1072,7 +1073,7 @@ const createStyles = (colors: any) =>
       alignItems: 'center',
       justifyContent: 'center',
       gap: SPACING.sm,
-      paddingHorizontal: SPACING.md,
+      paddingHorizontal: SPACING.md, borderCurve: 'continuous',
     },
     compactSecondaryButton: {
       flex: 1,
@@ -1085,7 +1086,7 @@ const createStyles = (colors: any) =>
       alignItems: 'center',
       justifyContent: 'center',
       gap: SPACING.sm,
-      paddingHorizontal: SPACING.md,
+      paddingHorizontal: SPACING.md, borderCurve: 'continuous',
     },
     heroSecondaryButtonLabel: {
       fontSize: SIZES.text14,
@@ -1115,7 +1116,7 @@ const createStyles = (colors: any) =>
       shadowOffset: { width: 0, height: 8 },
       shadowOpacity: 0.18,
       shadowRadius: 18,
-      elevation: 4,
+      elevation: 4, borderCurve: 'continuous',
     },
     submitButtonDisabled: {
       opacity: 0.5,

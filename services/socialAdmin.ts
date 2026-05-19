@@ -545,6 +545,9 @@ async function invokeSocialAdminEdgeFunction<TResponse>(options: {
   method?: 'GET' | 'POST';
   payload?: Record<string, unknown>;
   queryParams?: Record<string, string | undefined>;
+  // S-09 — Permet aux callers de passer Idempotency-Key et autres headers
+  // optionnels propages vers l'Edge Function.
+  extraHeaders?: Record<string, string>;
 }) {
   let functionUrl: string;
 
@@ -589,6 +592,7 @@ async function invokeSocialAdminEdgeFunction<TResponse>(options: {
         ...(options.method === 'GET'
           ? {}
           : { 'Content-Type': 'application/json' }),
+        ...(options.extraHeaders ?? {}),
       },
       ...(options.method === 'GET'
         ? {}
@@ -703,13 +707,31 @@ export async function reclassifySocialPost(
   return parseSocialReclassifyPostResponse(response);
 }
 
+function generateAdminIdempotencyKey(): string {
+  // S-09 — Genere une cle stable par tentative client. Sur retry (network
+  // glitch, double-tap UI), le caller doit reutiliser la meme cle pour que
+  // le serveur retourne 409 idempotent_request_already_processed au lieu de
+  // re-executer l'action destructive.
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 export async function moderateSocialUser(
   request: SocialAdminModerateUserRequest,
+  options: { idempotencyKey?: string } = {},
 ) {
+  const idempotencyKey =
+    typeof options.idempotencyKey === 'string' && options.idempotencyKey.length > 0
+      ? options.idempotencyKey
+      : generateAdminIdempotencyKey();
+
   const response = await invokeSocialAdminEdgeFunction<SocialAdminModerateUserResponse>({
     functionName: 'social-admin-moderate-user',
     method: 'POST',
     payload: request as unknown as Record<string, unknown>,
+    extraHeaders: { 'Idempotency-Key': idempotencyKey },
   });
 
   return parseSocialAdminModerateUserResponse(response);
@@ -717,11 +739,22 @@ export async function moderateSocialUser(
 
 export async function eradicateSocialUser(
   request: SocialAdminEradicateUserRequest,
+  options: { idempotencyKey?: string } = {},
 ) {
+  // S-09 — Idempotency-Key stable cote client : si non fourni, on en genere
+  // un UUID. Toute retry reseau (network glitch, double-tap) gardera le meme
+  // key et la RPC retournera l'outcome de la 1re execution au lieu de
+  // re-eradiquer.
+  const idempotencyKey =
+    typeof options.idempotencyKey === 'string' && options.idempotencyKey.length > 0
+      ? options.idempotencyKey
+      : generateAdminIdempotencyKey();
+
   const response = await invokeSocialAdminEdgeFunction<SocialAdminEradicateUserResponse>({
     functionName: 'social-admin-eradicate-user',
     method: 'POST',
     payload: request as unknown as Record<string, unknown>,
+    extraHeaders: { 'Idempotency-Key': idempotencyKey },
   });
 
   return parseSocialAdminEradicateUserResponse(response);
@@ -729,12 +762,19 @@ export async function eradicateSocialUser(
 
 export async function adjustSocialPostReactions(
   request: SocialAdminAdjustPostReactionsRequest,
+  options: { idempotencyKey?: string } = {},
 ) {
+  const idempotencyKey =
+    typeof options.idempotencyKey === 'string' && options.idempotencyKey.length > 0
+      ? options.idempotencyKey
+      : generateAdminIdempotencyKey();
+
   const response =
     await invokeSocialAdminEdgeFunction<SocialAdminAdjustPostReactionsResponse>({
       functionName: 'social-admin-adjust-post-reactions',
       method: 'POST',
       payload: request as unknown as Record<string, unknown>,
+      extraHeaders: { 'Idempotency-Key': idempotencyKey },
     });
 
   return parseSocialAdminAdjustPostReactionsResponse(response);

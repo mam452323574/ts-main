@@ -1,6 +1,26 @@
 import { useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import {
+  Activity,
+  AlertTriangle,
+  ArrowLeftRight,
+  Bell,
+  BookOpen,
+  CalendarClock,
+  Check,
+  ChefHat,
+  Clock3,
+  Compass,
+  Eye,
+  Flame,
+  Repeat,
+  ScanLine,
+  ShoppingBag,
+  Sparkles,
+  Target,
+  Utensils,
+} from 'lucide-react-native';
 
 import { useTheme } from '@/contexts/ThemeContext';
 import {
@@ -8,6 +28,7 @@ import {
   FONT_WEIGHTS,
   SIZES,
   SPACING,
+  getCoachPaperSurface,
   withAlpha,
 } from '@/constants/theme';
 import type {
@@ -16,12 +37,18 @@ import type {
   CoachShoppingSection,
   CoachStructuredContent,
 } from '@/shared/coachContent';
+import { Squircle } from '@/components/Squircle';
 
 export interface CoachStructuredContentLabels {
   context_notes?: string;
   priorities?: string;
   action_steps?: string;
   warnings?: string;
+  /**
+   * @deprecated Le champ `data_gaps` n'est plus rendu côté UI. Conservé dans
+   * l'interface pour compatibilité ascendante des i18n callers existants — il
+   * peut être passé sans effet visuel.
+   */
   data_gaps?: string;
   meal_template?: string;
   meal_swaps?: string;
@@ -56,7 +83,12 @@ interface CoachStructuredContentSectionsProps {
   labels?: CoachStructuredContentLabels;
   showSummary?: boolean;
   skipFirstActionStep?: boolean;
+  // 'numbered' (default) renders 01./02./… ; 'checked' renders ✓ bullets — used when a
+  // hero "primary action" tile already carries the 01. label upstream, to avoid the
+  // double-01 visual bug.
+  actionStepsStyle?: 'numbered' | 'checked';
   testIDPrefix?: string;
+  accentColor?: string;
 }
 
 const DEFAULT_LABELS: Required<
@@ -73,7 +105,9 @@ const DEFAULT_LABELS: Required<
   priorities: 'À surveiller',
   action_steps: 'À faire maintenant',
   warnings: 'Vigilance',
-  data_gaps: 'Zones sans assez de données',
+  // `data_gaps` n'est plus rendu côté UI ; la clé est laissée pour ne pas casser
+  // les callers i18n existants, mais elle n'est utilisée par aucune section.
+  data_gaps: '',
   meal_template: 'Prochain repas',
   meal_swaps: 'Échanges malins',
   shopping_list: 'Liste de courses',
@@ -215,7 +249,6 @@ export function hasRenderableCoachStructuredContent(
     hasItems(content.priorities) ||
     actionSteps.length > 0 ||
     hasItems(content.warnings) ||
-    hasItems(content.data_gaps) ||
     hasItems(content.daily_schedule) ||
     hasItems(content.micro_routine) ||
     !!content.meal_template ||
@@ -268,10 +301,19 @@ export function CoachStructuredContentSections({
   labels,
   showSummary = true,
   skipFirstActionStep = false,
+  actionStepsStyle = 'numbered',
   testIDPrefix = 'coach-section',
+  accentColor,
 }: CoachStructuredContentSectionsProps) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const { colors, isDark } = useTheme();
+  const resolvedAccent = accentColor ?? (colors.primary as string) ?? colors.primaryText;
+  const paper = useMemo(() => getCoachPaperSurface(isDark), [isDark]);
+  const warningIconColor = withAlpha(colors.warning, 0.85);
+  const iconColor = withAlpha(resolvedAccent, 0.78);
+  const styles = useMemo(
+    () => createStyles(colors, resolvedAccent, paper),
+    [colors, paper, resolvedAccent],
+  );
   const resolvedLabels = useMemo(() => resolveLabels(labels), [labels]);
   const formatters = labels?.formatters;
   const actionSteps = skipFirstActionStep
@@ -289,83 +331,96 @@ export function CoachStructuredContentSections({
   return (
     <View style={styles.container} testID={`${testIDPrefix}-content`}>
       {showSummary && content.summary ? (
-        <Text style={styles.summary}>{content.summary}</Text>
+        <View style={styles.summaryQuoteWrap}>
+          <Squircle style={styles.summaryQuoteRule} />
+          <Text style={styles.summaryQuoteText}>{content.summary}</Text>
+        </View>
       ) : null}
 
       {actionSteps.length > 0 ? (
         <Section
+          iconKey="action_steps"
+          iconColor={iconColor}
           label={resolvedLabels.action_steps}
           styles={styles}
           testID={`${testIDPrefix}-action_steps`}
         >
-          {actionSteps.map((step, index) => (
-            <Text key={`action-${index}`} style={styles.actionItem}>
-              {step}
-            </Text>
-          ))}
+          {actionSteps.map((step, index) =>
+            actionStepsStyle === 'checked' ? (
+              <CheckedItem
+                key={`action-${index}`}
+                styles={styles}
+                checkColor={iconColor}
+              >
+                {step}
+              </CheckedItem>
+            ) : (
+              <NumberedItem
+                key={`action-${index}`}
+                index={skipFirstActionStep ? index + 1 : index}
+                styles={styles}
+              >
+                {step}
+              </NumberedItem>
+            ),
+          )}
         </Section>
       ) : null}
 
       {content.context_notes.length > 0 ? (
         <Section
+          iconKey="context_notes"
+          iconColor={iconColor}
           label={resolvedLabels.context_notes}
           styles={styles}
           testID={`${testIDPrefix}-context_notes`}
         >
           {content.context_notes.map((note, index) => (
-            <Text key={`context-${index}`} style={styles.item}>
+            <BulletItem key={`context-${index}`} styles={styles}>
               {note}
-            </Text>
+            </BulletItem>
           ))}
         </Section>
       ) : null}
 
       {content.priorities.length > 0 ? (
         <Section
+          iconKey="priorities"
+          iconColor={iconColor}
           label={resolvedLabels.priorities}
           styles={styles}
           testID={`${testIDPrefix}-priorities`}
         >
           {content.priorities.map((priority, index) => (
-            <Text key={`priority-${index}`} style={styles.item}>
+            <BulletItem key={`priority-${index}`} styles={styles}>
               {priority}
-            </Text>
+            </BulletItem>
           ))}
         </Section>
       ) : null}
 
       {content.warnings.length > 0 ? (
         <Section
+          iconKey="warnings"
+          iconColor={iconColor}
           label={resolvedLabels.warnings}
           styles={styles}
           testID={`${testIDPrefix}-warnings`}
           tone="warning"
+          warningIconColor={warningIconColor}
         >
           {content.warnings.map((warning, index) => (
-            <Text key={`warning-${index}`} style={styles.item}>
+            <BulletItem key={`warning-${index}`} styles={styles} tone="warning">
               {warning}
-            </Text>
-          ))}
-        </Section>
-      ) : null}
-
-      {content.data_gaps.length > 0 ? (
-        <Section
-          label={resolvedLabels.data_gaps}
-          styles={styles}
-          testID={`${testIDPrefix}-data_gaps`}
-          tone="muted"
-        >
-          {content.data_gaps.map((gap, index) => (
-            <Text key={`gap-${index}`} style={styles.mutedItem}>
-              {gap}
-            </Text>
+            </BulletItem>
           ))}
         </Section>
       ) : null}
 
       {content.meal_template ? (
         <Section
+          iconKey="meal_template"
+          iconColor={iconColor}
           label={resolvedLabels.meal_template}
           styles={styles}
           testID={`${testIDPrefix}-meal_template`}
@@ -398,6 +453,8 @@ export function CoachStructuredContentSections({
 
       {content.quick_recipe ? (
         <Section
+          iconKey="quick_recipe"
+          iconColor={iconColor}
           label={resolvedLabels.quick_recipe}
           styles={styles}
           testID={`${testIDPrefix}-quick_recipe`}
@@ -433,6 +490,8 @@ export function CoachStructuredContentSections({
 
       {content.meal_swaps && content.meal_swaps.length > 0 ? (
         <Section
+          iconKey="meal_swaps"
+          iconColor={iconColor}
           label={resolvedLabels.meal_swaps}
           styles={styles}
           testID={`${testIDPrefix}-meal_swaps`}
@@ -448,6 +507,8 @@ export function CoachStructuredContentSections({
 
       {content.shopping_list && content.shopping_list.length > 0 ? (
         <Section
+          iconKey="shopping_list"
+          iconColor={iconColor}
           label={resolvedLabels.shopping_list}
           styles={styles}
           testID={`${testIDPrefix}-shopping_list`}
@@ -464,6 +525,8 @@ export function CoachStructuredContentSections({
 
       {content.daily_schedule && content.daily_schedule.length > 0 ? (
         <Section
+          iconKey="daily_schedule"
+          iconColor={iconColor}
           label={resolvedLabels.daily_schedule}
           styles={styles}
           testID={`${testIDPrefix}-daily_schedule`}
@@ -490,6 +553,8 @@ export function CoachStructuredContentSections({
 
       {content.micro_routine && content.micro_routine.length > 0 ? (
         <Section
+          iconKey="micro_routine"
+          iconColor={iconColor}
           label={resolvedLabels.micro_routine}
           styles={styles}
           testID={`${testIDPrefix}-micro_routine`}
@@ -517,6 +582,8 @@ export function CoachStructuredContentSections({
 
       {content.habit_tracker && content.habit_tracker.length > 0 ? (
         <Section
+          iconKey="habit_tracker"
+          iconColor={iconColor}
           label={resolvedLabels.habit_tracker}
           styles={styles}
           testID={`${testIDPrefix}-habit_tracker`}
@@ -537,6 +604,8 @@ export function CoachStructuredContentSections({
 
       {content.reminders && content.reminders.length > 0 ? (
         <Section
+          iconKey="reminders"
+          iconColor={iconColor}
           label={resolvedLabels.reminders}
           styles={styles}
           testID={`${testIDPrefix}-reminders`}
@@ -557,6 +626,8 @@ export function CoachStructuredContentSections({
 
       {content.knowledge_card ? (
         <Section
+          iconKey="knowledge_card"
+          iconColor={iconColor}
           label={resolvedLabels.knowledge_card}
           styles={styles}
           testID={`${testIDPrefix}-knowledge_card`}
@@ -571,6 +642,8 @@ export function CoachStructuredContentSections({
 
       {content.next_scan_suggestion ? (
         <Section
+          iconKey="next_scan_suggestion"
+          iconColor={iconColor}
           label={resolvedLabels.next_scan_suggestion}
           styles={styles}
           testID={`${testIDPrefix}-next_scan_suggestion`}
@@ -597,6 +670,8 @@ export function CoachStructuredContentSections({
 
       {content.signal_watch && content.signal_watch.length > 0 ? (
         <Section
+          iconKey="signal_watch"
+          iconColor={iconColor}
           label={resolvedLabels.signal_watch}
           styles={styles}
           testID={`${testIDPrefix}-signal_watch`}
@@ -614,13 +689,24 @@ export function CoachStructuredContentSections({
       ) : null}
 
       {content.encouragement ? (
-        <Text style={styles.encouragement} testID={`${testIDPrefix}-encouragement`}>
-          {content.encouragement}
-        </Text>
+        <View
+          style={styles.encouragementRow}
+          testID={`${testIDPrefix}-encouragement`}
+        >
+          <Sparkles
+            color={iconColor}
+            size={14}
+            strokeWidth={2}
+            style={styles.encouragementIcon}
+          />
+          <Text style={styles.encouragement}>{content.encouragement}</Text>
+        </View>
       ) : null}
 
       {content.streak_celebration ? (
         <Section
+          iconKey="streak_celebration"
+          iconColor={iconColor}
           label={resolvedLabels.streak_celebration}
           styles={styles}
           testID={`${testIDPrefix}-streak_celebration`}
@@ -634,134 +720,352 @@ export function CoachStructuredContentSections({
   );
 }
 
+type SectionIconKey =
+  | 'context_notes'
+  | 'priorities'
+  | 'action_steps'
+  | 'warnings'
+  | 'meal_template'
+  | 'meal_swaps'
+  | 'shopping_list'
+  | 'quick_recipe'
+  | 'daily_schedule'
+  | 'micro_routine'
+  | 'habit_tracker'
+  | 'reminders'
+  | 'knowledge_card'
+  | 'next_scan_suggestion'
+  | 'signal_watch'
+  | 'streak_celebration';
+
+const SECTION_ICONS: Record<SectionIconKey, typeof Eye> = {
+  context_notes: Eye,
+  priorities: Compass,
+  action_steps: Target,
+  warnings: AlertTriangle,
+  meal_template: Utensils,
+  meal_swaps: ArrowLeftRight,
+  shopping_list: ShoppingBag,
+  quick_recipe: ChefHat,
+  daily_schedule: CalendarClock,
+  micro_routine: Clock3,
+  habit_tracker: Repeat,
+  reminders: Bell,
+  knowledge_card: BookOpen,
+  next_scan_suggestion: ScanLine,
+  signal_watch: Activity,
+  streak_celebration: Flame,
+};
+
 function Section({
   children,
+  iconKey,
+  iconColor,
   label,
   styles,
   testID,
   tone = 'default',
+  warningIconColor,
 }: {
   children: ReactNode;
+  iconKey?: SectionIconKey;
+  iconColor: string;
   label: string;
   styles: ReturnType<typeof createStyles>;
   testID: string;
-  tone?: 'default' | 'warning' | 'muted';
+  tone?: 'default' | 'warning';
+  warningIconColor?: string;
 }) {
+  const Icon = iconKey ? SECTION_ICONS[iconKey] : null;
+  const resolvedIconColor =
+    tone === 'warning' ? (warningIconColor ?? iconColor) : iconColor;
   return (
     <View
       style={[
         styles.section,
         tone === 'warning' ? styles.warningSection : null,
-        tone === 'muted' ? styles.mutedSection : null,
       ]}
       testID={testID}
     >
-      <Text
-        style={[
-          styles.sectionLabel,
-          tone === 'warning' ? styles.warningLabel : null,
-        ]}
-      >
-        {label}
-      </Text>
+      <View style={styles.sectionLabelRow}>
+        {Icon ? (
+          <Icon
+            color={resolvedIconColor}
+            size={13}
+            strokeWidth={2}
+          />
+        ) : null}
+        <Text
+          style={[
+            styles.sectionLabel,
+            tone === 'warning' ? styles.warningLabel : null,
+          ]}
+        >
+          {label}
+        </Text>
+      </View>
       {children}
     </View>
   );
 }
 
-const createStyles = (colors: any) =>
+function BulletItem({
+  children,
+  styles,
+  tone = 'default',
+}: {
+  children: ReactNode;
+  styles: ReturnType<typeof createStyles>;
+  tone?: 'default' | 'warning';
+}) {
+  return (
+    <View style={styles.bulletRow}>
+      <View
+        style={[
+          styles.bulletDot,
+          tone === 'warning' ? styles.bulletDotWarning : null,
+        ]}
+      />
+      <Text style={styles.bulletText}>{children}</Text>
+    </View>
+  );
+}
+
+function NumberedItem({
+  index,
+  children,
+  styles,
+}: {
+  // Global index in the original action_steps[] (NOT post-slice). Callers that hide
+  // the first action upstream MUST pass index+1 so the rendered label continues the
+  // sequence (02., 03., …) instead of restarting at 01.
+  index: number;
+  children: ReactNode;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  const safeIndex = Number.isFinite(index) && index >= 0 ? index : 0;
+  const label = String(safeIndex + 1).padStart(2, '0');
+  return (
+    <View style={styles.numberedRow}>
+      <Text style={styles.numberedIndex}>
+        {label}
+        <Text style={styles.numberedIndexDot}>.</Text>
+      </Text>
+      <Text style={styles.numberedText}>{children}</Text>
+    </View>
+  );
+}
+
+function CheckedItem({
+  children,
+  styles,
+  checkColor,
+}: {
+  children: ReactNode;
+  styles: ReturnType<typeof createStyles>;
+  checkColor: string;
+}) {
+  return (
+    <View style={styles.checkedRow}>
+      <View style={styles.checkedBullet}>
+        <Check color={checkColor} size={12} strokeWidth={2.4} />
+      </View>
+      <Text style={styles.checkedText}>{children}</Text>
+    </View>
+  );
+}
+
+const createStyles = (
+  colors: any,
+  accentColor: string,
+  paper: ReturnType<typeof getCoachPaperSurface>,
+) =>
   StyleSheet.create({
     container: {
-      gap: SPACING.sm,
+      gap: SPACING.md + 2,
       paddingTop: SPACING.xs,
     },
     summary: {
-      fontSize: SIZES.text14,
-      lineHeight: 20,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.primaryText,
+      fontSize: SIZES.text16,
+      lineHeight: 26,
+      fontStyle: 'italic',
+      color: withAlpha(paper.ink, 0.86),
     },
     section: {
-      gap: 4,
-      paddingVertical: SPACING.xs,
+      gap: SPACING.sm + 2,
+    },
+    sectionLabelRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 7,
     },
     sectionLabel: {
-      fontSize: 11,
+      fontSize: 10,
       lineHeight: 14,
-      fontWeight: FONT_WEIGHTS.bold,
-      color: colors.textMuted ?? withAlpha(colors.primaryText, 0.68),
+      fontWeight: FONT_WEIGHTS.semiBold,
+      color: withAlpha(accentColor, 0.85),
+      letterSpacing: 1.2,
       textTransform: 'uppercase',
-      letterSpacing: 0.35,
     },
     lead: {
-      fontSize: SIZES.text14,
-      lineHeight: 20,
+      fontSize: SIZES.text16,
+      lineHeight: 24,
       fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.primaryText,
+      color: paper.ink,
     },
     item: {
-      fontSize: SIZES.text14,
-      lineHeight: 20,
-      color: colors.primaryText,
+      fontSize: SIZES.text15,
+      lineHeight: 24,
+      color: paper.ink,
     },
     actionItem: {
-      fontSize: SIZES.text14,
-      lineHeight: 20,
-      color: colors.primaryText,
+      fontSize: SIZES.text15,
+      lineHeight: 24,
+      color: paper.ink,
       fontWeight: FONT_WEIGHTS.semiBold,
     },
-    mutedItem: {
-      fontSize: 12,
-      lineHeight: 17,
-      color: colors.textMuted ?? withAlpha(colors.gray, 0.94),
-    },
     note: {
-      fontSize: 12,
-      lineHeight: 17,
-      color: colors.textMuted ?? withAlpha(colors.primaryText, 0.72),
+      fontSize: 13,
+      lineHeight: 20,
+      fontStyle: 'italic',
+      color: paper.inkMuted,
     },
     compoundItem: {
-      gap: 2,
-      paddingVertical: 2,
+      gap: 4,
+      paddingVertical: 4,
     },
     chipRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: SPACING.xs,
-      paddingTop: 2,
+      gap: SPACING.xs + 2,
+      paddingTop: SPACING.xs,
     },
     chipText: {
       overflow: 'hidden',
       maxWidth: '100%',
-      paddingHorizontal: SPACING.sm,
+      paddingHorizontal: SPACING.sm + 2,
       paddingVertical: 4,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.05),
-      borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
       fontSize: 11,
       lineHeight: 14,
-      color: colors.textMuted ?? withAlpha(colors.primaryText, 0.76),
+      fontWeight: FONT_WEIGHTS.medium,
+      color: paper.inkMuted,
+      backgroundColor: paper.raised,
+      borderWidth: 0,
+      letterSpacing: 0.3, borderCurve: 'continuous',
+    },
+    bulletRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 12,
+    },
+    bulletDot: {
+      width: 5,
+      height: 5,
+      borderRadius: 2.5,
+      backgroundColor: withAlpha(accentColor, 0.55),
+      marginTop: 10,
+      flexShrink: 0, borderCurve: 'continuous',
+    },
+    bulletDotWarning: {
+      backgroundColor: withAlpha(colors.warning, 0.7),
+    },
+    bulletText: {
+      flex: 1,
+      fontSize: SIZES.text15,
+      lineHeight: 24,
+      color: paper.ink,
+    },
+    numberedRow: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      gap: 12,
+    },
+    numberedIndex: {
+      fontSize: 13,
+      lineHeight: 24,
+      fontWeight: FONT_WEIGHTS.bold,
+      color: withAlpha(accentColor, 0.85),
+      letterSpacing: 0.4,
+      minWidth: 20,
+    },
+    numberedIndexDot: {
+      color: accentColor,
+    },
+    numberedText: {
+      flex: 1,
+      fontSize: SIZES.text15,
+      lineHeight: 24,
+      color: paper.ink,
+      fontWeight: FONT_WEIGHTS.semiBold,
+    },
+    checkedRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 12,
+    },
+    checkedBullet: {
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      backgroundColor: withAlpha(accentColor, 0.12),
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 3,
+      flexShrink: 0,
+      borderCurve: 'continuous',
+    },
+    checkedText: {
+      flex: 1,
+      fontSize: SIZES.text15,
+      lineHeight: 24,
+      color: paper.ink,
+      fontWeight: FONT_WEIGHTS.semiBold,
     },
     warningSection: {
-      backgroundColor: withAlpha(colors.warning, 0.08),
+      backgroundColor: withAlpha(colors.warning, 0.05),
       borderRadius: BORDER_RADIUS.md,
-      padding: SPACING.sm + 2,
-      borderWidth: 1,
-      borderColor: withAlpha(colors.warning, 0.22),
+      padding: SPACING.md,
+      borderWidth: 0, borderCurve: 'continuous',
     },
     warningLabel: {
-      color: colors.warning,
+      color: withAlpha(colors.warning, 0.9),
     },
-    mutedSection: {
-      borderTopWidth: 1,
-      borderTopColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.07),
+    encouragementRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 10,
+      paddingLeft: 12,
+      borderLeftWidth: 2,
+      borderLeftColor: withAlpha(accentColor, 0.5),
+      marginTop: SPACING.xs,
+    },
+    encouragementIcon: {
+      marginTop: 5,
+      flexShrink: 0,
     },
     encouragement: {
-      fontSize: SIZES.text14,
-      lineHeight: 20,
+      flex: 1,
+      fontSize: SIZES.text15,
+      lineHeight: 24,
       fontStyle: 'italic',
-      color: withAlpha(colors.primaryText, 0.86),
-      paddingTop: SPACING.xs,
+      color: withAlpha(paper.ink, 0.86),
+    },
+    summaryQuoteWrap: {
+      flexDirection: 'row',
+      alignItems: 'stretch',
+      gap: SPACING.md,
+    },
+    summaryQuoteRule: {
+      width: 2,
+      backgroundColor: withAlpha(accentColor, 0.55),
+      borderRadius: 1, borderCurve: 'continuous',
+    },
+    summaryQuoteText: {
+      flex: 1,
+      fontSize: SIZES.text16,
+      lineHeight: 26,
+      fontStyle: 'italic',
+      color: withAlpha(paper.ink, 0.86),
     },
   });

@@ -8,6 +8,8 @@ const mockReplace = jest.fn();
 const mockBack = jest.fn();
 const mockUseAuth = jest.fn();
 const mockUseSocialAdminModeration = jest.fn();
+// S-07 — Mock du hook admin-whoami ajoute pour le gating serveur du tier admin.
+const mockUseAdminWhoami = jest.fn();
 const mockShowAlert = jest.fn();
 const originalNodeEnv = process.env.NODE_ENV;
 const originalDevFlag = (global as typeof globalThis & { __DEV__?: boolean }).__DEV__;
@@ -88,6 +90,11 @@ jest.mock('@/hooks/queries', () => ({
 jest.mock('@/hooks/queries/useSocialAdminModeration', () => ({
   useSocialAdminModeration: (...args: unknown[]) =>
     mockUseSocialAdminModeration(...args),
+}));
+// S-07 — Stub du nouveau hook admin-whoami (revalidation serveur du tier admin).
+jest.mock('@/hooks/queries/useAdminWhoami', () => ({
+  useAdminWhoami: (...args: unknown[]) => mockUseAdminWhoami(...args),
+  ADMIN_WHOAMI_QUERY_KEY: ['admin', 'whoami'],
 }));
 
 jest.mock('@/hooks/useCustomAlert', () => ({
@@ -339,6 +346,15 @@ describe('AdminSocialModerationScreen', () => {
         account_tier: 'admin',
       },
       loading: false,
+    });
+
+    // S-07 — Default mock : admin confirme cote serveur. Les tests qui
+    // simulent un non-admin / une 403 du whoami override ce mock.
+    mockUseAdminWhoami.mockReturnValue({
+      data: { is_admin: true, user_id: 'admin-1', account_tier: 'admin' },
+      isError: false,
+      isLoading: false,
+      error: null,
     });
 
     const moderateMutateAsync = jest.fn().mockResolvedValue({ success: true });

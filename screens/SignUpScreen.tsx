@@ -58,6 +58,7 @@ import {
   normalizeUsernameInput,
   validateCanonicalUsername,
 } from '@/utils/username';
+import { Squircle } from '@/components/Squircle';
 
 const SIGNUP_STEPS: PreAuthOnboardingStep[] = [
   'intro',
@@ -543,9 +544,9 @@ export default function SignUpScreen() {
         subtitle={t('onboarding.intro_step_subtitle')}
         visual={<IntroStepVisual />}
       />
-      <View style={styles.infoContainer}>
+      <Squircle style={styles.infoContainer}>
         <Text style={styles.infoText}>{t('onboarding.intro_step_note')}</Text>
-      </View>
+      </Squircle>
       <Button
         title={t('common.next')}
         onPress={() => void persistStep('profile')}
@@ -568,7 +569,7 @@ export default function SignUpScreen() {
           />
         }
       />
-      <View style={styles.profileSection}>
+      <Squircle style={styles.profileSection}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>
             {t('onboarding.username_step_title')}
@@ -601,9 +602,9 @@ export default function SignUpScreen() {
                 : undefined
           }
         />
-      </View>
+      </Squircle>
 
-      <View style={styles.profileSection}>
+      <Squircle style={styles.profileSection}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>
             {t('onboarding.avatar_pre_auth_title')}
@@ -613,14 +614,14 @@ export default function SignUpScreen() {
           </Text>
         </View>
         <View style={styles.avatarStage}>
-          <View style={styles.avatarHalo}>
+          <Squircle style={styles.avatarHalo}>
             <ProfileAvatar
               avatarUrl={avatarLocalUri}
               username={username}
               size={148}
               testID="signup-avatar-preview"
             />
-          </View>
+          </Squircle>
           {avatarLocalUri ? (
             <Text style={styles.avatarSelectedText}>
               {t('onboarding.avatar_selected')}
@@ -667,9 +668,9 @@ export default function SignUpScreen() {
             <Text style={styles.skipLabel}>{t('onboarding.avatar_skip')}</Text>
           </Pressable>
         ) : null}
-      </View>
+      </Squircle>
 
-      <View style={styles.profileSection}>
+      <Squircle style={styles.profileSection}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>
             {t('onboarding.profile_theme_title')}
@@ -720,7 +721,7 @@ export default function SignUpScreen() {
             </View>
           </Pressable>
         </View>
-      </View>
+      </Squircle>
 
       <Button
         title={t('common.next')}
@@ -791,9 +792,9 @@ export default function SignUpScreen() {
         />
       </View>
 
-      <View style={styles.infoContainer}>
+      <Squircle style={styles.infoContainer}>
         <Text style={styles.infoText}>{t('auth.verification_note')}</Text>
-      </View>
+      </Squircle>
 
       <Button
         title={t('auth.signup_btn')}
@@ -850,9 +851,9 @@ export default function SignUpScreen() {
       <View style={styles.stepContent}>
         {renderCurrentStep()}
         {error ? (
-          <View style={styles.errorContainer}>
+          <Squircle style={styles.errorContainer}>
             <Text style={styles.errorText}>{error}</Text>
-          </View>
+          </Squircle>
         ) : null}
       </View>
       <Pressable
@@ -893,7 +894,7 @@ function IntroStepVisual() {
           end={{ x: 1, y: 1 }}
           style={styles.introHeroBackdrop}
         />
-        <View style={styles.introHeroCard}>
+        <Squircle style={styles.introHeroCard}>
           <View style={styles.introHeroBadgeRow}>
             <View style={styles.introHeroBadge}>
               <Text style={styles.introHeroBadgeText}>SCAN</Text>
@@ -903,17 +904,17 @@ function IntroStepVisual() {
             </View>
           </View>
           <View style={styles.introHeroHeadline}>
-            <View style={styles.introHeroIconWrap}>
+            <Squircle style={styles.introHeroIconWrap}>
               <Camera color={colors.primaryText} size={28} />
-            </View>
+            </Squircle>
             <View style={styles.introHeroBars}>
               <View style={styles.introHeroBar} />
               <View style={[styles.introHeroBar, styles.introHeroBarShort]} />
             </View>
           </View>
           <View style={styles.introHeroMetricRow}>
-            <View style={styles.introHeroMetricCard}>
-              <View style={styles.introHeroMetricDot} />
+            <Squircle style={styles.introHeroMetricCard}>
+              <Squircle style={styles.introHeroMetricDot} />
               <View style={styles.introHeroMetricBars}>
                 <View style={styles.introHeroMetricBar} />
                 <View
@@ -923,14 +924,14 @@ function IntroStepVisual() {
                   ]}
                 />
               </View>
-            </View>
-            <View
+            </Squircle>
+            <Squircle
               style={[
                 styles.introHeroMetricCard,
                 styles.introHeroMetricCardSoft,
               ]}
             >
-              <View
+              <Squircle
                 style={[
                   styles.introHeroMetricDot,
                   styles.introHeroMetricDotSoft,
@@ -945,9 +946,9 @@ function IntroStepVisual() {
                   ]}
                 />
               </View>
-            </View>
+            </Squircle>
           </View>
-        </View>
+        </Squircle>
         <View style={styles.heroMicroRow}>
           <View style={styles.heroMicroChip} />
           <View style={[styles.heroMicroChip, styles.heroMicroChipWide]} />
@@ -987,26 +988,26 @@ function ProfileStepVisual({
           </Text>
         </View>
         <View style={styles.usernameMetricRow}>
-          <View style={styles.usernameMetricCard}>
-            <View style={styles.usernameMetricDot} />
+          <Squircle style={styles.usernameMetricCard}>
+            <Squircle style={styles.usernameMetricDot} />
             <View style={styles.usernameMetricBars}>
               <View style={styles.usernameMetricBar} />
               <View
                 style={[styles.usernameMetricBar, styles.usernameMetricBarShort]}
               />
             </View>
-          </View>
-        <View style={[styles.usernameMetricCard, styles.usernameMetricCardSoft]}>
-          <View style={[styles.usernameMetricDot, styles.usernameMetricDotAlt]} />
+          </Squircle>
+        <Squircle style={[styles.usernameMetricCard, styles.usernameMetricCardSoft]}>
+          <Squircle style={[styles.usernameMetricDot, styles.usernameMetricDotAlt]} />
           <View style={styles.usernameMetricBars}>
               <View style={styles.usernameMetricBar} />
               <View
                 style={[styles.usernameMetricBar, styles.usernameMetricBarShort]}
               />
             </View>
-          </View>
+          </Squircle>
         </View>
-        <View style={styles.profileHeroStatus}>
+        <Squircle style={styles.profileHeroStatus}>
           <View
             style={[
               styles.profileHeroStatusDot,
@@ -1022,7 +1023,7 @@ function ProfileStepVisual({
               ]}
             />
           </View>
-        </View>
+        </Squircle>
       </View>
     </OnboardingHeroStage>
   );
@@ -1043,19 +1044,19 @@ function AccountStepVisual() {
       contentStyle={styles.visualStageContent}
     >
       <View style={styles.accountHeroShell}>
-        <View style={styles.accountHeroCardPrimary}>
+        <Squircle style={styles.accountHeroCardPrimary}>
           <Mail color={colors.primaryText} size={24} />
           <View style={styles.accountHeroCardBars}>
             <View style={styles.accountHeroBar} />
             <View style={[styles.accountHeroBar, styles.accountHeroBarShort]} />
           </View>
-        </View>
-        <View style={styles.accountHeroCardSecondary}>
+        </Squircle>
+        <Squircle style={styles.accountHeroCardSecondary}>
           <Lock color={colors.primaryText} size={22} />
-        </View>
-        <View style={styles.accountHeroShield}>
-          <View style={styles.accountHeroShieldInner} />
-        </View>
+        </Squircle>
+        <Squircle style={styles.accountHeroShield}>
+          <Squircle style={styles.accountHeroShieldInner} />
+        </Squircle>
       </View>
     </OnboardingHeroStage>
   );
@@ -1080,7 +1081,7 @@ const createStyles = (colors: any, isDark: boolean) =>
       borderRadius: BORDER_RADIUS.xl,
       borderWidth: 1,
       borderColor: withAlpha(colors.primaryText, isDark ? 0.1 : 0.06),
-      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.04 : 0.02),
+      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.04 : 0.02), borderCurve: 'continuous',
     },
     sectionHeader: {
       gap: SPACING.xs,
@@ -1109,7 +1110,7 @@ const createStyles = (colors: any, isDark: boolean) =>
         isDark ? 0.1 : 0.06,
       ),
       borderWidth: 1,
-      borderColor: withAlpha(colors.primary, isDark ? 0.18 : 0.1),
+      borderColor: withAlpha(colors.primary, isDark ? 0.18 : 0.1), borderCurve: 'continuous',
     },
     avatarSelectedText: {
       color: colors.success,
@@ -1129,7 +1130,7 @@ const createStyles = (colors: any, isDark: boolean) =>
       borderRadius: BORDER_RADIUS.pill,
       borderWidth: 1,
       borderColor: withAlpha(colors.primaryText, isDark ? 0.14 : 0.08),
-      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.05 : 0.03),
+      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.05 : 0.03), borderCurve: 'continuous',
     },
     secondaryActionPressed: {
       backgroundColor: withAlpha(colors.primaryText, isDark ? 0.1 : 0.06),
@@ -1162,7 +1163,7 @@ const createStyles = (colors: any, isDark: boolean) =>
       borderRadius: BORDER_RADIUS.xl,
       borderWidth: 1,
       borderColor: withAlpha(colors.primaryText, isDark ? 0.12 : 0.08),
-      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.04 : 0.02),
+      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.04 : 0.02), borderCurve: 'continuous',
     },
     themeChoiceCardActive: {
       borderColor: withAlpha(colors.primary, isDark ? 0.42 : 0.22),
@@ -1217,7 +1218,7 @@ const createStyles = (colors: any, isDark: boolean) =>
       paddingHorizontal: SPACING.lg,
       borderRadius: BORDER_RADIUS.xl,
       borderWidth: 1,
-      borderColor: withAlpha(colors.primary, isDark ? 0.18 : 0.1),
+      borderColor: withAlpha(colors.primary, isDark ? 0.18 : 0.1), borderCurve: 'continuous',
     },
     infoText: {
       color: colors.gray,
@@ -1229,7 +1230,7 @@ const createStyles = (colors: any, isDark: boolean) =>
       backgroundColor: withAlpha(colors.error, 0.10),
       paddingVertical: SPACING.md,
       paddingHorizontal: SPACING.lg,
-      borderRadius: BORDER_RADIUS.xl,
+      borderRadius: BORDER_RADIUS.xl, borderCurve: 'continuous',
     },
     errorText: {
       color: colors.error,
@@ -1280,7 +1281,7 @@ const createHeroVisualStyles = (
       width: '76%',
       height: 136,
       borderRadius: 999,
-      transform: [{ scaleX: 1.16 }],
+      transform: [{ scaleX: 1.16 }], borderCurve: 'continuous',
     },
     introHeroCard: {
       width: '100%',
@@ -1290,7 +1291,7 @@ const createHeroVisualStyles = (
       borderRadius: BORDER_RADIUS.hero,
       backgroundColor: palette.surfaceGlass,
       borderWidth: 1,
-      borderColor: palette.heroBorder,
+      borderColor: palette.heroBorder, borderCurve: 'continuous',
     },
     introHeroBadgeRow: {
       flexDirection: 'row',
@@ -1303,7 +1304,7 @@ const createHeroVisualStyles = (
       borderRadius: BORDER_RADIUS.pill,
       backgroundColor: withAlpha(colors.primaryText, isDark ? 0.08 : 0.05),
       borderWidth: 1,
-      borderColor: withAlpha(colors.primaryText, isDark ? 0.1 : 0.06),
+      borderColor: withAlpha(colors.primaryText, isDark ? 0.1 : 0.06), borderCurve: 'continuous',
     },
     introHeroBadgeText: {
       color: colors.primaryText,
@@ -1324,7 +1325,7 @@ const createHeroVisualStyles = (
       justifyContent: 'center',
       backgroundColor: withAlpha(colors.primary, isDark ? 0.18 : 0.12),
       borderWidth: 1,
-      borderColor: withAlpha(colors.primary, isDark ? 0.28 : 0.16),
+      borderColor: withAlpha(colors.primary, isDark ? 0.28 : 0.16), borderCurve: 'continuous',
     },
     introHeroBars: {
       flex: 1,
@@ -1334,7 +1335,7 @@ const createHeroVisualStyles = (
       width: '100%',
       height: 10,
       borderRadius: 999,
-      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.18 : 0.08),
+      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.18 : 0.08), borderCurve: 'continuous',
     },
     introHeroBarShort: {
       width: '56%',
@@ -1351,7 +1352,7 @@ const createHeroVisualStyles = (
       gap: SPACING.sm,
       backgroundColor: withAlpha(colors.primary, isDark ? 0.12 : 0.08),
       borderWidth: 1,
-      borderColor: withAlpha(colors.primary, isDark ? 0.2 : 0.12),
+      borderColor: withAlpha(colors.primary, isDark ? 0.2 : 0.12), borderCurve: 'continuous',
     },
     introHeroMetricCardSoft: {
       backgroundColor: withAlpha(colors.gold, isDark ? 0.16 : 0.1),
@@ -1361,7 +1362,7 @@ const createHeroVisualStyles = (
       width: 16,
       height: 16,
       borderRadius: 8,
-      backgroundColor: colors.primary,
+      backgroundColor: colors.primary, borderCurve: 'continuous',
     },
     introHeroMetricDotSoft: {
       backgroundColor: colors.gold,
@@ -1373,7 +1374,7 @@ const createHeroVisualStyles = (
       width: '100%',
       height: 7,
       borderRadius: 999,
-      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.16 : 0.08),
+      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.16 : 0.08), borderCurve: 'continuous',
     },
     introHeroMetricBarShort: {
       width: '58%',
@@ -1391,7 +1392,7 @@ const createHeroVisualStyles = (
       width: '68%',
       height: 124,
       borderRadius: 999,
-      transform: [{ scaleX: 1.14 }],
+      transform: [{ scaleX: 1.14 }], borderCurve: 'continuous',
     },
     themePreviewRow: {
       width: '100%',
@@ -1408,7 +1409,7 @@ const createHeroVisualStyles = (
       justifyContent: 'center',
       borderWidth: 1,
       borderColor: withAlpha(colors.primaryText, isDark ? 0.1 : 0.06),
-      backgroundColor: withAlpha(colors.white, isDark ? 0.04 : 0.7),
+      backgroundColor: withAlpha(colors.white, isDark ? 0.04 : 0.7), borderCurve: 'continuous',
     },
     themePreviewOrbDark: {
       backgroundColor: withAlpha('#0F1622', isDark ? 0.92 : 0.82),
@@ -1432,7 +1433,7 @@ const createHeroVisualStyles = (
       justifyContent: 'flex-start',
       backgroundColor: palette.secondaryActionFill,
       borderWidth: 1,
-      borderColor: palette.secondaryActionBorder,
+      borderColor: palette.secondaryActionBorder, borderCurve: 'continuous',
     },
     themeSelectionKnob: {
       width: 32,
@@ -1443,7 +1444,7 @@ const createHeroVisualStyles = (
       shadowOpacity: 0.24,
       shadowRadius: 14,
       shadowOffset: { width: 0, height: 6 },
-      elevation: 3,
+      elevation: 3, borderCurve: 'continuous',
     },
     themeSelectionKnobLight: {
       marginTop: 'auto',
@@ -1457,7 +1458,7 @@ const createHeroVisualStyles = (
       width: 52,
       height: 8,
       borderRadius: 999,
-      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.14 : 0.08),
+      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.14 : 0.08), borderCurve: 'continuous',
     },
     heroMicroChipWide: {
       width: 82,
@@ -1477,7 +1478,7 @@ const createHeroVisualStyles = (
       borderRadius: BORDER_RADIUS.pill,
       backgroundColor: palette.surfaceGlass,
       borderWidth: 1,
-      borderColor: palette.heroBorder,
+      borderColor: palette.heroBorder, borderCurve: 'continuous',
     },
     usernameChipLabel: {
       flexShrink: 1,
@@ -1500,7 +1501,7 @@ const createHeroVisualStyles = (
       gap: SPACING.sm,
       backgroundColor: withAlpha(colors.primary, isDark ? 0.12 : 0.08),
       borderWidth: 1,
-      borderColor: withAlpha(colors.primary, isDark ? 0.22 : 0.12),
+      borderColor: withAlpha(colors.primary, isDark ? 0.22 : 0.12), borderCurve: 'continuous',
     },
     usernameMetricCardSoft: {
       backgroundColor: withAlpha(colors.secondary, isDark ? 0.12 : 0.08),
@@ -1510,7 +1511,7 @@ const createHeroVisualStyles = (
       width: 18,
       height: 18,
       borderRadius: 9,
-      backgroundColor: colors.primary,
+      backgroundColor: colors.primary, borderCurve: 'continuous',
     },
     usernameMetricDotAlt: {
       backgroundColor: colors.secondary,
@@ -1522,7 +1523,7 @@ const createHeroVisualStyles = (
       width: '100%',
       height: 8,
       borderRadius: 999,
-      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.18 : 0.1),
+      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.18 : 0.1), borderCurve: 'continuous',
     },
     usernameMetricBarShort: {
       width: '58%',
@@ -1537,13 +1538,13 @@ const createHeroVisualStyles = (
       justifyContent: 'center',
       backgroundColor: palette.surfaceGlass,
       borderWidth: 1,
-      borderColor: palette.secondaryActionBorder,
+      borderColor: palette.secondaryActionBorder, borderCurve: 'continuous',
     },
     profileHeroStatusDot: {
       width: 16,
       height: 16,
       borderRadius: 8,
-      backgroundColor: withAlpha(colors.gray, 0.64),
+      backgroundColor: withAlpha(colors.gray, 0.64), borderCurve: 'continuous',
     },
     profileHeroStatusDotReady: {
       backgroundColor: colors.success,
@@ -1555,7 +1556,7 @@ const createHeroVisualStyles = (
       width: '100%',
       height: 7,
       borderRadius: 999,
-      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.14 : 0.08),
+      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.14 : 0.08), borderCurve: 'continuous',
     },
     profileHeroStatusBarShort: {
       width: '58%',
@@ -1572,7 +1573,7 @@ const createHeroVisualStyles = (
       borderRadius: 69,
       alignItems: 'center',
       justifyContent: 'center',
-      transform: [{ scaleX: 1.02 }],
+      transform: [{ scaleX: 1.02 }], borderCurve: 'continuous',
     },
     avatarHeroCore: {
       width: 106,
@@ -1582,7 +1583,7 @@ const createHeroVisualStyles = (
       justifyContent: 'center',
       backgroundColor: palette.surfaceGlass,
       borderWidth: 1,
-      borderColor: palette.heroBorder,
+      borderColor: palette.heroBorder, borderCurve: 'continuous',
     },
     avatarOrbitDot: {
       position: 'absolute',
@@ -1591,7 +1592,7 @@ const createHeroVisualStyles = (
       borderRadius: 7,
       backgroundColor: withAlpha(colors.white, isDark ? 0.74 : 0.92),
       borderWidth: 1,
-      borderColor: withAlpha(colors.secondary, isDark ? 0.28 : 0.18),
+      borderColor: withAlpha(colors.secondary, isDark ? 0.28 : 0.18), borderCurve: 'continuous',
     },
     avatarOrbitDotTop: {
       top: 10,
@@ -1617,13 +1618,13 @@ const createHeroVisualStyles = (
       borderRadius: BORDER_RADIUS.pill,
       backgroundColor: palette.surfaceGlass,
       borderWidth: 1,
-      borderColor: palette.secondaryActionBorder,
+      borderColor: palette.secondaryActionBorder, borderCurve: 'continuous',
     },
     avatarHeroStatusDot: {
       width: 16,
       height: 16,
       borderRadius: 8,
-      backgroundColor: withAlpha(colors.gray, 0.6),
+      backgroundColor: withAlpha(colors.gray, 0.6), borderCurve: 'continuous',
     },
     avatarHeroStatusDotReady: {
       backgroundColor: colors.success,
@@ -1636,7 +1637,7 @@ const createHeroVisualStyles = (
       width: '100%',
       height: 7,
       borderRadius: 999,
-      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.14 : 0.08),
+      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.14 : 0.08), borderCurve: 'continuous',
     },
     avatarHeroStatusBarShort: {
       width: '58%',
@@ -1656,7 +1657,7 @@ const createHeroVisualStyles = (
       justifyContent: 'space-between',
       backgroundColor: palette.surfaceGlass,
       borderWidth: 1,
-      borderColor: palette.heroBorder,
+      borderColor: palette.heroBorder, borderCurve: 'continuous',
     },
     accountHeroCardBars: {
       gap: 10,
@@ -1665,7 +1666,7 @@ const createHeroVisualStyles = (
       width: '100%',
       height: 8,
       borderRadius: 999,
-      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.16 : 0.08),
+      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.16 : 0.08), borderCurve: 'continuous',
     },
     accountHeroBarShort: {
       width: '52%',
@@ -1681,7 +1682,7 @@ const createHeroVisualStyles = (
       justifyContent: 'center',
       backgroundColor: withAlpha(colors.gold, isDark ? 0.18 : 0.12),
       borderWidth: 1,
-      borderColor: withAlpha(colors.gold, isDark ? 0.28 : 0.18),
+      borderColor: withAlpha(colors.gold, isDark ? 0.28 : 0.18), borderCurve: 'continuous',
     },
     accountHeroShield: {
       position: 'absolute',
@@ -1695,7 +1696,7 @@ const createHeroVisualStyles = (
       backgroundColor: withAlpha(colors.success, isDark ? 0.18 : 0.12),
       borderWidth: 1,
       borderColor: withAlpha(colors.success, isDark ? 0.24 : 0.14),
-      transform: [{ rotate: '-10deg' }],
+      transform: [{ rotate: '-10deg' }], borderCurve: 'continuous',
     },
     accountHeroShieldInner: {
       width: 26,
@@ -1705,6 +1706,6 @@ const createHeroVisualStyles = (
       borderBottomLeftRadius: 8,
       borderBottomRightRadius: 8,
       backgroundColor: colors.success,
-      transform: [{ rotate: '10deg' }],
+      transform: [{ rotate: '10deg' }], borderCurve: 'continuous',
     },
   });

@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
   type LayoutChangeEvent,
 } from 'react-native';
 import {
@@ -21,10 +22,12 @@ import { AppScreen } from '@/components/AppScreen';
 import { HeaderIconButton, ScreenHeader } from '@/components/ScreenHeader';
 import { ScreenState } from '@/components/ScreenState';
 import { CoachActionComposer } from '@/components/coach/CoachActionComposer';
+import { CoachConversationHeroCard } from '@/components/coach/CoachConversationHeroCard';
 import { CoachGuidanceCard } from '@/components/coach/CoachGuidanceCard';
 import { CoachPersonaDetailsModal } from '@/components/coach/CoachPersonaDetailsModal';
 import { CoachSettingsInline } from '@/components/coach/CoachSettingsInline';
 import { LoadingMiniGame } from '@/components/loading/LoadingMiniGame';
+import { useCoachConversationQuota } from '@/hooks/queries/useCoachConversationQuota';
 import {
   BORDER_RADIUS,
   FONT_WEIGHTS,
@@ -113,6 +116,7 @@ import {
 } from '@/utils/coachLocalization';
 import { resolveCoachCtaRoute } from '@/utils/coachRoutes';
 import { getMainTabBarMetrics } from '@/utils/mainTabBarMetrics';
+import { Squircle } from '@/components/Squircle';
 
 const PROMPT_TYPES: readonly CoachPromptType[] = COACH_PROMPT_TYPES;
 const DEFAULT_PROMPT_TYPE: CoachPromptType = DEFAULT_COACH_PROMPT_TYPE;
@@ -175,6 +179,201 @@ type CoachScanResultRouteRequest = CoachScanResultContext & {
   questionText: string | null;
   signature: string;
 };
+
+type CoachScreenUiState =
+  | 'generation_loading'
+  | 'query_loading'
+  | 'query_error'
+  | 'provider_unavailable'
+  | 'generation_error'
+  | 'empty'
+  | 'guidance'
+  | 'idle';
+
+type CoachTrackedDebugStatus = CoachEntry['status'] | 'missing' | null;
+type CoachDebugErrorInfo = {
+  message: string;
+  code: string | null;
+  status: number | null;
+  requestId: string | null;
+  functionName: string | null;
+  details: unknown;
+  providerFailureKind?: string | null;
+  providerFailureStage?: string | null;
+  providerNodeType?: string | null;
+  providerNodeName?: string | null;
+};
+
+type CoachScreenUiStateDebugPayload = {
+  last_mutation_entry_id: string | null;
+  last_mutation_status: CoachEntry['status'] | null;
+  display_mode: 'settings' | 'result';
+  result_display_enabled: boolean;
+  tracked_entry_id: string | null;
+  tracked_status: CoachTrackedDebugStatus;
+  tracked_error_code: string | null;
+  tracked_pending_stale: boolean;
+  is_mutation_pending: boolean;
+  is_entries_fetching: boolean;
+  ui_state: CoachScreenUiState;
+  load_error_source: CoachLoadErrorSource;
+  has_entries_error: boolean;
+  has_entries_data: boolean;
+  has_recent_scans_error: boolean;
+  has_recent_scans_data: boolean;
+  has_latest_ready_error: boolean;
+  has_latest_ready_entry_data: boolean;
+  tracked_guidance_available: boolean;
+  mutation_guidance_available: boolean;
+  generation_error_kind: CoachFailureKind | null;
+  generation_error: CoachDebugErrorInfo | null;
+  active_guidance_source: CoachGuidanceSource | null;
+  displayed_guidance_source: CoachGuidanceSource | null;
+};
+
+function resolveCoachScreenUiState(options: {
+  hasDisplayedGuidance: boolean;
+  showEmptyState: boolean;
+  showGenerationErrorState: boolean;
+  showGenerationLoadingState: boolean;
+  showLoadingState: boolean;
+  showProviderUnavailableState: boolean;
+  showQueryErrorState: boolean;
+}): CoachScreenUiState {
+  if (options.showGenerationLoadingState) {
+    return 'generation_loading';
+  }
+
+  if (options.showLoadingState) {
+    return 'query_loading';
+  }
+
+  if (options.showQueryErrorState) {
+    return 'query_error';
+  }
+
+  if (options.showProviderUnavailableState) {
+    return 'provider_unavailable';
+  }
+
+  if (options.showGenerationErrorState) {
+    return 'generation_error';
+  }
+
+  if (options.showEmptyState) {
+    return 'empty';
+  }
+
+  return options.hasDisplayedGuidance ? 'guidance' : 'idle';
+}
+
+function buildCoachScreenUiStateDebugPayload(options: {
+  activeGuidanceSource: CoachGuidanceSource | null;
+  displayedGuidanceSource: CoachGuidanceSource | null;
+  displayMode: 'settings' | 'result';
+  effectiveTrackedEntryId: string | null;
+  generationErrorDebugInfo: CoachDebugErrorInfo | null;
+  generationFailureKind: CoachFailureKind | null;
+  hasDisplayedGuidance: boolean;
+  hasEntriesData: boolean;
+  hasEntriesError: boolean;
+  hasGenerationGuidance: boolean;
+  hasLatestReadyEntryData: boolean;
+  hasLatestReadyError: boolean;
+  hasRecentScansData: boolean;
+  hasRecentScansError: boolean;
+  hasTrackedGuidance: boolean;
+  isEntriesFetching: boolean;
+  isTrackedEntryStaleFailure: boolean;
+  isMutationPending: boolean;
+  lastMutationEntryId: string | null;
+  lastMutationStatus: CoachEntry['status'] | null;
+  loadErrorSource: CoachLoadErrorSource;
+  showEmptyState: boolean;
+  showGenerationErrorState: boolean;
+  showGenerationLoadingState: boolean;
+  showLoadingState: boolean;
+  showProviderUnavailableState: boolean;
+  showQueryErrorState: boolean;
+  trackedEntryErrorCode: string | null;
+  trackedStatus: CoachTrackedDebugStatus;
+}): CoachScreenUiStateDebugPayload {
+  return {
+    last_mutation_entry_id: options.lastMutationEntryId,
+    last_mutation_status: options.lastMutationStatus,
+    display_mode: options.displayMode,
+    result_display_enabled: options.displayMode === 'result',
+    tracked_entry_id: options.effectiveTrackedEntryId,
+    tracked_status: options.trackedStatus,
+    tracked_error_code: options.trackedEntryErrorCode,
+    tracked_pending_stale: options.isTrackedEntryStaleFailure,
+    is_mutation_pending: options.isMutationPending,
+    is_entries_fetching: options.isEntriesFetching,
+    ui_state: resolveCoachScreenUiState({
+      hasDisplayedGuidance: options.hasDisplayedGuidance,
+      showEmptyState: options.showEmptyState,
+      showGenerationErrorState: options.showGenerationErrorState,
+      showGenerationLoadingState: options.showGenerationLoadingState,
+      showLoadingState: options.showLoadingState,
+      showProviderUnavailableState: options.showProviderUnavailableState,
+      showQueryErrorState: options.showQueryErrorState,
+    }),
+    load_error_source: options.loadErrorSource,
+    has_entries_error: options.hasEntriesError,
+    has_entries_data: options.hasEntriesData,
+    has_recent_scans_error: options.hasRecentScansError,
+    has_recent_scans_data: options.hasRecentScansData,
+    has_latest_ready_error: options.hasLatestReadyError,
+    has_latest_ready_entry_data: options.hasLatestReadyEntryData,
+    tracked_guidance_available: options.hasTrackedGuidance,
+    mutation_guidance_available: options.hasGenerationGuidance,
+    generation_error_kind: options.showGenerationErrorState
+      ? options.generationFailureKind
+      : null,
+    generation_error: options.generationErrorDebugInfo,
+    active_guidance_source: options.activeGuidanceSource,
+    displayed_guidance_source: options.displayedGuidanceSource,
+  };
+}
+
+function buildCoachScreenUiStateDebugSignature(
+  payload: CoachScreenUiStateDebugPayload,
+) {
+  return JSON.stringify({
+    last_mutation_entry_id: payload.last_mutation_entry_id,
+    last_mutation_status: payload.last_mutation_status,
+    display_mode: payload.display_mode,
+    result_display_enabled: payload.result_display_enabled,
+    tracked_entry_id: payload.tracked_entry_id,
+    tracked_status: payload.tracked_status,
+    tracked_error_code: payload.tracked_error_code,
+    tracked_pending_stale: payload.tracked_pending_stale,
+    is_mutation_pending: payload.is_mutation_pending,
+    ui_state: payload.ui_state,
+    load_error_source: payload.load_error_source,
+    has_entries_error: payload.has_entries_error,
+    has_entries_data: payload.has_entries_data,
+    has_recent_scans_error: payload.has_recent_scans_error,
+    has_recent_scans_data: payload.has_recent_scans_data,
+    has_latest_ready_error: payload.has_latest_ready_error,
+    has_latest_ready_entry_data: payload.has_latest_ready_entry_data,
+    tracked_guidance_available: payload.tracked_guidance_available,
+    mutation_guidance_available: payload.mutation_guidance_available,
+    generation_error_kind: payload.generation_error_kind,
+    generation_error_identity: payload.generation_error
+      ? {
+          code: payload.generation_error.code,
+          status: payload.generation_error.status,
+          requestId: payload.generation_error.requestId,
+          functionName: payload.generation_error.functionName,
+          providerFailureKind: payload.generation_error.providerFailureKind,
+          providerFailureStage: payload.generation_error.providerFailureStage,
+        }
+      : null,
+    active_guidance_source: payload.active_guidance_source,
+    displayed_guidance_source: payload.displayed_guidance_source,
+  });
+}
 
 function readCoachRouteParam(value: unknown) {
   const rawValue = Array.isArray(value) ? value[0] : value;
@@ -274,6 +473,16 @@ function formatCoachQuotaRemainingFromIso(nextRechargeAt: string | null | undefi
     : null;
 }
 
+function formatCoachConversationQuestionHint(count: number | null | undefined) {
+  const safeCount = Math.max(0, count ?? 0);
+  return `${safeCount} question${safeCount > 1 ? 's' : ''} restante${safeCount > 1 ? 's' : ''}`;
+}
+
+function formatCoachConversationMessageHint(count: number | null | undefined) {
+  const safeCount = Math.max(0, count ?? 0);
+  return `${safeCount} message${safeCount > 1 ? 's' : ''} restant${safeCount > 1 ? 's' : ''} aujourd’hui`;
+}
+
 function useCoachQuotaCountdown(
   nextRechargeAt: string | null | undefined,
   onElapsed: () => void,
@@ -333,12 +542,14 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
   const { locale, t } = useLanguage();
   const { alertElement, showAlert } = useCustomAlert();
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const coachAlertIcon = (
     <CoachFeatureIcon color={colors.primary} size={30} strokeWidth={2.3} />
   );
   const showBackButton = variant === 'stack';
   const [trackedEntryId, setTrackedEntryId] = useState<string | null>(null);
   const loadingWasActiveRef = useRef(false);
+  const uiStateDebugSignatureRef = useRef<string | null>(null);
   const trackedEntryTerminalInvalidationRef = useRef<string | null>(null);
   const [expandedPromptType, setExpandedPromptType] =
     useState<CoachPromptType | null>(null);
@@ -360,6 +571,9 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
   const [scanResultContext, setScanResultContext] =
     useState<CoachScanResultContext | null>(null);
   const [actionBarHeight, setActionBarHeight] = useState(0);
+  const [generationCardHeight, setGenerationCardHeight] = useState<number | null>(null);
+  const [scrollViewportHeight, setScrollViewportHeight] = useState<number | null>(null);
+  const [miniGameHostHeight, setMiniGameHostHeight] = useState<number | null>(null);
   const appliedScanResultRouteSignatureRef = useRef<string | null>(null);
   const autoSubmitAttemptedRouteSignatureRef = useRef<string | null>(null);
   const pendingAutoSubmitRef = useRef(false);
@@ -607,6 +821,101 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     () => getCoachPersonaVisual(activePersonaKey),
     [activePersonaKey],
   );
+
+  const coachConversationQuotaQuery = useCoachConversationQuota();
+  const coachConversationHero = useMemo(() => {
+    const quota = coachConversationQuotaQuery.data;
+    if (!quota) {
+      return null;
+    }
+    if (quota.tier === 'admin') {
+      return {
+        variant: 'premium_available' as const,
+        title: 'Parler au coach',
+        subtitle: 'Pose tes questions librement, sans limite.',
+        ctaLabel: 'Ouvrir la conversation',
+        hint: null as string | null,
+        target: '/coach/chat' as const,
+        targetParams: null as null | Record<string, string>,
+        disabled: false,
+      };
+    }
+    if (quota.tier === 'free') {
+      if (quota.free_used) {
+        return {
+          variant: 'free_exhausted' as const,
+          title: 'Conversation gratuite utilisée',
+          subtitle: 'Passe premium pour continuer à écrire au coach.',
+          ctaLabel: 'Passer premium',
+          hint: null,
+          target: '/premium-upgrade' as const,
+          targetParams: null,
+          disabled: false,
+        };
+      }
+      if (quota.free_conversation_id) {
+        return {
+          variant: 'free_resume' as const,
+          title: 'Conversation en cours',
+          subtitle: 'Continue là où tu t’es arrêté.',
+          ctaLabel: 'Continuer',
+          hint: formatCoachConversationQuestionHint(quota.free_remaining_messages),
+          target: '/coach/chat' as const,
+          targetParams: { id: quota.free_conversation_id },
+          disabled: false,
+        };
+      }
+      return {
+        variant: 'free_available' as const,
+        title: 'Parler au coach',
+        subtitle: 'Pose ta question et reçois une réponse personnalisée.',
+        ctaLabel: 'Démarrer une conversation',
+        hint: null,
+        target: '/coach/chat' as const,
+        targetParams: null,
+        disabled: false,
+      };
+    }
+    const available = quota.premium_today_available ?? 0;
+    if (available <= 0) {
+      return {
+        variant: 'premium_exhausted' as const,
+        title: 'Limite quotidienne atteinte',
+        subtitle: 'Consulte ton historique en attendant le prochain reset.',
+        ctaLabel: 'Voir l’historique',
+        hint: null,
+        target: '/coach-history' as const,
+        targetParams: null,
+        disabled: false,
+      };
+    }
+    return {
+      variant: 'premium_available' as const,
+      title: 'Parler au coach',
+      subtitle: 'Pose ta question, le coach personnalise sa réponse.',
+      ctaLabel: 'Démarrer une conversation',
+      hint: formatCoachConversationMessageHint(available),
+      target: '/coach/chat' as const,
+      targetParams: null,
+      disabled: false,
+    };
+  }, [coachConversationQuotaQuery.data]);
+
+  const handleHeroPress = useCallback(() => {
+    if (!coachConversationHero) {
+      router.push('/coach/chat' as any);
+      return;
+    }
+    if (coachConversationHero.targetParams) {
+      router.push({
+        pathname: coachConversationHero.target,
+        params: coachConversationHero.targetParams,
+      } as any);
+      return;
+    }
+    router.push(coachConversationHero.target as any);
+  }, [coachConversationHero, router]);
+
   const tabBarMetrics = useMemo(() => getMainTabBarMetrics(insets.bottom), [insets.bottom]);
   const coachChrome = useMemo(
     () => getMainPageChrome(colors, isDark, 'coach'),
@@ -1172,6 +1481,79 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     () => formatCoachTimestamp(displayedGuidance?.renderedAt ?? null, locale),
     [displayedGuidance?.renderedAt, locale],
   );
+  const hasDisplayedGuidance = !!displayedGuidance;
+  const coachScreenUiStateDebugPayload = useMemo(
+    () =>
+      buildCoachScreenUiStateDebugPayload({
+        activeGuidanceSource,
+        displayedGuidanceSource,
+        displayMode,
+        effectiveTrackedEntryId,
+        generationErrorDebugInfo,
+        generationFailureKind,
+        hasDisplayedGuidance,
+        hasEntriesData,
+        hasEntriesError,
+        hasGenerationGuidance,
+        hasLatestReadyEntryData,
+        hasLatestReadyError,
+        hasRecentScansData,
+        hasRecentScansError,
+        hasTrackedGuidance,
+        isEntriesFetching,
+        isTrackedEntryStaleFailure,
+        isMutationPending: coachGeneration.isPending,
+        lastMutationEntryId: coachGeneration.data?.entry_id ?? null,
+        lastMutationStatus: coachGeneration.data?.status ?? null,
+        loadErrorSource,
+        showEmptyState,
+        showGenerationErrorState,
+        showGenerationLoadingState,
+        showLoadingState,
+        showProviderUnavailableState,
+        showQueryErrorState,
+        trackedEntryErrorCode: trackedCoachEntry?.error_code ?? null,
+        trackedStatus:
+          trackedCoachEntry?.status ??
+          (!effectiveTrackedEntryId ? null : 'missing'),
+      }),
+    [
+      activeGuidanceSource,
+      coachGeneration.data?.entry_id,
+      coachGeneration.data?.status,
+      displayMode,
+      displayedGuidanceSource,
+      effectiveTrackedEntryId,
+      generationErrorDebugInfo,
+      generationFailureKind,
+      hasDisplayedGuidance,
+      hasEntriesData,
+      hasEntriesError,
+      hasGenerationGuidance,
+      hasLatestReadyEntryData,
+      hasLatestReadyError,
+      hasRecentScansData,
+      hasRecentScansError,
+      hasTrackedGuidance,
+      isEntriesFetching,
+      isTrackedEntryStaleFailure,
+      coachGeneration.isPending,
+      loadErrorSource,
+      showEmptyState,
+      showGenerationErrorState,
+      showGenerationLoadingState,
+      showLoadingState,
+      showProviderUnavailableState,
+      showQueryErrorState,
+      trackedCoachEntry?.error_code,
+      trackedCoachEntry?.status,
+    ],
+  );
+  const coachScreenUiStateDebugSignature = useMemo(
+    () =>
+      buildCoachScreenUiStateDebugSignature(coachScreenUiStateDebugPayload),
+    [coachScreenUiStateDebugPayload],
+  );
   const promptTitleResolver = useCallback(
     (promptType: (typeof COACH_PROMPT_TYPES)[number]) =>
       t(`coach.prompts.${promptType}.title`),
@@ -1312,6 +1694,14 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     coachGeneration.reset();
     setDisplayMode('settings');
   }, [coachGeneration]);
+
+  const handleReturnHome = useCallback(() => {
+    if (router.canDismiss()) {
+      router.dismissAll();
+    } else {
+      router.replace('/(tabs)' as any);
+    }
+  }, [router]);
 
   const handleActionBarLayout = useCallback(
     ({ nativeEvent: { layout } }: LayoutChangeEvent) => {
@@ -1482,85 +1872,19 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
 
   useEffect(() => {
     if (!shouldDebugCoachScreen()) {
+      uiStateDebugSignatureRef.current = null;
       return;
     }
 
-    const uiState = showGenerationLoadingState
-      ? 'generation_loading'
-      : showLoadingState
-        ? 'query_loading'
-        : showQueryErrorState
-          ? 'query_error'
-          : showProviderUnavailableState
-            ? 'provider_unavailable'
-            : showGenerationErrorState
-              ? 'generation_error'
-              : showEmptyState
-                ? 'empty'
-                : displayedGuidance
-                  ? 'guidance'
-                  : 'idle';
+    if (uiStateDebugSignatureRef.current === coachScreenUiStateDebugSignature) {
+      return;
+    }
 
-    console.log('[CoachScreen] ui state', {
-      last_mutation_entry_id: coachGeneration.data?.entry_id ?? null,
-      last_mutation_status: coachGeneration.data?.status ?? null,
-      display_mode: displayMode,
-      result_display_enabled: displayMode === 'result',
-      tracked_entry_id: effectiveTrackedEntryId,
-      tracked_status:
-        trackedCoachEntry?.status ??
-        (!effectiveTrackedEntryId ? null : 'missing'),
-      tracked_error_code: trackedCoachEntry?.error_code ?? null,
-      tracked_pending_stale: isTrackedEntryStaleFailure,
-      is_mutation_pending: coachGeneration.isPending,
-      is_entries_fetching: isEntriesFetching,
-      ui_state: uiState,
-      load_error_source: loadErrorSource,
-      has_entries_error: hasEntriesError,
-      has_entries_data: hasEntriesData,
-      has_recent_scans_error: hasRecentScansError,
-      has_recent_scans_data: hasRecentScansData,
-      has_latest_ready_error: hasLatestReadyError,
-      has_latest_ready_entry_data: hasLatestReadyEntryData,
-      tracked_guidance_available: hasTrackedGuidance,
-      mutation_guidance_available: hasGenerationGuidance,
-      generation_error_kind: showGenerationErrorState
-        ? generationFailureKind
-        : null,
-      generation_error: generationErrorDebugInfo,
-      active_guidance_source: activeGuidanceSource,
-      displayed_guidance_source: displayedGuidanceSource,
-    });
+    uiStateDebugSignatureRef.current = coachScreenUiStateDebugSignature;
+    console.log('[CoachScreen] ui state', coachScreenUiStateDebugPayload);
   }, [
-    activeGuidanceSource,
-    coachGeneration.data?.entry_id,
-    coachGeneration.data?.status,
-    displayMode,
-    displayedGuidance,
-    displayedGuidanceSource,
-    coachGeneration.isPending,
-    effectiveTrackedEntryId,
-    generationErrorDebugInfo,
-    generationFailureKind,
-    hasEntriesData,
-    hasEntriesError,
-    hasGenerationGuidance,
-    isEntriesFetching,
-    isTrackedEntryStaleFailure,
-    hasLatestReadyEntryData,
-    hasLatestReadyError,
-    hasRecentScansData,
-    hasRecentScansError,
-    hasTrackedGuidance,
-    loadErrorSource,
-    showEmptyState,
-    showGenerationErrorState,
-    showGenerationLoadingState,
-    showLoadingState,
-    showProviderUnavailableState,
-    showQueryErrorState,
-    trackedCoachEntry?.error_code,
-    trackedCoachEntry?.status,
+    coachScreenUiStateDebugPayload,
+    coachScreenUiStateDebugSignature,
   ]);
 
   useEffect(() => {
@@ -1570,7 +1894,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     }
 
     if (loadingWasActiveRef.current && !showGenerationLoadingState) {
-      const exitReason = displayedGuidance
+      const exitReason = hasDisplayedGuidance
         ? 'guidance_ready'
         : showProviderUnavailableState
           ? 'provider_unavailable'
@@ -1599,10 +1923,10 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
 
     loadingWasActiveRef.current = showGenerationLoadingState;
   }, [
-    displayedGuidance,
     effectiveTrackedEntryId,
     generationErrorDebugInfo,
     generationFailureKind,
+    hasDisplayedGuidance,
     isTrackedEntryStaleFailure,
     showEmptyState,
     showGenerationErrorState,
@@ -2013,6 +2337,9 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     router.push('/coach-history' as any);
   };
 
+  const shouldHideHistoryButton =
+    showLoadingState || showGenerationLoadingState || isGenerationAwaitingResult;
+
   const handleOpenScanner = () => {
     router.push('/scanner' as any);
   };
@@ -2027,15 +2354,21 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     !isGenerationAwaitingResult &&
     !hasScanResultSelectedScan &&
     hasConfirmedNoUsableCoachScans;
+  const isScanResultPopupResult =
+    isResultDisplay &&
+    scanResultContext !== null &&
+    variant === 'stack';
   const activePersonaTitle = t(activePersona.titleTranslationKey);
   const selectedPromptTitle = t('coach.questions.empty_summary');
   const actionPrimaryLabel = isGenerationAwaitingResult
     ? t('coach.action_bar.cta_generating')
     : shouldRoutePrimaryToScanner
       ? t('coach.action_bar.cta_scan')
-      : isResultDisplay
-        ? t('coach.action_bar.primary')
-        : t('coach.action_bar.cta_request');
+      : isScanResultPopupResult
+        ? t('common.home_back')
+        : isResultDisplay
+          ? t('coach.action_bar.primary')
+          : t('coach.action_bar.cta_request');
 
   const actionPrimaryA11yLabel = actionPrimaryLabel;
 
@@ -2059,6 +2392,11 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
       return;
     }
 
+    if (isScanResultPopupResult) {
+      handleReturnHome();
+      return;
+    }
+
     if (isResultDisplay) {
       handleEditSettings();
       return;
@@ -2067,51 +2405,139 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
   };
   const coachLoadingPercent = Math.round(coachLoadingProgress.progress);
   const coachLoadingProgressWidth = `${coachLoadingProgress.progress}%` as `${number}%`;
+  const coachLoadingMiniGameHeight = useMemo(() => {
+    const MIN_HEIGHT = 170;
+    const MAX_HEIGHT = 440;
+    const INNER_GAP = SPACING.sm + 2;
+    const SCROLLBODY_TOP = SPACING.md + 4;
+    // Popup Coach depuis scanner : marge basse plus serrée que l'onglet, on retire un peu de hauteur pour éviter le débordement.
+    const isFromScanResultPopup =
+      scanResultContext !== null && variant === 'stack';
+    const POPUP_BOTTOM_TRIM = isFromScanResultPopup ? 24 : 0;
+
+    if (miniGameHostHeight && miniGameHostHeight > 0) {
+      return Math.max(
+        MIN_HEIGHT,
+        Math.min(MAX_HEIGHT, Math.round(miniGameHostHeight) - POPUP_BOTTOM_TRIM),
+      );
+    }
+
+    if (!scrollViewportHeight) {
+      const fallbackOverhead =
+        insets.top
+        + 60
+        + SCROLLBODY_TOP
+        + 160
+        + INNER_GAP
+        + actionBarOverlayInset
+        + SPACING.md;
+      return Math.max(
+        MIN_HEIGHT,
+        Math.min(MAX_HEIGHT, Math.round(windowHeight - fallbackOverhead) - POPUP_BOTTOM_TRIM),
+      );
+    }
+
+    const cardEstimate = generationCardHeight ?? 160;
+    const reservedAbove = SCROLLBODY_TOP + cardEstimate + INNER_GAP;
+    const reservedBelow = coachContentBottomPadding;
+    const available = scrollViewportHeight - reservedAbove - reservedBelow;
+
+    return Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, Math.round(available) - POPUP_BOTTOM_TRIM));
+  }, [
+    miniGameHostHeight,
+    scrollViewportHeight,
+    generationCardHeight,
+    coachContentBottomPadding,
+    actionBarOverlayInset,
+    insets.top,
+    windowHeight,
+    scanResultContext,
+    variant,
+  ]);
+
+  const screenHeaderElement = (
+    <ScreenHeader
+      title={t('coach.title')}
+      variant={variant === 'tab' ? 'inline' : 'bar'}
+      borderless
+      onBack={showBackButton ? handleClose : undefined}
+      topInset
+      centered={variant !== 'tab'}
+      backTestID="coach-back-button"
+      right={
+        shouldHideHistoryButton ? null : (
+          <HeaderIconButton
+            accessibilityLabel={t('coach.history_button_a11y')}
+            icon={<History color={colors.primaryText} size={20} strokeWidth={2.2} />}
+            onPress={handleViewHistory}
+            testID="coach-history-icon-button"
+          />
+        )
+      }
+      style={styles.scrollHeader}
+      testID="coach-screen-header"
+    />
+  );
 
   return (
-    <AppScreen bottomInset={false} keyboard style={styles.safeArea}>
+    <AppScreen bottomInset={false} topInset={false} keyboard style={styles.safeArea}>
       {alertElement}
       <View style={styles.container}>
         <ScrollView
           ref={scrollViewRef}
           style={styles.scrollView}
+          onLayout={(e) => setScrollViewportHeight(e.nativeEvent.layout.height)}
           automaticallyAdjustContentInsets={false}
           automaticallyAdjustKeyboardInsets={false}
           contentInsetAdjustmentBehavior="never"
           contentContainerStyle={[
             styles.content,
             { paddingBottom: coachContentBottomPadding },
+            showGenerationLoadingState && { flexGrow: 1 },
           ]}
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : undefined}
           keyboardShouldPersistTaps="handled"
+          scrollEnabled={!showGenerationLoadingState}
           scrollIndicatorInsets={{ bottom: coachScrollIndicatorBottomInset }}
           showsVerticalScrollIndicator={false}
         >
-          <ScreenHeader
-            title={t('coach.title')}
-            variant={variant === 'tab' ? 'inline' : 'bar'}
-            borderless
-            onBack={showBackButton ? handleClose : undefined}
-            topInset={false}
-            centered={variant !== 'tab'}
-            backTestID="coach-back-button"
-            right={
-              <HeaderIconButton
-                accessibilityLabel={t('coach.history_button_a11y')}
-                icon={<History color={colors.primaryText} size={20} strokeWidth={2.2} />}
-                onPress={handleViewHistory}
-                testID="coach-history-icon-button"
-              />
-            }
-            style={styles.scrollHeader}
-            testID="coach-screen-header"
-          />
+          {screenHeaderElement}
 
-          <View style={styles.scrollBody} testID="coach-scroll-body">
+          <View
+            style={[
+              styles.scrollBody,
+              showGenerationLoadingState && { flex: 1, paddingTop: SPACING.sm },
+            ]}
+            testID="coach-scroll-body"
+          >
             <View
-              style={styles.primarySection}
+              style={[
+                styles.primarySection,
+                showGenerationLoadingState && { flex: 1 },
+              ]}
               testID="coach-latest-guidance-section"
             >
+            {displayMode === 'settings' &&
+            !showLoadingState &&
+            !showQueryErrorState &&
+            !showProviderUnavailableState &&
+            !isGenerationAwaitingResult &&
+            coachConversationHero ? (
+              <View style={styles.heroSlot} testID="coach-conversation-hero-slot">
+                <CoachConversationHeroCard
+                  personaKey={activePersonaKey}
+                  variant={coachConversationHero.variant}
+                  title={coachConversationHero.title}
+                  subtitle={coachConversationHero.subtitle}
+                  ctaLabel={coachConversationHero.ctaLabel}
+                  hint={coachConversationHero.hint}
+                  disabled={coachConversationHero.disabled}
+                  onPress={handleHeroPress}
+                  testID="coach-conversation-hero-card"
+                />
+              </View>
+            ) : null}
+
             {displayMode === 'settings' &&
             !showLoadingState &&
             !showQueryErrorState &&
@@ -2137,8 +2563,6 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
                 promptTitle={promptTitleResolver}
                 promptSubtitle={promptSubtitleResolver}
                 promptCategoryLabel={promptCategoryTitleResolver}
-                title={t('coach.settings.title')}
-                subtitle={t('coach.settings.subtitle')}
                 accentColor={activePersonaVisual.haloTint}
                 personaSectionLabel={t('coach.options_sheet.persona_label')}
                 modeSectionLabel={t('coach.options_sheet.mode_label')}
@@ -2183,6 +2607,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
                 busyPromptType={submittingPromptType}
                 busy={isGenerationAwaitingResult || isPersonaSaving}
                 disabled={arePromptCardsDisabled}
+                showFreeQuestionInput={!coachConversationHero}
               />
             ) : null}
 
@@ -2197,10 +2622,13 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
 
             {showGenerationLoadingState ? (
               <View
-                style={styles.generationLoadingShell}
+                style={[styles.generationLoadingShell, { flex: 1 }]}
                 testID="coach-generation-loading-state"
               >
-                <View style={styles.generationLoadingCard}>
+                <Squircle
+                  style={styles.generationLoadingCard}
+                  onLayout={(e) => setGenerationCardHeight(e.nativeEvent.layout.height)}
+                >
                   <View style={styles.generationLoadingHeader}>
                     <View style={styles.generationLoadingIconShell}>
                       <CoachFeatureIcon
@@ -2251,11 +2679,12 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
                   <Text style={styles.generationLoadingHint}>
                     {t('coach.loading_hint')}
                   </Text>
-                </View>
+                </Squircle>
 
                 {isCoachLoadingMiniGameActive ? (
                   <View
-                    style={styles.generationMiniGameHost}
+                    style={[styles.generationMiniGameHost, { flex: 1, minHeight: 0 }]}
+                    onLayout={(e) => setMiniGameHostHeight(e.nativeEvent.layout.height)}
                     testID="coach-loading-mini-game"
                   >
                     <LoadingMiniGame
@@ -2264,6 +2693,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
                       compact={false}
                       durationHintMs={COACH_GENERATION_LOADING_DURATION_MS}
                       variant="coach"
+                      cardHeight={coachLoadingMiniGameHeight}
                     />
                   </View>
                 ) : null}
@@ -2339,6 +2769,11 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
                   personaKey={displayedGuidance.persona_key}
                   personaLabel={t('coach.used_persona_label')}
                   personaValue={t(displayedGuidancePersona.titleTranslationKey)}
+                  personaTagline={
+                    displayedGuidancePersona.subtitleTranslationKey
+                      ? t(displayedGuidancePersona.subtitleTranslationKey)
+                      : null
+                  }
                   personaAvatarSource={displayedGuidancePersona.avatarSource}
                   personaAvatarFallbackLabel={
                     displayedGuidancePersona.avatarFallbackLabel
@@ -2457,7 +2892,7 @@ const createStyles = (
       justifyContent: 'center',
       backgroundColor: colors.surfaceMuted ?? colors.cardBackground,
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08), borderCurve: 'continuous',
     },
     headerTitle: {
       flex: 1,
@@ -2478,7 +2913,7 @@ const createStyles = (
       justifyContent: 'center',
       backgroundColor: colors.surfaceMuted ?? colors.cardBackground,
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08), borderCurve: 'continuous',
     },
     scrollView: {
       flex: 1,
@@ -2491,11 +2926,14 @@ const createStyles = (
     },
     scrollBody: {
       paddingHorizontal: SPACING.page,
-      paddingTop: SPACING.md + 4,
+      paddingTop: SPACING.sm,
       gap: SPACING.lg,
     },
     primarySection: {
       gap: SPACING.md,
+    },
+    heroSlot: {
+      gap: SPACING.sm,
     },
     actionBarOverlay: {
       position: 'absolute',
@@ -2523,7 +2961,7 @@ const createStyles = (
       elevation: 2,
       gap: SPACING.sm,
       alignItems: 'flex-start',
-      justifyContent: 'flex-start',
+      justifyContent: 'flex-start', borderCurve: 'continuous',
     },
     stateCardCentered: {
       alignItems: 'center',
@@ -2558,11 +2996,11 @@ const createStyles = (
       textAlign: 'left',
     },
     generationLoadingShell: {
-      gap: SPACING.sm + 2,
+      gap: SPACING.sm,
       alignSelf: 'stretch',
     },
     generationLoadingCard: {
-      padding: SPACING.md + 2,
+      padding: SPACING.md,
       borderRadius: BORDER_RADIUS.xl,
       backgroundColor: isDark
         ? withAlpha(chrome.elevatedSurface.backgroundColor, 0.92)
@@ -2574,8 +3012,8 @@ const createStyles = (
       shadowOpacity: isDark ? 0.2 : 0.12,
       shadowRadius: 24,
       elevation: 4,
-      gap: SPACING.sm + 2,
-      overflow: 'hidden',
+      gap: SPACING.sm,
+      overflow: 'hidden', borderCurve: 'continuous',
     },
     generationLoadingHeader: {
       flexDirection: 'row',
@@ -2590,7 +3028,7 @@ const createStyles = (
       justifyContent: 'center',
       backgroundColor: withAlpha(accentColor, isDark ? 0.16 : 0.1),
       borderWidth: 1,
-      borderColor: withAlpha(accentColor, isDark ? 0.32 : 0.22),
+      borderColor: withAlpha(accentColor, isDark ? 0.32 : 0.22), borderCurve: 'continuous',
     },
     generationLoadingCopy: {
       flex: 1,
@@ -2623,16 +3061,16 @@ const createStyles = (
       overflow: 'hidden',
       backgroundColor: withAlpha(colors.primaryText, isDark ? 0.09 : 0.07),
       borderWidth: StyleSheet.hairlineWidth,
-      borderColor: withAlpha(accentColor, isDark ? 0.22 : 0.16),
+      borderColor: withAlpha(accentColor, isDark ? 0.22 : 0.16), borderCurve: 'continuous',
     },
     generationProgressFillHost: {
       height: '100%',
       borderRadius: BORDER_RADIUS.full,
-      overflow: 'hidden',
+      overflow: 'hidden', borderCurve: 'continuous',
     },
     generationProgressFill: {
       flex: 1,
-      borderRadius: BORDER_RADIUS.full,
+      borderRadius: BORDER_RADIUS.full, borderCurve: 'continuous',
     },
     generationLoadingHint: {
       fontSize: SIZES.text12,
@@ -2651,7 +3089,7 @@ const createStyles = (
       backgroundColor: chrome.heroSurface.backgroundColor,
       borderWidth: 1,
       borderColor: chrome.heroSurface.borderColor,
-      ...chrome.heroSurface.shadowStyle,
+      ...chrome.heroSurface.shadowStyle, borderCurve: 'continuous',
     },
     emptyIconShell: {
       width: 44,
@@ -2661,7 +3099,7 @@ const createStyles = (
       justifyContent: 'center',
       backgroundColor: withAlpha(colors.primary, 0.1),
       borderWidth: 1,
-      borderColor: withAlpha(colors.primary, 0.2),
+      borderColor: withAlpha(colors.primary, 0.2), borderCurve: 'continuous',
     },
     emptyCopy: {
       gap: 4,
@@ -2687,7 +3125,7 @@ const createStyles = (
       paddingHorizontal: SPACING.md,
       backgroundColor: withAlpha(colors.primary, 0.13),
       borderWidth: 1,
-      borderColor: withAlpha(colors.primary, 0.26),
+      borderColor: withAlpha(colors.primary, 0.26), borderCurve: 'continuous',
     },
     emptyScanCtaText: {
       fontSize: SIZES.text14,
@@ -2710,7 +3148,7 @@ const createStyles = (
       borderRadius: 24,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.surfaceAccent ?? withAlpha(colors.primary, 0.08),
+      backgroundColor: colors.surfaceAccent ?? withAlpha(colors.primary, 0.08), borderCurve: 'continuous',
     },
     inlineLoadingIndicatorWrap: {
       width: 36,
@@ -2718,7 +3156,7 @@ const createStyles = (
       borderRadius: 18,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.surfaceAccent ?? withAlpha(colors.primary, 0.08),
+      backgroundColor: colors.surfaceAccent ?? withAlpha(colors.primary, 0.08), borderCurve: 'continuous',
     },
     inlineStateCopy: {
       flex: 1,

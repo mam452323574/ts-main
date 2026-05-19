@@ -110,12 +110,15 @@ Deno.serve(async (req: Request) => {
     const user = await requireAuthenticatedUser(supabase, req);
     await requireAdminUserProfile(supabase, user.id);
 
-    // S-03 — adjust reactions modifie un compteur visible publiquement.
+    // S-04 — adjust reactions modifie un compteur visible publiquement.
     // Limite plus permissive (60/h) car non destructeur, mais previent
     // un admin compromis qui spammerait des manipulations de feed.
+    // Fail-closed sur erreur DB.
+    // S-09 — on compte uniquement les .intent rows pour ne pas doubler avec
+    // les .outcome (best-effort).
     await enforceAdminRateLimit(supabase, {
       actorId: user.id,
-      actionPattern: 'social_admin_adjust_post_reactions%',
+      actionPattern: 'social_admin_adjust_post_reactions.intent',
       maxActions: 60,
       windowMs: 60 * 60 * 1000,
     });
@@ -130,6 +133,28 @@ Deno.serve(async (req: Request) => {
     const requestBody = parseSocialAdminAdjustPostReactionsRequest(
       await readJsonBody(req, { maxBytes: PHASE2_SOCIAL_REQUEST_MAX_BYTES }),
     );
+
+    // S-09 — Idempotency-Key + audit log INSERT BEFORE l'action.
+    const headerIdempotencyKey = req.headers.get('Idempotency-Key');
+    const idempotencyKey =
+      typeof headerIdempotencyKey === 'string' && headerIdempotencyKey.trim().length > 0
+        ? headerIdempotencyKey.trim()
+        : crypto.randomUUID();
+
+    await logAdminAuditEvent(supabase, {
+      actorId: user.id,
+      action: 'social_admin_adjust_post_reactions.intent',
+      requestId,
+      idempotencyKey,
+      metadata: {
+        post_id: requestBody.post_id,
+        admin_like_adjustment: requestBody.admin_like_adjustment,
+        admin_dislike_adjustment: requestBody.admin_dislike_adjustment,
+        note: requestBody.note ?? null,
+        phase: 'intent',
+      },
+      critical: true,
+    });
 
     const { data: existingPost, error: existingPostError } = await supabase
       .from('social_posts')
@@ -236,9 +261,11 @@ Deno.serve(async (req: Request) => {
       event_id: eventId,
     };
 
+    // S-09 — Outcome log (best-effort). Pas d'idempotency_key ici (deja
+    // consomme par le .intent log au debut).
     await logAdminAuditEvent(supabase, {
       actorId: user.id,
-      action: 'social_admin_adjust_post_reactions',
+      action: 'social_admin_adjust_post_reactions.outcome',
       requestId,
       metadata: {
         post_id: updatedCounts.post_id,
@@ -246,7 +273,9 @@ Deno.serve(async (req: Request) => {
         target_author_id: existingPost.author_id ?? null,
         admin_like_adjustment: updatedCounts.admin_like_adjustment,
         admin_dislike_adjustment: updatedCounts.admin_dislike_adjustment,
+        phase: 'completed',
       },
+      critical: false,
     });
 
     return jsonResponse(req, responseBody);

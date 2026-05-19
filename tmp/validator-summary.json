@@ -1,0 +1,162 @@
+{
+  "v2": {
+    "gentle_supportive": {
+      "verdict": "PASS",
+      "drink_water": [
+        "low",
+        "low",
+        "low"
+      ],
+      "two_lists": [
+        "low",
+        "low",
+        "low"
+      ]
+    },
+    "strict_tough": {
+      "verdict": "FAIL",
+      "drink_water": [
+        "medium",
+        "low",
+        "low"
+      ],
+      "two_lists": [
+        "high",
+        "low",
+        "low"
+      ]
+    },
+    "motivational_energetic": {
+      "verdict": "PASS",
+      "drink_water": [
+        "medium",
+        "low",
+        "low"
+      ],
+      "two_lists": [
+        "low",
+        "low",
+        "low"
+      ]
+    },
+    "patient_calm": {
+      "verdict": "PASS",
+      "drink_water": [
+        "low",
+        "low",
+        "low"
+      ],
+      "two_lists": [
+        "low",
+        "low",
+        "low"
+      ]
+    },
+    "analytical_precise": {
+      "verdict": "PASS",
+      "drink_water": [
+        "low",
+        "low",
+        "low"
+      ],
+      "two_lists": [
+        "low",
+        "low",
+        "low"
+      ]
+    },
+    "playful_light": {
+      "verdict": "PASS",
+      "drink_water": [
+        "low",
+        "low",
+        "low"
+      ],
+      "two_lists": [
+        "low",
+        "low",
+        "low"
+      ]
+    }
+  },
+  "v3": {
+    "gentle_supportive": {
+      "verdict": "PASS",
+      "drink_water": [
+        "low",
+        "low",
+        "low"
+      ],
+      "two_lists": [
+        "low",
+        "low",
+        "low"
+      ]
+    },
+    "strict_tough": {
+      "verdict": "PASS",
+      "drink_water": [
+        "low",
+        "low",
+        "low"
+      ],
+      "two_lists": [
+        "low",
+        "low",
+        "low"
+      ]
+    },
+    "motivational_energetic": {
+      "verdict": "PASS",
+      "drink_water": [
+        "low",
+        "low",
+        "low"
+      ],
+      "two_lists": [
+        "low",
+        "low",
+        "low"
+      ]
+    },
+    "patient_calm": {
+      "verdict": "PASS",
+      "drink_water": [
+        "low",
+        "low",
+        "low"
+      ],
+      "two_lists": [
+        "low",
+        "low",
+        "low"
+      ]
+    },
+    "analytical_precise": {
+      "verdict": "PASS",
+      "drink_water": [
+        "low",
+        "low",
+        "low"
+      ],
+      "two_lists": [
+        "low",
+        "low",
+        "low"
+      ]
+    },
+    "playful_light": {
+      "verdict": "PASS",
+      "drink_water": [
+        null,
+        null,
+        null
+      ],
+      "two_lists": [
+        null,
+        null,
+        null
+      ]
+    }
+  }
+}

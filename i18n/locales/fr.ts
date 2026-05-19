@@ -382,8 +382,6 @@ export const FR_TRANSLATIONS = {
       follow: 'Suivre',
       unfollow: 'Ne plus suivre',
       hide_author: "Masquer l'auteur",
-      save: 'Enregistrer',
-      unsave: "Retirer de l'enregistrement",
     },
     empty: {
       title: 'Rien à afficher pour le moment',
@@ -747,7 +745,7 @@ export const FR_TRANSLATIONS = {
     error_body_provider_unreachable:
       "Le service Coach n'a pas pu répondre pour le moment. Réessayez dans un instant.",
     error_body_invalid_response:
-      'Le service Coach a renvoyé une réponse inattendue. Réessayez dans un instant.',
+      'Petit hoquet technique côté Coach. Réessaye dans un instant.',
     unavailable_title: 'Coach indisponible',
     unavailable_body:
       'Nouvelles réponses indisponibles pour le moment. Vos conseils déjà enregistrés restent visibles.',
@@ -759,11 +757,11 @@ export const FR_TRANSLATIONS = {
     empty_scan_types_hint: 'Visage · Corps · Nutrition',
     first_scan_required_title: 'Premier scan requis',
     first_scan_required_body:
-      'Fais au moins un scan pour que ton coach ait des données à analyser.',
+      'Lance ton premier scan pour démarrer ton coaching personnalisé. Une minute suffit.',
     first_scan_required_cta: 'Faire un scan',
-    no_scan_title: 'Fais un scan d’abord',
+    no_scan_title: 'Commence par un scan',
     no_scan_body:
-      'Fais un scan d’abord pour que Coach ait des données à analyser.',
+      'Lance un scan pour démarrer ton coaching personnalisé.',
     history_title: 'Conseils précédents',
     view_history_cta: "Voir l'historique",
     history_cta_count: '{{count}} conseil(s) précédents',

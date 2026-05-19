@@ -36,6 +36,7 @@ import {
   type AvatarCropSelection,
   type AvatarCropTransform,
 } from '@/utils/avatarCrop';
+import { Squircle, SquirclePressable } from '@/components/Squircle';
 
 export interface AvatarCropAsset {
   uri: string;
@@ -245,9 +246,9 @@ export function AvatarCropModal({
       onRequestClose={onCancel}
     >
       <View style={styles.backdrop} testID="avatar-crop-modal">
-        <View style={styles.sheet}>
+        <Squircle style={styles.sheet}>
           <View style={styles.header}>
-            <Pressable
+            <SquirclePressable
               accessibilityRole="button"
               disabled={confirming}
               onPress={onCancel}
@@ -255,7 +256,7 @@ export function AvatarCropModal({
               testID="avatar-crop-cancel"
             >
               <X color={colors.primaryText} size={20} />
-            </Pressable>
+            </SquirclePressable>
             <Text style={styles.title}>{t('components.avatar.crop_title')}</Text>
             <Pressable
               accessibilityRole="button"
@@ -276,7 +277,7 @@ export function AvatarCropModal({
           </View>
 
           <GestureDetector gesture={gesture}>
-            <View style={styles.cropFrame} testID="avatar-crop-frame">
+            <Squircle style={styles.cropFrame} testID="avatar-crop-frame">
               {asset?.uri ? (
                 <Animated.Image
                   source={{ uri: asset.uri }}
@@ -285,9 +286,9 @@ export function AvatarCropModal({
                   testID="avatar-crop-image"
                 />
               ) : null}
-            </View>
+            </Squircle>
           </GestureDetector>
-        </View>
+        </Squircle>
       </View>
     </Modal>
   );
@@ -311,7 +312,7 @@ const createStyles = (colors: any, isDark: boolean, cropSize: number) =>
       borderRadius: BORDER_RADIUS.xl + 8,
       backgroundColor: colors.cardBackground,
       borderWidth: 1,
-      borderColor: withAlpha(colors.primaryText, isDark ? 0.10 : 0.08),
+      borderColor: withAlpha(colors.primaryText, isDark ? 0.10 : 0.08), borderCurve: 'continuous',
     },
     header: {
       width: '100%',
@@ -334,7 +335,7 @@ const createStyles = (colors: any, isDark: boolean, cropSize: number) =>
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: 22,
-      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.10 : 0.06),
+      backgroundColor: withAlpha(colors.primaryText, isDark ? 0.10 : 0.06), borderCurve: 'continuous',
     },
     confirmButton: {
       minHeight: 44,
@@ -346,7 +347,7 @@ const createStyles = (colors: any, isDark: boolean, cropSize: number) =>
       borderRadius: 22,
       backgroundColor: colors.primaryText,
       borderWidth: 1,
-      borderColor: withAlpha(colors.white, 0.2),
+      borderColor: withAlpha(colors.white, 0.2), borderCurve: 'continuous',
     },
     confirmButtonDisabled: {
       opacity: 0.65,
@@ -363,7 +364,7 @@ const createStyles = (colors: any, isDark: boolean, cropSize: number) =>
       overflow: 'hidden',
       backgroundColor: colors.background,
       borderWidth: 2,
-      borderColor: withAlpha(colors.white, isDark ? 0.42 : 0.72),
+      borderColor: withAlpha(colors.white, isDark ? 0.42 : 0.72), borderCurve: 'continuous',
     },
     cropImage: {
       position: 'absolute',

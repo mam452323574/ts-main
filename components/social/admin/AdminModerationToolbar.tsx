@@ -25,6 +25,7 @@ import {
   buildAdminChromePalette,
   resolveAdminSortAccent,
 } from './adminModerationTheme';
+import { Squircle } from '@/components/Squircle';
 
 const SORT_OPTIONS: AdminModerationSortMode[] = [
   'urgent',
@@ -76,8 +77,8 @@ export function AdminModerationToolbar({
 
   return (
     <View style={styles.wrapper} testID="admin-social-toolbar">
-      <View style={styles.filterPanel}>
-        <View style={styles.panelChrome} />
+      <Squircle style={styles.filterPanel}>
+        <Squircle style={styles.panelChrome} />
 
         <ScrollView
           horizontal
@@ -129,7 +130,7 @@ export function AdminModerationToolbar({
           })}
         </ScrollView>
 
-        <View style={styles.searchShell}>
+        <Squircle style={styles.searchShell}>
           <Search color={chrome.textMuted} size={18} />
           <TextInput
             value={searchQuery}
@@ -140,7 +141,7 @@ export function AdminModerationToolbar({
             selectionColor={chrome.filterAccent}
             testID="admin-social-search-input"
           />
-        </View>
+        </Squircle>
 
         <View style={styles.sortTrack} testID="admin-social-sort-row">
           {SORT_OPTIONS.map((mode) => {
@@ -182,7 +183,7 @@ export function AdminModerationToolbar({
             );
           })}
         </View>
-      </View>
+      </Squircle>
     </View>
   );
 }
@@ -206,7 +207,7 @@ const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
       shadowOffset: { width: 0, height: 14 },
       shadowOpacity: 0.3,
       shadowRadius: 22,
-      elevation: 7,
+      elevation: 7, borderCurve: 'continuous',
     },
     panelChrome: {
       position: 'absolute',
@@ -215,7 +216,7 @@ const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
       width: 156,
       height: 156,
       borderRadius: 78,
-      backgroundColor: chrome.filterAccentHalo,
+      backgroundColor: chrome.filterAccentHalo, borderCurve: 'continuous',
     },
     filterRow: {
       gap: SPACING.xs + 2,
@@ -228,7 +229,7 @@ const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
       justifyContent: 'center',
       backgroundColor: chrome.surfaceMuted,
       borderWidth: 1,
-      borderColor: chrome.borderSubtle,
+      borderColor: chrome.borderSubtle, borderCurve: 'continuous',
     },
     filterPillActive: {
       backgroundColor: chrome.filterAccentSoft,
@@ -261,7 +262,7 @@ const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
       paddingHorizontal: SPACING.xs,
       backgroundColor: withAlpha(chrome.textPrimary, 0.04),
       borderWidth: 1,
-      borderColor: chrome.borderSubtle,
+      borderColor: chrome.borderSubtle, borderCurve: 'continuous',
     },
     countBadgeActive: {
       backgroundColor: withAlpha(chrome.textPrimary, 0.08),
@@ -284,7 +285,7 @@ const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
       gap: SPACING.sm,
       backgroundColor: withAlpha(chrome.screenBackground, 0.48),
       borderWidth: 1,
-      borderColor: chrome.borderSubtle,
+      borderColor: chrome.borderSubtle, borderCurve: 'continuous',
     },
     searchInput: {
       flex: 1,
@@ -299,7 +300,7 @@ const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
       borderRadius: BORDER_RADIUS.full,
       backgroundColor: withAlpha(chrome.screenBackground, 0.44),
       borderWidth: 1,
-      borderColor: chrome.borderSubtle,
+      borderColor: chrome.borderSubtle, borderCurve: 'continuous',
     },
     sortPill: {
       flex: 1,
@@ -311,7 +312,7 @@ const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
       paddingHorizontal: SPACING.sm,
       borderRadius: BORDER_RADIUS.full,
       borderWidth: 1,
-      borderColor: 'transparent',
+      borderColor: 'transparent', borderCurve: 'continuous',
     },
     sortPillActive: {
       shadowColor: chrome.shadowColor,

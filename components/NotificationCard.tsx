@@ -4,6 +4,7 @@ import { Award, Bell, Sparkles, Clock } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { SIZES, SPACING, BORDER_RADIUS, FONT_WEIGHTS } from '@/constants/theme';
+import { Squircle } from '@/components/Squircle';
 
 interface NotificationCardProps {
   id: string;
@@ -86,11 +87,11 @@ export function NotificationCard({
       onPress={onPress || onMarkAsRead}
       activeOpacity={0.7}
     >
-      <View style={styles.iconContainer}>{getIcon()}</View>
+      <Squircle style={styles.iconContainer}>{getIcon()}</Squircle>
       <View style={styles.content}>
         <View style={styles.header}>
           <Text style={[styles.title, !isRead && styles.unreadTitle]}>{safeTitle}</Text>
-          {!isRead && <View style={styles.unreadBadge} />}
+          {!isRead && <Squircle style={styles.unreadBadge} />}
         </View>
         <Text style={styles.body} numberOfLines={2}>
           {safeBody}
@@ -111,7 +112,7 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     borderRadius: BORDER_RADIUS.lg,
     marginBottom: SPACING.sm,
     borderWidth: 1,
-    borderColor: colors.lightGray,
+    borderColor: colors.lightGray, borderCurve: 'continuous',
   },
   unreadContainer: {
     borderColor: colors.primary,
@@ -124,7 +125,7 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     backgroundColor: colors.grayLight,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: SPACING.md,
+    marginRight: SPACING.md, borderCurve: 'continuous',
   },
   content: {
     flex: 1,
@@ -149,7 +150,7 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: colors.primary,
-    marginLeft: SPACING.xs,
+    marginLeft: SPACING.xs, borderCurve: 'continuous',
   },
   body: {
     fontSize: SIZES.text14,

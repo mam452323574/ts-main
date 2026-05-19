@@ -28,7 +28,6 @@ import {
   removeSocialPostFromFeedPages,
   reportSocialContent,
   setSocialCommentLike,
-  setSocialPostSave,
   setReactionOnSocialPost,
   SocialServiceError,
   updateSocialComment,
@@ -50,7 +49,6 @@ import type {
   SocialReportContentRequest,
   SocialSetCommentLikeResponse,
   SocialSetReactionResponse,
-  SocialSetSaveResponse,
 } from '@/types';
 
 interface CreateSocialPostDraft {
@@ -340,41 +338,6 @@ function removeAuthorPostsFromFeedPages(
   });
 
   return didFilter ? nextPages : null;
-}
-
-function applySaveStateToFeedPages(
-  pages: SocialFeedPage[] | undefined,
-  postId: string,
-  saved: boolean,
-): SocialFeedPage[] | null {
-  if (!pages) {
-    return null;
-  }
-  let didPatch = false;
-  const nextPages = pages.map((page) => {
-    let didPatchPage = false;
-    const nextItems = page.items.map((post) => {
-      if (post.id !== postId) {
-        return post;
-      }
-      if (post.viewer_has_saved === saved) {
-        return post;
-      }
-      didPatchPage = true;
-      didPatch = true;
-      const nextSaveCount = Math.max(
-        0,
-        (post.save_count ?? 0) + (saved ? 1 : -1),
-      );
-      return {
-        ...post,
-        viewer_has_saved: saved,
-        save_count: nextSaveCount,
-      };
-    });
-    return didPatchPage ? { ...page, items: nextItems } : page;
-  });
-  return didPatch ? nextPages : null;
 }
 
 function buildReactionUiError(
@@ -1268,118 +1231,6 @@ export const useSocialMutations = () => {
     },
   });
 
-  const setSavePostMutation = useMutation({
-    mutationFn: ({
-      postId,
-      action,
-    }: {
-      postId: string;
-      action?: 'save' | 'unsave';
-    }) => setSocialPostSave(postId, action),
-    onMutate: async ({ postId, action }) => {
-      await queryClient.cancelQueries({ queryKey: ['socialFeed'] });
-      await queryClient.cancelQueries({
-        queryKey: SOCIAL_POST_QUERY_KEY(postId),
-        exact: true,
-      });
-      const previousSnapshots = queryClient.getQueriesData<SocialFeedInfiniteData>({
-        queryKey: ['socialFeed'],
-      });
-      const previousPostSnapshot = queryClient.getQueryData<SocialPost>(
-        SOCIAL_POST_QUERY_KEY(postId),
-      );
-
-      // Resolve optimistic state: explicit > toggle inferred from cache.
-      let nextSaved: boolean | null = null;
-      if (action === 'save') {
-        nextSaved = true;
-      } else if (action === 'unsave') {
-        nextSaved = false;
-      } else if (previousPostSnapshot) {
-        nextSaved = !(previousPostSnapshot.viewer_has_saved === true);
-      } else {
-        for (const [, snapshot] of previousSnapshots) {
-          if (!snapshot) continue;
-          for (const page of snapshot.pages) {
-            const match = page.items.find((post) => post.id === postId);
-            if (match) {
-              nextSaved = !(match.viewer_has_saved === true);
-              break;
-            }
-          }
-          if (nextSaved !== null) break;
-        }
-      }
-
-      if (nextSaved !== null) {
-        for (const [queryKey, snapshot] of previousSnapshots) {
-          if (!snapshot) continue;
-          const nextPages = applySaveStateToFeedPages(snapshot.pages, postId, nextSaved);
-          if (nextPages) {
-            queryClient.setQueryData<SocialFeedInfiniteData>(queryKey, {
-              ...snapshot,
-              pages: nextPages,
-            });
-          }
-        }
-        queryClient.setQueryData<SocialPost>(
-          SOCIAL_POST_QUERY_KEY(postId),
-          (currentPost) =>
-            currentPost
-              ? {
-                  ...currentPost,
-                  viewer_has_saved: nextSaved as boolean,
-                  save_count: Math.max(
-                    0,
-                    (currentPost.save_count ?? 0) +
-                      ((nextSaved as boolean) ? 1 : -1),
-                  ),
-                }
-              : currentPost,
-        );
-      }
-
-      return { postId, previousSnapshots, previousPostSnapshot };
-    },
-    onError: (error, draft, context) => {
-      if (!context) return;
-      for (const [queryKey, snapshot] of context.previousSnapshots) {
-        queryClient.setQueryData(queryKey, snapshot);
-      }
-      queryClient.setQueryData(
-        SOCIAL_POST_QUERY_KEY(context.postId),
-        context.previousPostSnapshot,
-      );
-      trackFailureEvent('social_post_save_failed', error, {
-        post_id: draft.postId,
-        action: draft.action ?? 'toggle',
-      });
-    },
-    onSuccess: (response: SocialSetSaveResponse) => {
-      const snapshots = queryClient.getQueriesData<SocialFeedInfiniteData>({
-        queryKey: ['socialFeed'],
-      });
-      for (const [queryKey, snapshot] of snapshots) {
-        if (!snapshot) continue;
-        const nextPages = applySaveStateToFeedPages(
-          snapshot.pages,
-          response.post_id,
-          response.saved,
-        );
-        if (nextPages) {
-          queryClient.setQueryData<SocialFeedInfiniteData>(queryKey, {
-            ...snapshot,
-            pages: nextPages,
-          });
-        }
-      }
-      trackEvent('social_post_save_toggled', {
-        post_id: response.post_id,
-        saved: response.saved,
-      });
-    },
-  });
-
   const hideAuthorMutation = useMutation({
     mutationFn: ({
       authorId,
@@ -1445,7 +1296,6 @@ export const useSocialMutations = () => {
     reportContentMutation,
     followAuthorMutation,
     hideAuthorMutation,
-    setSavePostMutation,
     commentLikeError,
     reactionError,
     clearCommentLikeError,

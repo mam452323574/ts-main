@@ -65,7 +65,7 @@ const createStyles = (colors: any) =>
       paddingVertical: SPACING.xs,
       borderRadius: BORDER_RADIUS.full,
       borderWidth: 1,
-      backgroundColor: withAlpha(colors.primary, 0.1),
+      backgroundColor: withAlpha(colors.primary, 0.1), borderCurve: 'continuous',
     },
     label: {
       fontSize: SIZES.text12,

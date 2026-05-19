@@ -1,14 +1,18 @@
 import {
   buildCanonicalAvatarPath,
+  clearAvatarUrlCache,
   isLocalAvatarUri,
   isManagedAvatarReference,
   isRemoteAvatarUrl,
+  resolveAvatarUrl,
   uploadAvatarFromLocalUri,
 } from '@/services/avatar';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { logExpectedFailure, logOperationalError } from '@/utils/observability';
 
 const mockUpload = jest.fn();
 const mockGetSession = jest.fn();
+const mockCreateSignedUrl = jest.fn();
 
 jest.mock('@/services/runtimeConfig', () => ({
   getRuntimeConfig: () => ({
@@ -30,10 +34,7 @@ jest.mock('@/services/supabase', () => ({
     },
     storage: {
       from: jest.fn(() => ({
-        createSignedUrl: jest.fn().mockResolvedValue({
-          data: { signedUrl: 'https://signed.example' },
-          error: null,
-        }),
+        createSignedUrl: (...args: unknown[]) => mockCreateSignedUrl(...args),
         upload: (...args: unknown[]) => mockUpload(...args),
       })),
     },
@@ -42,6 +43,7 @@ jest.mock('@/services/supabase', () => ({
 
 jest.mock('@/utils/observability', () => ({
   logOperationalError: jest.fn(),
+  logExpectedFailure: jest.fn(),
 }));
 
 describe('avatar — whitelist host (P2-A)', () => {
@@ -56,6 +58,10 @@ describe('avatar — whitelist host (P2-A)', () => {
       },
     });
     mockUpload.mockResolvedValue({ data: { path: 'user-id/avatar.jpg' }, error: null });
+    mockCreateSignedUrl.mockResolvedValue({
+      data: { signedUrl: 'https://signed.example' },
+      error: null,
+    });
   });
 
   it('rejette une URL HTTPS sur un host non Supabase', () => {
@@ -182,5 +188,77 @@ describe('avatar — whitelist host (P2-A)', () => {
     await expect(
       uploadAvatarFromLocalUri('user-id', 'file:///avatar.jpg'),
     ).rejects.toThrow('upload failed');
+  });
+});
+
+describe('resolveAvatarUrl — network failure handling', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    clearAvatarUrlCache();
+    mockCreateSignedUrl.mockResolvedValue({
+      data: { signedUrl: 'https://signed.example' },
+      error: null,
+    });
+  });
+
+  it('retries once on StorageUnknownError and succeeds the second time', async () => {
+    mockCreateSignedUrl
+      .mockResolvedValueOnce({
+        data: null,
+        error: { name: 'StorageUnknownError', message: 'Network request failed' },
+      })
+      .mockResolvedValueOnce({
+        data: { signedUrl: 'https://signed.example/after-retry' },
+        error: null,
+      });
+
+    const result = await resolveAvatarUrl('user-id/avatar.jpg');
+
+    expect(result).toBe('https://signed.example/after-retry');
+    expect(mockCreateSignedUrl).toHaveBeenCalledTimes(2);
+    expect(logOperationalError).not.toHaveBeenCalled();
+    expect(logExpectedFailure).not.toHaveBeenCalled();
+  });
+
+  it('logs as expected failure (warn) when both attempts fail with a network error', async () => {
+    const networkError = { name: 'StorageUnknownError', message: 'Network request failed' };
+    mockCreateSignedUrl.mockResolvedValue({ data: null, error: networkError });
+
+    const result = await resolveAvatarUrl('user-id/avatar-warn.jpg');
+
+    expect(result).toBeNull();
+    expect(mockCreateSignedUrl).toHaveBeenCalledTimes(2);
+    expect(logExpectedFailure).toHaveBeenCalledWith(
+      '[Avatar] Failed to resolve avatar URL',
+      networkError,
+      expect.objectContaining({
+        bucket: 'avatars',
+        context: 'avatar_signed_url',
+      }),
+    );
+    expect(logOperationalError).not.toHaveBeenCalled();
+  });
+
+  it('logs as operational error and does not retry when the failure is not network-related', async () => {
+    const notFoundError = {
+      name: 'StorageApiError',
+      message: 'Object not found',
+      status: 404,
+    };
+    mockCreateSignedUrl.mockResolvedValueOnce({ data: null, error: notFoundError });
+
+    const result = await resolveAvatarUrl('user-id/avatar-missing.jpg');
+
+    expect(result).toBeNull();
+    expect(mockCreateSignedUrl).toHaveBeenCalledTimes(1);
+    expect(logOperationalError).toHaveBeenCalledWith(
+      '[Avatar] Failed to resolve avatar URL',
+      notFoundError,
+      expect.objectContaining({
+        bucket: 'avatars',
+        context: 'avatar_signed_url',
+      }),
+    );
+    expect(logExpectedFailure).not.toHaveBeenCalled();
   });
 });

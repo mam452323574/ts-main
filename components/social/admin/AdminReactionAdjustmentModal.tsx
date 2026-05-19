@@ -27,6 +27,7 @@ import {
 } from '@/utils/mobileLayout';
 
 import { buildAdminChromePalette } from './adminModerationTheme';
+import { Squircle } from '@/components/Squircle';
 
 interface AdminReactionAdjustmentModalProps {
   item: SocialAdminModerationItem | null;
@@ -121,7 +122,7 @@ export function AdminReactionAdjustmentModal({
         behavior={getKeyboardAvoidingViewBehavior()}
         style={styles.modalBackdrop}
       >
-        <View style={styles.modalCard} testID="admin-social-adjust-reactions-modal">
+        <Squircle style={styles.modalCard} testID="admin-social-adjust-reactions-modal">
           <View style={styles.handle} />
           <Text style={styles.modalEyebrow}>
             {t('social.admin.reaction_adjustment.title')}
@@ -215,14 +216,14 @@ export function AdminReactionAdjustmentModal({
           </View>
 
           {!isInputValid ? (
-            <View style={styles.validationCard}>
+            <Squircle style={styles.validationCard}>
               <Text style={styles.validationTitle}>
                 {t('social.admin.reaction_adjustment.errors.invalid_title')}
               </Text>
               <Text style={styles.validationBody}>
                 {t('social.admin.reaction_adjustment.errors.invalid_body')}
               </Text>
-            </View>
+            </Squircle>
           ) : null}
 
           <View style={styles.modalActionsRow}>
@@ -262,7 +263,7 @@ export function AdminReactionAdjustmentModal({
               </Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </Squircle>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -294,14 +295,14 @@ const createStyles = (
       shadowOffset: { width: 0, height: -12 },
       shadowOpacity: 0.34,
       shadowRadius: 26,
-      elevation: 12,
+      elevation: 12, borderCurve: 'continuous',
     },
     handle: {
       alignSelf: 'center',
       width: 44,
       height: 5,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: chrome.handle,
+      backgroundColor: chrome.handle, borderCurve: 'continuous',
     },
     modalEyebrow: {
       fontSize: SIZES.text18,
@@ -324,7 +325,7 @@ const createStyles = (
       gap: SPACING.xs,
       backgroundColor: chrome.surfaceMuted,
       borderWidth: 1,
-      borderColor: chrome.borderSubtle,
+      borderColor: chrome.borderSubtle, borderCurve: 'continuous',
     },
     statColumnInvalid: {
       borderColor: chrome.dangerAccentBorder,
@@ -364,7 +365,7 @@ const createStyles = (
       borderColor: chrome.borderStrong,
       backgroundColor: withAlpha(chrome.screenBackground, 0.42),
       color: chrome.textPrimary,
-      fontSize: SIZES.text14,
+      fontSize: SIZES.text14, borderCurve: 'continuous',
     },
     modalInputInvalid: {
       borderColor: chrome.dangerAccentBorder,
@@ -379,7 +380,7 @@ const createStyles = (
       gap: SPACING.xs,
       backgroundColor: chrome.dangerAccentSoft,
       borderWidth: 1,
-      borderColor: chrome.dangerAccentBorder,
+      borderColor: chrome.dangerAccentBorder, borderCurve: 'continuous',
     },
     validationTitle: {
       fontSize: SIZES.text12,
@@ -402,7 +403,7 @@ const createStyles = (
       borderRadius: BORDER_RADIUS.full,
       alignItems: 'center',
       justifyContent: 'center',
-      borderWidth: 1,
+      borderWidth: 1, borderCurve: 'continuous',
     },
     actionButtonNeutral: {
       backgroundColor: chrome.surfaceMuted,

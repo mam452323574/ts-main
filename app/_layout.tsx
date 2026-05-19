@@ -114,6 +114,12 @@ function RootLayoutNav() {
     }),
     []
   );
+  const transparentModalContentStyle = useMemo(
+    () => ({
+      backgroundColor: 'transparent',
+    }),
+    []
+  );
 
   return (
     <NavigationThemeProvider value={navigationTheme}>
@@ -181,8 +187,26 @@ function RootLayoutNav() {
             options={{ presentation: 'modal', contentStyle }}
           />
           <Stack.Screen
+            name="scan-preview"
+            options={{ presentation: 'fullScreenModal', contentStyle: immersiveCameraContentStyle }}
+          />
+          <Stack.Screen
             name="scan-result"
-            options={{ presentation: 'modal', contentStyle }}
+            options={{
+              presentation: 'transparentModal',
+              contentStyle: transparentModalContentStyle,
+              gestureEnabled: false,
+              fullScreenGestureEnabled: false,
+            }}
+          />
+          <Stack.Screen
+            name="super-scan-result"
+            options={{
+              presentation: 'transparentModal',
+              contentStyle: transparentModalContentStyle,
+              gestureEnabled: false,
+              fullScreenGestureEnabled: false,
+            }}
           />
           <Stack.Screen
             name="scan-frigo"
@@ -190,7 +214,7 @@ function RootLayoutNav() {
           />
           <Stack.Screen
             name="fridge-scan-result"
-            options={{ presentation: 'modal', contentStyle: immersiveCameraContentStyle }}
+            options={{ presentation: 'fullScreenModal', contentStyle: immersiveCameraContentStyle }}
           />
           <Stack.Screen
             name="share-story"
@@ -222,17 +246,6 @@ function SystemBarsController() {
 
     void syncAndroidSystemBars(routeChrome);
   }, [routeChrome]);
-
-  if (Platform.OS !== 'android') {
-    return (
-      <StatusBar
-        style={routeChrome.statusBarStyle}
-        translucent
-        backgroundColor="transparent"
-        animated
-      />
-    );
-  }
 
   return (
     <StatusBar

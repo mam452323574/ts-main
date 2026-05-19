@@ -35,6 +35,7 @@ import {
 } from '@/utils/resultLayout';
 import { resolveChefSurfaceColors as resolveChefSurfaceThemeColors } from '@/utils/scanFlowVisualTheme';
 import type { PremiumRenderState } from '@/utils/subscription';
+import { Squircle } from '@/components/Squircle';
 
 type Translate = (scope: string, options?: Record<string, unknown>) => string;
 
@@ -432,17 +433,17 @@ export function ChefResultCard({
       >
         <View style={styles.headerTopRow}>
           <View style={styles.chefIdentity}>
-            <View style={styles.avatarShell}>
+            <Squircle style={styles.avatarShell}>
               <View style={styles.avatarHalo} />
-              <View style={styles.avatarRing}>
+              <Squircle style={styles.avatarRing}>
                 <ChefModeIcon
                   color={modeTheme.contrast}
                   mode={selectedMode}
                   size={layout.isCompact ? 24 : 26}
                   strokeWidth={2.35}
                 />
-              </View>
-            </View>
+              </Squircle>
+            </Squircle>
             <View style={styles.chefCopy}>
               <Text {...RESULT_TEXT_PROPS} numberOfLines={1} style={styles.eyebrow}>
                 {t('fridge_scan_result.labels.chef')}
@@ -590,14 +591,14 @@ export function ChefResultCard({
                 const value = valueParts.join(': ');
 
                 return (
-                  <View key={tag} style={styles.nutritionCard}>
+                  <Squircle key={tag} style={styles.nutritionCard}>
                     <Text {...RESULT_TEXT_PROPS} style={styles.nutritionLabel}>
                       {label}
                     </Text>
                     <Text {...RESULT_TEXT_PROPS} numberOfLines={2} style={styles.nutritionValue}>
                       {value}
                     </Text>
-                  </View>
+                  </Squircle>
                 );
               })}
             </View>
@@ -657,7 +658,7 @@ export function ChefResultCard({
 
       {mealResult.caution_note ? (
         isUnlocked ? (
-          <View style={styles.cautionCard} testID="chef-result-caution">
+          <Squircle style={styles.cautionCard} testID="chef-result-caution">
           <AlertCircle
             color={modeTheme.accent}
             size={18}
@@ -671,7 +672,7 @@ export function ChefResultCard({
               {mealResult.caution_note}
             </Text>
           </View>
-          </View>
+          </Squircle>
         ) : renderPremiumTeaser(
           t('fridge_scan_result.labels.caution'),
           'chef-result-caution',
@@ -693,7 +694,7 @@ const createPillStyles = (colors: ThemeColors, isDark: boolean) =>
       borderRadius: BORDER_RADIUS.full,
       borderWidth: 1,
       paddingHorizontal: SPACING.sm + 2,
-      paddingVertical: 5,
+      paddingVertical: 5, borderCurve: 'continuous',
     },
     pillSubtle: {
       backgroundColor: isDark
@@ -737,7 +738,7 @@ const createSectionStyles = (
       borderRadius: layout.featureRadius,
       borderWidth: 1,
       padding: layout.blockPadding,
-      gap: layout.sectionGap,
+      gap: layout.sectionGap, borderCurve: 'continuous',
     },
     sectionTitle: {
       color: colors.primaryText,
@@ -768,7 +769,7 @@ const createStyles = (
       borderWidth: 1,
       padding: layout.largeBlockPadding,
       overflow: 'hidden',
-      gap: layout.sectionGap,
+      gap: layout.sectionGap, borderCurve: 'continuous',
     },
     headerTopRow: {
       flexDirection: 'row',
@@ -789,13 +790,13 @@ const createStyles = (
       borderRadius: layout.isCompact ? 27 : 29,
       alignItems: 'center',
       justifyContent: 'center',
-      position: 'relative',
+      position: 'relative', borderCurve: 'continuous',
     },
     avatarHalo: {
       ...StyleSheet.absoluteFillObject,
       borderRadius: BORDER_RADIUS.full,
       backgroundColor: withAlpha(modeTheme.accent, 0.22),
-      transform: [{ scale: 1.08 }],
+      transform: [{ scale: 1.08 }], borderCurve: 'continuous',
     },
     avatarRing: {
       width: layout.isCompact ? 48 : 52,
@@ -805,7 +806,7 @@ const createStyles = (
       justifyContent: 'center',
       backgroundColor: withAlpha(modeTheme.deep, 0.78),
       borderWidth: 1,
-      borderColor: withAlpha(modeTheme.accent, 0.32),
+      borderColor: withAlpha(modeTheme.accent, 0.32), borderCurve: 'continuous',
     },
     chefCopy: {
       flex: 1,
@@ -838,7 +839,7 @@ const createStyles = (
       borderRadius: layout.featureRadius,
       borderWidth: 1,
       padding: layout.blockPadding,
-      gap: layout.sectionGap,
+      gap: layout.sectionGap, borderCurve: 'continuous',
     },
     cardLabelRow: {
       flexDirection: 'row',
@@ -865,7 +866,7 @@ const createStyles = (
       borderRadius: layout.standardRadius,
       backgroundColor: colors.surfaceMuted,
       borderWidth: StyleSheet.hairlineWidth,
-      borderColor: withAlpha(colors.primaryText, isDark ? 0.12 : 0.08),
+      borderColor: withAlpha(colors.primaryText, isDark ? 0.12 : 0.08), borderCurve: 'continuous',
     },
     cookCopy: {
       flex: 1,
@@ -897,7 +898,7 @@ const createStyles = (
       paddingVertical: 6,
       backgroundColor: modeTheme.soft,
       borderWidth: 1,
-      borderColor: withAlpha(modeTheme.accent, 0.22),
+      borderColor: withAlpha(modeTheme.accent, 0.22), borderCurve: 'continuous',
     },
     tagText: {
       color: colors.primaryText,
@@ -933,7 +934,7 @@ const createStyles = (
       backgroundColor: withAlpha(modeTheme.accent, 0.08),
       borderWidth: 1,
       borderColor: withAlpha(modeTheme.accent, 0.2),
-      gap: 4,
+      gap: 4, borderCurve: 'continuous',
     },
     nutritionLabel: {
       color: withAlpha(colors.primaryText, 0.58),
@@ -963,7 +964,7 @@ const createStyles = (
       borderRadius: layout.featureRadius,
       backgroundColor: withAlpha(modeTheme.accent, 0.08),
       borderWidth: 1,
-      borderColor: withAlpha(modeTheme.accent, 0.22),
+      borderColor: withAlpha(modeTheme.accent, 0.22), borderCurve: 'continuous',
     },
     cautionCopy: {
       flex: 1,
@@ -1001,7 +1002,7 @@ const createListStyles = (colors: ThemeColors) =>
     width: 7,
     height: 7,
     borderRadius: 4,
-    marginTop: 7,
+    marginTop: 7, borderCurve: 'continuous',
   },
   bulletText: {
     flex: 1,
@@ -1022,7 +1023,7 @@ const createListStyles = (colors: ThemeColors) =>
     borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
-    flexShrink: 0,
+    flexShrink: 0, borderCurve: 'continuous',
   },
   stepIndexText: {
     color: colors.background,
@@ -1048,7 +1049,7 @@ const createListStyles = (colors: ThemeColors) =>
     maxWidth: '100%',
     borderRadius: BORDER_RADIUS.full,
     paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs + 2,
+    paddingVertical: SPACING.xs + 2, borderCurve: 'continuous',
   },
   chipCompact: {
     paddingHorizontal: SPACING.sm,

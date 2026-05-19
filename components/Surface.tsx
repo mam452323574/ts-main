@@ -50,7 +50,7 @@ export function Surface({
         padded ? styles.padded : null,
         {
           borderRadius: radius,
-          borderWidth: border ? 1 : 0,
+          borderWidth: border ? 1 : 0, borderCurve: 'continuous',
         },
         surface,
         style,

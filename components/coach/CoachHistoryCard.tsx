@@ -18,13 +18,14 @@ import { useTheme } from '@/contexts/ThemeContext';
 import {
   BORDER_RADIUS,
   FONT_WEIGHTS,
-  SHADOWS,
   SIZES,
   SPACING,
+  getCoachPaperSurface,
   withAlpha,
 } from '@/constants/theme';
 import type { CoachPersonaVisual } from '@/shared/coachPersonaVisuals';
 import type { CoachStructuredContent } from '@/shared/coachContent';
+import { Squircle } from '@/components/Squircle';
 
 export type CoachHistorySectionLabels = CoachStructuredContentLabels;
 
@@ -92,8 +93,13 @@ export function CoachHistoryCard({
   onToggle,
   testID = 'coach-history-card',
 }: CoachHistoryCardProps) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const { colors, isDark } = useTheme();
+  const accentColor = personaAvatarHaloTint || (colors.primary as string);
+  const paper = useMemo(() => getCoachPaperSurface(isDark), [isDark]);
+  const styles = useMemo(
+    () => createStyles(colors, accentColor, paper),
+    [colors, accentColor, paper],
+  );
   const hasStructuredSections = useMemo(
     () =>
       hasRenderableCoachStructuredContent(content, {
@@ -114,7 +120,7 @@ export function CoachHistoryCard({
   const showFooter = !!disclaimer || (!!ctaLabel && !!onCtaPress);
 
   return (
-    <View style={styles.card} testID={testID}>
+    <Squircle style={styles.card} testID={testID}>
       <View style={styles.accentBar} />
 
       <TouchableOpacity
@@ -162,13 +168,13 @@ export function CoachHistoryCard({
                 </Text>
               </View>
             ) : null}
-            <View style={styles.chevronWrap}>
+            <Squircle style={styles.chevronWrap}>
               {expanded ? (
-                <ChevronUp color={colors.gray} size={18} />
+                <ChevronUp color={paper.inkMuted} size={16} />
               ) : (
-                <ChevronDown color={colors.gray} size={18} />
+                <ChevronDown color={paper.inkMuted} size={16} />
               )}
-            </View>
+            </Squircle>
           </View>
         </View>
 
@@ -202,9 +208,17 @@ export function CoachHistoryCard({
               style={styles.sectionsWrap}
               testID={`${testID}-structured-content`}
             >
+              {content.summary ? (
+                <View style={styles.summaryQuoteWrap}>
+                  <Squircle style={styles.summaryQuoteRule} />
+                  <Text style={styles.summaryQuoteText}>{content.summary}</Text>
+                </View>
+              ) : null}
               <CoachStructuredContentSections
                 content={content}
                 labels={sectionLabels}
+                accentColor={accentColor}
+                showSummary={false}
               />
             </View>
           ) : (
@@ -239,34 +253,42 @@ export function CoachHistoryCard({
           ) : null}
         </View>
       ) : null}
-    </View>
+    </Squircle>
   );
 }
 
-const createStyles = (colors: any) =>
+const createStyles = (
+  colors: any,
+  accentColor: string,
+  paper: ReturnType<typeof getCoachPaperSurface>,
+) =>
   StyleSheet.create({
     card: {
       position: 'relative',
-      borderRadius: BORDER_RADIUS.xl,
-      backgroundColor: colors.cardBackground,
+      borderRadius: 18,
+      backgroundColor: paper.canvas,
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderColor: paper.border,
       overflow: 'hidden',
-      ...SHADOWS.card,
+      shadowColor: '#000',
+      shadowOpacity: 0.04,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 2, borderCurve: 'continuous',
     },
     accentBar: {
       position: 'absolute',
       top: 0,
       left: 0,
       right: 0,
-      height: 3,
-      backgroundColor: withAlpha(colors.primary, 0.24),
+      height: 2,
+      backgroundColor: withAlpha(accentColor, 0.4),
     },
     toggle: {
-      paddingHorizontal: SPACING.md + 2,
-      paddingTop: SPACING.md + 2,
-      paddingBottom: SPACING.md,
-      gap: SPACING.md,
+      paddingHorizontal: SPACING.lg + 2,
+      paddingTop: SPACING.lg,
+      paddingBottom: SPACING.md + 2,
+      gap: SPACING.md + 2,
     },
     metaRow: {
       flexDirection: 'row',
@@ -279,156 +301,184 @@ const createStyles = (colors: any) =>
       minWidth: 0,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: SPACING.sm,
+      gap: SPACING.sm + 2,
     },
     metaCopy: {
       flex: 1,
       minWidth: 0,
-      gap: 2,
+      gap: 3,
     },
     personaValue: {
-      fontSize: SIZES.text12,
-      lineHeight: 16,
+      fontSize: 11,
+      lineHeight: 14,
       fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.primaryText,
+      color: withAlpha(accentColor, 0.85),
+      letterSpacing: 1.2,
+      textTransform: 'uppercase',
     },
     dateLabel: {
-      fontSize: 11,
-      lineHeight: 15,
-      color: colors.textMuted ?? colors.gray,
+      fontSize: 12,
+      lineHeight: 16,
+      color: paper.inkMuted,
     },
     trailingMeta: {
       flexShrink: 0,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: SPACING.xs,
+      gap: SPACING.xs + 2,
     },
     recentPill: {
-      maxWidth: 84,
-      paddingHorizontal: SPACING.sm,
+      maxWidth: 96,
+      paddingHorizontal: SPACING.sm + 2,
       paddingVertical: 4,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: withAlpha(colors.primary, 0.07),
-      borderWidth: 1,
-      borderColor: withAlpha(colors.primary, 0.12),
+      backgroundColor: withAlpha(accentColor, 0.08),
+      borderWidth: 0, borderCurve: 'continuous',
     },
     recentPillText: {
       fontSize: 10,
       lineHeight: 13,
-      fontWeight: FONT_WEIGHTS.bold,
-      color: colors.primary,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      color: withAlpha(accentColor, 0.95),
+      letterSpacing: 0.6,
       textTransform: 'uppercase',
-      letterSpacing: 0,
     },
     chevronWrap: {
-      width: 26,
-      height: 26,
-      borderRadius: 13,
+      width: 28,
+      height: 28,
+      borderRadius: 14,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.04),
+      backgroundColor: paper.raised, borderCurve: 'continuous',
     },
     summary: {
-      gap: SPACING.xs + 2,
+      gap: SPACING.sm + 2,
     },
     modePill: {
       alignSelf: 'flex-start',
-      paddingHorizontal: SPACING.sm,
-      paddingVertical: SPACING.xs,
+      paddingHorizontal: SPACING.sm + 2,
+      paddingVertical: 3,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.06),
-      borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
-      maxWidth: '80%',
+      backgroundColor: paper.raised,
+      borderWidth: 0,
+      maxWidth: '80%', borderCurve: 'continuous',
     },
     modePillText: {
-      fontSize: 11,
-      lineHeight: 14,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.textMuted ?? withAlpha(colors.primaryText, 0.8),
+      fontSize: 10,
+      lineHeight: 13,
+      fontWeight: FONT_WEIGHTS.medium,
+      color: paper.inkMuted,
+      letterSpacing: 0.4,
+      textTransform: 'uppercase',
     },
     sectionsWrap: {
-      gap: SPACING.sm + 2,
+      gap: SPACING.lg,
+    },
+    summaryQuoteWrap: {
+      flexDirection: 'row',
+      alignItems: 'stretch',
+      gap: SPACING.md,
+    },
+    summaryQuoteRule: {
+      width: 2,
+      backgroundColor: withAlpha(accentColor, 0.55),
+      borderRadius: 1, borderCurve: 'continuous',
+    },
+    summaryQuoteText: {
+      flex: 1,
+      fontSize: SIZES.text16,
+      lineHeight: 26,
+      fontStyle: 'italic',
+      color: withAlpha(paper.ink, 0.86),
     },
     structuredSummary: {
-      fontSize: SIZES.text14,
-      lineHeight: 20,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.primaryText,
+      fontSize: SIZES.text15,
+      lineHeight: 24,
+      fontStyle: 'italic',
+      color: withAlpha(paper.ink, 0.84),
     },
     section: {
-      gap: 4,
-      paddingVertical: SPACING.xs,
+      gap: SPACING.sm,
+      paddingVertical: SPACING.sm,
     },
     sectionLabel: {
-      fontSize: SIZES.text12,
-      lineHeight: 16,
-      fontWeight: FONT_WEIGHTS.bold,
-      color: colors.textMuted ?? withAlpha(colors.primaryText, 0.72),
+      fontSize: 10,
+      lineHeight: 14,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      color: withAlpha(accentColor, 0.85),
+      letterSpacing: 1.2,
       textTransform: 'uppercase',
-      letterSpacing: 0.45,
     },
     sectionItem: {
-      fontSize: SIZES.text14,
-      lineHeight: 20,
-      color: colors.primaryText,
+      fontSize: SIZES.text15,
+      lineHeight: 24,
+      color: paper.ink,
     },
     sectionItemAction: {
-      fontSize: SIZES.text14,
-      lineHeight: 20,
-      color: colors.primaryText,
+      fontSize: SIZES.text15,
+      lineHeight: 24,
+      color: paper.ink,
       fontWeight: FONT_WEIGHTS.semiBold,
     },
     warningSection: {
-      backgroundColor: withAlpha(colors.warning, 0.055),
-      borderRadius: BORDER_RADIUS.md,
-      padding: SPACING.sm + 2,
-      borderWidth: 1,
-      borderColor: withAlpha(colors.warning, 0.14),
+      backgroundColor: withAlpha(colors.warning, 0.05),
+      borderLeftWidth: 2,
+      borderLeftColor: withAlpha(colors.warning, 0.45),
+      paddingLeft: SPACING.md,
+      paddingVertical: SPACING.sm + 2,
+      paddingRight: SPACING.md,
     },
     warningLabel: {
-      color: colors.warning,
+      color: withAlpha(colors.warning, 0.9),
     },
     encouragement: {
-      fontSize: SIZES.text14,
-      lineHeight: 20,
+      fontSize: SIZES.text15,
+      lineHeight: 24,
       fontStyle: 'italic',
-      color: withAlpha(colors.primaryText, 0.9),
-      paddingTop: SPACING.xs,
+      color: withAlpha(paper.ink, 0.86),
+      paddingLeft: 14,
+      borderLeftWidth: 2,
+      borderLeftColor: withAlpha(accentColor, 0.5),
+      marginTop: SPACING.sm,
     },
     title: {
-      fontSize: SIZES.text16,
-      lineHeight: 22,
+      fontSize: SIZES.text18,
+      lineHeight: 24,
       fontWeight: FONT_WEIGHTS.bold,
-      color: colors.primaryText,
+      letterSpacing: -0.2,
+      color: paper.ink,
     },
     preview: {
-      fontSize: SIZES.text14,
-      lineHeight: 20,
-      color: colors.textMuted ?? withAlpha(colors.primaryText, 0.82),
+      fontSize: SIZES.text15,
+      lineHeight: 22,
+      fontStyle: 'italic',
+      color: withAlpha(paper.ink, 0.74),
     },
     expandedContent: {
-      gap: SPACING.md,
-      paddingHorizontal: SPACING.md + 2,
-      paddingBottom: SPACING.md + 2,
+      gap: SPACING.lg,
+      paddingHorizontal: SPACING.lg + 2,
+      paddingBottom: SPACING.lg,
+      paddingTop: SPACING.sm,
+      borderTopWidth: 1,
+      borderTopColor: paper.hairline,
     },
     bodyWrap: {
-      gap: SPACING.sm + 2,
+      gap: SPACING.md,
     },
     bodyParagraph: {
-      fontSize: SIZES.text14,
-      lineHeight: 21,
-      color: colors.primaryText,
+      fontSize: SIZES.text15,
+      lineHeight: 26,
+      color: paper.ink,
     },
     footer: {
       gap: SPACING.md,
       paddingTop: SPACING.md,
       borderTopWidth: 1,
-      borderTopColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.07),
+      borderTopColor: paper.hairline,
     },
     disclaimerText: {
       fontSize: 11,
       lineHeight: 17,
-      color: colors.textMuted ?? withAlpha(colors.gray, 0.92),
+      color: paper.inkSubtle,
     },
   });

@@ -81,6 +81,25 @@ function createNotificationsBridge() {
 
 const Notifications: any = createNotificationsBridge();
 
+// Android 8+ requiert un canal pour que toute notification (locale ou push)
+// soit affichée. Idempotent — setNotificationChannelAsync peut être appelé
+// plusieurs fois sans effet de bord. Appelé avant chaque scheduling pour
+// couvrir aussi le cas où l'utilisateur ne s'est pas (encore) inscrit aux
+// push (pas de passage dans registerForPushNotificationsAsync).
+async function ensureAndroidDefaultChannel() {
+  if (Platform.OS !== 'android') return;
+  try {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'default',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#1E3A2B',
+    });
+  } catch (error) {
+    console.warn('[useNotifications] setNotificationChannelAsync a échoué:', error);
+  }
+}
+
 if (Notifications.setNotificationHandler) {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -216,6 +235,7 @@ export function useNotifications() {
     body: string,
     data?: any
   ) => {
+    await ensureAndroidDefaultChannel();
     await Notifications.scheduleNotificationAsync({
       content: {
         title,
@@ -454,14 +474,7 @@ async function registerForPushNotificationsAsync() {
     }
   }
 
-  if (runtime.platform === 'android') {
-    Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#1E3A2B',
-    });
-  }
+  await ensureAndroidDefaultChannel();
 
   return token;
 }

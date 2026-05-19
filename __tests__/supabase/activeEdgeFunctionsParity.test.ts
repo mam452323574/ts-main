@@ -160,7 +160,6 @@ describe('active Edge Functions parity', () => {
       'social-reserve-upload',
       'social-set-comment-like',
       'social-set-reaction',
-      'social-set-save',
       'social-update-comment',
     ]);
 

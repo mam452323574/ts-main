@@ -17,6 +17,7 @@ import {
 } from '@/constants/theme';
 import { CoachPersonaAvatar } from '@/components/coach/CoachPersonaAvatar';
 import type { CoachPersonaVisual } from '@/shared/coachPersonaVisuals';
+import { Squircle } from '@/components/Squircle';
 
 interface CoachPersonaCardProps {
   title: string;
@@ -89,7 +90,7 @@ export function CoachPersonaCard({
     >
       {isPortrait ? (
         <>
-          <View
+          <Squircle
             style={[
               styles.portraitImageFrame,
               {
@@ -136,7 +137,7 @@ export function CoachPersonaCard({
               style={styles.portraitImageGradient}
               testID={testID ? `${testID}-portrait-gradient` : undefined}
             />
-          </View>
+          </Squircle>
 
           {active ? (
             <View
@@ -157,7 +158,15 @@ export function CoachPersonaCard({
                 styles.title,
                 styles.titlePortrait,
                 active && styles.titleActive,
-                active ? { color: mixColors(colors.white, avatarHaloTint, 0.12) } : null,
+                active
+                  ? {
+                      color: mixColors(
+                        isDark ? colors.white : colors.primaryText,
+                        avatarHaloTint,
+                        isDark ? 0.12 : 0.2,
+                      ),
+                    }
+                  : null,
               ]}
             >
               {title}
@@ -253,7 +262,7 @@ const createStyles = (
       borderRadius: BORDER_RADIUS.xl,
       borderWidth: 1,
       overflow: 'hidden',
-      gap: SPACING.sm,
+      gap: SPACING.sm, borderCurve: 'continuous',
     },
     cardCompact: {
       width: 146,
@@ -270,7 +279,7 @@ const createStyles = (
       paddingHorizontal: 0,
       paddingVertical: 0,
       gap: 0,
-      borderRadius: BORDER_RADIUS.xl,
+      borderRadius: BORDER_RADIUS.xl, borderCurve: 'continuous',
     },
     cardActive: {
       transform: [{ translateY: -1 }],
@@ -304,7 +313,7 @@ const createStyles = (
       color: colors.primaryText,
     },
     titlePortrait: {
-      color: colors.white,
+      color: isDark ? colors.white : colors.primaryText,
     },
     titleActive: {
       color: colors.primary,
@@ -315,7 +324,10 @@ const createStyles = (
       color: colors.textMuted ?? withAlpha(colors.gray, 0.98),
     },
     subtitlePortrait: {
-      color: withAlpha(colors.white, 0.72),
+      color: withAlpha(
+        isDark ? colors.white : colors.primaryText,
+        isDark ? 0.72 : 0.6,
+      ),
     },
     activeBadge: {
       width: isCompact ? 20 : 22,
@@ -323,7 +335,7 @@ const createStyles = (
       borderRadius: BORDER_RADIUS.full,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.primary,
+      backgroundColor: colors.primary, borderCurve: 'continuous',
     },
     activeBadgePortrait: {
       position: 'absolute',
@@ -339,7 +351,7 @@ const createStyles = (
       position: 'relative',
       height: 192,
       borderRadius: BORDER_RADIUS.lg,
-      overflow: 'hidden',
+      overflow: 'hidden', borderCurve: 'continuous',
     },
     portraitImage: {
       width: '100%',
@@ -396,7 +408,7 @@ const createStyles = (
         isDark ? 0.68 : 0.12,
       ),
       borderWidth: 1,
-      borderColor: withAlpha(colors.gold ?? '#FFD700', 0.32),
+      borderColor: withAlpha(colors.gold ?? '#FFD700', 0.32), borderCurve: 'continuous',
     },
     lockBadgePortrait: {
       alignSelf: 'flex-end',

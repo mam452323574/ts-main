@@ -1,0 +1,38 @@
+{
+  "persona": "motivational_energetic",
+  "tests": [
+    {
+      "message": "donne un plan sur 2 jours de récup",
+      "simulated_response": "Allez, on enclenche le mode récup, à fond mais malin !\n\nJour 1 :\n- Étirements doux du dos et des jambes, 10 minutes au réveil\n- Marche tranquille de 20 minutes dans la journée\n- Sieste ou pause au calme l après-midi, 20-30 minutes\n- Dîner léger et coucher tôt, écrans coupés 1h avant\n\nJour 2 :\n- Mobilité articulaire 10 minutes (épaules, hanches, chevilles)\n- Séance d auto-massage ou foam roller, 15 minutes\n- Balade en extérieur, 30 minutes, allure cool\n- Soirée détente, lecture ou musique, sans entraînement intense\n\nTu sors de ces 48h frais et prêt à repartir, on y croit !",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": true,
+      "respects_factual_cap": "n/a",
+      "notes": "Structure par période avec en-têtes Jour 1 / Jour 2, tirets uniquement, pas de numérotation, aucun PS hydratation, aucune reformulation type 'hydratation tout au long de la journée'. R2 et R4 respectés."
+    },
+    {
+      "message": "j ai mal au dos",
+      "simulated_response": "Aïe, on s en occupe tout de suite ! Première action : pose-toi sur le dos au sol, genoux pliés, et fais 10 respirations lentes pour relâcher la tension. Ensuite, enchaîne 2 minutes d étirement chat-vache à quatre pattes, en douceur. Évite la position assise prolongée et privilégie la marche lente sur les prochaines heures.\n\nDis-moi : la douleur est-elle apparue après un effort, un faux mouvement, ou plutôt installée depuis plusieurs jours ? Si elle est intense, irradie dans la jambe ou s accompagne d engourdissement, consulte un pro rapidement.",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": true,
+      "respects_factual_cap": "n/a",
+      "notes": "R5 respecté : actions concrètes (respiration ciblée dos, étirement chat-vache, éviter position assise) AVANT la question de clarification. Pas de pivot hydratation/sommeil. Safety pro mentionné si grave."
+    },
+    {
+      "message": "c est quoi la capitale de l Italie ?",
+      "simulated_response": "Rome ! Capitale historique et politique de l Italie.",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": true,
+      "respects_factual_cap": true,
+      "notes": "R3 respecté : 2 phrases courtes, aucune routine santé, aucun pivot, pas de relance."
+    }
+  ],
+  "overall_verdict": "PASS",
+  "remaining_loopholes": [
+    "Le ton motivational ('on y croit', 'à fond') reste compatible avec R1 mais une dérive 'allez, n oublie pas de bouger un peu plus chaque jour !' en clôture de plan reste théoriquement possible si le modèle confond énergie avec ajout de conseils — surveiller le wording final des plans.",
+    "R5 satisfait mais la frontière entre 'action concrète' et 'anti-réflexe' (ex : respiration sur Q2) pourrait être contestée si la respiration n est pas ciblée sur le dos ; ici elle l est, mais d autres symptômes (fatigue) pourraient déclencher un faux positif."
+  ],
+  "comparison_to_v2": "better"
+}

@@ -17,6 +17,7 @@ import {
   getResultSurfaceChrome,
 } from '@/utils/resultLayout';
 import type { PremiumRenderState } from '@/utils/subscription';
+import { Squircle } from '@/components/Squircle';
 
 interface PremiumTeaserCardProps {
   title: string;
@@ -94,7 +95,7 @@ export function PremiumTeaserCard({
         </View>
       </View>
 
-      <View
+      <Squircle
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
         style={[
@@ -120,7 +121,7 @@ export function PremiumTeaserCard({
             ]}
           />
         ))}
-      </View>
+      </Squircle>
     </View>
   );
 
@@ -146,7 +147,7 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       borderRadius: layout.featureRadius,
       borderWidth: 1,
       padding: layout.blockPadding,
-      gap: layout.sectionGap,
+      gap: layout.sectionGap, borderCurve: 'continuous',
     },
     headerRow: {
       flexDirection: 'row',
@@ -172,7 +173,7 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       borderWidth: 1,
       paddingHorizontal: SPACING.sm,
       paddingVertical: layout.isCompact ? 3 : 4,
-      flexShrink: 0,
+      flexShrink: 0, borderCurve: 'continuous',
     },
     statusText: {
       fontSize: SIZES.xs,
@@ -185,12 +186,12 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       borderRadius: layout.standardRadius,
       paddingHorizontal: SPACING.md,
       paddingVertical: SPACING.sm,
-      gap: SPACING.xs,
+      gap: SPACING.xs, borderCurve: 'continuous',
     },
     placeholderLine: {
       width: '88%',
       height: layout.isCompact ? 10 : 11,
-      borderRadius: 9999,
+      borderRadius: 9999, borderCurve: 'continuous',
     },
     placeholderLineShort: {
       width: '58%',

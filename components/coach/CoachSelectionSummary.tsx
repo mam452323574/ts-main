@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { CoachPersonaAvatar } from '@/components/coach/CoachPersonaAvatar';
@@ -17,6 +17,7 @@ import {
 import type { CoachPersonaVisual } from '@/shared/coachPersonaVisuals';
 import { getCoachPromptVisual } from '@/shared/coachPromptVisuals';
 import type { CoachPromptType } from '@/shared/coachPromptTypes';
+import { Squircle } from '@/components/Squircle';
 
 interface CoachSelectionSummaryProps {
   modeType: CoachPromptType;
@@ -49,13 +50,15 @@ export function CoachSelectionSummary({
   disabled = false,
   testID = 'coach-selection-summary',
 }: CoachSelectionSummaryProps) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { icon: ModeIcon, accentColor } = getCoachPromptVisual(modeType);
-  const iconGlyphColor = mixColors(colors.white, accentColor, 0.14);
+  const iconGlyphColor = isDark
+    ? mixColors(colors.white, accentColor, 0.14)
+    : mixColors(accentColor, colors.primaryText, 0.48);
 
   return (
-    <View style={styles.card} testID={testID}>
+    <Squircle style={styles.card} testID={testID}>
       <LinearGradient
         colors={[withAlpha(accentColor, 0.22), withAlpha(accentColor, 0.04)]}
         start={{ x: 0, y: 0 }}
@@ -74,7 +77,7 @@ export function CoachSelectionSummary({
         ]}
         testID={`${testID}-mode`}
       >
-        <View
+        <Squircle
           style={[
             styles.modeIconShell,
             {
@@ -87,7 +90,7 @@ export function CoachSelectionSummary({
           ]}
         >
           <ModeIcon color={iconGlyphColor} size={28} strokeWidth={2.2} />
-        </View>
+        </Squircle>
         <Text style={styles.modeTitle} numberOfLines={2}>
           {modeLabel}
         </Text>
@@ -123,7 +126,7 @@ export function CoachSelectionSummary({
         disabled={disabled}
         testID={`${testID}-generate-button`}
       />
-    </View>
+    </Squircle>
   );
 }
 
@@ -138,7 +141,7 @@ const createStyles = (colors: any) =>
       backgroundColor: colors.cardBackground,
       borderWidth: 1,
       borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
-      ...SHADOWS.card,
+      ...SHADOWS.card, borderCurve: 'continuous',
     },
     backdrop: {
       position: 'absolute',
@@ -162,7 +165,7 @@ const createStyles = (colors: any) =>
       borderRadius: BORDER_RADIUS.xl + 2,
       alignItems: 'center',
       justifyContent: 'center',
-      flexShrink: 0,
+      flexShrink: 0, borderCurve: 'continuous',
     },
     modeTitle: {
       flex: 1,
@@ -179,7 +182,7 @@ const createStyles = (colors: any) =>
       gap: SPACING.xs + 2,
       paddingHorizontal: SPACING.xs + 2,
       paddingVertical: SPACING.xs,
-      borderRadius: BORDER_RADIUS.full,
+      borderRadius: BORDER_RADIUS.full, borderCurve: 'continuous',
     },
     personaRowPressed: {
       backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.05),

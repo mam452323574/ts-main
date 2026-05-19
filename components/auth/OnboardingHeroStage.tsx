@@ -92,7 +92,7 @@ const createStyles = (palette: ReturnType<typeof useOnboardingPalette>) =>
       overflow: 'hidden',
       borderRadius: BORDER_RADIUS.hero,
       borderWidth: 1,
-      borderColor: palette.borderStrong,
+      borderColor: palette.borderStrong, borderCurve: 'continuous',
     },
     gradient: {
       ...StyleSheet.absoluteFillObject,
@@ -104,7 +104,7 @@ const createStyles = (palette: ReturnType<typeof useOnboardingPalette>) =>
       width: 240,
       height: 176,
       borderRadius: 999,
-      transform: [{ rotate: '-12deg' }],
+      transform: [{ rotate: '-12deg' }], borderCurve: 'continuous',
     },
     secondaryGlow: {
       position: 'absolute',
@@ -113,7 +113,7 @@ const createStyles = (palette: ReturnType<typeof useOnboardingPalette>) =>
       width: 220,
       height: 168,
       borderRadius: 999,
-      transform: [{ rotate: '14deg' }],
+      transform: [{ rotate: '14deg' }], borderCurve: 'continuous',
     },
     content: {
       flex: 1,

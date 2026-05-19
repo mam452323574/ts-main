@@ -139,7 +139,7 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       paddingHorizontal: layout.blockPadding,
       paddingVertical: layout.blockPadding,
       alignItems: 'center',
-      minWidth: 0,
+      minWidth: 0, borderCurve: 'continuous',
     },
     labelWrap: {
       width: '100%',

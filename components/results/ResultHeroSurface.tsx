@@ -10,6 +10,7 @@ import {
   getResultSurfaceChrome,
 } from '@/utils/resultLayout';
 import type { ResultSurfaceVariant } from '@/utils/resultVisualTheme';
+import { Squircle } from '@/components/Squircle';
 
 interface ResultHeroSurfaceProps {
   accentColor: string;
@@ -136,7 +137,7 @@ export function ResultHeroSurface({
           testID="result-hero-visual-column"
           style={[styles.visualColumn, shouldSplitHero ? styles.visualColumnSplit : null]}
         >
-          <View
+          <Squircle
             testID="result-hero-visual-shell"
             style={[
               styles.visualShell,
@@ -151,12 +152,12 @@ export function ResultHeroSurface({
             ]}
           >
             <View style={styles.visualWrap}>{visual}</View>
-          </View>
+          </Squircle>
         </View>
       </View>
 
       {insight ? (
-        <View
+        <Squircle
           style={[
             styles.insightStrip,
             {
@@ -173,7 +174,7 @@ export function ResultHeroSurface({
           >
             {insight}
           </Text>
-        </View>
+        </Squircle>
       ) : null}
 
       {footerContent}
@@ -189,7 +190,7 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       padding: layout.largeBlockPadding,
       gap: layout.sectionGap,
       overflow: 'hidden',
-      position: 'relative',
+      position: 'relative', borderCurve: 'continuous',
     },
     abstractBackdrop: {
       ...StyleSheet.absoluteFillObject,
@@ -282,7 +283,7 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       borderWidth: 1,
       padding: layout.cardPadding,
       alignItems: 'center',
-      justifyContent: 'center',
+      justifyContent: 'center', borderCurve: 'continuous',
     },
     visualWrap: {
       alignItems: 'center',
@@ -292,7 +293,7 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       borderRadius: layout.standardRadius,
       borderWidth: 1,
       paddingHorizontal: layout.cardPadding,
-      paddingVertical: layout.cardPadding,
+      paddingVertical: layout.cardPadding, borderCurve: 'continuous',
     },
     insightText: {
       fontSize: layout.bodyTextFontSize,

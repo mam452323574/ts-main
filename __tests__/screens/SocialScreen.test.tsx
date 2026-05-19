@@ -487,7 +487,6 @@ describe('SocialScreen', () => {
       isReactionPending: jest.fn().mockReturnValue(false),
       followAuthorMutation: { mutate: jest.fn(), isPending: false },
       hideAuthorMutation: { mutate: jest.fn(), isPending: false },
-      setSavePostMutation: { mutate: jest.fn(), isPending: false },
     });
     mockRecordSocialPostImpressions.mockResolvedValue({
       success: true,
@@ -853,7 +852,6 @@ describe('SocialScreen', () => {
       isReactionPending: jest.fn().mockReturnValue(false),
       followAuthorMutation: { mutate: jest.fn(), isPending: false },
       hideAuthorMutation: { mutate: jest.fn(), isPending: false },
-      setSavePostMutation: { mutate: jest.fn(), isPending: false },
     });
 
     const screen = render(<SocialScreen />);
@@ -883,7 +881,6 @@ describe('SocialScreen', () => {
       isReactionPending: jest.fn().mockReturnValue(false),
       followAuthorMutation: { mutate: jest.fn(), isPending: false },
       hideAuthorMutation: { mutate: jest.fn(), isPending: false },
-      setSavePostMutation: { mutate: jest.fn(), isPending: false },
     });
 
     const screen = render(<SocialScreen />);
@@ -911,7 +908,6 @@ describe('SocialScreen', () => {
       isReactionPending: jest.fn().mockReturnValue(false),
       followAuthorMutation: { mutate: jest.fn(), isPending: false },
       hideAuthorMutation: { mutate: jest.fn(), isPending: false },
-      setSavePostMutation: { mutate: jest.fn(), isPending: false },
     });
     mockUseSocialFeed.mockReturnValue(
       createSocialFeedQueryResult({
@@ -947,7 +943,6 @@ describe('SocialScreen', () => {
       isReactionPending: jest.fn().mockReturnValue(false),
       followAuthorMutation: { mutate: jest.fn(), isPending: false },
       hideAuthorMutation: { mutate: jest.fn(), isPending: false },
-      setSavePostMutation: { mutate: jest.fn(), isPending: false },
     });
     mockUseSocialFeed.mockReturnValue(
       createSocialFeedQueryResult({
@@ -983,7 +978,6 @@ describe('SocialScreen', () => {
       isReactionPending: (postId: string) => postId === 'post-1',
       followAuthorMutation: { mutate: jest.fn(), isPending: false },
       hideAuthorMutation: { mutate: jest.fn(), isPending: false },
-      setSavePostMutation: { mutate: jest.fn(), isPending: false },
     });
 
     const screen = render(<SocialScreen />);
@@ -1012,7 +1006,6 @@ describe('SocialScreen', () => {
       isReactionPending: jest.fn().mockReturnValue(false),
       followAuthorMutation: { mutate: jest.fn(), isPending: false },
       hideAuthorMutation: { mutate: jest.fn(), isPending: false },
-      setSavePostMutation: { mutate: jest.fn(), isPending: false },
     });
 
     const screen = render(<SocialScreen />);
@@ -1150,7 +1143,6 @@ describe('SocialScreen', () => {
       isReactionPending: jest.fn().mockReturnValue(false),
       followAuthorMutation: { mutate: jest.fn(), isPending: false },
       hideAuthorMutation: { mutate: jest.fn(), isPending: false },
-      setSavePostMutation: { mutate: jest.fn(), isPending: false },
     });
 
     const screen = render(<SocialScreen />);
@@ -1208,7 +1200,6 @@ describe('SocialScreen', () => {
       isReactionPending: jest.fn().mockReturnValue(false),
       followAuthorMutation: { mutate: jest.fn(), isPending: false },
       hideAuthorMutation: { mutate: jest.fn(), isPending: false },
-      setSavePostMutation: { mutate: jest.fn(), isPending: false },
     });
 
     const screen = render(<SocialScreen />);
@@ -1250,7 +1241,6 @@ describe('SocialScreen', () => {
       isReactionPending: jest.fn().mockReturnValue(false),
       followAuthorMutation: { mutate: jest.fn(), isPending: false },
       hideAuthorMutation: { mutate: jest.fn(), isPending: false },
-      setSavePostMutation: { mutate: jest.fn(), isPending: false },
     });
 
     const screen = render(<SocialScreen />);
@@ -1321,7 +1311,6 @@ describe('SocialScreen', () => {
       isReactionPending: jest.fn().mockReturnValue(false),
       followAuthorMutation: { mutate: jest.fn(), isPending: false },
       hideAuthorMutation: { mutate: jest.fn(), isPending: false },
-      setSavePostMutation: { mutate: jest.fn(), isPending: false },
     });
     mockRecordSocialPostImpressions.mockRejectedValueOnce(
       new SocialServiceError(

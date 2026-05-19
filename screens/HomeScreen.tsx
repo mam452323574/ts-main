@@ -70,6 +70,7 @@ import {
 } from '../utils/scanQuotaState';
 import { hasPremiumAccess } from '../utils/subscription';
 import { logOperationalError } from '../utils/observability';
+import { Squircle } from '@/components/Squircle';
 
 const STANDARD_SCAN_TYPES: ScanType[] = ['health', 'body', 'nutrition'];
 const EMPTY_LOADING_BY_SCAN_TYPE = {
@@ -415,7 +416,7 @@ export default function HomeScreen() {
           style={styles.superScanPromoShell}
           testID="home-super-scan-upsell-card"
         >
-          <View
+          <Squircle
             style={styles.superScanPromoSurface}
             testID="home-super-scan-upsell-surface"
           >
@@ -463,7 +464,7 @@ export default function HomeScreen() {
                 </View>
               </View>
             </LinearGradient>
-          </View>
+          </Squircle>
         </TouchableOpacity>
       );
     }
@@ -488,7 +489,7 @@ export default function HomeScreen() {
     }
 
     return (
-      <View style={styles.superQuotaStateCard} testID="super-scan-state-card">
+      <Squircle style={styles.superQuotaStateCard} testID="super-scan-state-card">
         <Text style={styles.superQuotaStateTitle}>
           {t(SCAN_TYPE_LABELS.super)}
         </Text>
@@ -498,7 +499,7 @@ export default function HomeScreen() {
               'scan_limit.missing_payload',
           )}
         </Text>
-      </View>
+      </Squircle>
     );
   };
 
@@ -541,17 +542,14 @@ export default function HomeScreen() {
           style={[styles.companionSection, journeyAnimatedStyle]}
           testID="home-journey-section"
         >
-          <View style={styles.sectionHeading}>
-            <Text style={styles.sectionEyebrow}>{t('home.companion_title')}</Text>
-          </View>
-          <View style={styles.companionCardShell}>
-            <View style={styles.companionCardSurface}>
+          <Squircle style={styles.companionCardShell}>
+            <Squircle style={styles.companionCardSurface}>
               <FoxEvolutionHero
                 gamification={effectiveGamification}
                 progress={gamificationProgress}
               />
-            </View>
-          </View>
+            </Squircle>
+          </Squircle>
         </Animated.View>
 
         <Animated.View
@@ -560,12 +558,6 @@ export default function HomeScreen() {
         >
           <ChefHomeCard onPress={() => router.push('/scan-frigo' as any)} />
 
-          <View style={styles.sectionHeading}>
-            <Text style={styles.sectionEyebrow}>{t('tabs.analytics')}</Text>
-            <Text style={styles.sectionSupportText}>
-              {t('home.analytics_card_scan_count', { count: effectiveScanCount })}
-            </Text>
-          </View>
           <AnalyticsHomeCard
             scanCount={effectiveScanCount}
             onPress={() => router.push('/analytics')}
@@ -576,17 +568,17 @@ export default function HomeScreen() {
           style={[styles.scanLimitsSection, scanRailAnimatedStyle]}
           testID="home-scan-rail-section"
         >
-          <View style={styles.scanRailShell} testID="home-scan-rail">
-            <View style={styles.scanSectionHeaderCard}>
+          <Squircle style={styles.scanRailShell} testID="home-scan-rail">
+            <Squircle style={styles.scanSectionHeaderCard}>
               <View style={styles.scanSectionHeaderCopy}>
                 <Text style={styles.scanSectionEyebrow}>{t('home.items_available')}</Text>
               </View>
-              <View style={styles.scanSectionAvailabilityPill}>
+              <Squircle style={styles.scanSectionAvailabilityPill}>
                 <Text style={styles.scanSectionAvailabilityValue}>
                   {totalAvailableScans}
                 </Text>
-              </View>
-            </View>
+              </Squircle>
+            </Squircle>
 
             <View style={styles.scanCardsGrid} testID="home-scan-cards-grid">
               {STANDARD_SCAN_TYPES.map((scanType) => {
@@ -594,12 +586,12 @@ export default function HomeScreen() {
                 const quotaStateLabelKey = getScanQuotaStatusLabelKey(quotaState);
 
                 return (
-                  <View
+                  <Squircle
                     key={scanType}
                     style={styles.scanLimitCardShell}
                     testID="scan-limit-card-shell"
                   >
-                    <View
+                    <Squircle
                       style={styles.scanLimitCardSurface}
                       testID="scan-limit-card-surface"
                     >
@@ -634,8 +626,8 @@ export default function HomeScreen() {
                           {t(quotaStateLabelKey ?? 'scan_limit.missing_payload')}
                         </Text>
                       )}
-                    </View>
-                  </View>
+                    </Squircle>
+                  </Squircle>
                 );
               })}
             </View>
@@ -643,7 +635,7 @@ export default function HomeScreen() {
             <View style={styles.superScanContainer} testID="home-super-scan-container">
               {renderSuperScanSlot()}
             </View>
-          </View>
+          </Squircle>
         </Animated.View>
       </>
     );
@@ -788,7 +780,7 @@ const createStyles = (
       borderRadius: BORDER_RADIUS.full,
       backgroundColor: chrome.chip.backgroundColor,
       borderWidth: 1,
-      borderColor: chrome.chip.borderColor,
+      borderColor: chrome.chip.borderColor, borderCurve: 'continuous',
     },
     scanLimitsSection: {
       paddingHorizontal: HOME_HORIZONTAL_PADDING,
@@ -802,7 +794,7 @@ const createStyles = (
       backgroundColor: chrome.elevatedSurface.backgroundColor,
       borderWidth: 1,
       borderColor: chrome.elevatedSurface.borderColor,
-      ...obsidianScanSurface.shadowStyle,
+      ...obsidianScanSurface.shadowStyle, borderCurve: 'continuous',
     },
     scanSectionHeaderCard: {
       flexDirection: 'row',
@@ -814,7 +806,7 @@ const createStyles = (
       borderRadius: BORDER_RADIUS.xl,
       backgroundColor: chrome.mutedSurface.backgroundColor,
       borderWidth: 1,
-      borderColor: chrome.mutedSurface.borderColor,
+      borderColor: chrome.mutedSurface.borderColor, borderCurve: 'continuous',
     },
     scanSectionHeaderCopy: {
       flex: 1,
@@ -835,7 +827,7 @@ const createStyles = (
       justifyContent: 'center',
       backgroundColor: chrome.chipActive.backgroundColor,
       borderWidth: 1,
-      borderColor: chrome.chipActive.borderColor,
+      borderColor: chrome.chipActive.borderColor, borderCurve: 'continuous',
     },
     scanSectionAvailabilityValue: {
       fontSize: SIZES.text18,
@@ -856,7 +848,7 @@ const createStyles = (
       flex: 1,
       minWidth: 0,
       borderRadius: BORDER_RADIUS.xl,
-      ...(isAndroidLight ? scanCardSurface?.shadowStyle : obsidianScanSurface.shadowStyle),
+      ...(isAndroidLight ? scanCardSurface?.shadowStyle : obsidianScanSurface.shadowStyle), borderCurve: 'continuous',
     },
     scanLimitCardSurface: {
       minWidth: 0,
@@ -872,7 +864,7 @@ const createStyles = (
       borderColor: isAndroidLight
         ? scanCardSurface?.borderColor
         : obsidianScanSurface.borderColor,
-      overflow: 'hidden',
+      overflow: 'hidden', borderCurve: 'continuous',
     },
     scanLimitLabel: {
       fontSize: SIZES.text12,
@@ -919,7 +911,7 @@ const createStyles = (
       borderColor: obsidianScanSurface.borderColor,
       alignItems: 'center',
       gap: SPACING.xs,
-      ...obsidianScanSurface.shadowStyle,
+      ...obsidianScanSurface.shadowStyle, borderCurve: 'continuous',
     },
     superQuotaStateTitle: {
       fontSize: SIZES.text16,
@@ -937,7 +929,7 @@ const createStyles = (
       borderRadius: BORDER_RADIUS.xl,
       ...(isAndroidLight
         ? premiumBannerSurface?.shadowStyle
-        : obsidianPremiumSurface.shadowStyle),
+        : obsidianPremiumSurface.shadowStyle), borderCurve: 'continuous',
     },
     superScanPromoSurface: {
       borderRadius: BORDER_RADIUS.xl,
@@ -948,7 +940,7 @@ const createStyles = (
       borderWidth: 1,
       borderColor: isAndroidLight
         ? premiumBannerSurface?.borderColor
-        : obsidianPremiumSurface.borderColor,
+        : obsidianPremiumSurface.borderColor, borderCurve: 'continuous',
     },
     superScanPromoGradient: {
       padding: SPACING.lg,
@@ -965,14 +957,20 @@ const createStyles = (
       paddingHorizontal: SPACING.sm,
       paddingVertical: 6,
       borderRadius: BORDER_RADIUS.pill,
-      backgroundColor: withAlpha(colors.white, isDark ? 0.08 : 0.16),
+      backgroundColor: withAlpha(
+        isDark ? colors.white : colors.primaryText,
+        isDark ? 0.08 : 0.06,
+      ),
       borderWidth: 1,
-      borderColor: withAlpha(colors.white, isDark ? 0.12 : 0.2),
+      borderColor: withAlpha(
+        isDark ? colors.white : colors.primaryText,
+        isDark ? 0.12 : 0.12,
+      ), borderCurve: 'continuous',
     },
     superScanPromoBadgeText: {
       fontSize: SIZES.text10,
       fontWeight: FONT_WEIGHTS.bold,
-      color: colors.white,
+      color: isDark ? colors.white : colors.primaryText,
       textTransform: 'uppercase',
       letterSpacing: 0.7,
       fontFamily: FONT_FAMILIES.accent,
@@ -981,13 +979,16 @@ const createStyles = (
       fontSize: SIZES.text18,
       lineHeight: 22,
       fontWeight: FONT_WEIGHTS.bold,
-      color: colors.white,
+      color: isDark ? colors.white : colors.primaryText,
       fontFamily: FONT_FAMILIES.display,
     },
     superScanPromoSubtitle: {
       fontSize: SIZES.text12,
       lineHeight: 18,
-      color: withAlpha(colors.white, isAndroidLight ? 0.88 : 0.85),
+      color: withAlpha(
+        isDark ? colors.white : colors.primaryText,
+        isDark ? (isAndroidLight ? 0.88 : 0.85) : 0.72,
+      ),
     },
     superScanPromoFooter: {
       gap: SPACING.md,
@@ -1001,14 +1002,20 @@ const createStyles = (
       paddingHorizontal: SPACING.sm,
       paddingVertical: 5,
       borderRadius: BORDER_RADIUS.pill,
-      backgroundColor: withAlpha(colors.white, isDark ? 0.08 : 0.16),
+      backgroundColor: withAlpha(
+        isDark ? colors.white : colors.primaryText,
+        isDark ? 0.08 : 0.06,
+      ),
       borderWidth: 1,
-      borderColor: withAlpha(colors.white, isDark ? 0.12 : 0.2),
+      borderColor: withAlpha(
+        isDark ? colors.white : colors.primaryText,
+        isDark ? 0.12 : 0.12,
+      ), borderCurve: 'continuous',
     },
     superScanPromoBenefitChipText: {
       fontSize: SIZES.text10,
       fontWeight: FONT_WEIGHTS.bold,
-      color: colors.white,
+      color: isDark ? colors.white : colors.primaryText,
       textTransform: 'uppercase',
       letterSpacing: 0.7,
       fontFamily: FONT_FAMILIES.accent,
@@ -1022,7 +1029,7 @@ const createStyles = (
       paddingHorizontal: SPACING.md,
       paddingVertical: SPACING.sm,
       borderRadius: BORDER_RADIUS.button,
-      backgroundColor: withAlpha(colors.white, 0.96),
+      backgroundColor: withAlpha(colors.white, 0.96), borderCurve: 'continuous',
     },
     superScanPromoCtaText: {
       fontSize: SIZES.text14,
@@ -1038,34 +1045,18 @@ const createStyles = (
     secondaryModulesSection: {
       paddingHorizontal: HOME_HORIZONTAL_PADDING,
       paddingTop: SPACING.xl,
-      gap: SPACING.md,
-    },
-    sectionHeading: {
-      gap: SPACING.xs,
-    },
-    sectionEyebrow: {
-      fontSize: SIZES.text12,
-      fontWeight: FONT_WEIGHTS.bold,
-      color: chrome.accentColor,
-      textTransform: 'uppercase',
-      letterSpacing: 1,
-      fontFamily: FONT_FAMILIES.display,
-    },
-    sectionSupportText: {
-      fontSize: SIZES.text14,
-      lineHeight: 20,
-      color: withAlpha(colors.primaryText, isDark ? 0.72 : 0.64),
+      gap: SPACING.lg,
     },
     companionCardShell: {
       borderRadius: BORDER_RADIUS.hero,
-      ...companionSurface,
+      ...companionSurface, borderCurve: 'continuous',
     },
     companionCardSurface: {
       borderRadius: BORDER_RADIUS.hero,
       borderWidth: 1,
       borderColor: companionSurface.borderColor,
       backgroundColor: companionSurface.backgroundColor,
-      overflow: 'hidden',
+      overflow: 'hidden', borderCurve: 'continuous',
     },
   });
 };

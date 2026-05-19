@@ -166,7 +166,7 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     borderRadius: BORDER_RADIUS.button,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 48,
+    minHeight: 48, borderCurve: 'continuous',
   },
   buttonLg: {
     minHeight: 56,
@@ -203,7 +203,7 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     borderRadius: BORDER_RADIUS.pill,
     minHeight: 52,
     paddingVertical: SPACING.md + 2,
-    ...SHADOWS.lift,
+    ...SHADOWS.lift, borderCurve: 'continuous',
   },
   monochromeButtonLg: {
     minHeight: 60,
@@ -221,7 +221,7 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     shadowOpacity: isDark ? 0.18 : 0.14,
     shadowRadius: isDark ? 20 : 14,
     shadowOffset: { width: 0, height: isDark ? 10 : 8 },
-    elevation: 4,
+    elevation: 4, borderCurve: 'continuous',
   },
   premiumButtonLg: {
     minHeight: 60,
@@ -230,7 +230,7 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   ghostButton: {
     backgroundColor: 'transparent',
     borderRadius: BORDER_RADIUS.pill,
-    minHeight: 44,
+    minHeight: 44, borderCurve: 'continuous',
   },
   disabledButton: {
     opacity: 0.5,

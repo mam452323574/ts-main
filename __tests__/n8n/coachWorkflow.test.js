@@ -1220,9 +1220,9 @@ describe('coach n8n workflow export', () => {
     expect(result.response_version).toBe(2);
     expect(result.title).toBe('Ton plan de la semaine');
     expect(result.source).toBe('n8n');
-    expect(result.body).toContain(
-      "Je n'ai pas pu formuler un conseil personnalise fiable",
-    );
+    // After the fallback cleanup, the user-facing body is a useful generic
+    // priority instead of an apologetic data-disclaimer.
+    expect(result.body).toContain('Voici ta priorite du jour');
     expect(result.disclaimer).toBeTruthy();
     expect(result.content.title).toBe('Ton plan de la semaine');
     expect(result.content.daily_schedule).toEqual([]);
@@ -1235,6 +1235,281 @@ describe('coach n8n workflow export', () => {
 
     expect(coachNode.parameters.messages.messageValues[0].message).toBe(
       '={{ $json.coach_prompt_system_text }}',
+    );
+  });
+
+  it('injects the 5 universal anti-divergence principles in every coach prompt (common block)', () => {
+    const workflow = readWorkflow();
+    const routes = [
+      'free_question',
+      'latest_scan',
+      'weekly_plan',
+      'nutrition_focus',
+      'body_focus',
+      'face_focus',
+      'hydration_focus',
+      'sleep_coach',
+      'risk_watch',
+      'recovery_plan',
+      'trend_review',
+    ];
+    const personas = [
+      'gentle_supportive',
+      'strict_tough',
+      'motivational_energetic',
+      'patient_calm',
+      'analytical_precise',
+      'playful_light',
+    ];
+
+    for (const promptType of routes) {
+      for (const personaKey of personas) {
+        const result = runCodeNode(workflow, 'Determine Coach Route', {
+          payload: {
+            prompt_type: promptType,
+            question_text:
+              promptType === 'free_question'
+                ? 'Quelle est la capitale de l Italie ?'
+                : null,
+          },
+          persona_key: personaKey,
+          language: 'fr',
+          scan_context: {
+            has_any_scan: true,
+            primary_scan: { scan_type: 'body' },
+          },
+        })[0].json;
+        const system = result.coach_prompt_system_text;
+        expect(system).toContain('PRIORITÉ ABSOLUE');
+        expect(system).toContain('RÉPONDS D ABORD à la question');
+        expect(system).toContain('ANTI-RÉFLEXE');
+        expect(system).toContain('"bois de l eau"');
+        expect(system).toContain('DÉTECTION D INTENTION');
+        expect(system).toContain('UNE SEULE LISTE NUMÉROTÉE');
+        expect(system).toContain('EXEMPLES À NE PAS REPRODUIRE');
+        expect(system).toContain(
+          'PERSONA + CONTRAT définissent la FORME',
+        );
+      }
+    }
+  });
+
+  it('enforces action_steps/priorities mutual-exclusion in the JSON contract', () => {
+    const workflow = readWorkflow();
+    const result = runCodeNode(workflow, 'Determine Coach Route', {
+      payload: {
+        prompt_type: 'latest_scan',
+        question_text: null,
+      },
+      persona_key: 'analytical_precise',
+      language: 'fr',
+      scan_context: {
+        has_any_scan: true,
+        primary_scan: { scan_type: 'body' },
+      },
+    })[0].json;
+    expect(result.coach_prompt_system_text).toContain(
+      'anti-double-numérotation visuelle',
+    );
+    expect(result.coach_prompt_system_text).toContain(
+      'mutuellement exclusifs au sens visuel',
+    );
+    expect(result.coach_prompt_system_text).toContain(
+      'Une seule liste numérotée visible par carte',
+    );
+  });
+
+  it('contains the exact bug-example anti-pattern so the LLM rejects the drink-water reflex', () => {
+    const workflow = readWorkflow();
+    const result = runCodeNode(workflow, 'Determine Coach Route', {
+      payload: {
+        prompt_type: 'recovery_plan',
+        question_text: 'donne un plan sur 2 jours de récup',
+      },
+      persona_key: 'gentle_supportive',
+      language: 'fr',
+      scan_context: {
+        has_any_scan: true,
+        primary_scan: { scan_type: 'body' },
+      },
+    })[0].json;
+    expect(result.coach_prompt_system_text).toContain(
+      'donne un plan sur 2 jours de récup',
+    );
+    expect(result.coach_prompt_system_text).toContain('bois un verre d eau');
+    expect(result.coach_prompt_system_text).toContain('content.daily_schedule');
+  });
+
+  it('hardens the free_question route with explicit anti-divergence directives', () => {
+    const workflow = readWorkflow();
+    const result = runCodeNode(workflow, 'Determine Coach Route', {
+      payload: {
+        prompt_type: 'free_question',
+        question_text: 'Donne-moi ta meilleure blague.',
+      },
+      persona_key: 'playful_light',
+      language: 'fr',
+      scan_context: {
+        has_any_scan: true,
+        primary_scan: { scan_type: 'body' },
+      },
+    })[0].json;
+
+    expect(result.coach_route).toBe('free_question');
+    expect(result.coach_prompt_system_text).toContain(
+      'C est une question libre. Tu DOIS répondre à la question posée',
+    );
+    expect(result.coach_prompt_system_text).toContain(
+      'Hors santé (culture générale, blague, vie quotidienne, météo, code',
+    );
+    expect(result.coach_prompt_system_text).toContain(
+      'Interdit de suggérer "bois de l eau"',
+    );
+    expect(result.coach_prompt_system_text).toContain(
+      'Interdit de basculer la réponse sur le dernier scan si l utilisateur ne pose pas de question dessus',
+    );
+  });
+
+  it('does not force a generic next-step or hydration default for free_question', () => {
+    const workflow = readWorkflow();
+    const result = runCodeNode(workflow, 'Determine Coach Route', {
+      payload: {
+        prompt_type: 'free_question',
+        question_text: 'Quelle est la capitale de l Italie ?',
+      },
+      persona_key: 'gentle_supportive',
+      language: 'fr',
+      scan_context: {
+        has_any_scan: true,
+        primary_scan: { scan_type: 'body' },
+      },
+    })[0].json;
+
+    expect(result.coach_prompt_system_text).not.toMatch(
+      /Always one concrete next step/i,
+    );
+    expect(result.coach_prompt_system_text).toContain('ANTI-RÉFLEXE');
+  });
+});
+
+describe('coach-conversation n8n workflow export', () => {
+  const conversationWorkflowPath = path.join(
+    process.cwd(),
+    'n8n',
+    'workflows',
+    'coach-conversation.json',
+  );
+  const conversationWorkflow = JSON.parse(
+    fs.readFileSync(conversationWorkflowPath, 'utf8'),
+  );
+  const normalizeNode = conversationWorkflow.nodes.find(
+    (n) => n.name === 'Normalize Coach Conversation Input',
+  );
+
+  function runConversationNormalize(payload) {
+    const fn = new Function('items', normalizeNode.parameters.jsCode);
+    return fn([{ json: payload }]);
+  }
+
+  const personas = [
+    'gentle_supportive',
+    'strict_tough',
+    'motivational_energetic',
+    'patient_calm',
+    'analytical_precise',
+    'playful_light',
+  ];
+
+  it.each(personas)(
+    'injects the 5 anti-divergence principles in the %s conversation system prompt',
+    (personaKey) => {
+      const result = runConversationNormalize({
+        conversation_id: 'c-test',
+        user_id: 'u-test',
+        persona_key: personaKey,
+        locale: 'fr',
+        messages: [{ role: 'user', content: 'Hello coach' }],
+      })[0].json;
+      const system = result.coach_conversation_system_prompt;
+      expect(system).toContain('PRIORITÉ ABSOLUE');
+      expect(system).toContain('RÉPONDS D ABORD à la question');
+      expect(system).toContain('ANTI-RÉFLEXE');
+      expect(system).toContain('"bois de l eau"');
+      expect(system).toContain('DÉTECTION D INTENTION');
+      expect(system).toContain('UNE SEULE LISTE NUMÉROTÉE');
+      expect(system).toContain('EXEMPLES À NE PAS REPRODUIRE');
+      expect(system).toContain('RAPPEL FINAL');
+      expect(system).toContain('Pas d action-réflexe générique');
+    },
+  );
+
+  it('triggers structured-output guidance when the user asks for a "plan" or a multi-day breakdown', () => {
+    const result = (function run() {
+      const fn = new Function('items', normalizeNode.parameters.jsCode);
+      return fn([{
+        json: {
+          conversation_id: 'c-test',
+          user_id: 'u-test',
+          persona_key: 'gentle_supportive',
+          locale: 'fr',
+          messages: [{ role: 'user', content: 'donne un plan sur 2 jours de récup' }],
+        },
+      }]);
+    })()[0].json;
+    const system = result.coach_conversation_system_prompt;
+    expect(system).toContain('plan');
+    expect(system).toContain('Jour 1');
+    expect(system).toContain('donne un plan sur 2 jours de récup');
+    expect(system).toContain('bois un verre d eau');
+  });
+
+  it('forbids two consecutive numbered lists (one-numbered-list rule)', () => {
+    const result = (function run() {
+      const fn = new Function('items', normalizeNode.parameters.jsCode);
+      return fn([{
+        json: {
+          conversation_id: 'c-test',
+          user_id: 'u-test',
+          persona_key: 'analytical_precise',
+          locale: 'fr',
+          messages: [{ role: 'user', content: 'Hello' }],
+        },
+      }]);
+    })()[0].json;
+    const system = result.coach_conversation_system_prompt;
+    expect(system).toContain('UNE SEULE LISTE NUMÉROTÉE');
+    expect(system).toContain('JAMAIS deux blocs numérotés');
+  });
+
+  it('removes the legacy "Always one concrete next step" instruction', () => {
+    const result = runConversationNormalize({
+      conversation_id: 'c-test',
+      user_id: 'u-test',
+      persona_key: 'gentle_supportive',
+      locale: 'fr',
+      messages: [{ role: 'user', content: 'Hello coach' }],
+    })[0].json;
+    expect(result.coach_conversation_system_prompt).not.toMatch(
+      /Always one concrete next step/i,
+    );
+  });
+
+  it('marks the scan digest as informational context, not a topic to comment on', () => {
+    const result = runConversationNormalize({
+      conversation_id: 'c-test',
+      user_id: 'u-test',
+      persona_key: 'analytical_precise',
+      locale: 'fr',
+      messages: [{ role: 'user', content: 'Quelle est la capitale du Japon ?' }],
+      user_context: {
+        recent_scan_digest: [{ scan_type: 'body', captured_at: '2026-05-15' }],
+      },
+    })[0].json;
+    expect(result.coach_conversation_system_prompt).toContain(
+      'Digest scans récents (informatif',
+    );
+    expect(result.coach_conversation_system_prompt).toContain(
+      'NE PAS commenter sauf si la question le demande',
     );
   });
 });

@@ -22,6 +22,7 @@ import {
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { LOCALE_OPTIONS, type LocaleCode } from '@/i18n/config';
+import { Squircle } from '@/components/Squircle';
 
 interface LanguageSelectorProps {
   style?: any;
@@ -85,11 +86,11 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({ style }) => 
             onPress={() => setModalVisible(false)}
           />
 
-          <View style={styles.modalContent}>
+          <Squircle style={styles.modalContent}>
             <View style={styles.modalHeaderIconRow}>
-              <View style={styles.modalHeaderIconBadge}>
+              <Squircle style={styles.modalHeaderIconBadge}>
                 <Globe color={colors.primary} size={22} />
-              </View>
+              </Squircle>
               <Text style={styles.modalEmoji}>🌐</Text>
             </View>
 
@@ -109,7 +110,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({ style }) => 
               keyExtractor={(item) => item.code}
               contentContainerStyle={styles.listContent}
             />
-          </View>
+          </Squircle>
         </View>
       </Modal>
     </>
@@ -136,7 +137,7 @@ const createStyles = (colors: any, isDark: boolean) => {
       borderWidth: 1,
       borderColor: tokens.border.subtle,
       backgroundColor: tokens.surfaceGlass.base,
-      ...SHADOWS.header,
+      ...SHADOWS.header, borderCurve: 'continuous',
     },
     flag: {
       fontSize: 18,
@@ -175,7 +176,7 @@ const createStyles = (colors: any, isDark: boolean) => {
       shadowOpacity: modalSurface.shadowOpacity,
       shadowRadius: modalSurface.shadowRadius,
       elevation: modalSurface.elevation,
-      maxHeight: '72%',
+      maxHeight: '72%', borderCurve: 'continuous',
     },
     modalHeaderIconRow: {
       alignItems: 'center',
@@ -189,7 +190,7 @@ const createStyles = (colors: any, isDark: boolean) => {
       justifyContent: 'center',
       backgroundColor: withAlpha(colors.primary, isDark ? 0.16 : 0.1),
       borderWidth: 1,
-      borderColor: withAlpha(colors.primary, isDark ? 0.34 : 0.2),
+      borderColor: withAlpha(colors.primary, isDark ? 0.34 : 0.2), borderCurve: 'continuous',
     },
     modalEmoji: {
       marginTop: SPACING.xs,
@@ -211,7 +212,7 @@ const createStyles = (colors: any, isDark: boolean) => {
     closeButton: {
       padding: 6,
       borderRadius: 16,
-      backgroundColor: tokens.surfaceMuted.base,
+      backgroundColor: tokens.surfaceMuted.base, borderCurve: 'continuous',
     },
     listContent: {
       paddingHorizontal: SPACING.lg,
@@ -225,7 +226,7 @@ const createStyles = (colors: any, isDark: boolean) => {
       borderRadius: 16,
       borderWidth: 1,
       borderColor: tokens.border.subtle,
-      backgroundColor: tokens.surface.base,
+      backgroundColor: tokens.surface.base, borderCurve: 'continuous',
     },
     languageOptionSelected: {
       borderColor: withAlpha(colors.primary, 0.34),

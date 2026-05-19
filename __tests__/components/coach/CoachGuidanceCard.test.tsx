@@ -3,6 +3,7 @@ import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import { CoachGuidanceCard } from '@/components/coach/CoachGuidanceCard';
+import { parseCoachStructuredContent } from '@/shared/coachContentParser';
 
 const LONG_BODY = [
   'Premier paragraphe de guidance avec assez de contexte pour depasser la preview compacte tout en restant agreable a lire.',
@@ -11,7 +12,7 @@ const LONG_BODY = [
 
 describe('CoachGuidanceCard', () => {
   it.each(['compact', 'fresh'] as const)(
-    'removes external shadow artifacts from the %s result card',
+    'applies a soft premium shadow to the %s result card',
     (variant) => {
       render(
         <CoachGuidanceCard
@@ -38,15 +39,13 @@ describe('CoachGuidanceCard', () => {
         screen.getByTestId('coach-guidance-card').props.style,
       );
 
-      expect(cardStyle).toEqual(
-        expect.objectContaining({
-          shadowColor: 'transparent',
-          shadowOpacity: 0,
-          shadowRadius: 0,
-          shadowOffset: { width: 0, height: 0 },
-          elevation: 0,
-        }),
-      );
+      expect(cardStyle.shadowColor).toBe('#000');
+      expect(cardStyle.shadowOpacity).toBeGreaterThan(0);
+      expect(cardStyle.shadowOpacity).toBeLessThanOrEqual(0.22);
+      expect(cardStyle.shadowRadius).toBeGreaterThanOrEqual(18);
+      expect(cardStyle.shadowOffset).toEqual({ width: 0, height: 10 });
+      expect(cardStyle.elevation).toBeGreaterThan(0);
+      expect(cardStyle.borderRadius).toBe(24);
     },
   );
 
@@ -82,8 +81,7 @@ describe('CoachGuidanceCard', () => {
     expect(screen.getByTestId('coach-guidance-timestamp').props.children).toBe(
       '18 avr. 09:30',
     );
-    expect(screen.getByTestId('coach-guidance-preview').props.numberOfLines).toBe(2);
-    expect(screen.getByTestId('coach-guidance-preview-fade')).toBeTruthy();
+    expect(screen.getByTestId('coach-guidance-preview').props.numberOfLines).toBe(3);
     expect(screen.getByTestId('coach-guidance-continuation-hint').props.children).toBe(
       'Contenu resume, touchez pour ouvrir',
     );
@@ -95,14 +93,13 @@ describe('CoachGuidanceCard', () => {
     ).toBe(false);
     expect(screen.getByText('Lire la suite')).toBeTruthy();
     expect(screen.queryByText('Second paragraphe plus detaille avec une suite concrete pour verifier le depliage complet de la carte.')).toBeNull();
-    expect(screen.getByTestId('coach-guidance-disclaimer').props.children).toBe(
-      'Info, pas diagnostic',
-    );
+    // Iteration 7: disclaimer pill is no longer rendered visually; the disclaimer copy
+    // is exposed via the card's accessibilityLabel for screen readers.
+    expect(screen.queryByTestId('coach-guidance-disclaimer')).toBeNull();
+    expect(screen.queryByText('Info, pas diagnostic')).toBeNull();
     expect(
-      screen.getByTestId('coach-guidance-disclaimer').props.accessibilityLabel,
-    ).toContain(
-      'Wellness guidance only.',
-    );
+      screen.getByTestId('coach-guidance-card').props.accessibilityLabel,
+    ).toContain('Wellness guidance only.');
 
     fireEvent.press(screen.getByTestId('coach-guidance-toggle'));
 
@@ -151,12 +148,12 @@ describe('CoachGuidanceCard', () => {
     expect(screen.queryByTestId('coach-guidance-preview-fade')).toBeNull();
     expect(screen.getByText('Gardez deux priorites claires')).toBeTruthy();
     expect(screen.getByText('Un seul paragraphe suffit ici.')).toBeTruthy();
-    expect(screen.getByText('Info, pas diagnostic')).toBeTruthy();
+    // Iteration 7: disclaimer pill removed; the disclaimer copy lives only in the card's
+    // accessibilityLabel (so it stays available for screen readers / a11y).
+    expect(screen.queryByText('Info, pas diagnostic')).toBeNull();
     expect(
-      screen.getByTestId('coach-guidance-disclaimer').props.accessibilityLabel,
-    ).toContain(
-      'not a diagnosis',
-    );
+      screen.getByTestId('coach-guidance-card').props.accessibilityLabel,
+    ).toContain('not a diagnosis');
 
     fireEvent.press(screen.getByText('Ouvrir mon plan'));
 
@@ -194,7 +191,7 @@ describe('CoachGuidanceCard', () => {
     ).toBeTruthy();
   });
 
-  it('keeps structured guidance compact until the user expands it', () => {
+  it('keeps structured guidance compact until the user expands it, then exposes all actions under a single section', () => {
     render(
       <CoachGuidanceCard
         variant="fresh"
@@ -241,17 +238,28 @@ describe('CoachGuidanceCard', () => {
     expect(
       screen.getByTestId('coach-guidance-card-persona-theme-strict_tough'),
     ).toBeTruthy();
-    expect(screen.getByTestId('coach-guidance-primary-action')).toBeTruthy();
-    expect(
-      screen.getByText('Choisis une heure fixe de coucher pendant trois soirs.'),
-    ).toBeTruthy();
-    expect(screen.getByTestId('coach-guidance-compact-signals')).toBeTruthy();
+    // No more isolated hero tile : actions are only revealed once the card is expanded.
+    expect(screen.queryByTestId('coach-guidance-primary-action')).toBeNull();
+    expect(screen.queryByTestId('coach-section-action_steps')).toBeNull();
     expect(screen.queryByTestId('coach-section-context_notes')).toBeNull();
+    expect(
+      screen.queryByText('Choisis une heure fixe de coucher pendant trois soirs.'),
+    ).toBeNull();
 
     fireEvent.press(screen.getByTestId('coach-guidance-toggle'));
 
     expect(screen.getByTestId('coach-section-context_notes')).toBeTruthy();
+    expect(screen.getByTestId('coach-section-action_steps')).toBeTruthy();
+    // Both action_steps now live inside the « À faire maintenant » section.
+    expect(
+      screen.getByText('Choisis une heure fixe de coucher pendant trois soirs.'),
+    ).toBeTruthy();
     expect(screen.getByText('Prepare la bouteille d eau avant 21h.')).toBeTruthy();
+    // The `data_gaps` payload entries must never reach the UI.
+    expect(screen.queryByTestId('coach-section-data_gaps')).toBeNull();
+    expect(screen.queryByText('Zones sans assez de donnees')).toBeNull();
+    expect(screen.queryByText('Peu de donnees corps')).toBeNull();
+    expect(screen.queryByText('Pas de scan nutrition recent')).toBeNull();
     expect(screen.getByText('Reduire')).toBeTruthy();
   });
 
@@ -516,8 +524,6 @@ describe('CoachGuidanceCard', () => {
       />,
     );
 
-    expect(screen.getByTestId('coach-guidance-structured-teaser')).toBeTruthy();
-    expect(screen.getByText('Prochain repas: Bowl Boost Proteines')).toBeTruthy();
     expect(screen.queryByTestId('coach-section-meal_template')).toBeNull();
 
     fireEvent.press(screen.getByTestId('coach-guidance-toggle'));
@@ -534,5 +540,184 @@ describe('CoachGuidanceCard', () => {
     expect(screen.queryByText('meal_template')).toBeNull();
     expect(screen.queryByText('null')).toBeNull();
     expect(screen.queryByText('[empty array]')).toBeNull();
+  });
+
+  describe('actions are grouped under a single « À faire maintenant » section', () => {
+    const baseProps = {
+      variant: 'fresh' as const,
+      eyebrow: 'Conseil',
+      statusLabel: 'Recent',
+      personaKey: 'gentle_supportive' as const,
+      personaLabel: 'Personnalite du Coach',
+      personaValue: 'Noah',
+      personaAvatarFallbackLabel: 'NO',
+      personaAvatarHaloTint: '#88A7FF',
+      title: 'Plan du jour',
+      body: 'Fallback body.',
+      sectionLabels: { action_steps: 'A faire maintenant' },
+      disclaimerLabel: 'Rappel non diagnostique',
+      disclaimerPillLabel: 'Info, pas diagnostic',
+      disclaimer: 'Wellness guidance only.',
+      expandLabel: 'Lire la suite',
+      collapseLabel: 'Reduire',
+      continuationHintLabel: 'Contenu resume, touchez pour ouvrir',
+      defaultExpanded: true,
+    };
+
+    const baseContent = {
+      title: 'Plan du jour',
+      summary: 'Reste sur une seule priorite.',
+      context_notes: [],
+      priorities: [],
+      warnings: [],
+      encouragement: null,
+      primary_metric_delta: null,
+      data_gaps: [],
+      confidence: 'medium' as const,
+    };
+
+    it('renders every action numbered 01./02./03. in the same section, with no hero tile above', () => {
+      const rendered = render(
+        <CoachGuidanceCard
+          {...baseProps}
+          content={{
+            ...baseContent,
+            action_steps: [
+              "Bois 1,5L d'eau par jour.",
+              'Ajoute 20g de protéines à chaque repas.',
+              'Couche-toi avant 23h en semaine.',
+            ],
+          }}
+        />,
+      );
+
+      // No isolated hero tile anymore.
+      expect(screen.queryByTestId('coach-guidance-primary-action')).toBeNull();
+
+      // All actions are inside the single « À faire maintenant » section.
+      expect(screen.getByTestId('coach-section-action_steps')).toBeTruthy();
+      expect(screen.getByText("Bois 1,5L d'eau par jour.")).toBeTruthy();
+      expect(screen.getByText('Ajoute 20g de protéines à chaque repas.')).toBeTruthy();
+      expect(screen.getByText('Couche-toi avant 23h en semaine.')).toBeTruthy();
+
+      // Numbering starts at 01 and is monotonic ; no duplicate « 01 » prefix.
+      const json = JSON.stringify(rendered.toJSON());
+      expect((json.match(/"01"/g) ?? []).length).toBe(1);
+      expect((json.match(/"02"/g) ?? []).length).toBe(1);
+      expect((json.match(/"03"/g) ?? []).length).toBe(1);
+    });
+
+    it('LLM injects "01." inside the action_step text: parser strips it before render', () => {
+      const parsed = parseCoachStructuredContent({
+        title: 'Plan du jour',
+        summary: 'Reste sur une seule priorite.',
+        action_steps: [
+          "01. Bois 1,5L d'eau par jour.",
+          '2) Ajoute 20g de protéines à chaque repas.',
+          '- Couche-toi avant 23h en semaine.',
+        ],
+      });
+
+      expect(parsed.content?.action_steps).toEqual([
+        "Bois 1,5L d'eau par jour.",
+        'Ajoute 20g de protéines à chaque repas.',
+        'Couche-toi avant 23h en semaine.',
+      ]);
+    });
+
+    it('a single action still renders inside the « À faire maintenant » section (no hero tile)', () => {
+      render(
+        <CoachGuidanceCard
+          {...baseProps}
+          content={{
+            ...baseContent,
+            action_steps: ["Bois 1,5L d'eau par jour."],
+          }}
+        />,
+      );
+
+      expect(screen.queryByTestId('coach-guidance-primary-action')).toBeNull();
+      expect(screen.getByTestId('coach-section-action_steps')).toBeTruthy();
+      expect(screen.getByText("Bois 1,5L d'eau par jour.")).toBeTruthy();
+    });
+
+    it('multiple sections together keep stable 01./02./03. numbering and render every section', () => {
+      const rendered = render(
+        <CoachGuidanceCard
+          {...baseProps}
+          content={{
+            ...baseContent,
+            action_steps: ['First action.', 'Second action.', 'Third action.'],
+            context_notes: ['Note A', 'Note B'],
+            priorities: ['Priorite A'],
+            warnings: ['Vigilance A'],
+          }}
+        />,
+      );
+
+      // Hero tile is gone ; the action_steps section is the only place numbering appears.
+      expect(screen.queryByTestId('coach-guidance-primary-action')).toBeNull();
+      const json = JSON.stringify(rendered.toJSON());
+      expect((json.match(/"01"/g) ?? []).length).toBe(1);
+      expect((json.match(/"02"/g) ?? []).length).toBe(1);
+      expect((json.match(/"03"/g) ?? []).length).toBe(1);
+
+      // All sections render their content.
+      expect(screen.getByText('First action.')).toBeTruthy();
+      expect(screen.getByText('Second action.')).toBeTruthy();
+      expect(screen.getByText('Third action.')).toBeTruthy();
+      expect(screen.getByText('Note A')).toBeTruthy();
+      expect(screen.getByText('Priorite A')).toBeTruthy();
+      expect(screen.getByText('Vigilance A')).toBeTruthy();
+    });
+
+    it('never renders a « Zones sans assez de données » section, even when data_gaps is populated', () => {
+      render(
+        <CoachGuidanceCard
+          {...baseProps}
+          sectionLabels={{
+            action_steps: 'A faire maintenant',
+            data_gaps: 'Zones sans assez de donnees',
+          }}
+          content={{
+            ...baseContent,
+            action_steps: ['Une seule action.'],
+            data_gaps: [
+              'Les données de fibres et sucres du dernier scan ne sont pas disponibles.',
+              'Pas assez de scans corps pour conclure.',
+            ],
+          }}
+        />,
+      );
+
+      expect(screen.queryByTestId('coach-section-data_gaps')).toBeNull();
+      expect(screen.queryByText('Zones sans assez de donnees')).toBeNull();
+      expect(
+        screen.queryByText(
+          'Les données de fibres et sucres du dernier scan ne sont pas disponibles.',
+        ),
+      ).toBeNull();
+      expect(screen.queryByText('Pas assez de scans corps pour conclure.')).toBeNull();
+    });
+
+    it('does not surface the « Voir plus » toggle when only data_gaps would overflow', () => {
+      render(
+        <CoachGuidanceCard
+          {...baseProps}
+          defaultExpanded={false}
+          content={{
+            ...baseContent,
+            // The summary fits, no action_steps / notes / warnings / extended blocks ;
+            // only data_gaps is populated and it must not count as overflow content.
+            action_steps: [],
+            data_gaps: [
+              'Les données de fibres et sucres du dernier scan ne sont pas disponibles.',
+            ],
+          }}
+        />,
+      );
+
+      expect(screen.queryByTestId('coach-guidance-toggle')).toBeNull();
+    });
   });
 });

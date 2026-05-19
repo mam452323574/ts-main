@@ -140,7 +140,7 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
     },
     primaryButtonShell: {
       borderRadius: layout.ctaRadius,
-      overflow: 'hidden',
+      overflow: 'hidden', borderCurve: 'continuous',
     },
     primaryButton: {
       minHeight: layout.ctaMinHeight,
@@ -154,7 +154,7 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       shadowOffset: { width: 0, height: 10 },
       shadowOpacity: 0.18,
       shadowRadius: 24,
-      elevation: 4,
+      elevation: 4, borderCurve: 'continuous',
     },
     secondaryButton: {
       minHeight: layout.ctaMinHeight,
@@ -163,7 +163,7 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       paddingHorizontal: layout.blockPadding,
       paddingVertical: SPACING.md,
       alignItems: 'center',
-      justifyContent: 'center',
+      justifyContent: 'center', borderCurve: 'continuous',
     },
     primaryText: {
       fontSize: layout.bodyTextFontSize,

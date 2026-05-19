@@ -7,9 +7,13 @@
  */
 
 const allowedOriginsEnv = Deno.env.get('ALLOWED_ORIGINS') || '';
+// S-11 — Normalise en lowercase au load des env vars. RFC 6454 stipule que
+// le hostname Origin est case-insensitive. Sans normalisation, un déploiement
+// avec ALLOWED_ORIGINS=https://MyApp.com bloquerait les requêtes browser qui
+// envoient https://myapp.com (et vice-versa).
 const allowedOrigins = allowedOriginsEnv
   .split(',')
-  .map((origin) => origin.trim())
+  .map((origin) => origin.trim().toLowerCase())
   .filter((origin) => origin.length > 0);
 
 function isProductionEnvironment() {
@@ -32,7 +36,8 @@ function isOriginAllowed(origin: string): boolean {
     return true;
   }
 
-  return allowedOrigins.includes(origin);
+  // S-11 — comparison case-insensitive (l'allowlist est deja lowercase).
+  return allowedOrigins.includes(origin.toLowerCase());
 }
 
 // AUTH-VULN-04 fix: explicit cache-prevention on every Edge Function response.
@@ -68,12 +73,16 @@ export function getCorsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get('Origin') || '';
 
   // Audit S-08 : pas d'header Origin = appel non-browser (mobile natif, server-to-server,
-  // curl). On renvoie '*' sans 'Allow-Credentials' : les cookies cross-origin ne peuvent
-  // pas etre attaches a une reponse '*', et l'auth de l'app est portee par le bearer
+  // curl). On renvoie 'null' sans 'Allow-Credentials' : les cookies cross-origin ne peuvent
+  // pas etre attaches a une reponse 'null', et l'auth de l'app est portee par le bearer
   // token JWT (header Authorization) - aucune CSRF cookie-based exploitable ici.
+  // S-10 — au lieu de '*' (wildcard), on retourne 'null' qui est strictement plus
+  // restrictif : un browser legitime sans header Origin (rare, ex: <img>) recoit
+  // toujours la reponse via fetch no-cors mais ne peut pas la lire ; le mobile
+  // natif ignore CORS de toute facon. Pas de regression UX, posture renforcee.
   const baseHeaders: Record<string, string> = !origin
     ? {
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': 'null',
         'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
       }

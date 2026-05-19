@@ -75,7 +75,7 @@ const createStyles = (colors: any, isDark: boolean) => {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: BORDER_RADIUS.button,
+    borderRadius: BORDER_RADIUS.button, borderCurve: 'continuous',
   },
   containerSmall: {
     paddingVertical: SPACING.xs,

@@ -53,7 +53,7 @@ const createStyles = (colors: any) =>
       borderRadius: BORDER_RADIUS.full,
       alignItems: 'center',
       justifyContent: 'center',
-      borderWidth: 1,
+      borderWidth: 1, borderCurve: 'continuous',
     },
     pillDefault: {
       minHeight: 38,

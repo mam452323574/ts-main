@@ -113,7 +113,7 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       paddingVertical: layout.isCompact ? 4 : 5,
       borderRadius: 9999,
       borderWidth: 1,
-      maxWidth: '100%',
+      maxWidth: '100%', borderCurve: 'continuous',
     },
     iconSlot: {
       flexShrink: 0,

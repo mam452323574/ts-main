@@ -11,6 +11,12 @@
     "coach-screen-snapshot",
     "coach-generate-response",
     "coach-sync-profile-memory",
+    "coach-start-conversation",
+    "coach-send-message",
+    "coach-end-conversation",
+    "coach-archive-conversation",
+    "coach-conversation-quota-status",
+    "coach-conversations-list",
     "social-reserve-upload",
     "social-create-post",
     "social-delete-post",
@@ -24,7 +30,6 @@
     "social-report-content",
     "social-follow-author",
     "social-hide-author",
-    "social-set-save",
     "social-list-moderation-queue",
     "social-moderate-content",
     "social-reclassify-post",
@@ -41,6 +46,8 @@
     "cleanup-orphan-user",
     "social-admin-moderate-user",
     "social-admin-eradicate-user",
-    "social-admin-adjust-post-reactions"
+    "social-admin-adjust-post-reactions",
+    "admin-whoami",
+    "purge-soft-deleted-social-assets"
   ]
 }

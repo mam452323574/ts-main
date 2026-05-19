@@ -100,7 +100,7 @@ const createStyles = (_colors: any) =>
       paddingVertical: SPACING.xs + 1,
       borderRadius: BORDER_RADIUS.full,
       alignSelf: 'flex-start',
-      maxWidth: '100%',
+      maxWidth: '100%', borderCurve: 'continuous',
     },
     label: {
       fontSize: 11,

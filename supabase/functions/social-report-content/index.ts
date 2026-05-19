@@ -181,7 +181,7 @@ Deno.serve(async (req: Request) => {
         reason_code: requestBody.reason_code,
         details: requestBody.details ?? null,
         report_count_24h: reportCount24h,
-        auto_hidden: shouldAutoHideForReports(reportCount24h, 3),
+        auto_hidden: shouldAutoHideForReports(reportCount24h),
       });
 
       if (webhookResult.ok) {

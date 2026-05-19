@@ -11,6 +11,7 @@ import {
   safeOpenExternalUrl,
   TRUSTED_SHOP_URL_HOSTS,
 } from '@/utils/urlSecurity';
+import { Squircle } from '@/components/Squircle';
 
 interface ProductCardProps {
   product: Product;
@@ -39,18 +40,18 @@ export function ProductCard({ product }: ProductCardProps) {
 
   return (
     <TouchableOpacity onPress={handlePress} activeOpacity={0.7}>
-      <View style={styles.container}>
-        <View style={styles.imageContainer}>
+      <Squircle style={styles.container}>
+        <Squircle style={styles.imageContainer}>
           {safeImageUri ? (
             <OptimizedImage source={{ uri: safeImageUri }} style={styles.image} />
           ) : null}
-        </View>
+        </Squircle>
         <View style={styles.content}>
           <Text style={styles.name} numberOfLines={2}>{product.name}</Text>
           <View style={styles.benefitsContainer}>
             {displayBenefits.map((benefit, index) => (
               <View key={index} style={styles.benefitRow}>
-                <View style={styles.bulletDot} />
+                <Squircle style={styles.bulletDot} />
                 <Text style={styles.benefitText} numberOfLines={1}>{benefit}</Text>
               </View>
             ))}
@@ -59,7 +60,7 @@ export function ProductCard({ product }: ProductCardProps) {
         <View style={styles.arrowContainer}>
           <ChevronRight color={colors.grayMedium || '#C7C7CC'} size={20} strokeWidth={2} />
         </View>
-      </View>
+      </Squircle>
     </TouchableOpacity>
   );
 }
@@ -72,14 +73,14 @@ const createStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: SPACING.md,
-    ...SHADOWS.card,
+    ...SHADOWS.card, borderCurve: 'continuous',
   },
   imageContainer: {
     width: 72,
     height: 72,
     borderRadius: BORDER_RADIUS.md,
     overflow: 'hidden',
-    backgroundColor: colors.grayLight,
+    backgroundColor: colors.grayLight, borderCurve: 'continuous',
   },
   image: {
     width: '100%',
@@ -110,7 +111,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primary, borderCurve: 'continuous',
   },
   benefitText: {
     fontSize: SIZES.text12,

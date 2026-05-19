@@ -23,8 +23,6 @@ export type AnalyticsEventName =
   | 'social_author_follow_toggled'
   | 'social_hide_author_failed'
   | 'social_author_hide_toggled'
-  | 'social_post_save_toggled'
-  | 'social_post_save_failed'
   | 'coach_opened'
   | 'coach_premium_unlock_tapped'
   | 'coach_persona_locked_tapped'

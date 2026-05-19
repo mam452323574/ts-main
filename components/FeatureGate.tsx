@@ -7,6 +7,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { FONT_WEIGHTS, SIZES, SPACING, BORDER_RADIUS, SHADOWS, withAlpha } from '@/constants/theme';
 import { hasPremiumAccessFromProfile } from '@/utils/subscription';
+import { Squircle } from '@/components/Squircle';
 
 interface FeatureGateProps {
   featureKey: string;
@@ -45,12 +46,12 @@ export function FeatureGate({
   return (
     <View style={styles.container}>
       <View style={styles.lockContainer}>
-        <View style={styles.iconBackground}>
+        <Squircle style={styles.iconBackground}>
           <Lock color={colors.primary} size={48} />
-        </View>
-        <View style={styles.crownBadge}>
+        </Squircle>
+        <Squircle style={styles.crownBadge}>
           <Crown color={colors.background} size={20} fill={colors.background} />
-        </View>
+        </Squircle>
       </View>
 
       <View style={styles.content}>
@@ -111,7 +112,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: withAlpha(colors.primary, 0.28),
-    ...SHADOWS.card,
+    ...SHADOWS.card, borderCurve: 'continuous',
   },
   crownBadge: {
     position: 'absolute',
@@ -124,7 +125,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
-    borderColor: colors.background,
+    borderColor: colors.background, borderCurve: 'continuous',
   },
   title: {
     fontSize: SIZES.lg,
@@ -156,7 +157,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     gap: SPACING.sm,
     borderWidth: 1,
     borderColor: withAlpha(colors.white, 0.2),
-    ...SHADOWS.button,
+    ...SHADOWS.button, borderCurve: 'continuous',
   },
   upgradeButtonText: {
     fontSize: SIZES.lg,

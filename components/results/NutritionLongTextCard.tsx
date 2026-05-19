@@ -19,6 +19,7 @@ import {
 } from '@/utils/resultLayout';
 import type { ResultLongTextSectionViewModel } from '@/utils/resultViewModels';
 import type { ResolvedResultItemTheme } from '@/utils/resultVisualTheme';
+import { Squircle } from '@/components/Squircle';
 
 interface NutritionLongTextCardProps {
   section: ResultLongTextSectionViewModel;
@@ -71,7 +72,7 @@ export function NutritionLongTextCard({
       ]}
     >
       <View style={styles.headerRow}>
-        <View
+        <Squircle
           style={[
             styles.iconWrap,
             {
@@ -85,7 +86,7 @@ export function NutritionLongTextCard({
             size={layout.isCompact ? 17 : 18}
             token={section.icon}
           />
-        </View>
+        </Squircle>
         <Text
           {...RESULT_TEXT_PROPS}
           numberOfLines={2}
@@ -97,7 +98,7 @@ export function NutritionLongTextCard({
 
       {isLocked || isLoading ? (
         <View style={styles.lockedContent}>
-          <View
+          <Squircle
             testID={`nutrition-long-section-placeholder-${section.id}`}
             style={[
               styles.placeholder,
@@ -128,7 +129,7 @@ export function NutritionLongTextCard({
                 },
               ]}
             />
-          </View>
+          </Squircle>
           <View
             style={[
               styles.statusTag,
@@ -276,7 +277,7 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       borderWidth: 1,
       paddingHorizontal: layout.blockPadding,
       paddingVertical: layout.isCompact ? SPACING.md : SPACING.lg,
-      gap: layout.isCompact ? SPACING.sm : SPACING.md,
+      gap: layout.isCompact ? SPACING.sm : SPACING.md, borderCurve: 'continuous',
     },
     headerRow: {
       flexDirection: 'row',
@@ -291,7 +292,7 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1,
-      flexShrink: 0,
+      flexShrink: 0, borderCurve: 'continuous',
     },
     title: {
       flex: 1,
@@ -311,7 +312,7 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       borderRadius: 9999,
       paddingHorizontal: SPACING.sm,
       paddingVertical: layout.isCompact ? 4 : 5,
-      maxWidth: '100%',
+      maxWidth: '100%', borderCurve: 'continuous',
     },
     tagText: {
       fontSize: SIZES.xs,
@@ -329,7 +330,7 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       borderWidth: 1,
       borderRadius: 9999,
       paddingHorizontal: SPACING.md,
-      paddingVertical: layout.isCompact ? 6 : 7,
+      paddingVertical: layout.isCompact ? 6 : 7, borderCurve: 'continuous',
     },
     expandText: {
       fontSize: SIZES.xs,
@@ -346,17 +347,17 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       borderRadius: layout.standardRadius - 6,
       paddingHorizontal: SPACING.md,
       paddingVertical: SPACING.sm,
-      gap: SPACING.xs,
+      gap: SPACING.xs, borderCurve: 'continuous',
     },
     placeholderLine: {
       width: '82%',
       height: layout.isCompact ? 11 : 12,
-      borderRadius: 9999,
+      borderRadius: 9999, borderCurve: 'continuous',
     },
     placeholderLineShort: {
       width: '56%',
       height: layout.isCompact ? 10 : 11,
-      borderRadius: 9999,
+      borderRadius: 9999, borderCurve: 'continuous',
     },
     statusTag: {
       flexDirection: 'row',
@@ -365,7 +366,7 @@ const createStyles = (layout: ReturnType<typeof getResultLayoutState>) =>
       borderRadius: 9999,
       borderWidth: 1,
       paddingHorizontal: SPACING.sm,
-      paddingVertical: layout.isCompact ? 3 : 4,
+      paddingVertical: layout.isCompact ? 3 : 4, borderCurve: 'continuous',
     },
     statusText: {
       fontSize: SIZES.xs,

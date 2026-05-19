@@ -2,20 +2,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Check } from 'lucide-react-native';
 
-import { ChefModeIcon } from '@/components/fridge/ChefModeIcon';
 import { OptimizedImage } from '@/components/OptimizedImage';
 import {
-  BORDER_RADIUS,
   FONT_WEIGHTS,
-  SHADOWS,
   SIZES,
   SPACING,
-  mixColors,
   withAlpha,
 } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { FridgeChefPersona } from '@/shared/fridgeChefPersonas';
-import { resolveChefSurfaceColors } from '@/utils/scanFlowVisualTheme';
+import { Squircle } from '@/components/Squircle';
 
 interface FridgeChefPersonaCardProps {
   persona: FridgeChefPersona;
@@ -24,7 +20,6 @@ interface FridgeChefPersonaCardProps {
   description: string;
   selected: boolean;
   disabled?: boolean;
-  compact?: boolean;
   onPress: () => void;
   testID?: string;
 }
@@ -36,19 +31,11 @@ export function FridgeChefPersonaCard({
   description,
   selected,
   disabled = false,
-  compact = false,
   onPress,
   testID,
 }: FridgeChefPersonaCardProps) {
-  const { colors: themeColors, isDark } = useTheme();
-  const colors = useMemo(
-    () => resolveChefSurfaceColors(themeColors, isDark),
-    [isDark, themeColors],
-  );
-  const styles = useMemo(
-    () => createStyles(colors, compact, isDark),
-    [colors, compact, isDark],
-  );
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => {
@@ -65,59 +52,22 @@ export function FridgeChefPersonaCard({
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,
-        {
-          borderColor: selected
-            ? withAlpha(accentColor, 0.64)
-            : withAlpha(accentColor, isDark ? 0.26 : 0.2),
-          backgroundColor: selected
-            ? mixColors(colors.cardBackground, accentColor, isDark ? 0.2 : 0.1)
-            : isDark
-              ? withAlpha(colors.white, 0.075)
-              : mixColors(colors.cardBackground, accentColor, 0.04),
-          shadowColor: selected ? accentColor : '#000000',
-        },
         selected ? styles.cardSelected : null,
         pressed && !disabled ? styles.cardPressed : null,
         disabled ? styles.cardDisabled : null,
       ]}
       testID={testID}
     >
-      <View
-        pointerEvents="none"
-        style={[
-          styles.accentWash,
-          { backgroundColor: withAlpha(accentColor, selected ? 0.3 : 0.16) },
-        ]}
-      />
-
-      <View style={styles.avatarShell}>
-        <View
-          style={[
-            styles.avatarHalo,
-            { backgroundColor: withAlpha(accentColor, selected ? 0.4 : 0.22) },
-          ]}
-        />
-        <View
-          style={[
-            styles.avatarRing,
-            {
-              borderColor: selected
-                ? withAlpha(isDark ? colors.white : colors.cardBackground, 0.34)
-                : withAlpha(accentColor, isDark ? 0.34 : 0.24),
-              backgroundColor: withAlpha(accentColor, selected ? 0.2 : 0.13),
-            },
-          ]}
-        >
+      <Squircle style={styles.avatarShell}>
+        <Squircle style={styles.avatarHalo} />
+        <Squircle style={styles.avatarRing}>
           {imageFailed ? (
-            <View
-              style={[
-                styles.avatarFallback,
-                { backgroundColor: withAlpha(accentColor, 0.24) },
-              ]}
+            <Squircle
+              style={styles.avatarFallback}
               testID={testID ? `${testID}-fallback` : undefined}
             >
               <Text style={styles.avatarFallbackText}>{persona.fallbackLabel}</Text>
-            </View>
+            </Squircle>
           ) : (
             <OptimizedImage
               source={persona.imageSource}
@@ -128,24 +78,25 @@ export function FridgeChefPersonaCard({
               testID={testID ? `${testID}-image` : undefined}
             />
           )}
-        </View>
-      </View>
+        </Squircle>
+      </Squircle>
 
       <View style={styles.copy}>
-        <View style={styles.titleRow}>
-          <Text numberOfLines={1} style={styles.title}>
-            {title}
-          </Text>
-        </View>
-        <Text numberOfLines={compact ? 2 : 1} style={styles.description}>
+        <Text numberOfLines={1} style={styles.title}>
+          {title}
+        </Text>
+        <Text numberOfLines={2} style={styles.description}>
           {description}
         </Text>
         <View
           style={[
             styles.labelPill,
-            { backgroundColor: withAlpha(accentColor, selected ? 0.3 : 0.17) },
+            { backgroundColor: withAlpha(accentColor, isDark ? 0.16 : 0.12) },
           ]}
         >
+          <Squircle
+            style={[styles.labelDot, { backgroundColor: accentColor }]}
+          />
           <Text numberOfLines={1} style={styles.labelText}>
             {label}
           </Text>
@@ -154,135 +105,144 @@ export function FridgeChefPersonaCard({
 
       <View
         style={[
-          styles.statusBadge,
-          {
-            backgroundColor: selected
-              ? accentColor
-              : withAlpha(accentColor, 0.14),
-            borderColor: selected
-              ? withAlpha(colors.white, 0.22)
-              : withAlpha(accentColor, 0.2),
-          },
+          styles.radio,
+          selected ? styles.radioSelected : null,
         ]}
       >
         {selected ? (
-          <Check color="#FFFFFF" size={compact ? 17 : 15} strokeWidth={3} />
-        ) : (
-          <ChefModeIcon
-            mode={persona.mode}
-            color={mixColors(colors.primaryText, accentColor, isDark ? 0.22 : 0.56)}
-            size={compact ? 18 : 16}
-            strokeWidth={2.5}
-          />
-        )}
+          <Check color="#FFFFFF" size={15} strokeWidth={3} />
+        ) : null}
       </View>
     </Pressable>
   );
 }
 
-const createStyles = (colors: any, compact: boolean, isDark: boolean) =>
+const createStyles = (colors: any, isDark: boolean) =>
   StyleSheet.create({
     card: {
-      position: 'relative',
-      minHeight: compact ? 98 : 78,
       width: '100%',
-      borderRadius: 18,
+      minHeight: 104,
+      borderRadius: 20,
       borderWidth: 1,
-      overflow: 'hidden',
+      borderColor: isDark
+        ? withAlpha(colors.white, 0.08)
+        : withAlpha(colors.primaryText, 0.08),
+      backgroundColor: isDark
+        ? withAlpha(colors.white, 0.05)
+        : colors.cardBackground,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: compact ? SPACING.md : SPACING.sm,
-      paddingVertical: compact ? SPACING.sm + 2 : SPACING.sm,
-      paddingLeft: compact ? SPACING.md : SPACING.sm + 2,
-      paddingRight: compact ? SPACING.sm + 2 : SPACING.sm,
-      ...SHADOWS.card,
+      gap: SPACING.md + 2,
+      paddingVertical: 14,
+      paddingHorizontal: 14,
+      shadowColor: '#000000',
+      shadowOpacity: isDark ? 0 : 0.04,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: isDark ? 0 : 1, borderCurve: 'continuous',
     },
     cardSelected: {
-      shadowOpacity: 0.3,
-      shadowRadius: 18,
-      shadowOffset: { width: 0, height: 10 },
-      elevation: 5,
+      borderColor: withAlpha(colors.primary, isDark ? 0.6 : 0.55),
+      backgroundColor: isDark
+        ? withAlpha(colors.primary, 0.08)
+        : withAlpha(colors.primary, 0.05),
+      shadowColor: colors.primary,
+      shadowOpacity: isDark ? 0.28 : 0.18,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 4,
     },
     cardPressed: {
       transform: [{ scale: 0.985 }],
     },
     cardDisabled: {
-      opacity: 0.66,
-    },
-    accentWash: {
-      position: 'absolute',
-      top: compact ? -36 : -26,
-      right: compact ? -22 : -18,
-      width: compact ? 152 : 116,
-      height: compact ? 152 : 116,
-      borderRadius: compact ? 76 : 58,
+      opacity: 0.5,
     },
     avatarShell: {
-      width: compact ? 72 : 58,
-      height: compact ? 72 : 58,
-      borderRadius: compact ? 36 : 29,
+      width: 76,
+      height: 76,
+      borderRadius: 38,
       alignItems: 'center',
-      justifyContent: 'center',
+      justifyContent: 'center', borderCurve: 'continuous',
     },
     avatarHalo: {
       ...StyleSheet.absoluteFillObject,
-      borderRadius: compact ? 36 : 29,
-      transform: [{ scale: compact ? 1.08 : 1.06 }],
+      borderRadius: 38,
+      backgroundColor: isDark
+        ? withAlpha(colors.white, 0.06)
+        : withAlpha(colors.primaryText, 0.04),
+      transform: [{ scale: 1.06 }], borderCurve: 'continuous',
     },
     avatarRing: {
-      width: compact ? 66 : 52,
-      height: compact ? 66 : 52,
-      borderRadius: compact ? 33 : 26,
+      width: 72,
+      height: 72,
+      borderRadius: 36,
       borderWidth: 1,
+      borderColor: isDark
+        ? withAlpha(colors.white, 0.1)
+        : withAlpha(colors.primaryText, 0.06),
+      backgroundColor: isDark
+        ? withAlpha(colors.white, 0.04)
+        : withAlpha(colors.primaryText, 0.02),
       overflow: 'hidden',
       alignItems: 'center',
-      justifyContent: 'center',
+      justifyContent: 'center', borderCurve: 'continuous',
     },
     avatarImage: {
-      width: compact ? 64 : 50,
-      height: compact ? 64 : 50,
-      borderRadius: compact ? 32 : 25,
-      backgroundColor: colors.surfaceMuted,
+      width: 70,
+      height: 70,
+      borderRadius: 35, borderCurve: 'continuous',
     },
     avatarFallback: {
-      width: compact ? 64 : 50,
-      height: compact ? 64 : 50,
-      borderRadius: compact ? 32 : 25,
+      width: 70,
+      height: 70,
+      borderRadius: 35,
       alignItems: 'center',
       justifyContent: 'center',
+      backgroundColor: isDark
+        ? withAlpha(colors.white, 0.1)
+        : withAlpha(colors.primaryText, 0.08), borderCurve: 'continuous',
     },
     avatarFallbackText: {
-      color: colors.white,
-      fontSize: SIZES.text12,
+      color: colors.primaryText,
+      fontSize: SIZES.text14,
       fontWeight: FONT_WEIGHTS.bold,
       letterSpacing: 0.8,
     },
     copy: {
       flex: 1,
       minWidth: 0,
-      gap: compact ? 5 : 4,
-    },
-    titleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      minWidth: 0,
+      gap: 4,
     },
     title: {
-      flexShrink: 1,
       color: colors.primaryText,
-      fontSize: compact ? SIZES.text16 + 1 : SIZES.text14 + 1,
-      lineHeight: compact ? 21 : 19,
+      fontSize: 17,
+      lineHeight: 21,
       fontWeight: FONT_WEIGHTS.bold,
+      letterSpacing: -0.2,
+      includeFontPadding: false,
+    },
+    description: {
+      color: colors.secondaryText,
+      fontSize: SIZES.text12 + 1,
+      lineHeight: 17,
       includeFontPadding: false,
     },
     labelPill: {
       alignSelf: 'flex-start',
-      maxWidth: compact ? 134 : 104,
-      paddingHorizontal: compact ? SPACING.sm : SPACING.xs + 2,
-      paddingVertical: compact ? 3 : 2,
-      borderRadius: BORDER_RADIUS.full,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: withAlpha(colors.primaryText, isDark ? 0.14 : 0.08),
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      maxWidth: '100%',
+      paddingHorizontal: 9,
+      paddingVertical: 4,
+      marginTop: 2,
+      borderRadius: 9999, borderCurve: 'continuous',
+    },
+    labelDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3, borderCurve: 'continuous',
     },
     labelText: {
       color: colors.primaryText,
@@ -290,21 +250,23 @@ const createStyles = (colors: any, compact: boolean, isDark: boolean) =>
       lineHeight: 12,
       fontWeight: FONT_WEIGHTS.bold,
       textTransform: 'uppercase',
-      letterSpacing: 0.4,
+      letterSpacing: 0.6,
       includeFontPadding: false,
     },
-    description: {
-      color: colors.secondaryText,
-      fontSize: compact ? SIZES.text12 + 1 : SIZES.text12,
-      lineHeight: compact ? 17 : 15,
-      includeFontPadding: false,
-    },
-    statusBadge: {
-      width: compact ? 34 : 28,
-      height: compact ? 34 : 28,
-      borderRadius: compact ? 17 : 14,
+    radio: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      borderWidth: 1.5,
+      borderColor: isDark
+        ? withAlpha(colors.white, 0.22)
+        : withAlpha(colors.primaryText, 0.18),
+      backgroundColor: 'transparent',
       alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 1,
+      justifyContent: 'center', borderCurve: 'continuous',
+    },
+    radioSelected: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primary,
     },
   });

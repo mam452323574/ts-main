@@ -10,6 +10,7 @@ import {
   withAlpha,
 } from '@/constants/theme';
 import type { CoachPersonaVisual } from '@/shared/coachPersonaVisuals';
+import { Squircle } from '@/components/Squircle';
 
 interface CoachPersonaAvatarProps {
   imageSource?: CoachPersonaVisual['imageSource'];
@@ -81,13 +82,13 @@ export function CoachPersonaAvatar({
   const imageScale = resolvedEmphasis === 'featured' ? 1.03 : 1;
 
   return (
-    <View
+    <Squircle
       style={[
         styles.shell,
         {
           width: shellSize,
           height: shellSize,
-          borderRadius: shellSize / 2,
+          borderRadius: shellSize / 2, borderCurve: 'continuous',
         },
       ]}
       testID={testID}
@@ -115,7 +116,7 @@ export function CoachPersonaAvatar({
               ringTintStrength,
             ),
             borderColor: ringBorderColor,
-            borderWidth: ringBorderWidth,
+            borderWidth: ringBorderWidth, borderCurve: 'continuous',
           },
           dimmed && styles.ringDimmed,
         ]}
@@ -138,7 +139,7 @@ export function CoachPersonaAvatar({
             testID={testID ? `${testID}-image` : undefined}
           />
         ) : (
-          <View
+          <Squircle
             style={[
               styles.fallback,
               {
@@ -149,7 +150,7 @@ export function CoachPersonaAvatar({
                   colors.cardBackground,
                   haloTint,
                   fallbackTintStrength,
-                ),
+                ), borderCurve: 'continuous',
               },
             ]}
             testID={testID ? `${testID}-fallback` : undefined}
@@ -165,10 +166,10 @@ export function CoachPersonaAvatar({
             >
               {fallbackLabel}
             </Text>
-          </View>
+          </Squircle>
         )}
       </View>
-    </View>
+    </Squircle>
   );
 }
 
@@ -181,7 +182,7 @@ const createStyles = (colors: any) =>
     },
     halo: {
       ...StyleSheet.absoluteFillObject,
-      borderRadius: 999,
+      borderRadius: 999, borderCurve: 'continuous',
     },
     ring: {
       alignItems: 'center',

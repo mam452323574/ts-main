@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -23,6 +23,7 @@ import {
   mixColors,
   withAlpha,
 } from '@/constants/theme';
+import { Squircle } from '@/components/Squircle';
 
 interface FridgeScanIllustrationProps {
   size: number;
@@ -123,7 +124,7 @@ export function FridgeScanIllustration({
   });
 
   return (
-    <View
+    <Squircle
       style={[styles.container, { width: size, height: size }]}
       accessible={false}
       pointerEvents="none"
@@ -243,7 +244,7 @@ export function FridgeScanIllustration({
         />
       </Animated.View>
 
-    </View>
+    </Squircle>
   );
 }
 
@@ -251,16 +252,16 @@ const styles = StyleSheet.create({
   container: {
     position: 'relative',
     overflow: 'hidden',
-    borderRadius: BORDER_RADIUS.lg + 6,
+    borderRadius: BORDER_RADIUS.lg + 6, borderCurve: 'continuous',
   },
   scanLineWrap: {
     position: 'absolute',
     height: 2,
-    borderRadius: 1,
+    borderRadius: 1, borderCurve: 'continuous',
   },
   scanLineGradient: {
     flex: 1,
     height: 2,
-    borderRadius: 1,
+    borderRadius: 1, borderCurve: 'continuous',
   },
 });

@@ -9,11 +9,38 @@ import { DARK_COLORS, LIGHT_COLORS } from '@/constants/theme';
 
 const mockLoadPurchasesModule = jest.fn();
 const mockGetRuntimeCapabilities = jest.fn();
-const mockGetRuntimeConfig = jest.fn();
 const mockSetLogLevel = jest.fn();
 const mockConfigure = jest.fn();
 const mockLogRuntimeDecision = jest.fn();
 const mockUsePathname = jest.fn(() => '/');
+
+type MockRuntimeConfig = {
+  supabaseUrl: string;
+  supabaseAnonKey: string;
+  revenueCatIosApiKey: string | null;
+  revenueCatAndroidApiKey: string | null;
+  aptabaseAppKey: string | null;
+  aptabaseHost: string | null;
+};
+
+var mockRuntimeConfigValue: MockRuntimeConfig | undefined;
+
+function mockGetRuntimeConfig(): MockRuntimeConfig {
+  return (
+    mockRuntimeConfigValue ?? {
+      supabaseUrl: 'https://example.supabase.co',
+      supabaseAnonKey: 'anon-key',
+      revenueCatIosApiKey: 'ios_public_key',
+      revenueCatAndroidApiKey: 'android_public_key',
+      aptabaseAppKey: null,
+      aptabaseHost: null,
+    }
+  );
+}
+
+function setMockRuntimeConfig(value: MockRuntimeConfig) {
+  mockRuntimeConfigValue = value;
+}
 
 type MockThemeValue = {
   theme: 'light' | 'dark';
@@ -97,6 +124,10 @@ jest.mock('@/hooks/useProtectedRoute', () => ({
   }),
 }));
 
+jest.mock('@/hooks/useBootPrefetch', () => ({
+  useBootPrefetch: jest.fn(),
+}));
+
 jest.mock('@/contexts/AuthContext', () => ({
   AuthProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
@@ -178,7 +209,7 @@ describe('RootLayout', () => {
       canUseLocalNotifications: false,
       canRegisterForPushNotifications: false,
     });
-    mockGetRuntimeConfig.mockReturnValue({
+    setMockRuntimeConfig({
       supabaseUrl: 'https://example.supabase.co',
       supabaseAnonKey: 'anon-key',
       revenueCatIosApiKey: 'ios_public_key',
@@ -277,7 +308,7 @@ describe('RootLayout', () => {
       canUseLocalNotifications: true,
       canRegisterForPushNotifications: true,
     });
-    mockGetRuntimeConfig.mockReturnValue({
+    setMockRuntimeConfig({
       supabaseUrl: 'https://example.supabase.co',
       supabaseAnonKey: 'anon-key',
       revenueCatIosApiKey: 'ios_public_key',
@@ -340,7 +371,7 @@ describe('RootLayout', () => {
     const screen = render(<RootLayout />);
 
     await waitFor(() => {
-      expect(mockSetSystemBackgroundColorAsync).toHaveBeenCalledWith(DARK_COLORS.background);
+      expect(mockSetSystemBackgroundColorAsync).toHaveBeenCalledWith(DARK_COLORS.cardBackground);
       expect(mockSetNavigationBarButtonStyleAsync).toHaveBeenCalledWith('light');
     });
 
@@ -516,12 +547,24 @@ describe('RootLayout', () => {
     const fridgeScanScreenProps = stackScreenCalls.find(
       ([props]) => props.name === 'scan-frigo'
     )?.[0];
+    const scanPreviewScreenProps = stackScreenCalls.find(
+      ([props]) => props.name === 'scan-preview'
+    )?.[0];
+    const scanResultScreenProps = stackScreenCalls.find(
+      ([props]) => props.name === 'scan-result'
+    )?.[0];
+    const superScanResultScreenProps = stackScreenCalls.find(
+      ([props]) => props.name === 'super-scan-result'
+    )?.[0];
 
     expect(coachScreenProps).toBeDefined();
     expect(analyticsScreenProps).toBeDefined();
     expect(coachHistoryScreenProps).toBeDefined();
     expect(adminSocialModerationScreenProps).toBeDefined();
     expect(fridgeScanScreenProps).toBeDefined();
+    expect(scanPreviewScreenProps).toBeDefined();
+    expect(scanResultScreenProps).toBeDefined();
+    expect(superScanResultScreenProps).toBeDefined();
     expect(adminSocialModerationScreenProps?.options).toEqual(
       expect.objectContaining({
         contentStyle: expect.objectContaining({
@@ -593,6 +636,34 @@ describe('RootLayout', () => {
       expect.objectContaining({
         contentStyle: expect.objectContaining({
           backgroundColor: '#000000',
+        }),
+      })
+    );
+    expect(scanPreviewScreenProps?.options).toEqual(
+      expect.objectContaining({
+        presentation: 'fullScreenModal',
+        contentStyle: expect.objectContaining({
+          backgroundColor: '#000000',
+        }),
+      })
+    );
+    expect(scanResultScreenProps?.options).toEqual(
+      expect.objectContaining({
+        presentation: 'transparentModal',
+        gestureEnabled: false,
+        fullScreenGestureEnabled: false,
+        contentStyle: expect.objectContaining({
+          backgroundColor: 'transparent',
+        }),
+      })
+    );
+    expect(superScanResultScreenProps?.options).toEqual(
+      expect.objectContaining({
+        presentation: 'transparentModal',
+        gestureEnabled: false,
+        fullScreenGestureEnabled: false,
+        contentStyle: expect.objectContaining({
+          backgroundColor: 'transparent',
         }),
       })
     );

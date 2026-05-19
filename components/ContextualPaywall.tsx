@@ -16,6 +16,7 @@ import {
 import { buildPremiumHealthPalette, type PremiumHealthPalette } from '@/constants/premiumHealth';
 import { Button } from '@/components/Button';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { Squircle } from '@/components/Squircle';
 
 interface ContextualPaywallProps {
   visible: boolean;
@@ -85,20 +86,20 @@ export const ContextualPaywall: React.FC<ContextualPaywallProps> = ({
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
-            <View style={styles.shell} testID="contextual-paywall-shell">
-              <View style={styles.surface} testID="contextual-paywall-surface">
+            <Squircle style={styles.shell} testID="contextual-paywall-shell">
+              <Squircle style={styles.surface} testID="contextual-paywall-surface">
                 <TouchableOpacity style={styles.closeButton} onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                   <X color={colors.gray} size={20} />
                 </TouchableOpacity>
 
                 <View style={styles.heroWrap}>
-                  <View style={styles.iconContainer}>
+                  <Squircle style={styles.iconContainer}>
                     {icon || <Crown color={colors.gold} size={31} />}
-                  </View>
+                  </Squircle>
                   {badgeIcon !== null ? (
-                    <View style={styles.sparkleBadge} testID="contextual-paywall-badge">
+                    <Squircle style={styles.sparkleBadge} testID="contextual-paywall-badge">
                       {badgeIcon ?? <Sparkles color={colors.gold} size={14} />}
-                    </View>
+                    </Squircle>
                   ) : null}
                 </View>
 
@@ -119,18 +120,18 @@ export const ContextualPaywall: React.FC<ContextualPaywallProps> = ({
                 ) : null}
 
                 {bulletPoints && bulletPoints.length > 0 ? (
-                  <View style={styles.bulletList}>
+                  <Squircle style={styles.bulletList}>
                     {bulletPoints.map((point, index) => (
                       <View key={index} style={styles.bulletItem}>
-                        <View style={styles.bulletIconPill}>
+                        <Squircle style={styles.bulletIconPill}>
                           <Check color={colors.primary} size={13} strokeWidth={3} />
-                        </View>
+                        </Squircle>
                         <Text {...TEXT_PROPS} style={styles.bulletText}>
                           {point}
                         </Text>
                       </View>
                     ))}
-                  </View>
+                  </Squircle>
                 ) : null}
 
                 <View style={styles.footer}>
@@ -153,8 +154,8 @@ export const ContextualPaywall: React.FC<ContextualPaywallProps> = ({
                     </Text>
                   </TouchableOpacity>
                 </View>
-              </View>
-            </View>
+              </Squircle>
+            </Squircle>
           </TouchableWithoutFeedback>
         </View>
       </TouchableWithoutFeedback>
@@ -218,7 +219,7 @@ const createStyles = (
             shadowRadius: 24,
             elevation: 11,
           })),
-      position: 'relative',
+      position: 'relative', borderCurve: 'continuous',
     },
     surface: {
       borderRadius: BORDER_RADIUS.hero,
@@ -236,7 +237,7 @@ const createStyles = (
           ? (obsidianSurface?.borderColor ?? premiumHealth.borderStrong)
           : premiumHealth.borderSubtle,
       overflow: 'hidden',
-      position: 'relative',
+      position: 'relative', borderCurve: 'continuous',
     },
     closeButton: {
       position: 'absolute',
@@ -251,7 +252,7 @@ const createStyles = (
         ? premiumHealth.secondaryActionBackground
         : premiumHealth.secondaryActionBackground,
       borderWidth: 1,
-      borderColor: premiumHealth.secondaryActionBorder,
+      borderColor: premiumHealth.secondaryActionBorder, borderCurve: 'continuous',
     },
     heroWrap: {
       alignItems: 'center',
@@ -265,7 +266,7 @@ const createStyles = (
       justifyContent: 'center',
       backgroundColor: premiumHealth.premiumAccentMuted,
       borderWidth: 1,
-      borderColor: premiumHealth.borderStrong,
+      borderColor: premiumHealth.borderStrong, borderCurve: 'continuous',
     },
     sparkleBadge: {
       marginTop: SPACING.xs,
@@ -276,7 +277,7 @@ const createStyles = (
       justifyContent: 'center',
       backgroundColor: premiumHealth.premiumAccentSoft,
       borderWidth: 1,
-      borderColor: premiumHealth.borderStrong,
+      borderColor: premiumHealth.borderStrong, borderCurve: 'continuous',
     },
     title: {
       fontSize: SIZES.xl,
@@ -311,7 +312,7 @@ const createStyles = (
       backgroundColor: premiumHealth.trustAccentMuted,
       borderWidth: 1,
       borderColor: premiumHealth.borderSubtle,
-      gap: SPACING.sm,
+      gap: SPACING.sm, borderCurve: 'continuous',
     },
     bulletItem: {
       flexDirection: 'row',
@@ -325,7 +326,7 @@ const createStyles = (
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: premiumHealth.trustAccentSoft,
-      marginTop: 1,
+      marginTop: 1, borderCurve: 'continuous',
     },
     bulletText: {
       fontSize: SIZES.sm,
@@ -348,7 +349,7 @@ const createStyles = (
       borderRadius: 14,
       backgroundColor: premiumHealth.secondaryActionBackground,
       borderWidth: 1,
-      borderColor: premiumHealth.secondaryActionBorder,
+      borderColor: premiumHealth.secondaryActionBorder, borderCurve: 'continuous',
     },
     secondaryButtonText: {
       fontSize: SIZES.sm,

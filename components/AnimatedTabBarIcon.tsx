@@ -96,6 +96,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderRadius: 5,
     backgroundColor: colors.error,
     borderWidth: 2,
-    borderColor: colors.cardBackground,
+    borderColor: colors.cardBackground, borderCurve: 'continuous',
   },
 });

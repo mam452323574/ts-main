@@ -211,7 +211,7 @@ const createStyles = (colors: any, palette: ReturnType<typeof useAuthPalette>) =
       shadowOpacity: 0.08,
       shadowRadius: 14,
       shadowOffset: { width: 0, height: 6 },
-      elevation: 2,
+      elevation: 2, borderCurve: 'continuous',
     },
     containerError: {
       borderColor: withAlpha(colors.error, 0.5),

@@ -11,8 +11,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useNotificationContext } from '@/contexts/NotificationContext';
 import { AccountBadge } from '@/components/AccountBadge';
-import { ModalHandle } from '@/components/ModalHandle';
-import { ScreenHeader } from '@/components/ScreenHeader';
+import { ResultSheetTopChrome } from '@/components/results/ResultSheetTopChrome';
 import { ScreenSection } from '@/components/ScreenSection';
 import { SettingRow } from '@/components/SettingRow';
 import { navigationService } from '@/services/navigation';
@@ -27,6 +26,7 @@ import {
   hasScanQuotaPayload,
   resolveScanQuotaState,
 } from '@/utils/scanQuotaState';
+import { Squircle } from '@/components/Squircle';
 
 const SETTINGS_SCAN_TYPES: ScanType[] = ['health', 'body', 'nutrition', 'super'];
 const EMPTY_LOADING_BY_SCAN_TYPE = {
@@ -203,15 +203,22 @@ export default function SettingsScreen() {
   return (
     <AppScreen topInset={false} bottomInset={false} style={styles.container}>
       {alertElement}
-      <ModalHandle />
-      <ScreenHeader title={t('settings.title')} onBack={() => router.back()} centered />
       <ScrollView
         style={styles.scrollContent}
         contentContainerStyle={styles.scrollContentContainer}
         keyboardShouldPersistTaps="handled"
         scrollEnabled={true}
+        testID="settings-scroll"
       >
-        <View style={styles.header}>
+        <ResultSheetTopChrome
+          onLeftAction={() => router.back()}
+          leftActionAccessibilityLabel={t('common.back')}
+          testID="settings-top-chrome"
+          title={t('settings.title')}
+          titleTestID="settings-screen-header"
+          variant="result"
+        />
+        <View style={styles.header} testID="settings-profile-header">
           <View style={styles.avatarContainer}>
             <AvatarPicker
               userId={userProfile.id}
@@ -235,7 +242,7 @@ export default function SettingsScreen() {
           contentStyle={styles.subscriptionCard}
         >
             <AccountBadge tier={userProfile.account_tier} size="large" />
-            <View style={styles.quotaSummary} testID="settings-quota-summary">
+            <Squircle style={styles.quotaSummary} testID="settings-quota-summary">
               <Text style={styles.quotaSummaryTitle}>{t('home.items_available')}</Text>
               {scanQuotaRows.map(({ scanType, state }) => {
                 const hasPayload = hasScanQuotaPayload(state);
@@ -265,7 +272,7 @@ export default function SettingsScreen() {
                   </View>
                 );
               })}
-            </View>
+            </Squircle>
             {userProfile.account_tier === 'free' && (
               <TouchableOpacity
                 style={styles.upgradeCard}
@@ -367,11 +374,11 @@ export default function SettingsScreen() {
           activeOpacity={1}
           onPress={() => setShowLanguageModal(false)}
         >
-          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
+          <Squircle style={styles.modalContent} onStartShouldSetResponder={() => true}>
             <View style={styles.modalIconRow}>
-              <View style={styles.modalIconBadge}>
+              <Squircle style={styles.modalIconBadge}>
                 <Globe color={colors.primary} size={24} />
-              </View>
+              </Squircle>
               <Text style={styles.modalEmoji}>🌐</Text>
             </View>
             <Text style={styles.modalTitle}>{t('settings.select_language_title')}</Text>
@@ -405,7 +412,7 @@ export default function SettingsScreen() {
             >
               <Text style={styles.closeButtonText}>{t('settings.cancel')}</Text>
             </TouchableOpacity>
-          </View>
+          </Squircle>
         </TouchableOpacity>
       </Modal>
 
@@ -422,17 +429,18 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => StyleSheet.c
     flex: 1,
   },
   scrollContentContainer: {
+    paddingTop: insets.top + SPACING.md,
     paddingBottom: SPACING.xxxl + SPACING.xl + insets.bottom,
   },
   header: {
     alignItems: 'center',
-    paddingTop: SPACING.xxl,
+    paddingTop: SPACING.xl,
     paddingBottom: SPACING.xl,
-    backgroundColor: isDark
-      ? withAlpha(colors.cardBackground, 0.42)
-      : colors.cardBackground,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+    backgroundColor: isDark ? 'transparent' : colors.cardBackground,
+    borderBottomWidth: isDark ? 0 : 1,
+    borderBottomColor: isDark
+      ? 'transparent'
+      : (colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08)),
   },
   avatarContainer: {
     marginBottom: SPACING.md,
@@ -470,7 +478,7 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => StyleSheet.c
     backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.04),
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
-    gap: SPACING.xs,
+    gap: SPACING.xs, borderCurve: 'continuous',
   },
   quotaSummaryTitle: {
     fontSize: SIZES.text12,
@@ -519,7 +527,7 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => StyleSheet.c
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: isDark ? 0.16 : 0.1,
     shadowRadius: 22,
-    elevation: 3,
+    elevation: 3, borderCurve: 'continuous',
   },
   upgradeCardText: {
     flex: 1,
@@ -546,7 +554,7 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => StyleSheet.c
     height: 22,
     paddingHorizontal: SPACING.xs,
     justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'center', borderCurve: 'continuous',
   },
   notificationBadgeText: {
     fontSize: SIZES.text12,
@@ -587,7 +595,7 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => StyleSheet.c
     },
     shadowOpacity: 0.15,
     shadowRadius: 24,
-    elevation: 10,
+    elevation: 10, borderCurve: 'continuous',
   },
   modalIconRow: {
     alignItems: 'center',
@@ -601,7 +609,7 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => StyleSheet.c
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: withAlpha(colors.primary, 0.26),
+    borderColor: withAlpha(colors.primary, 0.26), borderCurve: 'continuous',
   },
   modalEmoji: {
     marginTop: SPACING.xs,
@@ -623,7 +631,7 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => StyleSheet.c
     borderRadius: 16,
     marginBottom: SPACING.xs,
     borderWidth: 1,
-    borderColor: withAlpha(colors.gray, 0.18),
+    borderColor: withAlpha(colors.gray, 0.18), borderCurve: 'continuous',
   },
   languageOptionSelected: {
     backgroundColor: withAlpha(colors.primary, 0.12),
@@ -642,7 +650,7 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => StyleSheet.c
     alignItems: 'center',
     paddingVertical: SPACING.md,
     borderRadius: 14,
-    backgroundColor: withAlpha(colors.gray, 0.14),
+    backgroundColor: withAlpha(colors.gray, 0.14), borderCurve: 'continuous',
   },
   closeButtonText: {
     fontSize: SIZES.text16,

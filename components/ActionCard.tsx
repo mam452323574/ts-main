@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
-import { TouchableOpacity, Text, View, StyleSheet, Platform } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { LucideIcon } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { SIZES, SPACING, BORDER_RADIUS, FONT_WEIGHTS, SHADOWS } from '@/constants/theme';
+import { Squircle } from '@/components/Squircle';
 
 interface ActionCardProps {
   title: string;
@@ -27,10 +28,10 @@ export function ActionCard({ title, icon: Icon, onPress }: ActionCardProps) {
       onPress={handlePress}
       activeOpacity={0.7}
     >
-      <View style={styles.container}>
+      <Squircle style={styles.container}>
         <Icon color={colors.primary} size={48} strokeWidth={2} />
         <Text style={styles.title}>{title}</Text>
-      </View>
+      </Squircle>
     </TouchableOpacity>
   );
 }
@@ -47,7 +48,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     flex: 1,
     paddingVertical: SPACING.xl,
     paddingHorizontal: SPACING.lg,
-    ...SHADOWS.card,
+    ...SHADOWS.card, borderCurve: 'continuous',
   },
   title: {
     fontSize: SIZES.text16,

@@ -1,16 +1,17 @@
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Clock, ChevronRight } from 'lucide-react-native';
+import { ChevronRight, Clock } from 'lucide-react-native';
 
 import { useTheme } from '@/contexts/ThemeContext';
 import {
   BORDER_RADIUS,
   FONT_WEIGHTS,
-  SHADOWS,
   SIZES,
   SPACING,
+  getCoachPaperSurface,
   withAlpha,
 } from '@/constants/theme';
+import { Squircle } from '@/components/Squircle';
 
 interface CoachHistoryPreviewProps {
   eyebrow: string;
@@ -31,8 +32,9 @@ export function CoachHistoryPreview({
   onPress,
   testID = 'coach-history-preview',
 }: CoachHistoryPreviewProps) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const { colors, isDark } = useTheme();
+  const paper = useMemo(() => getCoachPaperSurface(isDark), [isDark]);
+  const styles = useMemo(() => createStyles(colors, paper), [colors, paper]);
 
   return (
     <Pressable
@@ -42,12 +44,18 @@ export function CoachHistoryPreview({
       style={({ pressed }) => [styles.card, pressed ? styles.cardPressed : null]}
       testID={testID}
     >
-      <View style={styles.iconWrap}>
-        <Clock color={colors.primary} size={18} strokeWidth={2.2} />
-      </View>
+      <Squircle style={styles.iconWrap}>
+        <Clock
+          color={withAlpha(colors.primary, 0.85)}
+          size={18}
+          strokeWidth={2.2}
+        />
+      </Squircle>
 
       <View style={styles.copy}>
-        <Text style={styles.eyebrow}>{eyebrow}</Text>
+        <Text style={styles.eyebrow} numberOfLines={1}>
+          {eyebrow}
+        </Text>
         <Text numberOfLines={1} style={styles.title}>
           {title}
         </Text>
@@ -68,30 +76,31 @@ export function CoachHistoryPreview({
         </View>
       </View>
 
-      <View style={styles.trailing} accessibilityLabel={ctaLabel}>
-        <ChevronRight
-          color={withAlpha(colors.primaryText, 0.42)}
-          size={18}
-          strokeWidth={2.2}
-        />
-      </View>
+      <Squircle style={styles.trailing} accessibilityLabel={ctaLabel}>
+        <ChevronRight color={paper.inkMuted} size={16} strokeWidth={2} />
+      </Squircle>
     </Pressable>
   );
 }
 
-const createStyles = (colors: any) =>
+const createStyles = (
+  colors: any,
+  paper: ReturnType<typeof getCoachPaperSurface>,
+) =>
   StyleSheet.create({
     card: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: SPACING.md,
-      padding: SPACING.md,
-      borderRadius: BORDER_RADIUS.xl,
-      backgroundColor: withAlpha(colors.primary, 0.03),
-      ...SHADOWS.card,
+      paddingVertical: SPACING.md + 2,
+      paddingHorizontal: SPACING.lg,
+      borderRadius: 14,
+      backgroundColor: paper.canvas,
+      borderWidth: 1,
+      borderColor: paper.border, borderCurve: 'continuous',
     },
     cardPressed: {
-      backgroundColor: withAlpha(colors.primary, 0.08),
+      backgroundColor: paper.raised,
       transform: [{ scale: 0.992 }],
     },
     iconWrap: {
@@ -100,47 +109,48 @@ const createStyles = (colors: any) =>
       borderRadius: BORDER_RADIUS.lg,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: withAlpha(colors.primary, 0.12),
+      backgroundColor: withAlpha(colors.primary, 0.08), borderCurve: 'continuous',
     },
     copy: {
       flex: 1,
       minWidth: 0,
-      gap: 2,
+      gap: 3,
     },
     eyebrow: {
-      fontSize: 11,
+      fontSize: 10,
       lineHeight: 14,
       fontWeight: FONT_WEIGHTS.semiBold,
-      color: withAlpha(colors.primaryText, 0.6),
+      color: withAlpha(colors.primary, 0.85),
+      letterSpacing: 1,
       textTransform: 'uppercase',
-      letterSpacing: 0.45,
     },
     title: {
-      fontSize: SIZES.text14,
-      lineHeight: 18,
-      fontWeight: FONT_WEIGHTS.bold,
-      color: colors.primaryText,
+      fontSize: SIZES.text15,
+      lineHeight: 22,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      color: paper.ink,
+      letterSpacing: -0.1,
     },
     metaRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: SPACING.xs,
+      gap: SPACING.xs + 2,
     },
     meta: {
       fontSize: SIZES.text12,
       lineHeight: 16,
-      color: withAlpha(colors.primaryText, 0.68),
+      color: paper.inkMuted,
     },
     metaDot: {
-      fontSize: SIZES.text12,
-      lineHeight: 16,
-      color: withAlpha(colors.primaryText, 0.4),
+      fontSize: 10,
+      lineHeight: 14,
+      color: paper.inkSubtle,
     },
     trailing: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
+      width: 28,
+      height: 28,
+      borderRadius: 14,
       alignItems: 'center',
-      justifyContent: 'center',
+      justifyContent: 'center', borderCurve: 'continuous',
     },
   });

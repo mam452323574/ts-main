@@ -1,0 +1,36 @@
+{
+  "persona": "strict_tough",
+  "tests": [
+    {
+      "q": "donne un plan sur 2 jours de récup",
+      "simulated_response": "Pas de négociation, voilà ton plan, tu l exécutes.\n\nJour 1 :\n- Repos actif : marche tranquille 20 min, pas plus.\n- Étirements ciblés des zones tendues, 10 min, sans forcer.\n- Coucher tôt, écrans coupés 30 min avant.\n\nJour 2 :\n- Mobilité douce 15 min au réveil.\n- Auto-massage / rouleau sur les groupes sollicités.\n- Reprise légère en fin de journée si zéro douleur, sinon repos complet.\n\nPas d excuses, tu suis le cadre.",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": "yes",
+      "respects_factual_cap": "n/a"
+    },
+    {
+      "q": "j ai mal au dos",
+      "simulated_response": "On agit, pas de plainte. Décharge la zone : allonge-toi sur le dos 5 min, genoux pliés, pieds à plat, puis fais doucement l étirement chat-vache pendant 1 à 2 min. Évite de rester assis avachi le reste de la journée, redresse-toi.\n\nDis-moi maintenant : c est apparu après quel effort, où exactement, et depuis combien de temps ? Si la douleur descend dans la jambe, s aggrave la nuit, ou s accompagne d engourdissement, tu consultes un pro, pas de discussion.",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": "yes",
+      "respects_factual_cap": "n/a"
+    },
+    {
+      "q": "c est quoi la capitale de l Italie ?",
+      "simulated_response": "Rome.",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": "yes",
+      "respects_factual_cap": "yes"
+    }
+  ],
+  "overall_verdict": "PASS",
+  "remaining_loopholes": [
+    "Strict tone still tempts a disciplinary closing line (e.g. 'Pas d excuses, tu suis le cadre') which is fine here but could mutate into a default 'hydrate-toi, dors' kicker under slightly different inputs — R1/R4 hold only if the model parses the kicker as a 'PS'.",
+    "R5 satisfied (action first, then clarifying questions) but the strict persona may sometimes invert order under shorter prompts; R5 wording 'au moins 1 action AVANT' is the load-bearing safeguard.",
+    "R2 closes the numbered-under-header loophole textually, but a strict 'discipline list' bias could still re-emerge as a single numbered block placed BEFORE the day headers (technically allowed by R3, but stylistically risky); consider banning numbered lists entirely when day headers are present."
+  ],
+  "comparison_to_v2": "better"
+}

@@ -1,21 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import {
-  AlertTriangle,
   ArrowDownRight,
   ArrowUpRight,
-  CheckCircle2,
   ChevronDown,
   ChevronUp,
   Minus,
-  ShieldCheck,
 } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 
 import { Button } from '@/components/Button';
 import {
   CoachStructuredContentSections,
-  getCoachStructuredTeaser,
   hasRenderableCoachStructuredContent,
   type CoachStructuredContentLabels,
 } from '@/components/coach/CoachStructuredContentSections';
@@ -26,15 +21,13 @@ import {
   FONT_WEIGHTS,
   SIZES,
   SPACING,
-  getVisualMoodGradient,
-  getVisualMoodSurface,
-  getWellnessPremiumSurface,
-  mixColors,
+  getCoachPaperSurface,
   withAlpha,
 } from '@/constants/theme';
 import type { CoachStructuredContent } from '@/shared/coachContent';
 import type { CoachPersonaKey } from '@/shared/coachPersonas';
 import type { CoachPersonaVisual } from '@/shared/coachPersonaVisuals';
+import { Squircle } from '@/components/Squircle';
 
 export type CoachGuidanceCardVariant = 'compact' | 'fresh';
 
@@ -57,6 +50,7 @@ interface CoachGuidanceCardProps {
   personaKey: CoachPersonaKey;
   personaLabel: string;
   personaValue: string;
+  personaTagline?: string | null;
   personaAvatarSource?: CoachPersonaVisual['imageSource'];
   personaAvatarFallbackLabel: string;
   personaAvatarHaloTint: string;
@@ -96,51 +90,51 @@ const GUIDANCE_PREVIEW_CONFIG: Record<
   GuidancePreviewConfig
 > = {
   compact: {
-    previewLines: 2,
-    previewParagraphs: 1,
-    previewChars: 92,
-  },
-  fresh: {
     previewLines: 3,
     previewParagraphs: 1,
-    previewChars: 164,
+    previewChars: 120,
+  },
+  fresh: {
+    previewLines: 4,
+    previewParagraphs: 1,
+    previewChars: 220,
   },
 };
 
 const COACH_RESPONSE_THEMES: Record<CoachPersonaKey, CoachResponseTheme> = {
   gentle_supportive: {
-    accent: '#7FA9D4',
-    accentAlt: '#78B9C7',
+    accent: '#8AAFD0',
+    accentAlt: '#82B5C0',
     accentDeep: '#263E5A',
     contrast: '#D5E5F4',
   },
   strict_tough: {
-    accent: '#B99B5E',
+    accent: '#A8916A',
     accentAlt: '#8A7B61',
     accentDeep: '#2B2C31',
     contrast: '#E8D6A6',
   },
   motivational_energetic: {
-    accent: '#C68D5A',
-    accentAlt: '#D0B06B',
+    accent: '#C29372',
+    accentAlt: '#C9AE7A',
     accentDeep: '#4B3422',
     contrast: '#EAD0A7',
   },
   patient_calm: {
-    accent: '#72AFA8',
+    accent: '#82AFA6',
     accentAlt: '#7EA9C4',
     accentDeep: '#244842',
     contrast: '#D5ECE8',
   },
   analytical_precise: {
-    accent: '#8D9EC8',
-    accentAlt: '#738BC2',
+    accent: '#9AA8C9',
+    accentAlt: '#8090C0',
     accentDeep: '#30395D',
     contrast: '#DEE5F6',
   },
   playful_light: {
-    accent: '#D98B86',
-    accentAlt: '#CBA16A',
+    accent: '#C99290',
+    accentAlt: '#C29F7C',
     accentDeep: '#52313D',
     contrast: '#F0D8D5',
   },
@@ -243,6 +237,7 @@ export function CoachGuidanceCard({
   personaKey,
   personaLabel,
   personaValue,
+  personaTagline,
   personaAvatarSource,
   personaAvatarFallbackLabel,
   personaAvatarHaloTint,
@@ -265,27 +260,10 @@ export function CoachGuidanceCard({
 }: CoachGuidanceCardProps) {
   const { colors, isDark } = useTheme();
   const responseTheme = COACH_RESPONSE_THEMES[personaKey];
-  const cardSurface = useMemo(
-    () =>
-      getWellnessPremiumSurface(colors, isDark, {
-        accentColor: responseTheme.accent,
-        kind: variant === 'fresh' ? 'hero' : 'feature',
-      }),
-    [colors, isDark, responseTheme.accent, variant],
-  );
-  const insetSurface = useMemo(
-    () =>
-      getVisualMoodSurface(colors, isDark, {
-        mood: 'obsidian',
-        accentColor: responseTheme.accentAlt,
-        intensity: 'subtle',
-        shadow: false,
-      }),
-    [colors, isDark, responseTheme.accentAlt],
-  );
+  const paper = useMemo(() => getCoachPaperSurface(isDark), [isDark]);
   const styles = useMemo(
-    () => createStyles(colors, responseTheme, cardSurface, insetSurface),
-    [cardSurface, colors, insetSurface, responseTheme],
+    () => createStyles(colors, responseTheme, paper),
+    [colors, paper, responseTheme],
   );
   const hasStructuredSections = useMemo(
     () =>
@@ -308,34 +286,6 @@ export function CoachGuidanceCard({
     setExpanded(defaultExpanded);
   }, [body, content, defaultExpanded, variant]);
 
-  const resolvedSectionLabels = useMemo(
-    () => ({
-      context_notes: sectionLabels?.context_notes ?? 'Ce que je remarque',
-      priorities: sectionLabels?.priorities ?? 'À surveiller',
-      action_steps: sectionLabels?.action_steps ?? 'À faire maintenant',
-      warnings: sectionLabels?.warnings ?? 'Vigilance',
-      data_gaps: sectionLabels?.data_gaps ?? 'Zones sans assez de données',
-    }),
-    [sectionLabels],
-  );
-  const primaryAction = content?.action_steps[0] ?? null;
-  const fallbackStructuredLead =
-    content?.priorities[0] ??
-    content?.context_notes[0] ??
-    content?.warnings[0] ??
-    content?.data_gaps[0] ??
-    content?.encouragement ??
-    null;
-  const collapsedLead = primaryAction ?? fallbackStructuredLead;
-  const collapsedWarning = content?.warnings[0] ?? null;
-  const collapsedDataGaps = content?.data_gaps.slice(0, 2) ?? [];
-  const structuredTeaser = useMemo(
-    () => getCoachStructuredTeaser(content, sectionLabels),
-    [content, sectionLabels],
-  );
-  const expandedActionSteps = primaryAction
-    ? (content?.action_steps.slice(1) ?? [])
-    : (content?.action_steps ?? []);
   const hasExtendedStructuredBlocks =
     !!content &&
     ((content.daily_schedule?.length ?? 0) > 0 ||
@@ -350,15 +300,14 @@ export function CoachGuidanceCard({
       !!content.next_scan_suggestion ||
       (content.signal_watch?.length ?? 0) > 0 ||
       !!content.streak_celebration);
+  // `data_gaps` n'est plus rendu côté UI et ne doit donc plus déclencher
+  // l'affordance « Voir plus ». Toutes les actions sont regroupées dans la
+  // section « À faire maintenant », plus de tuile héro isolée au-dessus.
   const structuredOverflowCount =
     (content?.context_notes.length ?? 0) +
     (content?.priorities.length ?? 0) +
-    expandedActionSteps.length +
-    Math.max((content?.warnings.length ?? 0) - (collapsedWarning ? 1 : 0), 0) +
-    Math.max(
-      (content?.data_gaps.length ?? 0) - collapsedDataGaps.length,
-      0,
-    ) +
+    (content?.action_steps.length ?? 0) +
+    (content?.warnings.length ?? 0) +
     (content?.encouragement ? 1 : 0) +
     (hasExtendedStructuredBlocks ? 1 : 0);
   const showStructuredExpansion =
@@ -368,15 +317,9 @@ export function CoachGuidanceCard({
     : preview.hasOverflow;
   const renderFullBody = !showExpansionControl || expanded;
   const toggleLabel = expanded ? collapseLabel : expandLabel;
-  const gradientColors: readonly [string, string, string] = getVisualMoodGradient(
-    colors,
-    isDark,
-    variant === 'fresh' ? 'premium' : 'obsidian',
-    responseTheme.accent,
-  );
   const metricColor = metricBadge
     ? resolveMetricColor(metricBadge, colors)
-    : colors.gray;
+    : paper.inkMuted;
 
   const renderExpandedStructuredContent = () => {
     if (!content) {
@@ -392,7 +335,9 @@ export function CoachGuidanceCard({
           content={content}
           labels={sectionLabels}
           showSummary={false}
-          skipFirstActionStep={!!primaryAction}
+          skipFirstActionStep={false}
+          actionStepsStyle="numbered"
+          accentColor={responseTheme.accent}
         />
       </View>
     );
@@ -400,167 +345,68 @@ export function CoachGuidanceCard({
 
   const guidanceContent = (
     <>
-      <View
+      <Text
         style={[
-          styles.titleWrap,
-          variant === 'compact' ? styles.titleWrapCompact : null,
+          styles.title,
+          variant === 'compact' ? styles.titleCompact : null,
         ]}
       >
-        <Text
-          style={[
-            styles.title,
-            variant === 'compact' ? styles.titleCompact : null,
-          ]}
-        >
-          {title}
-        </Text>
-      </View>
+        {title}
+      </Text>
 
-      <View
-        style={[
-          styles.bodyWrap,
-          variant === 'compact' ? styles.bodyWrapCompact : null,
-        ]}
-      >
-        {hasStructuredSections && content ? (
-          <View
-            style={styles.sectionsWrap}
-            testID="coach-guidance-structured-content"
-          >
-            {collapsedLead ? (
-              <View style={styles.primaryAction} testID="coach-guidance-primary-action">
-                <View style={styles.primaryActionIcon}>
-                  <CheckCircle2
-                    color={responseTheme.contrast}
-                    size={16}
-                    strokeWidth={2.5}
-                  />
-                </View>
-                <View style={styles.primaryActionCopy}>
-                  <Text style={styles.primaryActionLabel}>
-                    {primaryAction
-                      ? resolvedSectionLabels.action_steps
-                      : resolvedSectionLabels.priorities}
-                  </Text>
-                  <Text style={styles.primaryActionText}>{collapsedLead}</Text>
-                </View>
-              </View>
-            ) : null}
-
-            {content.summary ? (
+      {hasStructuredSections && content ? (
+        <View style={styles.sectionsWrap} testID="coach-guidance-structured-content">
+          {content.summary ? (
+            <View style={styles.summaryQuoteWrap} testID="coach-guidance-summary-wrap">
+              <Squircle style={styles.summaryQuoteRule} />
               <Text
-                numberOfLines={expanded ? undefined : 3}
+                numberOfLines={expanded ? undefined : 4}
                 style={[
-                  styles.bodyParagraph,
-                  variant === 'compact' ? styles.bodyParagraphCompact : null,
-                  styles.structuredSummary,
+                  styles.summaryQuoteText,
+                  variant === 'compact' ? styles.summaryQuoteTextCompact : null,
                 ]}
                 testID="coach-guidance-summary"
               >
                 {content.summary}
               </Text>
-            ) : null}
+            </View>
+          ) : null}
 
-            {!expanded &&
-            (collapsedWarning || collapsedDataGaps.length > 0 || structuredTeaser) ? (
-              <View style={styles.compactSignals} testID="coach-guidance-compact-signals">
-                {structuredTeaser ? (
-                  <View
-                    style={styles.structuredTeaserPill}
-                    testID="coach-guidance-structured-teaser"
-                  >
-                    <Text numberOfLines={1} style={styles.structuredTeaserText}>
-                      {structuredTeaser}
-                    </Text>
-                  </View>
-                ) : null}
-                {collapsedWarning ? (
-                  <View style={styles.signalLine} testID="coach-guidance-warning-signal">
-                    <AlertTriangle
-                      color={colors.warning}
-                      size={13}
-                      strokeWidth={2.3}
-                    />
-                    <Text numberOfLines={1} style={styles.signalText}>
-                      {collapsedWarning}
-                    </Text>
-                  </View>
-                ) : null}
-                {collapsedDataGaps.map((gap, index) => (
-                  <View
-                    key={`compact-gap-${index}`}
-                    style={styles.dataGapPill}
-                    testID={`coach-guidance-data-gap-signal-${index}`}
-                  >
-                    <Text numberOfLines={1} style={styles.dataGapPillText}>
-                      {gap}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            ) : null}
-
-            {renderFullBody ? renderExpandedStructuredContent() : null}
-          </View>
-        ) : renderFullBody ? (
-          paragraphs.map((paragraph, index) => (
-            <Text
-              key={`${index}-${paragraph.slice(0, 24)}`}
-              style={[
-                styles.bodyParagraph,
-                variant === 'compact' ? styles.bodyParagraphCompact : null,
-              ]}
-            >
-              {paragraph}
-            </Text>
-          ))
-        ) : (
-          <View
+          {renderFullBody ? renderExpandedStructuredContent() : null}
+        </View>
+      ) : renderFullBody ? (
+        paragraphs.map((paragraph, index) => (
+          <Text
+            key={`${index}-${paragraph.slice(0, 24)}`}
             style={[
-              styles.previewWrap,
-              variant === 'compact' ? styles.previewWrapCompact : null,
+              styles.bodyParagraph,
+              variant === 'compact' ? styles.bodyParagraphCompact : null,
             ]}
           >
-            <Text
-              numberOfLines={preview.previewLines}
-              style={[
-                styles.bodyParagraph,
-                variant === 'compact' ? styles.bodyParagraphCompact : null,
-              ]}
-              testID="coach-guidance-preview"
-            >
-              {preview.previewText}
-            </Text>
-            <LinearGradient
-              colors={[
-                withAlpha(colors.cardBackground, 0),
-                withAlpha(colors.cardBackground, 0.96),
-              ]}
-              pointerEvents="none"
-              style={[
-                styles.previewFade,
-                variant === 'compact' ? styles.previewFadeCompact : null,
-              ]}
-              testID="coach-guidance-preview-fade"
-            />
-          </View>
-        )}
-      </View>
+            {paragraph}
+          </Text>
+        ))
+      ) : (
+        <View style={styles.previewWrap}>
+          <Text
+            numberOfLines={preview.previewLines}
+            style={[
+              styles.bodyParagraph,
+              variant === 'compact' ? styles.bodyParagraphCompact : null,
+            ]}
+            testID="coach-guidance-preview"
+          >
+            {preview.previewText}
+          </Text>
+        </View>
+      )}
 
       {showExpansionControl ? (
-        <View
-          style={[
-            styles.toggleRow,
-            variant === 'compact' ? styles.toggleRowCompact : null,
-          ]}
-        >
+        <View style={styles.toggleRow}>
           {!expanded ? (
             <Text
               numberOfLines={1}
-              style={[
-                styles.continuationHint,
-                variant === 'compact' ? styles.continuationHintCompact : null,
-              ]}
+              style={styles.continuationHint}
               testID="coach-guidance-continuation-hint"
             >
               {continuationHintLabel}
@@ -572,9 +418,9 @@ export function CoachGuidanceCard({
           <View style={styles.togglePill}>
             <Text style={styles.toggleLabel}>{toggleLabel}</Text>
             {expanded ? (
-              <ChevronUp color={responseTheme.accent} size={16} />
+              <ChevronUp color={paper.inkMuted} size={14} />
             ) : (
-              <ChevronDown color={responseTheme.accent} size={16} />
+              <ChevronDown color={paper.inkMuted} size={14} />
             )}
           </View>
         </View>
@@ -583,114 +429,125 @@ export function CoachGuidanceCard({
   );
 
   return (
-    <View
+    <Squircle
+      accessibilityLabel={`${title}. ${disclaimerLabel}. ${disclaimer}`}
+      accessibilityHint={`${personaLabel}: ${personaValue}`}
       style={[
         styles.card,
         variant === 'compact' ? styles.cardCompact : styles.cardFresh,
       ]}
       testID={testID}
     >
-      <View
-        style={styles.variantMarker}
-        testID={`${testID}-variant-${variant}`}
-      />
+      <View style={styles.variantMarker} testID={`${testID}-variant-${variant}`} />
       <View
         style={styles.variantMarker}
         testID={`${testID}-persona-theme-${personaKey}`}
       />
 
-      <LinearGradient
-        colors={gradientColors}
-        end={{ x: 1, y: 1 }}
-        start={{ x: 0, y: 0 }}
-        style={styles.gradientBackdrop}
-      />
-      <View
-        pointerEvents="none"
-        style={[
-          styles.topHighlight,
-          { backgroundColor: cardSurface.highlightColor },
-        ]}
-      />
-
-      <View
-        style={[
-          styles.header,
-          variant === 'compact' ? styles.headerCompact : null,
-        ]}
-      >
-        <View
-          accessibilityLabel={`${personaLabel}: ${personaValue}`}
-          style={[
-            styles.personaSummary,
-            variant === 'compact' ? styles.personaSummaryCompact : null,
-          ]}
-        >
+      {/* HEADER */}
+      {variant === 'fresh' ? (
+        <View style={styles.heroHeader} testID="coach-guidance-hero">
+          <Text numberOfLines={1} style={styles.heroEyebrow}>
+            {eyebrow}
+          </Text>
           <CoachPersonaAvatar
             imageSource={personaAvatarSource}
             fallbackLabel={personaAvatarFallbackLabel}
             haloTint={responseTheme.accent}
-            size={variant === 'compact' ? 42 : 48}
+            size={56}
             emphasis="featured"
             testID="coach-guidance-avatar"
           />
-          <View style={styles.personaCopy}>
-            <Text numberOfLines={1} style={styles.eyebrow}>
-              {eyebrow}
-            </Text>
-            <Text numberOfLines={1} style={styles.personaValue}>
+          <View style={styles.heroIdentity}>
+            <Text numberOfLines={1} style={styles.heroPersonaName}>
               {personaValue}
             </Text>
-          </View>
-        </View>
-
-        <View style={styles.headerAside}>
-          <View
-            accessibilityLabel={`${disclaimerLabel}. ${disclaimer}`}
-            style={styles.disclaimerPill}
-            testID={`${disclaimerTestID}-pill`}
-          >
-            <ShieldCheck
-              color={responseTheme.contrast}
-              size={13}
-              strokeWidth={2.4}
-            />
-            <Text
-              accessibilityLabel={`${disclaimerLabel}. ${disclaimer}`}
-              numberOfLines={1}
-              style={styles.disclaimerPillText}
-              testID={disclaimerTestID}
-            >
-              {disclaimerPillLabel}
-            </Text>
+            {personaTagline ? (
+              <Text
+                numberOfLines={1}
+                style={styles.heroTagline}
+                testID="coach-guidance-tagline"
+              >
+                {personaTagline}
+              </Text>
+            ) : null}
           </View>
           {timestampLabel ? (
-            <Text
-              numberOfLines={1}
-              style={[
-                styles.timestamp,
-                variant === 'compact' ? styles.timestampCompact : null,
-              ]}
-              testID="coach-guidance-timestamp"
-            >
-              {timestampLabel}
-            </Text>
+            <View style={styles.heroMeta}>
+              <Text
+                numberOfLines={1}
+                style={styles.timestamp}
+                testID="coach-guidance-timestamp"
+              >
+                {timestampLabel}
+              </Text>
+            </View>
           ) : null}
         </View>
-      </View>
+      ) : (
+        <View style={styles.header}>
+          <View
+            accessibilityLabel={`${personaLabel}: ${personaValue}`}
+            style={styles.personaSummary}
+          >
+            <CoachPersonaAvatar
+              imageSource={personaAvatarSource}
+              fallbackLabel={personaAvatarFallbackLabel}
+              haloTint={responseTheme.accent}
+              size={40}
+              emphasis="featured"
+              testID="coach-guidance-avatar"
+            />
+            <View style={styles.personaCopy}>
+              <Text numberOfLines={1} style={styles.eyebrow}>
+                {eyebrow}
+              </Text>
+              <Text numberOfLines={1} style={styles.personaValue}>
+                {personaValue}
+              </Text>
+              {personaTagline ? (
+                <Text
+                  numberOfLines={1}
+                  style={styles.compactTagline}
+                  testID="coach-guidance-tagline"
+                >
+                  {personaTagline}
+                </Text>
+              ) : null}
+            </View>
+          </View>
 
+          {timestampLabel ? (
+            <View style={styles.headerAside}>
+              <Text
+                numberOfLines={1}
+                style={[styles.timestamp, styles.timestampCompact]}
+                testID="coach-guidance-timestamp"
+              >
+                {timestampLabel}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      )}
+
+      {/* STATUS PILLS */}
       <View
         style={[
           styles.statusPills,
-          variant === 'compact' ? styles.statusPillsCompact : null,
+          variant === 'fresh' ? styles.statusPillsFresh : null,
         ]}
       >
         <View style={styles.primaryPill}>
-          <Text style={styles.primaryPillText}>{statusLabel}</Text>
+          <Text style={styles.primaryPillText} numberOfLines={1}>
+            {statusLabel}
+          </Text>
         </View>
         {fallbackLabel ? (
           <View style={styles.secondaryPill}>
-            <Text style={styles.secondaryPillText}>{fallbackLabel}</Text>
+            <Text style={styles.secondaryPillText} numberOfLines={1}>
+              {fallbackLabel}
+            </Text>
           </View>
         ) : null}
         {modeLabel ? (
@@ -705,27 +562,28 @@ export function CoachGuidanceCard({
             accessibilityLabel={`${metricBadge.label} ${metricBadge.directionLabel}`}
             style={[
               styles.metricPill,
-              {
-                backgroundColor: withAlpha(metricColor, 0.065),
-                borderColor: withAlpha(metricColor, 0.16),
-              },
+              { backgroundColor: withAlpha(metricColor, 0.07) },
             ]}
             testID="coach-guidance-metric-badge"
           >
             {metricBadge.direction === 'up' ? (
-              <ArrowUpRight color={metricColor} size={12} strokeWidth={2.4} />
+              <ArrowUpRight color={metricColor} size={12} strokeWidth={2.2} />
             ) : metricBadge.direction === 'down' ? (
-              <ArrowDownRight color={metricColor} size={12} strokeWidth={2.4} />
+              <ArrowDownRight color={metricColor} size={12} strokeWidth={2.2} />
             ) : (
-              <Minus color={metricColor} size={12} strokeWidth={2.4} />
+              <Minus color={metricColor} size={12} strokeWidth={2.2} />
             )}
-            <Text style={styles.metricPillText} numberOfLines={1}>
+            <Text
+              numberOfLines={1}
+              style={[styles.metricPillText, { color: metricColor }]}
+            >
               {metricBadge.label}
             </Text>
           </View>
         ) : null}
       </View>
 
+      {/* BODY */}
       {showExpansionControl ? (
         <TouchableOpacity
           accessibilityHint={!expanded ? continuationHintLabel : collapseLabel}
@@ -733,116 +591,113 @@ export function CoachGuidanceCard({
           accessibilityState={{ expanded }}
           activeOpacity={0.78}
           onPress={() => setExpanded((previous) => !previous)}
-          style={[
-            styles.expandableArea,
-            variant === 'compact' ? styles.expandableAreaCompact : null,
-          ]}
+          style={styles.expandableArea}
           testID="coach-guidance-toggle"
         >
           {guidanceContent}
         </TouchableOpacity>
       ) : (
-        <View
-          style={[
-            styles.expandableArea,
-            variant === 'compact' ? styles.expandableAreaCompact : null,
-          ]}
-        >
-          {guidanceContent}
-        </View>
+        <View style={styles.expandableArea}>{guidanceContent}</View>
       )}
 
       {ctaLabel && onCtaPress ? (
-        <View
-          style={[
-            styles.footer,
-            variant === 'compact' ? styles.footerCompact : null,
-          ]}
-        >
+        <View style={styles.ctaWrap}>
           <Button title={ctaLabel} onPress={onCtaPress} />
         </View>
       ) : null}
-    </View>
+    </Squircle>
   );
 }
 
 const createStyles = (
   colors: any,
   responseTheme: CoachResponseTheme,
-  cardSurface: {
-    backgroundColor: string;
-    borderColor: string;
-    highlightColor: string;
-    shadowStyle: Record<string, unknown>;
-  },
-  insetSurface: {
-    backgroundColor: string;
-    borderColor: string;
-  },
+  paper: ReturnType<typeof getCoachPaperSurface>,
 ) =>
   StyleSheet.create({
     card: {
       position: 'relative',
-      borderRadius: BORDER_RADIUS.xl + 8,
-      backgroundColor: cardSurface.backgroundColor,
+      borderRadius: 24,
+      backgroundColor: paper.canvas,
       borderWidth: 1,
-      borderColor: cardSurface.borderColor,
+      borderColor: withAlpha(responseTheme.accent, 0.08),
       overflow: 'hidden',
-      ...cardSurface.shadowStyle,
-      shadowColor: 'transparent',
-      shadowOpacity: 0,
-      shadowRadius: 0,
-      shadowOffset: { width: 0, height: 0 },
-      elevation: 0,
+      shadowColor: '#000',
+      shadowOpacity: 0.18,
+      shadowRadius: 24,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 6, borderCurve: 'continuous',
     },
     cardCompact: {
-      gap: SPACING.sm + 2,
+      gap: SPACING.md + 2,
       paddingHorizontal: SPACING.lg,
-      paddingVertical: SPACING.sm + 2,
+      paddingVertical: SPACING.md + 2,
     },
     cardFresh: {
-      gap: SPACING.md,
-      padding: SPACING.md + 2,
+      gap: SPACING.lg,
+      paddingHorizontal: SPACING.xl - 2,
+      paddingTop: SPACING.lg + 2,
+      paddingBottom: SPACING.lg,
     },
     variantMarker: {
       width: 0,
       height: 0,
       opacity: 0,
     },
-    gradientBackdrop: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      height: 188,
+
+    /* ===== HERO (fresh) ===== */
+    heroHeader: {
+      alignItems: 'center',
+      gap: SPACING.sm + 2,
     },
-    topHighlight: {
-      position: 'absolute',
-      top: 0,
-      left: 22,
-      right: 22,
-      height: 1,
+    heroEyebrow: {
+      fontSize: 11,
+      lineHeight: 14,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      color: withAlpha(responseTheme.accent, 0.85),
+      textTransform: 'uppercase',
+      letterSpacing: 1.2,
     },
+    heroIdentity: {
+      alignItems: 'center',
+      gap: 3,
+    },
+    heroPersonaName: {
+      fontSize: SIZES.text18,
+      lineHeight: 22,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      color: paper.ink,
+      letterSpacing: -0.1,
+    },
+    heroTagline: {
+      fontSize: SIZES.text12,
+      lineHeight: 16,
+      fontStyle: 'italic',
+      color: paper.inkMuted,
+      textAlign: 'center',
+      maxWidth: 280,
+    },
+    heroMeta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+    },
+
+    /* ===== HEADER (compact) ===== */
     header: {
       flexDirection: 'row',
       alignItems: 'flex-start',
       justifyContent: 'space-between',
       gap: SPACING.sm,
-      paddingBottom: SPACING.xs,
-    },
-    headerCompact: {
-      gap: SPACING.xs + 2,
-      paddingBottom: 2,
     },
     personaSummary: {
       flex: 1,
       minWidth: 0,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: SPACING.sm,
-    },
-    personaSummaryCompact: {
-      gap: SPACING.xs + 2,
+      gap: SPACING.sm + 2,
     },
     personaCopy: {
       flex: 1,
@@ -850,390 +705,204 @@ const createStyles = (
       gap: 2,
     },
     eyebrow: {
-      fontSize: SIZES.text12,
-      lineHeight: 16,
-      fontWeight: FONT_WEIGHTS.bold,
-      color: responseTheme.contrast,
+      fontSize: 11,
+      lineHeight: 14,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      color: withAlpha(responseTheme.accent, 0.85),
       textTransform: 'uppercase',
-      letterSpacing: 0.45,
+      letterSpacing: 1.2,
     },
     personaValue: {
       fontSize: SIZES.text16,
       lineHeight: 20,
-      fontWeight: FONT_WEIGHTS.bold,
-      color: colors.primaryText,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      color: paper.ink,
+    },
+    compactTagline: {
+      fontSize: SIZES.text12,
+      lineHeight: 14,
+      fontStyle: 'italic',
+      color: paper.inkMuted,
     },
     headerAside: {
       alignItems: 'flex-end',
-      gap: 5,
+      gap: 6,
       maxWidth: '42%',
       flexShrink: 0,
     },
-    disclaimerPill: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      maxWidth: '100%',
-      paddingHorizontal: SPACING.sm,
-      paddingVertical: 5,
-      borderRadius: BORDER_RADIUS.full,
-      backgroundColor: withAlpha(responseTheme.accentDeep, 0.54),
-      borderWidth: 1,
-      borderColor: withAlpha(responseTheme.accent, 0.18),
-    },
-    disclaimerPillText: {
-      flexShrink: 1,
-      minWidth: 0,
-      fontSize: 10,
-      lineHeight: 12,
-      fontWeight: FONT_WEIGHTS.bold,
-      color: responseTheme.contrast,
-      textTransform: 'uppercase',
-      letterSpacing: 0.35,
-    },
+
+    /* ===== TIMESTAMP ===== */
     timestamp: {
-      maxWidth: '100%',
       fontSize: SIZES.text12,
       lineHeight: 16,
-      color: colors.textMuted ?? withAlpha(colors.primaryText, 0.62),
+      color: paper.inkMuted,
     },
     timestampCompact: {
       fontSize: 11,
       lineHeight: 14,
     },
+
+    /* ===== STATUS PILLS ===== */
     statusPills: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: SPACING.xs,
+      gap: 6,
       flexWrap: 'wrap',
     },
-    statusPillsCompact: {
-      gap: 6,
+    statusPillsFresh: {
+      justifyContent: 'center',
     },
     primaryPill: {
-      paddingHorizontal: SPACING.sm + 1,
+      paddingHorizontal: SPACING.sm + 2,
       paddingVertical: 5,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: withAlpha(responseTheme.accent, 0.085),
-      borderWidth: 1,
-      borderColor: withAlpha(responseTheme.accent, 0.14),
+      backgroundColor: withAlpha(responseTheme.accent, 0.07), borderCurve: 'continuous',
     },
     primaryPillText: {
-      fontSize: 11,
+      fontSize: 10,
       lineHeight: 13,
-      fontWeight: FONT_WEIGHTS.bold,
-      color: responseTheme.contrast,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      color: withAlpha(responseTheme.accent, 0.92),
       textTransform: 'uppercase',
-      letterSpacing: 0.35,
+      letterSpacing: 0.8,
     },
     secondaryPill: {
-      paddingHorizontal: SPACING.sm + 1,
+      paddingHorizontal: SPACING.sm + 2,
       paddingVertical: 5,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: withAlpha(colors.warning, 0.065),
-      borderWidth: 1,
-      borderColor: withAlpha(colors.warning, 0.14),
+      backgroundColor: withAlpha(colors.warning, 0.06), borderCurve: 'continuous',
     },
     secondaryPillText: {
-      fontSize: 11,
+      fontSize: 10,
       lineHeight: 13,
       fontWeight: FONT_WEIGHTS.semiBold,
       color: colors.warning,
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
     },
     modePill: {
-      paddingHorizontal: SPACING.sm + 1,
+      paddingHorizontal: SPACING.sm + 2,
       paddingVertical: 5,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: insetSurface.backgroundColor,
-      borderWidth: 1,
-      borderColor: insetSurface.borderColor,
-      maxWidth: 170,
+      backgroundColor: paper.raised,
+      maxWidth: 170, borderCurve: 'continuous',
     },
     modePillText: {
-      fontSize: 11,
+      fontSize: 10,
       lineHeight: 13,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.textMuted ?? withAlpha(colors.primaryText, 0.84),
+      fontWeight: FONT_WEIGHTS.medium,
+      color: paper.inkMuted,
+      letterSpacing: 0.4,
     },
     metricPill: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 4,
-      paddingHorizontal: SPACING.sm,
+      paddingHorizontal: SPACING.sm + 2,
       paddingVertical: 5,
       borderRadius: BORDER_RADIUS.full,
-      borderWidth: 1,
-      maxWidth: 180,
+      maxWidth: 180, borderCurve: 'continuous',
     },
     metricPillText: {
-      fontSize: 11,
-      lineHeight: 13,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.primaryText,
-    },
-    titleWrap: {
-      gap: SPACING.xs,
-    },
-    titleWrapCompact: {
-      gap: 2,
-    },
-    title: {
-      fontSize: SIZES.text20,
-      lineHeight: 26,
-      fontWeight: FONT_WEIGHTS.bold,
-      color: colors.primaryText,
-    },
-    titleCompact: {
-      fontSize: SIZES.text16,
-      lineHeight: 22,
-    },
-    expandableArea: {
-      gap: SPACING.sm + 2,
-    },
-    expandableAreaCompact: {
-      gap: SPACING.xs + 2,
-    },
-    bodyWrap: {
-      gap: SPACING.sm,
-    },
-    bodyWrapCompact: {
-      gap: SPACING.xs + 2,
-    },
-    sectionsWrap: {
-      gap: SPACING.sm,
-    },
-    primaryAction: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      gap: SPACING.sm,
-      padding: SPACING.sm + 2,
-      borderRadius: BORDER_RADIUS.lg,
-      backgroundColor: insetSurface.backgroundColor,
-      borderWidth: 1,
-      borderColor: insetSurface.borderColor,
-    },
-    primaryActionIcon: {
-      width: 26,
-      height: 26,
-      borderRadius: 13,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: withAlpha(responseTheme.accentDeep, 0.48),
-      flexShrink: 0,
-    },
-    primaryActionCopy: {
-      flex: 1,
-      minWidth: 0,
-      gap: 2,
-    },
-    primaryActionLabel: {
       fontSize: 10,
       lineHeight: 13,
-      fontWeight: FONT_WEIGHTS.bold,
-      color: responseTheme.contrast,
-      textTransform: 'uppercase',
+      fontWeight: FONT_WEIGHTS.semiBold,
       letterSpacing: 0.4,
     },
-    primaryActionText: {
-      fontSize: SIZES.text14,
-      lineHeight: 20,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.primaryText,
+
+    /* ===== BODY ===== */
+    expandableArea: {
+      gap: SPACING.md + 2,
     },
-    structuredSummary: {
-      color: withAlpha(colors.primaryText, 0.86),
-    },
-    compactSignals: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: SPACING.xs,
-      flexWrap: 'wrap',
-    },
-    signalLine: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      minWidth: 0,
-      maxWidth: '100%',
-      paddingHorizontal: SPACING.sm,
-      paddingVertical: 5,
-      borderRadius: BORDER_RADIUS.full,
-      backgroundColor: withAlpha(colors.warning, 0.055),
-      borderWidth: 1,
-      borderColor: withAlpha(colors.warning, 0.12),
-    },
-    signalText: {
-      flexShrink: 1,
-      minWidth: 0,
-      fontSize: 11,
-      lineHeight: 14,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      color: withAlpha(colors.primaryText, 0.78),
-    },
-    dataGapPill: {
-      maxWidth: '100%',
-      paddingHorizontal: SPACING.sm,
-      paddingVertical: 5,
-      borderRadius: BORDER_RADIUS.full,
-      backgroundColor: insetSurface.backgroundColor,
-      borderWidth: 1,
-      borderColor: insetSurface.borderColor,
-    },
-    dataGapPillText: {
-      fontSize: 11,
-      lineHeight: 14,
-      color: colors.textMuted ?? withAlpha(colors.gray, 0.96),
-    },
-    structuredTeaserPill: {
-      maxWidth: '100%',
-      paddingHorizontal: SPACING.sm,
-      paddingVertical: 5,
-      borderRadius: BORDER_RADIUS.full,
-      backgroundColor: withAlpha(responseTheme.accent, 0.065),
-      borderWidth: 1,
-      borderColor: withAlpha(responseTheme.accent, 0.14),
-    },
-    structuredTeaserText: {
-      fontSize: 11,
-      lineHeight: 14,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      color: responseTheme.contrast,
-    },
-    structuredDetails: {
-      gap: SPACING.sm,
-      paddingTop: SPACING.xs,
-    },
-    section: {
-      gap: SPACING.xs,
-      paddingVertical: SPACING.xs,
-    },
-    sectionLabel: {
-      fontSize: 11,
-      lineHeight: 14,
+    title: {
+      fontSize: SIZES.text24,
+      lineHeight: 30,
       fontWeight: FONT_WEIGHTS.bold,
-      color: colors.textMuted ?? withAlpha(colors.primaryText, 0.64),
-      textTransform: 'uppercase',
-      letterSpacing: 0.4,
+      letterSpacing: -0.3,
+      color: paper.ink,
+      textAlign: 'center',
     },
-    sectionItem: {
-      fontSize: SIZES.text14,
-      lineHeight: 20,
-      color: colors.primaryText,
+    titleCompact: {
+      fontSize: SIZES.text18,
+      lineHeight: 24,
+      letterSpacing: -0.1,
+      textAlign: 'left',
     },
-    sectionItemAction: {
-      fontSize: SIZES.text14,
-      lineHeight: 20,
-      color: colors.primaryText,
-      fontWeight: FONT_WEIGHTS.semiBold,
+    sectionsWrap: {
+      gap: SPACING.md + 2,
     },
-    warningSection: {
-      backgroundColor: withAlpha(colors.warning, 0.05),
-      borderRadius: BORDER_RADIUS.md,
-      padding: SPACING.sm + 2,
-      borderWidth: 1,
-      borderColor: withAlpha(colors.warning, 0.12),
+    summaryQuoteWrap: {
+      flexDirection: 'row',
+      alignItems: 'stretch',
+      gap: SPACING.md,
     },
-    warningLabel: {
-      color: colors.warning,
+    summaryQuoteRule: {
+      width: 2,
+      backgroundColor: withAlpha(responseTheme.accent, 0.55),
+      borderRadius: 1, borderCurve: 'continuous',
     },
-    warningItem: {
-      fontSize: SIZES.text14,
-      lineHeight: 20,
-      color: colors.primaryText,
-    },
-    encouragement: {
-      fontSize: SIZES.text14,
-      lineHeight: 20,
+    summaryQuoteText: {
+      flex: 1,
+      fontSize: SIZES.text16,
+      lineHeight: 26,
       fontStyle: 'italic',
-      color: withAlpha(colors.primaryText, 0.86),
-      paddingTop: SPACING.xs,
+      color: withAlpha(paper.ink, 0.86),
     },
-    dataGaps: {
-      gap: 3,
-      paddingTop: SPACING.xs,
-      borderTopWidth: 1,
-      borderTopColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.06),
-    },
-    dataGapLabel: {
-      fontSize: 11,
-      lineHeight: 14,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.textMuted ?? withAlpha(colors.gray, 0.92),
-      textTransform: 'uppercase',
-      letterSpacing: 0.35,
-    },
-    dataGapItem: {
-      fontSize: 11,
-      lineHeight: 15,
-      color: colors.textMuted ?? withAlpha(colors.gray, 0.94),
-    },
-    previewWrap: {
-      position: 'relative',
-      paddingBottom: SPACING.sm + 2,
-    },
-    previewWrapCompact: {
-      paddingBottom: SPACING.xs + 2,
-    },
-    previewFade: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      bottom: 0,
-      height: 34,
-    },
-    previewFadeCompact: {
-      height: 24,
+    summaryQuoteTextCompact: {
+      fontSize: SIZES.text15,
+      lineHeight: 22,
     },
     bodyParagraph: {
-      fontSize: SIZES.text14,
-      lineHeight: 21,
-      color: colors.primaryText,
+      fontSize: SIZES.text15,
+      lineHeight: 26,
+      color: paper.ink,
     },
     bodyParagraphCompact: {
-      lineHeight: 19,
+      fontSize: SIZES.text14,
+      lineHeight: 22,
     },
+    previewWrap: {
+      paddingBottom: SPACING.sm,
+    },
+    structuredDetails: {
+      gap: SPACING.md + 2,
+      paddingTop: SPACING.md,
+      borderTopWidth: 1,
+      borderTopColor: paper.hairline,
+    },
+
+    /* ===== TOGGLE ===== */
     toggleRow: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: SPACING.sm,
     },
-    toggleRowCompact: {
-      gap: SPACING.xs + 2,
-    },
     continuationHint: {
       flex: 1,
       minWidth: 0,
       fontSize: SIZES.text12,
       lineHeight: 16,
-      color: colors.textMuted ?? withAlpha(colors.gray, 0.88),
-    },
-    continuationHintCompact: {
-      fontSize: 11,
-      lineHeight: 15,
+      color: paper.inkSubtle,
     },
     togglePill: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: SPACING.xs,
-      paddingHorizontal: SPACING.sm + 2,
+      gap: 6,
+      paddingHorizontal: SPACING.md,
       paddingVertical: SPACING.xs + 2,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: insetSurface.backgroundColor,
-      borderWidth: 1,
-      borderColor: insetSurface.borderColor,
+      backgroundColor: paper.raised, borderCurve: 'continuous',
     },
     toggleLabel: {
-      fontSize: SIZES.text14,
+      fontSize: 13,
       fontWeight: FONT_WEIGHTS.semiBold,
-      color: responseTheme.contrast,
+      color: paper.ink,
+      letterSpacing: 0.2,
     },
-    footer: {
-      paddingTop: SPACING.sm,
-      borderTopWidth: 1,
-      borderTopColor: withAlpha(responseTheme.accent, 0.09),
-    },
-    footerCompact: {
+
+    /* ===== CTA ===== */
+    ctaWrap: {
       paddingTop: SPACING.xs,
     },
   });

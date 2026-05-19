@@ -12,6 +12,7 @@ import {
 } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuthPalette } from '@/components/auth/tokens';
+import { Squircle } from '@/components/Squircle';
 
 interface AuthSelectCardProps {
   selected: boolean;
@@ -48,7 +49,7 @@ export function AuthSelectCard({
       activeOpacity={0.85}
       disabled={disabled}
     >
-      {visual ? <View style={styles.visual}>{visual}</View> : null}
+      {visual ? <Squircle style={styles.visual}>{visual}</Squircle> : null}
       <View style={styles.copy}>
         <Text style={styles.title}>{title}</Text>
         {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
@@ -78,7 +79,7 @@ const createStyles = (colors: any, palette: ReturnType<typeof useAuthPalette>) =
       shadowOpacity: 0.07,
       shadowRadius: 14,
       shadowOffset: { width: 0, height: 6 },
-      elevation: 2,
+      elevation: 2, borderCurve: 'continuous',
     },
     cardSelected: {
       borderColor: palette.accentRing,
@@ -97,7 +98,7 @@ const createStyles = (colors: any, palette: ReturnType<typeof useAuthPalette>) =
       justifyContent: 'center',
       backgroundColor: palette.accentSofter,
       borderWidth: 1,
-      borderColor: withAlpha(palette.accentRing, 0.16),
+      borderColor: withAlpha(palette.accentRing, 0.16), borderCurve: 'continuous',
     },
     copy: {
       flex: 1,
@@ -119,7 +120,7 @@ const createStyles = (colors: any, palette: ReturnType<typeof useAuthPalette>) =
       height: 28,
       borderRadius: 14,
       alignItems: 'center',
-      justifyContent: 'center',
+      justifyContent: 'center', borderCurve: 'continuous',
     },
     checkSlotSelected: {
       backgroundColor: palette.accentSoft,

@@ -61,6 +61,7 @@ import { logOperationalError } from '@/utils/observability';
 import { getRuntimeCapabilities } from '@/utils/runtimeCapabilities';
 import { hasPremiumAccessFromProfile } from '@/utils/subscription';
 import { resolveSafeReturnRoute, safeOpenExternalUrl } from '@/utils/urlSecurity';
+import { Squircle } from '@/components/Squircle';
 
 // ─── Feature list types ───
 interface FeatureItem {
@@ -682,9 +683,9 @@ export default function PremiumUpgradeScreen() {
       <View style={styles.container}>
         {alertElement}
           <View style={styles.alreadyPremiumContainer}>
-          <View style={styles.premiumBadge}>
+          <Squircle style={styles.premiumBadge}>
             <Crown color={colors.gold} size={64} fill={withAlpha(colors.gold, 0.2)} />
-          </View>
+          </Squircle>
           <Text style={styles.alreadyPremiumTitle}>{t('premium.already_premium_title')}</Text>
           <Text style={[styles.alreadyPremiumText, { color: colors.primaryText, fontWeight: 'bold' }]}>
             {t('premium.already_premium_active')}
@@ -723,7 +724,7 @@ export default function PremiumUpgradeScreen() {
 
     return (
       <View key={index} style={styles.featureRow}>
-        <View
+        <Squircle
           style={[
             styles.featureIcon,
             {
@@ -740,7 +741,7 @@ export default function PremiumUpgradeScreen() {
           ) : (
             <X color={colors.error} size={14} />
           )}
-        </View>
+        </Squircle>
         <Text
           style={[
             styles.featureText,
@@ -785,7 +786,7 @@ export default function PremiumUpgradeScreen() {
       purchasingPackageId !== null;
 
     return (
-      <View
+      <Squircle
         key={pack.identifier}
         style={[
           styles.cardShell,
@@ -800,7 +801,7 @@ export default function PremiumUpgradeScreen() {
           </View>
         ) : null}
 
-        <View
+        <Squircle
           style={[
             styles.cardSurface,
             shouldUseHighlightStyles ? styles.cardSurfaceAnnual : styles.cardSurfaceMonthly,
@@ -859,8 +860,8 @@ export default function PremiumUpgradeScreen() {
               <Text style={styles.ctaButtonText}>{ctaLabel}</Text>
             )}
           </TouchableOpacity>
-        </View>
-      </View>
+        </Squircle>
+      </Squircle>
     );
   };
 
@@ -891,19 +892,19 @@ export default function PremiumUpgradeScreen() {
           ]}
         >
           {/* ─── Hero section ─── */}
-          <View style={styles.heroShell}>
+          <Squircle style={styles.heroShell}>
             <LinearGradient
               colors={heroGradientColors}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.heroSection}
             >
-              <View style={styles.heroCrownContainer}>
+              <Squircle style={styles.heroCrownContainer}>
                 <Crown color={colors.gold} size={44} fill={withAlpha(colors.gold, 0.22)} />
                 <View style={styles.heroSparkle}>
                   <Sparkles color={colors.gold} size={20} fill={colors.gold} />
                 </View>
-              </View>
+              </Squircle>
               <Text style={[styles.heroTitle, { color: colors.primaryText }]}>
                 {t('premium.subscription_page.hero_title')}
               </Text>
@@ -915,21 +916,21 @@ export default function PremiumUpgradeScreen() {
 
               <View style={styles.heroBenefits}>
                 {premiumFeatures.slice(0, 3).map((feature, index) => (
-                  <View key={`${feature.label}-${index}`} style={styles.heroBenefitChip}>
+                  <Squircle key={`${feature.label}-${index}`} style={styles.heroBenefitChip}>
                     <Check color={colors.gold} size={14} />
                     <Text style={styles.heroBenefitText} numberOfLines={2}>
                       {feature.label}
                     </Text>
-                  </View>
+                  </Squircle>
                 ))}
               </View>
             </LinearGradient>
-          </View>
+          </Squircle>
 
-          <View style={styles.contextCard}>
-            <View style={styles.contextIconWrap}>
+          <Squircle style={styles.contextCard}>
+            <Squircle style={styles.contextIconWrap}>
               <ChartNoAxesCombined color={colors.primary} size={18} />
-            </View>
+            </Squircle>
             <View style={styles.contextCopy}>
               <Text style={styles.contextTitle}>
                 {t('premium.subscription_page.contextual_analytics_title')}
@@ -938,21 +939,21 @@ export default function PremiumUpgradeScreen() {
                 {t('premium.subscription_page.contextual_analytics_body')}
               </Text>
             </View>
-          </View>
+          </Squircle>
 
           {/* ─── Cards horizontal scroll ─── */}
           <View style={styles.cardsContainer} testID="premium-cards-scroll">
             {loadingPackages ? (
-              <View style={[styles.cardShell, styles.cardShellMonthly]}>
-                <View style={[styles.cardSurface, styles.cardSurfaceMonthly, styles.loadingCard]}>
+              <Squircle style={[styles.cardShell, styles.cardShellMonthly]}>
+                <Squircle style={[styles.cardSurface, styles.cardSurfaceMonthly, styles.loadingCard]}>
                   <ActivityIndicator color={colors.primary} />
-                </View>
-              </View>
+                </Squircle>
+              </Squircle>
             ) : sortedPackages.length > 0 ? (
               sortedPackages.map(renderPackageCard)
             ) : (
-              <View style={[styles.cardShell, styles.cardShellMonthly]}>
-                <View style={[styles.cardSurface, styles.cardSurfaceMonthly, styles.emptyCard]}>
+              <Squircle style={[styles.cardShell, styles.cardShellMonthly]}>
+                <Squircle style={[styles.cardSurface, styles.cardSurfaceMonthly, styles.emptyCard]}>
                   <Text style={[styles.emptyCardTitle, { color: colors.primaryText }]}>
                     {t('premium.subscription_page.packages_unavailable')}
                   </Text>
@@ -963,12 +964,12 @@ export default function PremiumUpgradeScreen() {
                         : t('premium.native_unavailable')}
                     </Text>
                   ) : null}
-                </View>
-              </View>
+                </Squircle>
+              </Squircle>
             )}
 
-            <View style={[styles.cardShell, styles.cardShellFree]} testID="premium-card-free-shell">
-              <View style={[styles.cardSurface, styles.cardSurfaceFree]} testID="premium-card-free-surface">
+            <Squircle style={[styles.cardShell, styles.cardShellFree]} testID="premium-card-free-shell">
+              <Squircle style={[styles.cardSurface, styles.cardSurfaceFree]} testID="premium-card-free-surface">
                 <View style={styles.cardHeader}>
                   <Text style={[styles.cardTitle, { color: colors.gray }]}>
                     {t('premium.subscription_page.free_title')}
@@ -983,12 +984,12 @@ export default function PremiumUpgradeScreen() {
                 <View style={styles.featuresList} testID="premium-card-features-list">
                   {freeFeatures.map((f, i) => renderFeatureRow(f, i, false))}
                 </View>
-              </View>
-            </View>
+              </Squircle>
+            </Squircle>
           </View>
 
           {/* ─── Bottom section ─── */}
-          <View style={styles.bottomSection}>
+          <Squircle style={styles.bottomSection}>
             {/* Restore purchases */}
             {Platform.OS !== 'web' && (
               <TouchableOpacity
@@ -1035,7 +1036,7 @@ export default function PremiumUpgradeScreen() {
                 {t('premium.web_note')}
               </Text>
             )}
-          </View>
+          </Squircle>
 
         </Animated.View>
       </ScrollView>
@@ -1171,12 +1172,12 @@ const createStyles = (
     borderWidth: 1,
     borderColor: heroSurface.borderColor,
     backgroundColor: heroSurface.backgroundColor,
-    gap: SPACING.md,
+    gap: SPACING.md, borderCurve: 'continuous',
   },
   heroShell: {
     marginHorizontal: SPACING.page,
     borderRadius: BORDER_RADIUS.hero,
-    ...(heroSurface.shadowColor ? heroSurface : SHADOWS.card),
+    ...(heroSurface.shadowColor ? heroSurface : SHADOWS.card), borderCurve: 'continuous',
   },
   heroCrownContainer: {
     position: 'relative',
@@ -1191,7 +1192,7 @@ const createStyles = (
     borderWidth: 1,
     borderColor: withAlpha(colors.gold, isDark ? 0.28 : 0.22),
     marginBottom: SPACING.md,
-    ...(isDark ? annualSurface?.shadowStyle : SHADOWS.card),
+    ...(isDark ? annualSurface?.shadowStyle : SHADOWS.card), borderCurve: 'continuous',
   },
   heroSparkle: {
     position: 'absolute',
@@ -1222,7 +1223,7 @@ const createStyles = (
     borderRadius: BORDER_RADIUS.xl,
     backgroundColor: premiumHealth.chipBackground,
     borderWidth: 1,
-    borderColor: premiumHealth.chipBorder,
+    borderColor: premiumHealth.chipBorder, borderCurve: 'continuous',
   },
   heroBenefitText: {
     flex: 1,
@@ -1242,7 +1243,7 @@ const createStyles = (
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.md,
-    ...(contextSurface.shadowColor ? contextSurface : SHADOWS.none),
+    ...(contextSurface.shadowColor ? contextSurface : SHADOWS.none), borderCurve: 'continuous',
   },
   contextIconWrap: {
     width: 36,
@@ -1250,7 +1251,7 @@ const createStyles = (
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: withAlpha(colors.primary, isDark ? 0.16 : 0.1),
+    backgroundColor: withAlpha(colors.primary, isDark ? 0.16 : 0.1), borderCurve: 'continuous',
   },
   contextCopy: {
     flex: 1,
@@ -1284,7 +1285,7 @@ const createStyles = (
     maxWidth: 460,
     borderRadius: BORDER_RADIUS.hero,
     overflow: 'visible',
-    alignSelf: 'center',
+    alignSelf: 'center', borderCurve: 'continuous',
   },
   cardShellFree: {
     opacity: 0.85,
@@ -1302,7 +1303,7 @@ const createStyles = (
     borderRadius: BORDER_RADIUS.hero,
     padding: SPACING.lg,
     overflow: 'hidden',
-    borderWidth: 1,
+    borderWidth: 1, borderCurve: 'continuous',
   },
   cardSurfaceFree: {
     backgroundColor: freeSurface
@@ -1337,7 +1338,7 @@ const createStyles = (
     gap: SPACING.xs,
     zIndex: 10,
     borderWidth: 1,
-    borderColor: withAlpha(colors.white, 0.22),
+    borderColor: withAlpha(colors.white, 0.22), borderCurve: 'continuous',
   },
   badgeText: {
     color: colors.background,
@@ -1393,7 +1394,7 @@ const createStyles = (
     height: 22,
     borderRadius: 11,
     justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'center', borderCurve: 'continuous',
   },
   featureText: {
     fontSize: SIZES.sm - 1,
@@ -1410,7 +1411,7 @@ const createStyles = (
     marginTop: SPACING.lg,
     borderWidth: 1,
     borderColor: premiumHealth.primaryActionBorder,
-    backgroundColor: premiumHealth.primaryActionBackground,
+    backgroundColor: premiumHealth.primaryActionBackground, borderCurve: 'continuous',
   },
   ctaButtonAnnual: {
     paddingVertical: SPACING.md + 2,
@@ -1453,7 +1454,7 @@ const createStyles = (
     marginHorizontal: SPACING.page,
     alignItems: 'center',
     gap: SPACING.md,
-    ...(contextSurface.shadowColor ? contextSurface : SHADOWS.none),
+    ...(contextSurface.shadowColor ? contextSurface : SHADOWS.none), borderCurve: 'continuous',
   },
   restoreButton: {
     flexDirection: 'row',
@@ -1512,7 +1513,7 @@ const createStyles = (
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: SPACING.xl,
-    ...(annualSurface?.shadowStyle ?? SHADOWS.card),
+    ...(annualSurface?.shadowStyle ?? SHADOWS.card), borderCurve: 'continuous',
   },
   alreadyPremiumTitle: {
     fontSize: SIZES.xxxl,

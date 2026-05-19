@@ -88,6 +88,7 @@ function createFeatureFlags() {
     scope: 'mobile',
     social_enabled: false,
     coach_enabled: true,
+    coach_chat_enabled: false,
     entry_offer_enabled: false,
     social_comments_enabled: false,
     moderation_enabled: false,

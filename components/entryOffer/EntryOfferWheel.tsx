@@ -219,10 +219,10 @@ const createStyles = (colors: any) =>
       zIndex: 2,
     },
     pointer: {
-      borderRadius: BORDER_RADIUS.full,
+      borderRadius: BORDER_RADIUS.full, borderCurve: 'continuous',
     },
     pressable: {
-      borderRadius: 160,
+      borderRadius: 160, borderCurve: 'continuous',
     },
     pressablePressed: {
       transform: [{ scale: 0.99 }],

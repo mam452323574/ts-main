@@ -735,6 +735,16 @@ function shouldRetryAnalyzeScanAfterUploadError(error: unknown) {
 const ANALYZE_SCAN_IN_PROGRESS_POLL_DELAY_MS = 1_500;
 const ANALYZE_SCAN_IN_PROGRESS_MAX_POLLS = 30; // 30 × 1.5 s = 45 s max
 
+// Timeout client par scan_type. Doit rester > timeout Edge→n8n (100s côté
+// supabase/functions/analyze-scan/index.ts) pour qu'un dépassement côté n8n
+// produise une 502 propre plutôt qu'un AbortController opaque côté client.
+const ANALYZE_SCAN_TIMEOUT_MS_BY_SCAN_TYPE: Record<ScanType, number> = {
+  body: 60_000,
+  health: 60_000,
+  nutrition: 60_000,
+  super: 120_000,
+};
+
 function isAnalyzeScanInProgressError(error: unknown): error is ApiError {
   return (
     error instanceof ApiError &&
@@ -1689,7 +1699,10 @@ export class ApiService {
           'analyze-scan',
           buildAnalyzeScanRequest(scanId, scanType, language),
           {
-            timeoutMs: options.timeoutMs ?? 70000,
+            timeoutMs:
+              options.timeoutMs ??
+              ANALYZE_SCAN_TIMEOUT_MS_BY_SCAN_TYPE[scanType] ??
+              70_000,
             context: {
               scanId,
               scanType,

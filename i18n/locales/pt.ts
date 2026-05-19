@@ -32,8 +32,6 @@ export const PT_TRANSLATIONS = {
     hours: 'horas',
     minute: 'minuto',
     minutes: 'minutos',
-    yesterday: 'Ontem',
-    days_ago: 'há {{count}} dias',
     time_ago: {
       just_now: 'Agora mesmo',
       minutes_ago: 'Há {{count}} minutos',
@@ -41,6 +39,8 @@ export const PT_TRANSLATIONS = {
       yesterday: 'Ontem',
       days_ago: '{{count}} há dias',
     },
+    yesterday: 'Ontem',
+    days_ago: 'há {{count}} dias',
   },
   loading_mini_game: {
     title: 'Minijogo',
@@ -75,14 +75,6 @@ export const PT_TRANSLATIONS = {
     scanner: 'Escanear',
     social: 'Social',
   },
-  copilot: {
-    analytics_step:
-      'Verifique suas estatísticas e acompanhe seu progresso ao longo do tempo.',
-    scanner_step: 'Escaneie seus alimentos e fotos para analisar sua saúde!',
-    settings_step: 'Acesse as configurações da sua conta e do aplicativo.',
-    notifications_step:
-      'Encontre aqui suas notificações e conquistas desbloqueadas!',
-  },
   home: {
     items_available: 'Scans disponíveis',
     items_advised: 'Suplementos Recomendados',
@@ -103,10 +95,13 @@ export const PT_TRANSLATIONS = {
       progress_goal_label: 'Meta {{count}} scans',
       max_stage: 'Evolucao final atingida',
     },
+    coach_card_eyebrow: 'Coach',
+    coach_card_title: 'Cada scan se torna um plano de ação claro',
+    coach_card_body: 'Escolha o estilo de coach que combina com você e receba recomendações precisas, motivadoras e fáceis de aplicar.',
+    coach_card_cta: 'Descobrir Coach',
     analytics_card_eyebrow: 'Analises',
     analytics_card_title: 'Minhas analises',
-    analytics_card_subtitle:
-      'Encontre seus resultados, suas tendencias e sua evolucao.',
+    analytics_card_subtitle: 'Encontre seus resultados, suas tendencias e sua evolucao.',
     analytics_card_cta: 'Ver minhas analises',
     analytics_card_empty: 'Faca um scan para comecar seu acompanhamento.',
     analytics_card_scan_label: 'scans analisados',
@@ -144,8 +139,7 @@ export const PT_TRANSLATIONS = {
     type_label: 'Tipo de scan',
     confirm_button: 'Confirmar e Salvar',
     confirm_loading: 'Salvando...',
-    loading_text:
-      'Sua análise chegará em breve, isso pode levar alguns segundos...',
+    loading_text: 'Sua análise chegará em breve, isso pode levar alguns segundos...',
     loading: {
       insights_label: 'Indicadores em curso',
       scan: {
@@ -185,23 +179,19 @@ export const PT_TRANSLATIONS = {
       phases: {
         verification: {
           headline: 'Verificacao da foto',
-          subtext:
-            'Estamos verificando nitidez, luz e enquadramento antes de seguir.',
+          subtext: 'Estamos verificando nitidez, luz e enquadramento antes de seguir.',
         },
         upload: {
           headline: 'Upload seguro',
-          subtext:
-            'A foto passa por um upload seguro antes do processamento.',
+          subtext: 'A foto passa por um upload seguro antes do processamento.',
         },
         analysis: {
           headline: 'Analise Health Scan',
-          subtext:
-            'Estamos transformando sinais visiveis em uma leitura clara e estruturada.',
+          subtext: 'Estamos transformando sinais visiveis em uma leitura clara e estruturada.',
         },
         preparing: {
           headline: 'Preparando o resultado',
-          subtext:
-            'Estamos reunindo pontuacoes, indicadores e verificacoes finais de consistencia.',
+          subtext: 'Estamos reunindo pontuacoes, indicadores e verificacoes finais de consistencia.',
         },
       },
     },
@@ -214,18 +204,13 @@ export const PT_TRANSLATIONS = {
     error_title_provider: 'Serviço de análise indisponível',
     error_title_server: 'Erro do servidor',
     error_msg_default: 'Ops, a imagem não pôde ser analisada.',
-    error_msg_type:
-      'O tipo de análise retornado pelo backend não corresponde ao scan solicitado.',
+    error_msg_type: 'O tipo de análise retornado pelo backend não corresponde ao scan solicitado.',
     error_msg_network: 'Impossível contatar o servidor de análise.',
     error_msg_session: 'Sua sessão expirou. Entre novamente e tente de novo.',
-    error_msg_timeout:
-      'A análise está demorando demais. Tente novamente em instantes.',
-    error_msg_upload:
-      'A imagem do scan não pôde ser enviada ou encontrada no armazenamento.',
-    error_msg_provider:
-      'O provedor de análise está indisponível ou mal configurado para este scan.',
-    error_msg_server:
-      'O processamento do scan falhou no servidor. Tente novamente em instantes.',
+    error_msg_timeout: 'A análise está demorando demais. Tente novamente em instantes.',
+    error_msg_upload: 'A imagem do scan não pôde ser enviada ou encontrada no armazenamento.',
+    error_msg_provider: 'O provedor de análise está indisponível ou mal configurado para este scan.',
+    error_msg_server: 'O processamento do scan falhou no servidor. Tente novamente em instantes.',
     error_validation: 'Parâmetros inválidos.',
     error_session: 'Sessão expirada.',
   },
@@ -271,24 +256,17 @@ export const PT_TRANSLATIONS = {
     coach_action: {
       title: 'Passar à ação',
       button: 'Perguntar ao coach',
-      fallback_priority:
-        'O coach pode propor um plano simples para melhorar o ponto prioritário deste scan.',
-      fallback_generic:
-        'O teu coach pode ajudar a transformar este scan em ações concretas para os próximos dias.',
-      fallback_stable:
-        'Os teus resultados estão globalmente estáveis. O coach pode ajudar-te a manter esta progressão.',
+      fallback_priority: 'O coach pode propor um plano simples para melhorar o ponto prioritário deste scan.',
+      fallback_generic: 'O teu coach pode ajudar a transformar este scan em ações concretas para os próximos dias.',
+      fallback_stable: 'Os teus resultados estão globalmente estáveis. O coach pode ajudar-te a manter esta progressão.',
     },
     trajectory_preview: {
       title: 'Projeção de 30 dias',
       locked_headline: 'Desbloqueie sua projeção motivadora de 30 dias.',
-      locked_subtitle:
-        'O Premium revela uma projeção positiva e plausível para este scan.',
-      unlocked_headline:
-        'Mantendo a consistência, sua %{label} pode chegar a %{score} em 30 dias.',
-      unlocked_subtitle_with_history:
-        'Projeção baseada neste scan e na sua tendência recente quando disponível.',
-      unlocked_subtitle_without_history:
-        'Projeção baseada neste scan e em um modelo de progressão positiva.',
+      locked_subtitle: 'O Premium revela uma projeção positiva e plausível para este scan.',
+      unlocked_headline: 'Mantendo a consistência, sua %{label} pode chegar a %{score} em 30 dias.',
+      unlocked_subtitle_with_history: 'Projeção baseada neste scan e na sua tendência recente quando disponível.',
+      unlocked_subtitle_without_history: 'Projeção baseada neste scan e em um modelo de progressão positiva.',
       note: 'Projeção indicativa, não é uma previsão médica.',
       cta: 'Desbloquear minha projeção de 30 dias',
       badge_unlocked: 'DESBLOQUEADO',
@@ -319,8 +297,7 @@ export const PT_TRANSLATIONS = {
       title: 'Compartilhamento indisponível',
       message: 'O compartilhamento não está disponível neste dispositivo.',
     },
-    unsupported_super_message:
-      'O compartilhamento ainda não está disponível para este novo formato de Super Scan.',
+    unsupported_super_message: 'O compartilhamento ainda não está disponível para este novo formato de Super Scan.',
     error: {
       title: 'Falha na exportação',
       message: 'O visual não pôde ser exportado agora.',
@@ -360,11 +337,11 @@ export const PT_TRANSLATIONS = {
   social: {
     placeholder_eyebrow: 'Fase 1',
     placeholder_title: 'O Social chegara em breve',
-    placeholder_body:
-      'O shell, os hooks e o roteamento agora ficam atras de feature flags. O feed real, o composer e a moderacao chegarao nas proximas fases.',
+    placeholder_body: 'O shell, os hooks e o roteamento agora ficam atras de feature flags. O feed real, o composer e a moderacao chegarao nas proximas fases.',
     placeholder_feed_title: 'Feed pronto para integracao',
-    placeholder_feed_body:
-      'O servico Supabase e o hook React Query retornam por enquanto um estado vazio e seguro.',
+    placeholder_feed_body: 'O servico Supabase e o hook React Query retornam por enquanto um estado vazio e seguro.',
+    feed_title: 'Feed da comunidade',
+    feed_subtitle: 'Compartilhe seus progressos, refeições e transformações no feed público Health Scan.',
     actions: {
       compose: 'Criar post',
       share: 'Compartilhar',
@@ -382,38 +359,67 @@ export const PT_TRANSLATIONS = {
       follow: 'Seguir',
       unfollow: 'Deixar de seguir',
       hide_author: 'Ocultar autor',
-      save: 'Salvar',
-      unsave: 'Remover dos salvos',
     },
-    report: {
-      title: 'Denunciar publicacao',
-      message: 'Por que deseja denunciar esta publicacao?',
-      error_title: 'Falha ao denunciar',
-      error_submit: 'Esta denuncia nao pode ser enviada agora.',
-    },
-    delete: {
-      confirm_title: 'Remover publicacao',
-      confirm_message:
-        'Esta publicacao saira do feed e as denuncias abertas serao encerradas. Esta acao nao pode ser desfeita.',
-      error_title: 'Falha ao remover',
-      error_submit: 'Esta publicacao nao pode ser removida agora.',
-    },
-    post_actions: {
-      title: 'Opcoes da publicacao',
-      not_interested_hint:
-        'Use isto como feedback leve para esta publicacao.',
-      report_hint: 'Envie esta publicacao para revisao da moderacao.',
-      delete_hint: 'Remova esta publicacao do feed publico.',
-      follow_hint: 'Veja mais publicacoes deste autor no seu feed.',
-      hide_author_hint: 'Pare de ver publicacoes deste autor.',
+    empty: {
+      title: 'Nada para mostrar por enquanto',
+      body: 'Publique o primeiro antes/depois, refeição ou atualização física.',
     },
     errors: {
+      share_title: 'Compartilhamento indisponível',
+      share_failed: 'Este post social não pôde ser compartilhado por enquanto.',
+      compose_title: 'Publicação indisponível',
+      compose_failed: 'Seu post não pôde ser publicado por enquanto.',
       reaction_title: 'Reacao nao salva',
       reaction_failed: 'Sua reacao nao pode ser salva.',
       reaction_route_label: 'Rota',
       reaction_code_label: 'Codigo',
       reaction_status_label: 'Status',
       reaction_request_id_label: 'ID da requisicao',
+    },
+    categories: {
+      all: 'Tudo',
+      before_after: 'Antes / Depois',
+      food: 'Refeições',
+      physique: 'Físico',
+    },
+    moderation: {
+      pending: 'Aguardando moderação',
+      approved: 'Aprovado',
+      rejected: 'Rejeitado',
+      flagged: 'Sinalizado para revisão',
+      hidden: 'Ocultado pela moderação',
+      removed: 'Removido pela moderação',
+    },
+    report: {
+      title: 'Denunciar publicacao',
+      message: 'Por que deseja denunciar esta publicacao?',
+      error_title: 'Falha ao denunciar',
+      error_submit: 'Esta denuncia nao pode ser enviada agora.',
+      reasons: {
+        harassment: 'Assédio',
+        hate_speech: 'Ódio ou discriminação',
+        sexual_content: 'Conteúdo sexual',
+        graphic_gore: 'Conteúdo gráfico ou chocante',
+        spam_repeat: 'Spam ou conteúdo repetitivo',
+        self_harm: 'Automutilação ou conteúdo de crise',
+        illegal_activity: 'Atividade ilegal',
+        misinformation: 'Desinformação ou conteúdo enganoso',
+        other: 'Outro',
+      },
+    },
+    delete: {
+      confirm_title: 'Remover publicacao',
+      confirm_message: 'Esta publicacao saira do feed e as denuncias abertas serao encerradas. Esta acao nao pode ser desfeita.',
+      error_title: 'Falha ao remover',
+      error_submit: 'Esta publicacao nao pode ser removida agora.',
+    },
+    post_actions: {
+      title: 'Opcoes da publicacao',
+      not_interested_hint: 'Use isto como feedback leve para esta publicacao.',
+      report_hint: 'Envie esta publicacao para revisao da moderacao.',
+      delete_hint: 'Remova esta publicacao do feed publico.',
+      follow_hint: 'Veja mais publicacoes deste autor no seu feed.',
+      hide_author_hint: 'Pare de ver publicacoes deste autor.',
     },
     comments: {
       title: 'Comentarios',
@@ -436,12 +442,10 @@ export const PT_TRANSLATIONS = {
       report_message: 'Por que deseja denunciar este comentario?',
       report_error: 'Esta denuncia nao pode ser enviada agora.',
       delete_confirm_title: 'Remover comentario',
-      delete_confirm_message:
-        'Este comentario sera removido da conversa. Esta acao nao pode ser desfeita.',
+      delete_confirm_message: 'Este comentario sera removido da conversa. Esta acao nao pode ser desfeita.',
       delete_error: 'Seu comentario nao pode ser removido agora.',
       read_only_title: 'Comentarios bloqueados',
-      read_only_body:
-        'Voce ainda pode ler esta conversa, mas novos comentarios estao desativados para esta publicacao.',
+      read_only_body: 'Voce ainda pode ler esta conversa, mas novos comentarios estao desativados para esta publicacao.',
       missing_title: 'Publicacao indisponivel',
       missing_body: 'Nao foi possivel abrir esta conversa de comentarios.',
       load_previous: 'Carregar comentarios anteriores',
@@ -471,8 +475,7 @@ export const PT_TRANSLATIONS = {
       subtitle: 'Comece pela imagem e adicione poucas palavras se quiser.',
       identity_meta: 'Perfil publico',
       draft_loading: 'Carregando seu rascunho social salvo...',
-      draft_missing:
-        'Esse rascunho compartilhado nao esta mais disponivel, entao um composer vazio foi aberto.',
+      draft_missing: 'Esse rascunho compartilhado nao esta mais disponivel, entao um composer vazio foi aberto.',
       category_label: 'Categoria',
       caption_label: 'Texto',
       caption_placeholder: 'Adicione contexto, progresso ou uma nota curta.',
@@ -487,13 +490,11 @@ export const PT_TRANSLATIONS = {
       generating_asset: 'Preparando seu asset social...',
       asset_ready: 'Foto pronta',
       placeholder_title: 'Comece com uma foto',
-      placeholder_body:
-        'Escolha uma foto ou reutilize seu cartao de resultado.',
+      placeholder_body: 'Escolha uma foto ou reutilize seu cartao de resultado.',
       hashtags: 'Hashtags',
       mention: 'Mencao',
       visibility_title: 'Todos podem ver esta publicacao',
-      visibility_body:
-        'Ela fica publica depois da aprovacao da moderacao.',
+      visibility_body: 'Ela fica publica depois da aprovacao da moderacao.',
       submit: 'Publicar post',
       submitting: 'Publicando...',
       helper: 'Posts ficam ocultos ate a moderacao liberar.',
@@ -503,8 +504,7 @@ export const PT_TRANSLATIONS = {
     },
     admin: {
       title: 'Moderacao social',
-      subtitle:
-        'Console admin para conteudos a revisar e conteudos reportados.',
+      subtitle: 'Console admin para conteudos a revisar e conteudos reportados.',
       summary: {
         pending: 'Pendentes',
         flagged: 'Marcados',
@@ -517,16 +517,32 @@ export const PT_TRANSLATIONS = {
         reported: 'Reportados',
         processed: 'Tratados',
       },
+      toolbar: {
+        search_placeholder: 'Buscar por autor ou conteúdo',
+      },
+      sort: {
+        urgent: 'Urgente',
+        recent: 'Recentes',
+        oldest: 'Antigos',
+      },
+      hero: {
+        active_queue: 'Fila ativa',
+        last_sync: 'Atualizado {{date}}',
+      },
+      menu: {
+        title: 'Ações secundárias',
+      },
+      details: {
+        show: 'Mostrar detalhes',
+        hide: 'Ocultar detalhes',
+      },
       sections: {
         review_title: 'Para moderar',
-        review_body:
-          'Conteudos pending ou flagged que ainda precisam de uma decisao admin.',
+        review_body: 'Conteudos pending ou flagged que ainda precisam de uma decisao admin.',
         reported_title: 'Reportados',
-        reported_body:
-          'Conteudos com reports abertos que ja nao estao na fila pending ou flagged.',
+        reported_body: 'Conteudos com reports abertos que ja nao estao na fila pending ou flagged.',
         processed_title: 'Tratados',
-        processed_body:
-          'Conteudos ja aprovados, rejeitados, ocultados ou removidos que ainda podem ser revistos.',
+        processed_body: 'Conteudos ja aprovados, rejeitados, ocultados ou removidos que ainda podem ser revistos.',
       },
       empty: {
         review_title: 'Nada para moderar',
@@ -534,8 +550,9 @@ export const PT_TRANSLATIONS = {
         reported_title: 'Nada mais reportado',
         reported_body: 'Nao ha conteudo adicional com reports abertos agora.',
         processed_title: 'Nada tratado ainda',
-        processed_body:
-          'Nao ha conteudo aprovado, rejeitado, ocultado ou removido para este filtro agora.',
+        processed_body: 'Nao ha conteudo aprovado, rejeitado, ocultado ou removido para este filtro agora.',
+        search_title: 'Sem resultados',
+        search_body: 'Tente outro nome de autor ou outra palavra-chave.',
       },
       types: {
         post: 'Post',
@@ -548,6 +565,9 @@ export const PT_TRANSLATIONS = {
         remove: 'Remover',
         restore: 'Restaurar',
         change_category: 'Mudar categoria',
+        adjust_reactions: 'Ajustar reações',
+        moderate_author: 'Sancionar o autor',
+        more: 'Mais',
       },
       bulk: {
         selected_count: '{{count}} selecionados',
@@ -560,8 +580,17 @@ export const PT_TRANSLATIONS = {
         partial_title: 'Aprovacao parcial',
         partial_body: '{{approved}} / {{total}} conteudos aprovados.',
         failure_title: 'Falha na aprovacao em lote',
-        failure_body:
-          'Nenhum dos {{total}} conteudos selecionados pode ser aprovado.',
+        failure_body: 'Nenhum dos {{total}} conteudos selecionados pode ser aprovado.',
+      },
+      pending_action: '{{action}} em andamento...',
+      user_moderation: {
+        title: 'Sancionar este autor',
+        body: 'Qual ação de moderação você quer aplicar a este usuário?',
+        ban_posts: 'Banir das publicações (permanente)',
+        ban_comments: 'Banir dos comentários (permanente)',
+        remove_avatar: 'Remover o avatar atual',
+        eradicate_content: 'Erradicar o conteúdo da conta',
+        revoke_all: 'Revogar as sanções ativas',
       },
       category_change: {
         title: 'Mudar categoria',
@@ -569,33 +598,53 @@ export const PT_TRANSLATIONS = {
       },
       meta: {
         reports: '{{count}} reports abertos',
+        reports_compact: '{{count}} denúncias',
         created_at: 'Criado em',
         reported_24h: 'Reports em 24h: {{count}}',
         unique_reporters: 'Reportantes unicos em 24h: {{count}}',
+        unique_reporters_compact: '{{count}} autores',
         unique_views: 'Visualizacoes unicas: {{count}}',
+        unique_views_compact: '{{count}} visualizações',
         last_reported_at: 'Ultimo report',
         completed_at: 'Ultima moderacao',
+        likes_snapshot: 'Likes bruto/efetivo: {{raw}} / {{effective}}',
+        dislikes_snapshot: 'Dislikes bruto/efetivo: {{raw}} / {{effective}}',
+        admin_adjustments: 'Ajustes admin likes/dislikes: {{likes}} / {{dislikes}}',
         reason: 'Motivo',
         provider: 'Provider',
         last_error: 'Ultimo erro',
       },
       errors: {
         load_title: 'Nao foi possivel carregar a fila de moderacao',
-        load_route_missing:
-          'A moderacao admin ainda nao esta disponivel neste ambiente. Verifique o deploy backend do Supabase e tente novamente.',
-        load_authentication:
-          'A sua sessao de admin expirou. Inicie sessao novamente e tente outra vez.',
-        load_admin_access:
-          'Esta conta nao tem acesso a consola de moderacao admin.',
-        load_invalid_payload:
-          'O backend de moderacao devolveu uma resposta invalida. Tente novamente em instantes.',
-        load_backend_unavailable:
-          'A moderacao social admin esta temporariamente indisponivel. Tente novamente em instantes.',
+        load_route_missing: 'A moderacao admin ainda nao esta disponivel neste ambiente. Verifique o deploy backend do Supabase e tente novamente.',
+        load_authentication: 'A sua sessao de admin expirou. Inicie sessao novamente e tente outra vez.',
+        load_admin_access: 'Esta conta nao tem acesso a consola de moderacao admin.',
+        load_invalid_payload: 'O backend de moderacao devolveu uma resposta invalida. Tente novamente em instantes.',
+        load_backend_unavailable: 'A moderacao social admin esta temporariamente indisponivel. Tente novamente em instantes.',
         action_title: 'Falha na acao de moderacao',
         action_failed: 'A decisao de moderacao nao pode ser aplicada agora.',
         category_change_title: 'Falha ao mudar categoria',
-        category_change_failed:
-          'A categoria do post nao pode ser atualizada agora.',
+        category_change_failed: 'A categoria do post nao pode ser atualizada agora.',
+        author_missing: 'Não foi possível identificar o autor deste conteúdo.',
+        user_action_title: 'Ação de moderação de usuário não pôde ser aplicada',
+        user_action_failed: 'A sanção não pôde ser aplicada ao usuário no momento.',
+      },
+      reaction_adjustment: {
+        title: 'Ajustar reações',
+        body: 'Use offsets admin absolutos. Os contadores públicos permanecem limitados a zero.',
+        likes_label: 'Ajuste de likes',
+        dislikes_label: 'Ajuste de dislikes',
+        current_value: 'Atual: {{count}}',
+        preview_value: 'Pré-visualização: {{count}}',
+        note_label: 'Nota (opcional)',
+        input_placeholder: '0',
+        note_placeholder: 'Por que você está sobrescrevendo os contadores?',
+        errors: {
+          invalid_title: 'Ajuste inválido',
+          invalid_body: 'Os ajustes de likes e dislikes devem ser números inteiros.',
+          submit_title: 'Falha no ajuste',
+          submit_failed: 'O ajuste das reações não pôde ser aplicado no momento.',
+        },
       },
     },
   },
@@ -604,8 +653,7 @@ export const PT_TRANSLATIONS = {
     title: 'O teu coach',
     body: 'Um olhar focado sobre os teus ultimos scans. Apenas orientacao, nunca um diagnostico.',
     persona_section_title: 'A tua equipa',
-    persona_section_body:
-      'Seleciona o estilo de coaching antes de gerar a orientacao. Usuarios gratis mantem o coach mais gentil e ainda podem ver as personalidades premium bloqueadas.',
+    persona_section_body: 'Seleciona o estilo de coaching antes de gerar a orientacao. Usuarios gratis mantem o coach mais gentil e ainda podem ver as personalidades premium bloqueadas.',
     prompt_section_title: 'O que queres explorar?',
     latest_guidance_label: 'Ultima orientacao',
     recent_badge: 'Recente',
@@ -614,8 +662,7 @@ export const PT_TRANSLATIONS = {
     fallback_badge: 'Fallback',
     disclaimer_label: 'Aviso nao diagnostico',
     disclaimer_pill_label: 'Info, sem diagnostico',
-    disclaimer_default:
-      'Orientacao de bem-estar apenas. Isto nao e um diagnostico nem um conselho medico.',
+    disclaimer_default: 'Orientacao de bem-estar apenas. Isto nao e um diagnostico nem um conselho medico.',
     locked_badge: 'Premium',
     locked_tap_hint: 'Toque para desbloquear esta personalidade.',
     free_persona_hint: 'Noah está incluído no plano grátis.',
@@ -631,55 +678,42 @@ export const PT_TRANSLATIONS = {
     persona_detail_motivation_label: 'Estilo de motivacao',
     persona_detail_best_for_label: 'Ideal se...',
     persona_current_badge: 'Coach atual',
-    persona_unknown_title: 'Coach',
     persona_current_cta: 'Manter este coach',
     persona_choose_cta: 'Escolher este coach',
     persona_unlock_cta: 'Desbloquear este coach',
     persona_locked_title: 'Disponivel com Health Scan Premium',
-    persona_locked_body:
-      'Voce pode ver esta personalidade e desbloquea-la quando quiser usar este coach.',
+    persona_locked_body: 'Voce pode ver esta personalidade e desbloquea-la quando quiser usar este coach.',
+    persona_unknown_title: 'Coach',
     loading_title: 'Analise em andamento...',
-    loading_body:
-      'O Coach esta preparando sua orientacao com base nos seus resultados mais recentes.',
+    loading_body: 'O Coach esta preparando sua orientacao com base nos seus resultados mais recentes.',
     loading_hint: 'Isso pode levar alguns segundos.',
     error_title: 'Nao foi possivel atualizar o Coach agora',
-    error_body:
-      'Sua ultima orientacao salva continua disponivel quando possivel. Tente novamente em instantes.',
-    error_body_provider_unreachable:
-      'O Coach nao conseguiu falar com o provedor de resposta neste momento. Tente novamente em instantes.',
-    error_body_invalid_response:
-      'O Coach retornou um formato de resposta inesperado. Tente novamente em instantes.',
+    error_body: 'Sua ultima orientacao salva continua disponivel quando possivel. Tente novamente em instantes.',
+    error_body_provider_unreachable: 'O Coach nao conseguiu falar com o provedor de resposta neste momento. Tente novamente em instantes.',
+    error_body_invalid_response: 'Pequeno soluço técnico do lado do Coach. Tente novamente em instantes.',
     unavailable_title: 'Coach esta temporariamente indisponivel',
-    unavailable_body:
-      'Coach permanece desativado neste servidor ate que o provider de backend seja configurado. Sua orientacao ja salva ainda pode aparecer abaixo, mas novas respostas do Coach ficam indisponiveis por enquanto.',
+    unavailable_body: 'Coach permanece desativado neste servidor ate que o provider de backend seja configurado. Sua orientacao ja salva ainda pode aparecer abaixo, mas novas respostas do Coach ficam indisponiveis por enquanto.',
     empty_title: 'Ainda nao ha scans recentes',
-    empty_body:
-      'Faca primeiro um scan para que o Coach transforme seus ultimos resultados em um plano semanal ou em uma recomendacao focada.',
-    empty_body_compact:
-      'Um scan recente ajuda o Coach a personalizar a proxima acao.',
+    empty_body: 'Faca primeiro um scan para que o Coach transforme seus ultimos resultados em um plano semanal ou em uma recomendacao focada.',
+    empty_body_compact: 'Um scan recente ajuda o Coach a personalizar a proxima acao.',
     empty_scan_cta: 'Inicie um scan para liberar seu conselho',
     empty_scan_types_hint: 'Rosto · Corpo · Nutricao',
     first_scan_required_title: 'Primeiro scan necessario',
-    first_scan_required_body:
-      'Faca pelo menos um scan para que seu coach tenha dados para analisar.',
+    first_scan_required_body: 'Inicia o teu primeiro scan para ativar o coaching personalizado. Um minuto basta.',
     first_scan_required_cta: 'Fazer um scan',
-    no_scan_title: 'Faça um scan primeiro',
-    no_scan_body:
-      'Faça um scan primeiro para que Coach tenha dados para analisar.',
+    no_scan_title: 'Começa com um scan',
+    no_scan_body: 'Começa com um scan para ativar o coaching personalizado.',
     history_title: 'Orientacoes anteriores',
     view_history_cta: 'Ver historico',
     history_cta_count: '{{count}} orientacoes anteriores',
     history_cta_latest: 'Ultima salva {{date}}',
     history_load_more: 'Mostrar mais 10',
     history_loading_more: 'Carregando...',
-    history_screen_body:
-      'Revise orientacoes anteriores sem pesar a tela principal do Coach.',
+    history_screen_body: 'Revise orientacoes anteriores sem pesar a tela principal do Coach.',
     history_empty_title: 'Ainda nao ha conselhos',
-    history_empty_body:
-      'Peca um novo conselho e as respostas concluidas aparecerao aqui automaticamente.',
+    history_empty_body: 'Peca um novo conselho e as respostas concluidas aparecerao aqui automaticamente.',
     no_active_guidance_title: 'Ainda nao ha orientacao ativa',
-    no_active_guidance_body:
-      'Escolha abaixo um tipo de guidance para gerar uma nova resposta com esta personalidade.',
+    no_active_guidance_body: 'Escolha abaixo um tipo de guidance para gerar uma nova resposta com esta personalidade.',
     prompt_selection_hint: 'Escolha uma pergunta curta e acionavel.',
     generate_cta: 'Pedir este conselho',
     expand_cta: 'Ler mais',
@@ -699,140 +733,111 @@ export const PT_TRANSLATIONS = {
         title: 'Noah',
         subtitle: 'Caloroso e tranquilizador.',
         tone_badge: 'Acolhedor',
-        summary:
-          'Um coach caloroso que acalma sem infantilizar e te coloca de volta no ritmo com cuidado.',
+        summary: 'Um coach caloroso que acalma sem infantilizar e te coloca de volta no ritmo com cuidado.',
         voice: 'Fala com tato, clareza e acolhimento.',
         energy: 'Calma, estavel e sem pressao desnecessaria.',
         motivation: 'Motiva com confianca e pequenos passos sustentaveis.',
-        best_for:
-          'Ideal se voce quer avancar sem se sentir julgado.',
+        best_for: 'Ideal se voce quer avancar sem se sentir julgado.',
       },
       strict_tough: {
         title: 'Axel',
         subtitle: 'Direto e exigente.',
         tone_badge: 'Firme',
-        summary:
-          'Um coach direto que corta desculpas e te coloca rapido de volta em acao.',
+        summary: 'Um coach direto que corta desculpas e te coloca rapido de volta em acao.',
         voice: 'Fala de forma franca, firme e sem rodeios.',
         energy: 'Alta, estruturada e exigente.',
-        motivation:
-          'Empurra com disciplina, responsabilidade e padroes claros.',
-        best_for:
-          'Ideal se voce responde bem a um enquadramento firme.',
+        motivation: 'Empurra com disciplina, responsabilidade e padroes claros.',
+        best_for: 'Ideal se voce responde bem a um enquadramento firme.',
       },
       motivational_energetic: {
         title: 'Leo',
         subtitle: 'Motivador e energético.',
         tone_badge: 'Energia',
-        summary:
-          'Um coach que reacende seu ritmo rapido e transforma vontade em impulso concreto.',
+        summary: 'Um coach que reacende seu ritmo rapido e transforma vontade em impulso concreto.',
         voice: 'Fala com energia, confianca e frases que dao vontade de agir.',
         energy: 'Rapida, luminosa e orientada para acao.',
-        motivation:
-          'Motiva com impulso, pequenas vitorias e sensacao de progresso.',
-        best_for:
-          'Ideal se voce precisa de um verdadeiro gas para comecar.',
+        motivation: 'Motiva com impulso, pequenas vitorias e sensacao de progresso.',
+        best_for: 'Ideal se voce precisa de um verdadeiro gas para comecar.',
       },
       patient_calm: {
         title: 'Mira',
         subtitle: 'Calmo e sereno.',
         tone_badge: 'Calmo',
-        summary:
-          'Um coach sereno que organiza as prioridades sem aumentar a pressao.',
+        summary: 'Um coach sereno que organiza as prioridades sem aumentar a pressao.',
         voice: 'Fala com calma, paciencia e bastante perspectiva.',
         energy: 'Tranquila, serena e constante.',
-        motivation:
-          'Faz voce avancar com repeticao, suavidade e estabilidade.',
-        best_for:
-          'Ideal se voce quer menos estresse e mais constancia.',
+        motivation: 'Faz voce avancar com repeticao, suavidade e estabilidade.',
+        best_for: 'Ideal se voce quer menos estresse e mais constancia.',
       },
       analytical_precise: {
         title: 'Elias',
         subtitle: 'Claro e preciso.',
         tone_badge: 'Preciso',
-        summary:
-          'Um coach que coloca tudo em ordem e explica com clareza o que fazer e por que.',
+        summary: 'Um coach que coloca tudo em ordem e explica com clareza o que fazer e por que.',
         voice: 'Fala com logica, detalhe e estrutura.',
         energy: 'Concentrada, calma e metodica.',
-        motivation:
-          'Da vontade de agir porque deixa as prioridades claras e compreensiveis.',
-        best_for:
-          'Ideal se voce gosta de entender antes de aplicar.',
+        motivation: 'Da vontade de agir porque deixa as prioridades claras e compreensiveis.',
+        best_for: 'Ideal se voce gosta de entender antes de aplicar.',
       },
       playful_light: {
         title: 'Milo',
         subtitle: 'Leve e positivo.',
         tone_badge: 'Leve',
-        summary:
-          'Um coach mais leve que continua util sem deixar a conversa pesada.',
+        summary: 'Um coach mais leve que continua util sem deixar a conversa pesada.',
         voice: 'Fala com leveza, humor e naturalidade.',
         energy: 'Flexivel, positiva e descontraida.',
-        motivation:
-          'Mantem voce engajado com leveza e acoes simples de iniciar.',
-        best_for:
-          'Ideal se voce se mantem mais constante com um tom mais leve.',
+        motivation: 'Mantem voce engajado com leveza e acoes simples de iniciar.',
+        best_for: 'Ideal se voce se mantem mais constante com um tom mais leve.',
       },
     },
     prompts: {
       latest_scan: {
         title: 'Plano do dia',
-        subtitle:
-          'A partir do meu ultimo scan, diz-me as 3 acoes mais uteis para hoje.',
+        subtitle: 'A partir do meu ultimo scan, diz-me as 3 acoes mais uteis para hoje.',
       },
       free_question: {
         title: 'Pergunte ao coach',
-        subtitle:
-          'Faz uma pergunta livre e recebe um proximo passo concreto a partir dos teus scans.',
+        subtitle: 'Faz uma pergunta livre e recebe um proximo passo concreto a partir dos teus scans.',
       },
       latest_scan_issue_resolution: {
         title: 'Acao pos-scan',
-        subtitle:
-          'Ajuda-me a resolver a prioridade deste scan com acoes simples.',
+        subtitle: 'Ajuda-me a resolver a prioridade deste scan com acoes simples.',
       },
       weekly_plan: {
         title: 'Plano 7 dias',
-        subtitle:
-          'Prepara um plano realista de refeicoes e movimento para os proximos 7 dias.',
+        subtitle: 'Prepara um plano realista de refeicoes e movimento para os proximos 7 dias.',
       },
       nutrition_focus: {
         title: 'Refeicao inteligente',
-        subtitle:
-          'Que refeicao simples posso fazer hoje e o que devo comprar para 2-3 dias sem complicar?',
+        subtitle: 'Que refeicao simples posso fazer hoje e o que devo comprar para 2-3 dias sem complicar?',
       },
       body_focus: {
         title: 'Mover melhor',
-        subtitle:
-          'Monta um mini plano de treino ou mobilidade para esta semana de acordo com o meu nivel.',
+        subtitle: 'Monta um mini plano de treino ou mobilidade para esta semana de acordo com o meu nivel.',
       },
       face_focus: {
         title: 'Rotina rosto',
-        subtitle:
-          'Que rotina simples de manha e noite devo seguir esta semana para parecer mais descansado?',
+        subtitle: 'Que rotina simples de manha e noite devo seguir esta semana para parecer mais descansado?',
       },
       hydration_focus: {
         title: 'Hidratacao facil',
-        subtitle:
-          'Organiza a minha agua do dia num ritmo facil de manter.',
+        subtitle: 'Organiza a minha agua do dia num ritmo facil de manter.',
       },
       sleep_coach: {
         title: 'Noite de recuperacao',
-        subtitle:
-          'Prepara uma rotina simples para a noite para recuperar melhor esta semana.',
+        subtitle: 'Prepara uma rotina simples para a noite para recuperar melhor esta semana.',
       },
       risk_watch: {
         title: 'A acompanhar',
-        subtitle:
-          'Que sinais devo acompanhar com calma esta semana e quando procurar um profissional?',
+        subtitle: 'Que sinais devo acompanhar com calma esta semana e quando procurar um profissional?',
       },
       trend_review: {
         title: 'O que funciona',
-        subtitle:
-          'Diz-me o que melhora, o que bloqueia e o que devo continuar esta semana.',
+        subtitle: 'Diz-me o que melhora, o que bloqueia e o que devo continuar esta semana.',
       },
       recovery_plan: {
         title: 'Reset 48h',
-        subtitle:
-          'Faz-me um plano simples de 2 dias para voltar aos trilhos sem excessos.',
+        subtitle: 'Faz-me um plano simples de 2 dias para voltar aos trilhos sem excessos.',
       },
     },
     prompt_categories: {
@@ -979,11 +984,9 @@ export const PT_TRANSLATIONS = {
       scan_result_maintain: 'Como manter meus bons resultados depois deste scan?',
     },
     selectionRequiredTitle: 'Faz uma seleção',
-    selectionRequiredMessage:
-      'Escolhe uma pergunta ou escreve o teu pedido antes de pedir um conselho.',
+    selectionRequiredMessage: 'Escolhe uma pergunta ou escreve o teu pedido antes de pedir um conselho.',
     freeQuestionRequiredTitle: 'Escreve o teu pedido',
-    freeQuestionRequiredMessage:
-      'Adiciona uma pergunta antes de pedir um conselho.',
+    freeQuestionRequiredMessage: 'Adiciona uma pergunta antes de pedir um conselho.',
     options_sheet: {
       persona_label: 'Coach',
       mode_label: 'Pergunta ao coach',
@@ -992,7 +995,60 @@ export const PT_TRANSLATIONS = {
     },
     history_button_a11y: 'Ver historico',
   },
-  entry_offer: {},
+  entry_offer: {
+    eyebrow: 'Presente de boas-vindas',
+    title: 'Uma oferta privada de boas-vindas espera por você',
+    body: 'Gire apenas uma vez para revelar seu presente premium. O preço e a elegibilidade continuam controlados pelo RevenueCat e pelo seu growth state.',
+    reveal_title: 'Revele seu desconto secreto',
+    reveal_body: 'A roda serve apenas para a revelação. A verdadeira oferta é carregada ao vivo pelo RevenueCat.',
+    reveal_caption: 'Toque na roda para revelar seu presente de boas-vindas',
+    revealing_caption: 'Revelando seu presente...',
+    spin_label: 'SPIN',
+    spinning_label: '...',
+    reward_badge: 'Oferta secreta',
+    reward_title: 'Sua oferta premium de boas-vindas foi desbloqueada',
+    reward_body: 'Confira o plano real disponível antes de continuar.',
+    claim_cta: 'Ver esta oferta',
+    dismiss_cta: 'Continuar sem o presente',
+    unavailable_title: 'Esta oferta não está disponível agora',
+    unavailable_body: 'Não foi possível resolver uma oferta RevenueCat válida para esta experiência. O app continua com segurança pelo fluxo padrão.',
+    error_title: 'Oferta indisponível',
+    purchase_error: 'Não foi possível concluir esta compra agora. Tente novamente em um instante.',
+    open_paywall_error: 'Não foi possível abrir os planos premium agora. Tente novamente em um instante.',
+    open_standard_paywall_cta: 'Abrir os planos premium',
+    fallback_price: 'Preço indisponível',
+    duration_label: '{{count}} {{unit}}',
+    unit: {
+      day_one: 'dia',
+      day_other: 'dias',
+      week_one: 'semana',
+      week_other: 'semanas',
+      month_one: 'mês',
+      month_other: 'meses',
+      year_one: 'ano',
+      year_other: 'anos',
+    },
+    billing: {
+      weekly: 'Cobrança semanal',
+      monthly: 'Cobrança mensal',
+      two_month: 'Cobrança a cada 2 meses',
+      three_month: 'Cobrança a cada 3 meses',
+      six_month: 'Cobrança a cada 6 meses',
+      annual: 'Cobrança anual',
+    },
+    intro: {
+      free_trial: 'Teste gratuito de {{duration}}',
+      free_trial_if_eligible: 'Teste gratuito de {{duration}} se você for elegível',
+      discounted_period: '{{duration}} por {{price}}',
+      discounted_period_if_eligible: '{{duration}} por {{price}} se você for elegível',
+    },
+    wheel_label_1: 'Glow',
+    wheel_label_2: 'Reset',
+    wheel_label_3: 'Focus',
+    wheel_label_4: 'Boost',
+    wheel_label_5: 'Secret',
+    wheel_label_6: 'Presente',
+  },
   notification_settings: {
     title: 'Config. Notificações',
     types: 'Tipos de Notificação',
@@ -1015,57 +1071,41 @@ export const PT_TRANSLATIONS = {
     intro_title: '1. Introdução',
     intro_content: 'Bem-vindo ao Health Scan. Protegemos sua privacidade.',
     data_title: '2. Dados Coletados',
-    usage_title: '3. Uso de Dados',
-    storage_title: '4. Armazenamento & Segurança',
-    sharing_title: '5. Compartilhamento',
-    rights_title: '6. Seus Direitos',
-    contact_title: '10. Contato',
     data_content: 'Recolhemos as seguintes categorias de dados:',
-    data_account:
-      'Informação da conta: e-mail, nome de utilizador, fotografia de perfil',
-    data_scans:
-      'Dados de digitalização: imagens analisadas (rosto, corpo, refeições), resultados de análises e pontuações de saúde',
-    data_device:
-      'Informações técnicas: identificador do dispositivo para segurança de início de sessão',
-    data_usage:
-      'Dados de utilização: histórico de verificação, preferências, estatísticas de utilização',
+    data_account: 'Informação da conta: e-mail, nome de utilizador, fotografia de perfil',
+    data_scans: 'Dados de digitalização: imagens analisadas (rosto, corpo, refeições), resultados de análises e pontuações de saúde',
+    data_device: 'Informações técnicas: identificador do dispositivo para segurança de início de sessão',
+    data_usage: 'Dados de utilização: histórico de verificação, preferências, estatísticas de utilização',
     camera_title: '3. Usando a câmara',
-    camera_content:
-      'O Health Scan utiliza a câmara do seu dispositivo exclusivamente para captar imagens para análise (rosto, corpo, dieta). As fotos são processadas pela nossa infraestrutura de análise para gerar análises de saúde. As imagens são transmitidas de forma segura por HTTPS e nunca são partilhadas com terceiros. Pode eliminar os seus dados a qualquer momento.',
+    camera_content: 'O Health Scan utiliza a câmara do seu dispositivo exclusivamente para captar imagens para análise (rosto, corpo, dieta). As fotos são processadas pela nossa infraestrutura de análise para gerar análises de saúde. As imagens são transmitidas de forma segura por HTTPS e nunca são partilhadas com terceiros. Pode eliminar os seus dados a qualquer momento.',
+    usage_title: '3. Uso de Dados',
     usage_content: 'Os seus dados são utilizados para:',
-    usage_analysis:
-      'Fornecer análises de saúde personalizadas',
-    usage_improve:
-      'Melhorar os nossos algoritmos e a qualidade dos nossos serviços',
+    usage_analysis: 'Fornecer análises de saúde personalizadas',
+    usage_improve: 'Melhorar os nossos algoritmos e a qualidade dos nossos serviços',
     usage_personalize: 'Personalize a sua experiência e recomendações',
-    storage_content:
-      'Os seus dados são armazenados de forma segura no Supabase, uma plataforma na nuvem que cumpre os mais elevados padrões de segurança. Todas as comunicações são encriptadas via TLS/SSL. As suas palavras-passe são encriptadas com algoritmos criptográficos robustos. Aplicamos políticas de segurança (RLS) ao nível da base de dados para garantir que apenas você pode aceder aos seus dados.',
-    sharing_content:
-      'Nunca vendemos os seus dados pessoais. Os seus dados apenas são partilhados com prestadores de serviços técnicos essenciais ao funcionamento do serviço (hospedagem, envio de emails) e apenas na medida do necessário. No caso de uma obrigação legal, poderemos ser obrigados a comunicar determinadas informações às autoridades competentes.',
+    storage_title: '4. Armazenamento & Segurança',
+    storage_content: 'Os seus dados são armazenados de forma segura no Supabase, uma plataforma na nuvem que cumpre os mais elevados padrões de segurança. Todas as comunicações são encriptadas via TLS/SSL. As suas palavras-passe são encriptadas com algoritmos criptográficos robustos. Aplicamos políticas de segurança (RLS) ao nível da base de dados para garantir que apenas você pode aceder aos seus dados.',
+    sharing_title: '5. Compartilhamento',
+    sharing_content: 'Nunca vendemos os seus dados pessoais. Os seus dados apenas são partilhados com prestadores de serviços técnicos essenciais ao funcionamento do serviço (hospedagem, envio de emails) e apenas na medida do necessário. No caso de uma obrigação legal, poderemos ser obrigados a comunicar determinadas informações às autoridades competentes.',
+    rights_title: '6. Seus Direitos',
     rights_content: 'De acordo com o RGPD, tem os seguintes direitos:',
     rights_access: 'Direito de acesso: consultar todos os seus dados pessoais',
-    rights_delete:
-      'Direito ao apagamento: apague a sua conta e todos os seus dados',
-    rights_export:
-      'Direito à portabilidade: exporte os seus dados em formato standard',
-    rights_withdraw:
-      'Direito de desistência: retire o seu consentimento a qualquer momento',
+    rights_delete: 'Direito ao apagamento: apague a sua conta e todos os seus dados',
+    rights_export: 'Direito à portabilidade: exporte os seus dados em formato standard',
+    rights_withdraw: 'Direito de desistência: retire o seu consentimento a qualquer momento',
     children_title: '8. Proteção de Menores',
-    children_content:
-      'O Health Scan não se destina a menores de 16 anos de idade. Não recolhemos intencionalmente dados de menores. Se é pai e acredita que o seu filho nos forneceu informações, por favor contacte-nos para as eliminar.',
+    children_content: 'O Health Scan não se destina a menores de 16 anos de idade. Não recolhemos intencionalmente dados de menores. Se é pai e acredita que o seu filho nos forneceu informações, por favor contacte-nos para as eliminar.',
     updates_title: '9. Mudanças',
-    updates_content:
-      'Poderemos atualizar esta política de privacidade. Em caso de alterações significativas, iremos notificá-lo através da aplicação ou por e-mail. A data da última atualização está indicada no topo desta página.',
-    contact_content:
-      'Se tiver alguma dúvida sobre os seus dados ou sobre esta política, por favor contacte-nos:',
+    updates_content: 'Poderemos atualizar esta política de privacidade. Em caso de alterações significativas, iremos notificá-lo através da aplicação ou por e-mail. A data da última atualização está indicada no topo desta página.',
+    contact_title: '10. Contato',
+    contact_content: 'Se tiver alguma dúvida sobre os seus dados ou sobre esta política, por favor contacte-nos:',
   },
   components: {
     avatar: {
       error_title: 'Erro',
       error_download: 'Não foi possível baixar a foto',
       error_picker_launch: 'Não foi possível abrir o seletor de fotos agora.',
-      error_camera_unavailable:
-        'A câmera não está disponível neste dispositivo.',
+      error_camera_unavailable: 'A câmera não está disponível neste dispositivo.',
       error_size: 'Imagem muito grande. Máximo 5MB.',
       perm_title: 'Permissão necessária',
       perm_gallery: 'Permitir acesso à galeria',
@@ -1081,8 +1121,7 @@ export const PT_TRANSLATIONS = {
     },
     urgency: {
       title: 'Atenção',
-      message:
-        'Indicadores visuais requerem atenção.\n\nIsto não é um diagnóstico médico.',
+      message: 'Indicadores visuais requerem atenção.\n\nIsto não é um diagnóstico médico.',
       dismiss: 'Entendi',
     },
     table: {
@@ -1142,19 +1181,68 @@ export const PT_TRANSLATIONS = {
     msg_premium_only: 'Apenas membros Premium',
     msg_daily_reached_3: 'Limite diário atingido (3 scans)',
     msg_daily_reached_1: 'Limite diário atingido (1 scan)',
-    msg_weekly_reached_with_time:
-      'Limite diário atingido (1 scan). Próximo scan disponível em {{time}}',
-    msg_monthly_reached_with_time:
-      'Limite diário atingido (1 scan). Próximo scan disponível em {{time}}',
-    msg_days_3_reached_with_time:
-      'Limite diário atingido (1 scan). Próximo scan disponível em {{time}}',
-    msg_daily_reached_3_with_time:
-      'Limite diário atingido (3 scans). Próximo scan disponível em {{time}}',
-    msg_daily_reached_1_with_time:
-      'Limite diário atingido (1 scan). Próximo scan disponível em {{time}}',
+    msg_weekly_reached_with_time: 'Limite diário atingido (1 scan). Próximo scan disponível em {{time}}',
+    msg_monthly_reached_with_time: 'Limite diário atingido (1 scan). Próximo scan disponível em {{time}}',
+    msg_days_3_reached_with_time: 'Limite diário atingido (1 scan). Próximo scan disponível em {{time}}',
+    msg_daily_reached_3_with_time: 'Limite diário atingido (3 scans). Próximo scan disponível em {{time}}',
+    msg_daily_reached_1_with_time: 'Limite diário atingido (1 scan). Próximo scan disponível em {{time}}',
     next_scan_available_title: 'Seu próximo scan estará disponível em {{time}}',
-    upgrade_unlimited_subtitle:
-      'Torne-se Premium para mais quota e acesso ao Super Scan',
+    upgrade_unlimited_subtitle: 'Torne-se Premium para mais quota e acesso ao Super Scan',
+  },
+  scan_values: {
+    face_shape: {
+      Oval: 'Oval',
+      Round: 'Redondo',
+      Square: 'Quadrado',
+      Heart: 'Coração',
+      Diamond: 'Diamante',
+      Long: 'Alongado',
+      Triangle: 'Triângulo',
+      Rectangular: 'Retangular',
+    },
+    body_type: {
+      Ectomorph: 'Ectomorfo',
+      Mesomorph: 'Mesomorfo',
+      Endomorph: 'Endomorfo',
+      Hourglass: 'Ampulheta',
+      Pear: 'Pera',
+      Apple: 'Maçã',
+      Rectangle: 'Retângulo',
+      'Inverted Triangle': 'Triângulo Invertido',
+    },
+    muscle_mass: {
+      Low: 'Fraco',
+      Moderate: 'Moderado',
+      Average: 'Média',
+      High: 'Alto',
+      'Very High': 'Muito alto',
+      Athlete: 'Atlético',
+    },
+    glycemic_index: {
+      Low: 'Fraco',
+      Moderate: 'Moderado',
+      High: 'Aluno',
+    },
+    ingredient_quality: {
+      Excellent: 'Excelente',
+      Good: 'Boa',
+      Average: 'Média',
+      Poor: 'Baixa',
+      Bad: 'Muito baixa',
+      Processed: 'Processado',
+      'Ultra Processed': 'Ultraprocessado',
+    },
+    severity: {
+      low: 'Fraco',
+      moderate: 'Moderado',
+      high: 'Aluno',
+    },
+  },
+  condition_card: {
+    explanation: 'Explicação',
+    advice: 'Conselhos práticos',
+    probability: 'probabilidade',
+    unlock: 'Desbloquear',
   },
   notifications: {
     title: 'Notificações',
@@ -1168,19 +1256,15 @@ export const PT_TRANSLATIONS = {
     scan_health_title: 'Scan Saúde Disponível',
     scan_health_body: 'Seu scan de saúde semanal está disponível. Cuide-se!',
     scan_body_title: 'Scan Corpo Disponível',
-    scan_body_body:
-      'Seu scan corporal mensal está disponível. Acompanhe seu progresso!',
+    scan_body_body: 'Seu scan corporal mensal está disponível. Acompanhe seu progresso!',
     scan_nutrition_title: 'Scan Nutrição Disponível',
-    scan_nutrition_body:
-      'Seu scan de nutrição está disponível. Analise suas refeições!',
+    scan_nutrition_body: 'Seu scan de nutrição está disponível. Analise suas refeições!',
     scan_super_title: 'Super Scan Disponível',
-    scan_super_body:
-      'Seu Super Scan diário está disponível. Obtenha uma análise completa!',
+    scan_super_body: 'Seu Super Scan diário está disponível. Obtenha uma análise completa!',
     achievements: {
       title: 'Nova Conquista!',
       one_week: 'Parabéns! Uma semana de acompanhamento da saúde!',
-      one_month:
-        'Parabéns! 🎉 Você está cuidando de si mesmo com o Health Scan há um mês.',
+      one_month: 'Parabéns! 🎉 Você está cuidando de si mesmo com o Health Scan há um mês.',
       three_months: 'Muito bem! 3 meses de acompanhamento da saúde!',
       six_months: 'Incrível! 6 meses acompanhando sua saúde. Continue assim!',
       one_year: 'Extraordinário! Um ano com o Health Scan! 🏆',
@@ -1269,8 +1353,7 @@ export const PT_TRANSLATIONS = {
     section_app: 'Aplicativo',
     privacy_policy: 'Política de privacidade',
     danger_zone_title: 'Zona de Perigo',
-    danger_zone_desc:
-      'Uma vez que sua conta for excluída, não haverá volta. Tenha certeza.',
+    danger_zone_desc: 'Uma vez que sua conta for excluída, não haverá volta. Tenha certeza.',
     sign_out_button: 'Sair',
     sign_out_loading: 'Saindo...',
     footer_version: 'Health Scan v1.0.0',
@@ -1282,6 +1365,8 @@ export const PT_TRANSLATIONS = {
     sign_out_error_title: 'Erro',
     sign_out_error_msg: 'Erro ao sair',
     danger_zone: 'Zona de perigo',
+    admin_moderation: 'Moderação social',
+    admin_moderation_subtitle: 'Gerencie e modere os conteúdos sociais',
   },
   api_errors: {
     network: 'Erro de rede. Verifique sua conexão.',
@@ -1294,8 +1379,7 @@ export const PT_TRANSLATIONS = {
     session_expired_title: 'Sessão Expirada',
     session_expired_msg: 'Sua sessão expirou. Por favor faça login novamente.',
     loop_error_title: 'Erro de Navegação',
-    loop_error_msg:
-      'Loop de redirecionamento detectado. Saia e tente novamente.',
+    loop_error_msg: 'Loop de redirecionamento detectado. Saia e tente novamente.',
     logout_btn: 'Sair',
   },
   auth: {
@@ -1318,22 +1402,18 @@ export const PT_TRANSLATIONS = {
     error_email_required: 'O email é obrigatório',
     error_password_required: 'A senha é obrigatória',
     error_passwords_match: 'As senhas não coincidem',
-    error_password_length:
-      'A senha deve ter pelo menos 8 caracteres e incluir uma minúscula e um número',
+    error_password_length: 'A senha deve ter pelo menos 8 caracteres e incluir uma minúscula e um número',
     error_login_generic: 'Falha no login',
-    error_ip_limit_reached:
-      'Limite de criação de conta atingido para esta rede. Tente novamente mais tarde.',
+    error_ip_limit_reached: 'Limite de criação de conta atingido para esta rede. Tente novamente mais tarde.',
     error_signup_generic: 'Falha no cadastro',
     error_account_creation: 'Erro ao criar conta',
     error_username_taken: 'Este nome de usuário já está em uso. Escolha outro.',
     error_session_invalid: 'Sessão inválida',
-    error_email_verification_required:
-      'Por favor, verifique seu email antes de continuar.',
+    error_email_verification_required: 'Por favor, verifique seu email antes de continuar.',
     error_disposable_email: 'Emails temporários não são permitidos',
     error_verification_send: 'Falha ao enviar código de verificação',
     cancel_verification_title: 'Cancelar verificação?',
-    cancel_verification_message:
-      'A sua sessão será terminada e poderá continuar mais tarde pelo login.',
+    cancel_verification_message: 'A sua sessão será terminada e poderá continuar mais tarde pelo login.',
     cancel_verification_confirm: 'Terminar sessão',
     error_verification_code: 'Código incorreto',
     error_auth_cancelled: 'Autenticação cancelada',
@@ -1343,56 +1423,46 @@ export const PT_TRANSLATIONS = {
     verification_sent_subtitle_signup: 'Estamos preparando seu primeiro scan...',
     verification_sent_subtitle_login: 'Entrando...',
     verify_title: 'Mais um passo antes do seu primeiro scan',
-    verify_subtitle:
-      'Digite o código enviado para seu email para ativar sua conta.',
+    verify_subtitle: 'Digite o código enviado para seu email para ativar sua conta.',
     code_expired: 'Código expira em',
     resend_code: 'Reenviar código',
     resend_in: 'Reenviar em {{seconds}}s',
     code_incomplete: 'Por favor, digite o código completo',
     code_invalid: 'Código incorreto ou expirado',
+    code_incorrect: 'Código incorreto',
+    code_not_found: 'Nenhum código de verificação encontrado. Solicite um novo.',
+    code_expired_error: 'Este código expirou. Solicite um novo.',
+    too_many_attempts: 'Muitas tentativas incorretas. Solicite um novo código.',
+    attempts_remaining: '{{count}} restantes testes',
     remember_device: 'Lembrar deste dispositivo',
     email_label: 'Email',
     errors: {
       fill_all: 'Por favor, preencha todos os campos',
       invalid_email: 'Email inválido',
       password_mismatch: 'As senhas não coincidem',
-      password_short:
-        'A senha deve ter pelo menos 8 caracteres e incluir uma minúscula e um número',
+      password_short: 'A senha deve ter pelo menos 8 caracteres e incluir uma minúscula e um número',
       disposable_email: 'Emails temporários não são permitidos',
       email_in_use: 'Este email já está em uso',
       general_error: 'Ocorreu um erro',
       invalid_credentials: 'Credenciais inválidas',
       oauth_login: 'Erro ao entrar com {{provider}}',
-      password_too_common:
-        'Essa senha é muito comum. Escolha uma mais difícil de adivinhar.',
-      signup_followup:
-        'Se o cadastro foi concluído, um código de verificação foi enviado para o seu email.',
+      password_too_common: 'Essa senha é muito comum. Escolha uma mais difícil de adivinhar.',
+      signup_followup: 'Se o cadastro foi concluído, um código de verificação foi enviado para o seu email.',
     },
-    code_incorrect: 'Código incorreto',
-    code_not_found:
-      'Nenhum código de verificação encontrado. Solicite um novo.',
-    code_expired_error: 'Este código expirou. Solicite um novo.',
-    too_many_attempts: 'Muitas tentativas incorretas. Solicite um novo código.',
-    attempts_remaining: '{{count}} restantes testes',
     general_error: 'Ocorreu um erro',
   },
   scanner: {
     authorize_camera: 'Autorizar câmera',
     camera_permission_msg: 'Precisamos de acesso à sua câmera para escanear.',
+    camera_permission_detail: 'As fotos de rosto, corpo e comida sao usadas para executar a analise de saude dentro do aplicativo.',
+    camera_permission_backend: 'As imagens sao enviadas com seguranca para o nosso backend e processadas pela nossa infraestrutura de analise. Voce pode revisar a politica de privacidade antes de autorizar a camera.',
+    camera_preparing: 'Preparando camera...',
     error_taking_photo: 'Não foi possível tirar a foto',
     error_loading_image: 'Não foi possível carregar a imagem',
-    eligibility_error_title:
-      'Não foi possível verificar a disponibilidade do scan',
-    eligibility_auth_msg:
-      'Sua sessão expirou. Entre novamente e tente de novo.',
-    eligibility_unavailable_msg:
-      'A verificação de disponibilidade do scan falhou. Tente novamente em instantes.',
+    eligibility_error_title: 'Não foi possível verificar a disponibilidade do scan',
+    eligibility_auth_msg: 'Sua sessão expirou. Entre novamente e tente de novo.',
+    eligibility_unavailable_msg: 'A verificação de disponibilidade do scan falhou. Tente novamente em instantes.',
     type_required_title: 'Tipo de scan necessário',
-    camera_permission_detail:
-      'As fotos de rosto, corpo e comida sao usadas para executar a analise de saude dentro do aplicativo.',
-    camera_permission_backend:
-      'As imagens sao enviadas com seguranca para o nosso backend e processadas pela nossa infraestrutura de analise. Voce pode revisar a politica de privacidade antes de autorizar a camera.',
-    camera_preparing: 'Preparando camera...',
     type_required_msg: 'Por favor selecione um tipo de scan.',
     super_unavailable_title: 'Super Scan indisponível',
     super_unavailable_msg: 'Por favor selecione outro tipo de scan.',
@@ -1405,24 +1475,18 @@ export const PT_TRANSLATIONS = {
   },
   fridge_scan: {
     title: 'Chef',
-    subtitle:
-      'Tire uma foto dos seus alimentos e seu chef sugere o que comer.',
+    subtitle: 'Tire uma foto dos seus alimentos e seu chef sugere o que comer.',
     overlay_title: 'Enquadre seus alimentos',
-    overlay_hint:
-      'Mantenha os alimentos visiveis dentro de um unico quadro.',
+    overlay_hint: 'Mantenha os alimentos visiveis dentro de um unico quadro.',
     permission_title: 'A camera e necessaria para Chef',
-    permission_body:
-      'Tire uma foto dos seus alimentos. A imagem so e enviada quando voce confirma a analise.',
+    permission_body: 'Tire uma foto dos seus alimentos. A imagem so e enviada quando voce confirma a analise.',
     permission_denied_title: 'O acesso a camera continua bloqueado',
-    permission_denied_body:
-      'Autorize a camera para iniciar Chef. Voce tambem pode revisar antes a politica de privacidade.',
+    permission_denied_body: 'Autorize a camera para iniciar Chef. Voce tambem pode revisar antes a politica de privacidade.',
     permission_cta: 'Autorizar camera',
     camera_unavailable_title: 'Camera indisponivel',
-    camera_unavailable_body:
-      'A camera dedicada do Chef nao consegue iniciar agora. Tente novamente ou volte para a Home.',
+    camera_unavailable_body: 'A camera dedicada do Chef nao consegue iniciar agora. Tente novamente ou volte para a Home.',
     feedback_title: 'Escolha seu chef',
-    feedback_body:
-      'Escolha um estilo e peça sua refeição.',
+    feedback_body: 'Escolha um estilo e peça sua refeição.',
     chef_selector_eyebrow: 'Seu estilo culinário',
     chef_selector_title: 'Qual chef você prefere?',
     feedback_primary_cta: 'Pedir ao chef',
@@ -1432,38 +1496,26 @@ export const PT_TRANSLATIONS = {
     feedback_gallery_badge: 'Foto galeria',
     submission_queued_badge: 'Na fila',
     submission_queued_title: 'Pedido enviado',
-    submission_queued_body:
-      'Sua foto foi salva. Seu chef prepara uma sugestao adaptada. Voce ainda tem {{remaining}} pedido(s) hoje.',
+    submission_queued_body: 'Sua foto foi salva. Seu chef prepara uma sugestao adaptada. Voce ainda tem {{remaining}} pedido(s) hoje.',
     submission_queued_cta: 'Tirar outra foto',
     submission_queued_message: 'Pedido Chef salvo',
     available_message: 'Chef disponivel',
-    premium_required_message:
-      'Chef reservado para membros Premium',
+    premium_required_message: 'Chef reservado para membros Premium',
     paywall_title: 'Chef Premium',
-    paywall_subtitle:
-      'Um chef adaptado ao seu objetivo sugere uma ideia com o que voce tem',
-    paywall_body:
-      'Vire Premium para pedir ao seu chef que analise seus alimentos e sugira uma refeicao adaptada.',
+    paywall_subtitle: 'Um chef adaptado ao seu objetivo sugere uma ideia com o que voce tem',
+    paywall_body: 'Vire Premium para pedir ao seu chef que analise seus alimentos e sugira uma refeicao adaptada.',
     paywall_bullet_identify: 'Observa os alimentos visiveis',
-    paywall_bullet_meal:
-      'Sugere uma refeicao adaptada ao seu objetivo',
+    paywall_bullet_meal: 'Sugere uma refeicao adaptada ao seu objetivo',
     paywall_bullet_limit: 'Ate 5 pedidos Chef por dia',
     limit_reached_title: 'Limite Chef atingido',
-    limit_reached_with_time:
-      'Limite Chef atingido (5 pedidos). Proximo pedido disponivel em {{time}}',
-    limit_reached_fallback:
-      'Sua cota Chef foi atingida por enquanto.',
+    limit_reached_with_time: 'Limite Chef atingido (5 pedidos). Proximo pedido disponivel em {{time}}',
+    limit_reached_fallback: 'Sua cota Chef foi atingida por enquanto.',
     capture_error: 'Nao foi possivel capturar a foto agora.',
-    gallery_error:
-      'Nao foi possivel carregar a imagem da galeria agora.',
-    submission_auth_error:
-      'Sua sessao expirou antes de enviar o pedido Chef. Entre novamente e tente de novo.',
-    submission_network_error:
-      'Chef nao conseguiu acessar o servidor. Verifique sua conexao e tente de novo.',
-    submission_image_error:
-      'Chef nao conseguiu preparar esta foto. Tire outra e tente de novo.',
-    submission_service_error:
-      'Chef nao conseguiu aceitar o pedido agora. Tente novamente em instantes.',
+    gallery_error: 'Nao foi possivel carregar a imagem da galeria agora.',
+    submission_auth_error: 'Sua sessao expirou antes de enviar o pedido Chef. Entre novamente e tente de novo.',
+    submission_network_error: 'Chef nao conseguiu acessar o servidor. Verifique sua conexao e tente de novo.',
+    submission_image_error: 'Chef nao conseguiu preparar esta foto. Tire outra e tente de novo.',
+    submission_service_error: 'Chef nao conseguiu aceitar o pedido agora. Tente novamente em instantes.',
     submission_error: 'O pedido Chef nao pode ser enviado agora.',
     back_accessibility: 'Voltar',
     gallery_accessibility: 'Escolher uma foto de alimentos da galeria',
@@ -1491,11 +1543,9 @@ export const PT_TRANSLATIONS = {
     ready_badge: 'Sugestao do chef',
     failed_badge: 'Erro',
     queued_title: 'Seu chef prepara uma ideia',
-    queued_body:
-      'Seu chef analisa os alimentos visiveis e adapta a sugestao ao perfil escolhido.',
+    queued_body: 'Seu chef analisa os alimentos visiveis e adapta a sugestao ao perfil escolhido.',
     error_title: 'Resultado indisponivel',
-    error_body:
-      'O chef nao conseguiu sugerir uma refeicao agora. Tire uma foto mais clara.',
+    error_body: 'O chef nao conseguiu sugerir uma refeicao agora. Tire uma foto mais clara.',
     sections: {
       why: 'Por que combina',
       ingredients: 'Ingredientes',
@@ -1555,8 +1605,7 @@ export const PT_TRANSLATIONS = {
     restore_btn: 'Restaurar compras',
     restoring: 'Restaurando...',
     store_disclaimer: 'Via App Store / Google Play',
-    web_disclaimer:
-      'Compras no aplicativo estão disponíveis apenas no app móvel.',
+    web_disclaimer: 'Compras no aplicativo estão disponíveis apenas no app móvel.',
     purchase_success_title: 'Bem-vindo ao Premium!',
     purchase_success_msg: 'Sua assinatura foi ativada.',
     restore_success_title: 'Compras restauradas',
@@ -1578,30 +1627,22 @@ export const PT_TRANSLATIONS = {
     price: '9,99 €',
     period: '/mês',
     web_unavailable_title: 'Indisponível na Web',
-    native_unavailable:
-      'As compras no aplicativo não estão disponíveis nesta build. Use uma build de desenvolvimento nativa ou o aplicativo da loja.',
+    native_unavailable: 'As compras no aplicativo não estão disponíveis nesta build. Use uma build de desenvolvimento nativa ou o aplicativo da loja.',
     validation_title: 'Validação em andamento',
-    purchase_error_default:
-      'Ocorreu um erro durante a compra. Tente novamente.',
-    purchase_error_generic:
-      'Sua compra não pôde ser processada. Verifique sua conexão e tente novamente.',
+    purchase_error_default: 'Ocorreu um erro durante a compra. Tente novamente.',
+    purchase_error_generic: 'Sua compra não pôde ser processada. Verifique sua conexão e tente novamente.',
     restore_empty_title: 'Info',
-    restore_error_default:
-      'Não foi possível restaurar suas compras. Tente novamente.',
-    restore_error_generic:
-      'Ocorreu um erro durante a restauração. Tente novamente.',
-    web_note:
-      'Nota: As compras no aplicativo estão disponíveis apenas em aplicativos móveis nativos. Use o aplicativo Android ou iOS para assinar.',
-    store_note:
-      'A assinatura será cobrada através da sua conta %{store}. Gerencie sua assinatura nas configurações da sua conta %{store}.',
+    restore_error_default: 'Não foi possível restaurar suas compras. Tente novamente.',
+    restore_error_generic: 'Ocorreu um erro durante a restauração. Tente novamente.',
+    web_note: 'Nota: As compras no aplicativo estão disponíveis apenas em aplicativos móveis nativos. Use o aplicativo Android ou iOS para assinar.',
+    store_note: 'A assinatura será cobrada através da sua conta %{store}. Gerencie sua assinatura nas configurações da sua conta %{store}.',
     already_premium_intro: 'É um membro Premium.',
     already_premium_active: 'Sua assinatura está ativa.',
     renewal_date: 'Renova em: %{date}',
     manage_subscription: 'Gerenciar assinatura',
     subscription_page: {
       hero_title: 'Desbloqueie a experiência HealthScan completa',
-      hero_subtitle:
-        'Coach avançado, Super Scan, Chef Premium e análises mais profundas.',
+      hero_subtitle: 'Coach avançado, Super Scan, Chef Premium e análises mais profundas.',
       free_title: 'Grátis',
       free_price: '0 €',
       weekly_title: 'Premium Semanal',
@@ -1619,13 +1660,11 @@ export const PT_TRANSLATIONS = {
       annual_coming_soon: 'A assinatura anual estará disponível em breve.',
       entry_offer_badge: 'Oferta de boas-vindas',
       entry_offer_cta: 'Continuar com este plano',
-      entry_offer_subtitle:
-        'Sua oferta de boas-vindas corresponde ao produto ao vivo exibido aqui.',
+      entry_offer_subtitle: 'Sua oferta de boas-vindas corresponde ao produto ao vivo exibido aqui.',
       cta_generic: 'Continuar com este plano',
       contextual_cta: 'Ver ofertas',
       contextual_analytics_title: 'Acompanhe seu progresso de saúde',
-      contextual_analytics_body:
-        'Desbloqueie gráficos de 3 meses e 1 ano para acompanhar sua evolução completa.',
+      contextual_analytics_body: 'Desbloqueie gráficos de 3 meses e 1 ano para acompanhar sua evolução completa.',
       price_per_month: '{{price}} / mês',
       packages_unavailable: 'Os planos premium estão indisponíveis no momento.',
       cta_monthly: 'Assinar - 9,99 €/mês',
@@ -1647,11 +1686,9 @@ export const PT_TRANSLATIONS = {
       prem_feat_history: 'Histórico completo + gráficos',
       prem_feat_ai: 'Dicas personalizadas',
       prem_feat_coach_quota: 'Coach avançado: até 8 dicas a cada 24h',
-      prem_feat_coach_modes:
-        'Todos os coaches e modos premium: nutrição, corpo, sono, risco, tendências, plano semanal',
+      prem_feat_coach_modes: 'Todos os coaches e modos premium: nutrição, corpo, sono, risco, tendências, plano semanal',
       prem_feat_chef: 'Chef Premium: até 5 pedidos a cada 24h',
-      prem_feat_complete_analysis:
-        'Análises completas: resultados bloqueados, histórico e gráficos liberados',
+      prem_feat_complete_analysis: 'Análises completas: resultados bloqueados, histórico e gráficos liberados',
     },
   },
   exercises: {
@@ -1681,46 +1718,34 @@ export const PT_TRANSLATIONS = {
     setup_profile: 'Configure seu perfil',
     choose_style: 'Escolha seu estilo',
     theme_step_title: 'Escolha seu estilo',
-    theme_step_subtitle:
-      'Escolha claro ou escuro. Você pode trocar depois.',
+    theme_step_subtitle: 'Escolha claro ou escuro. Você pode trocar depois.',
     intro_step_title: 'Seu primeiro scan começa aqui',
-    intro_step_subtitle:
-      'Escaneie, entenda e depois acompanhe o que muda. Primeiro vamos preparar só o essencial.',
-    intro_step_note:
-      'Escolha um nome, uma aparência e depois confirme seu email. Falta um passo para seu primeiro scan.',
+    intro_step_subtitle: 'Escaneie, entenda e depois acompanhe o que muda. Primeiro vamos preparar só o essencial.',
+    intro_step_note: 'Escolha um nome, uma aparência e depois confirme seu email. Falta um passo para seu primeiro scan.',
     profile_step_title: 'Prepare seu perfil de scan',
-    profile_step_subtitle:
-      'Escolha seu nome, adicione uma foto se quiser e mantenha um visual claro.',
+    profile_step_subtitle: 'Escolha seu nome, adicione uma foto se quiser e mantenha um visual claro.',
     username_step_title: 'Como devemos chamar você?',
-    username_step_subtitle:
-      'Esse nome aparecerá nos seus scans e publicações.',
+    username_step_subtitle: 'Esse nome aparecerá nos seus scans e publicações.',
     avatar_title: 'Adicione uma foto de perfil',
-    avatar_subtitle:
-      'Isso é opcional agora e você pode alterar depois nas configurações.',
+    avatar_subtitle: 'Isso é opcional agora e você pode alterar depois nas configurações.',
     avatar_change_title: 'Foto de perfil',
-    avatar_change_subtitle:
-      'Você já tem uma foto. Pode mantê-la ou trocar quando quiser.',
+    avatar_change_subtitle: 'Você já tem uma foto. Pode mantê-la ou trocar quando quiser.',
     avatar_skip: 'Pular por agora',
     avatar_pre_auth_title: 'Adicione uma foto',
-    avatar_pre_auth_subtitle:
-      'É opcional. Ela fica no seu dispositivo até a verificação da conta.',
+    avatar_pre_auth_subtitle: 'É opcional. Ela fica no seu dispositivo até a verificação da conta.',
     avatar_selected: 'Foto selecionada',
     avatar_take_photo: 'Tirar foto',
     avatar_choose_gallery: 'Escolher da galeria',
     avatar_upload_retry: 'Tentar envio novamente',
     avatar_upload_continue: 'Continuar sem foto',
     account_step_title: 'Crie sua conta',
-    account_step_subtitle:
-      'Email, senha e depois um código antes do seu primeiro scan.',
+    account_step_subtitle: 'Email, senha e depois um código antes do seu primeiro scan.',
     username_label: 'Nome de usuário *',
     username_placeholder: 'usuario123',
     profile_theme_title: 'Aparência',
-    profile_theme_subtitle:
-      'Escolha a versão mais clara para seu fluxo. Você pode trocar depois.',
-    social_avatar_prompt_title:
-      'Adicione uma foto para ser reconhecido mais rápido',
-    social_avatar_prompt_subtitle:
-      'É opcional, mas útil quando você compartilha scans e progresso.',
+    profile_theme_subtitle: 'Escolha a versão mais clara para seu fluxo. Você pode trocar depois.',
+    social_avatar_prompt_title: 'Adicione uma foto para ser reconhecido mais rápido',
+    social_avatar_prompt_subtitle: 'É opcional, mas útil quando você compartilha scans e progresso.',
     username_status: {
       ready: 'Nome pronto',
       checking: 'Verificando...',
@@ -1739,36 +1764,31 @@ export const PT_TRANSLATIONS = {
     enter_app: 'Abrir o app',
     slide_1_eyebrow: 'Scanner',
     slide_1_title: 'Escaneie primeiro. Suponha menos.',
-    slide_1_subtitle:
-      'Uma foto para refeições, rosto ou corpo. O Health Scan transforma isso em um ponto de partida claro.',
+    slide_1_subtitle: 'Uma foto para refeições, rosto ou corpo. O Health Scan transforma isso em um ponto de partida claro.',
     slide_1_bullet_1: 'Rosto, corpo, refeições',
     slide_1_bullet_2: 'Captura rápida',
     slide_1_bullet_3: 'Base clara',
     slide_2_eyebrow: 'Coach',
     slide_2_title: 'Entenda o que o scan mostra',
-    slide_2_subtitle:
-      'Seu coach transforma cada scan em próximos passos simples de seguir.',
+    slide_2_subtitle: 'Seu coach transforma cada scan em próximos passos simples de seguir.',
     slide_2_bullet_1: 'Conselhos pessoais',
     slide_2_bullet_2: 'Contexto após cada scan',
     slide_2_bullet_3: 'Próxima melhor ação',
     slide_3_eyebrow: 'Comunidade',
     slide_3_title: 'Compartilhe avanços quando quiser',
-    slide_3_subtitle:
-      'Publique atualizações, compare jornadas e mantenha seu ritmo.',
+    slide_3_subtitle: 'Publique atualizações, compare jornadas e mantenha seu ritmo.',
     slide_3_bullet_1: 'Compartilhar scans',
     slide_3_bullet_2: 'Seguir outras pessoas',
     slide_3_bullet_3: 'Motivação',
     slide_4_eyebrow: 'Progresso',
     slide_4_title: 'Veja progresso, não ruído',
-    slide_4_subtitle:
-      'Compare seus scans ao longo do tempo e veja o que melhora, trava ou desvia.',
+    slide_4_subtitle: 'Compare seus scans ao longo do tempo e veja o que melhora, trava ou desvia.',
     slide_4_bullet_1: 'Antes e depois',
     slide_4_bullet_2: 'Visão de tendência',
     slide_4_bullet_3: 'Mudança mensurável',
     slide_5_eyebrow: 'Geladeira',
     slide_5_title: 'Leve isso para suas refeições',
-    slide_5_subtitle:
-      'Escaneie sua geladeira e transforme seu plano em ideias de refeições simples.',
+    slide_5_subtitle: 'Escaneie sua geladeira e transforme seu plano em ideias de refeições simples.',
     slide_5_bullet_1: 'Scan de ingredientes',
     slide_5_bullet_2: 'Ideias de receitas',
     slide_5_bullet_3: 'Leve ou indulgente',
@@ -1776,8 +1796,7 @@ export const PT_TRANSLATIONS = {
     error_email: 'Por favor, verifique seu email antes de continuar.',
     error_username_empty: 'Por favor, escolha um nome de usuário',
     error_username_taken: 'Por favor, escolha um nome de usuário disponível',
-    error_avatar_upload:
-      'We could not upload your photo. Retry or continue without a photo.',
+    error_avatar_upload: 'We could not upload your photo. Retry or continue without a photo.',
   },
   languages: {
     fr: 'Francês',
@@ -1797,8 +1816,7 @@ export const PT_TRANSLATIONS = {
       year_1: '1 Ano',
     },
     premium_feature: 'Recurso Premium',
-    premium_feature_msg:
-      'As análises de 3 meses e 1 ano são reservadas para membros Premium.\n\nDesbloqueie o acesso total ao seu histórico de saúde!',
+    premium_feature_msg: 'As análises de 3 meses e 1 ano são reservadas para membros Premium.\n\nDesbloqueie o acesso total ao seu histórico de saúde!',
     empty_state: 'Comece a escanear para ver seu progresso aqui!',
     health_score: 'Pontuação de Saúde',
     health_score_subtitle: 'Evolução da sua pontuação global',
@@ -1832,18 +1850,15 @@ export const PT_TRANSLATIONS = {
   },
   super_scan_features: {
     premium_alert_title: 'Super Scan Premium',
-    premium_alert_msg:
-      'O Super Scan é um recurso exclusivo para membros Premium.\n\nObtenha uma análise completa e detalhada tornando-se Premium!',
+    premium_alert_msg: 'O Super Scan é um recurso exclusivo para membros Premium.\n\nObtenha uma análise completa e detalhada tornando-se Premium!',
     used_alert_title: 'Super Scan utilizado',
-    used_alert_msg:
-      'Você já utilizou seu Super Scan hoje.\n\nVolte amanhã para um novo Super Scan!',
+    used_alert_msg: 'Você já utilizou seu Super Scan hoje.\n\nVolte amanhã para um novo Super Scan!',
     global_risk_score: 'Pontuação de Risco Global',
     analysis_summary: 'Resumo da análise',
     conditions_detected: 'Condições detectadas',
     ras_title: 'Nada a assinalar',
     ras_subtitle: 'Nenhum sinal detectado',
-    ras_description:
-      'A análise não detectou nenhuma condição particular. Continue a cuidar de si mesmo!',
+    ras_description: 'A análise não detectou nenhuma condição particular. Continue a cuidar de si mesmo!',
     premium_badge: 'Premium',
     used_today: 'Utilizado',
     limit_daily: '1/dia',
@@ -1861,8 +1876,7 @@ export const PT_TRANSLATIONS = {
     list: {
       health_scans: {
         title: 'Scans de Saúde',
-        description:
-          'Analise sua saúde facial para detectar sinais de fadiga e estresse',
+        description: 'Analise sua saúde facial para detectar sinais de fadiga e estresse',
         free: '1 scan de saúde por semana',
         premium: '3 scans de saúde por dia',
       },
@@ -1874,30 +1888,25 @@ export const PT_TRANSLATIONS = {
       },
       nutrition_scans: {
         title: 'Scans de Nutrição',
-        description:
-          'Analise suas refeições para um acompanhamento nutricional preciso',
+        description: 'Analise suas refeições para um acompanhamento nutricional preciso',
         free: '1 scan de nutrição a cada 3 dias',
         premium: '3 scans de nutrição por dia',
       },
       detailed_analytics: {
         title: 'Análises Detalhadas',
-        description:
-          'Gráficos avançados, histórico completo e previsões de saúde',
+        description: 'Gráficos avançados, histórico completo e previsões de saúde',
         free: 'Gráficos básicos (7 dias)',
-        premium:
-          'Análises detalhadas ilimitadas com histórico completo e previsões',
+        premium: 'Análises detalhadas ilimitadas com histórico completo e previsões',
       },
       unlimited_scans: {
         title: 'Scans diários',
-        description:
-          '1 scan grátis por tipo a cada 24 horas e até 3 scans por tipo por dia com Premium',
+        description: '1 scan grátis por tipo a cada 24 horas e até 3 scans por tipo por dia com Premium',
         free: '1 scan de cada tipo a cada 24 horas',
         premium: '3 scans de cada tipo por dia',
       },
       advanced_recipes: {
         title: 'Receitas Avançadas',
-        description:
-          'Acesso a receitas premium com planos nutricionais detalhados e vídeos',
+        description: 'Acesso a receitas premium com planos nutricionais detalhados e vídeos',
         free: 'Acesso a receitas básicas',
         premium: 'Acesso completo a receitas premium com planos e vídeos',
       },
@@ -1921,15 +1930,13 @@ export const PT_TRANSLATIONS = {
       },
       custom_goals: {
         title: 'Objetivos Personalizados',
-        description:
-          'Defina objetivos de saúde sob medida com acompanhamento avançado',
+        description: 'Defina objetivos de saúde sob medida com acompanhamento avançado',
         free: 'Objetivos predefinidos',
         premium: 'Objetivos personalizados com acompanhamento avançado',
       },
       meal_planner: {
         title: 'Planejador de Refeições',
-        description:
-          'Planejamento automático de refeições com base em seus objetivos',
+        description: 'Planejamento automático de refeições com base em seus objetivos',
         free: 'Não disponível',
         premium: 'Planejamento automático com base em seus objetivos',
       },
@@ -1949,60 +1956,11 @@ export const PT_TRANSLATIONS = {
     '10': 'Nov',
     '11': 'Dez',
   },
-  scan_values: {
-    face_shape: {
-      Oval: 'Oval',
-      Round: 'Redondo',
-      Square: 'Quadrado',
-      Heart: 'Coração',
-      Diamond: 'Diamante',
-      Long: 'Alongado',
-      Triangle: 'Triângulo',
-      Rectangular: 'Retangular',
-    },
-    body_type: {
-      Ectomorph: 'Ectomorfo',
-      Mesomorph: 'Mesomorfo',
-      Endomorph: 'Endomorfo',
-      Hourglass: 'Ampulheta',
-      Pear: 'Pera',
-      Apple: 'Maçã',
-      Rectangle: 'Retângulo',
-      'Inverted Triangle': 'Triângulo Invertido',
-    },
-    muscle_mass: {
-      Low: 'Fraco',
-      Moderate: 'Moderado',
-      Average: 'Média',
-      High: 'Alto',
-      'Very High': 'Muito alto',
-      Athlete: 'Atlético',
-    },
-    glycemic_index: {
-      Low: 'Fraco',
-      Moderate: 'Moderado',
-      High: 'Aluno',
-    },
-    ingredient_quality: {
-      Excellent: 'Excelente',
-      Good: 'Boa',
-      Average: 'Média',
-      Poor: 'Baixa',
-      Bad: 'Muito baixa',
-      Processed: 'Processado',
-      'Ultra Processed': 'Ultraprocessado',
-    },
-    severity: {
-      low: 'Fraco',
-      moderate: 'Moderado',
-      high: 'Aluno',
-    },
-  },
-  condition_card: {
-    explanation: 'Explicação',
-    advice: 'Conselhos práticos',
-    probability: 'probabilidade',
-    unlock: 'Desbloquear',
+  copilot: {
+    analytics_step: 'Verifique suas estatísticas e acompanhe seu progresso ao longo do tempo.',
+    scanner_step: 'Escaneie seus alimentos e fotos para analisar sua saúde!',
+    settings_step: 'Acesse as configurações da sua conta e do aplicativo.',
+    notifications_step: 'Encontre aqui suas notificações e conquistas desbloqueadas!',
   },
 } as const;
 

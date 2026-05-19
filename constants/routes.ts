@@ -33,6 +33,7 @@ export const PROTECTED_ROUTES = [
   'exercises',
   'scan-preview',
   'scan-result',
+  'super-scan-result',
   'share-story',
   'settings',
   'notifications',
@@ -76,7 +77,16 @@ export const SCREEN_OPTIONS = {
   'recipes': { presentation: 'modal' as const },
   'exercises': { presentation: 'modal' as const },
   'scan-preview': { presentation: 'fullScreenModal' as const },
-  'scan-result': { presentation: 'modal' as const },
+  'scan-result': {
+    presentation: 'transparentModal' as const,
+    gestureEnabled: false,
+    fullScreenGestureEnabled: false,
+  },
+  'super-scan-result': {
+    presentation: 'transparentModal' as const,
+    gestureEnabled: false,
+    fullScreenGestureEnabled: false,
+  },
   'share-story': { presentation: 'modal' as const },
 } as const;
 

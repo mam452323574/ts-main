@@ -77,6 +77,7 @@ export interface Phase2FeatureFlags {
   scope: string;
   social_enabled: boolean;
   coach_enabled: boolean;
+  coach_chat_enabled: boolean;
   entry_offer_enabled: boolean;
   social_comments_enabled: boolean;
   moderation_enabled: boolean;
@@ -559,15 +560,4 @@ export interface SocialHideAuthorResponse {
   success: true;
   author_id: string;
   hidden: boolean;
-}
-
-export interface SocialSetSaveRequest {
-  post_id: string;
-  action?: 'save' | 'unsave';
-}
-
-export interface SocialSetSaveResponse {
-  success: true;
-  post_id: string;
-  saved: boolean;
 }

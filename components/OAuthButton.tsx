@@ -15,6 +15,7 @@ import {
   mixColors,
   withAlpha,
 } from '@/constants/theme';
+import { Squircle } from '@/components/Squircle';
 
 interface OAuthButtonProps {
   provider: 'google' | 'apple';
@@ -86,9 +87,9 @@ export function OAuthButton({
           {provider === 'google' ? (
             <GoogleMark styles={styles} />
           ) : (
-            <View style={styles.appleMark}>
+            <Squircle style={styles.appleMark}>
               <Text style={styles.appleMarkText}>A</Text>
-            </View>
+            </Squircle>
           )}
           <Text style={[styles.label, { color: config.textColor }]}>
             {config.label}
@@ -105,13 +106,13 @@ function GoogleMark({
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <View style={styles.googleMark} testID="oauth-google-mark">
+    <Squircle style={styles.googleMark} testID="oauth-google-mark">
       <Text style={styles.googleLetter}>G</Text>
       <View style={[styles.googleAccent, styles.googleAccentBlue]} />
       <View style={[styles.googleAccent, styles.googleAccentRed]} />
       <View style={[styles.googleAccent, styles.googleAccentYellow]} />
       <View style={[styles.googleAccent, styles.googleAccentGreen]} />
-    </View>
+    </Squircle>
   );
 }
 
@@ -130,7 +131,7 @@ const createStyles = (colors: any, isDark: boolean) =>
       shadowOffset: { width: 0, height: 8 },
       shadowOpacity: isDark ? 0.14 : 0.06,
       shadowRadius: 18,
-      elevation: 2,
+      elevation: 2, borderCurve: 'continuous',
     },
     buttonPressed: {
       transform: [{ translateY: 1 }],
@@ -155,7 +156,7 @@ const createStyles = (colors: any, isDark: boolean) =>
       backgroundColor: '#FFFFFF',
       borderWidth: 1,
       borderColor: withAlpha('#1C1C1E', 0.08),
-      overflow: 'hidden',
+      overflow: 'hidden', borderCurve: 'continuous',
     },
     googleLetter: {
       color: '#202124',
@@ -168,7 +169,7 @@ const createStyles = (colors: any, isDark: boolean) =>
       position: 'absolute',
       width: 16,
       height: 4,
-      borderRadius: 999,
+      borderRadius: 999, borderCurve: 'continuous',
     },
     googleAccentBlue: {
       right: -2,
@@ -199,7 +200,7 @@ const createStyles = (colors: any, isDark: boolean) =>
       borderRadius: 14,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: isDark ? '#111111' : '#FFFFFF',
+      backgroundColor: isDark ? '#111111' : '#FFFFFF', borderCurve: 'continuous',
     },
     appleMarkText: {
       color: isDark ? '#FFFFFF' : '#111111',

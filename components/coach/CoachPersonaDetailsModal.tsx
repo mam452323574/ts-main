@@ -27,6 +27,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { CoachPersonaDefinition } from '@/shared/coachPersonas';
 import type { CoachPersonaVisual } from '@/shared/coachPersonaVisuals';
+import { Squircle } from '@/components/Squircle';
 
 interface CoachPersonaDetailsModalProps {
   visible: boolean;
@@ -132,7 +133,7 @@ export function CoachPersonaDetailsModal({
           testID="coach-persona-details-backdrop"
         />
 
-        <View
+        <Squircle
           style={[styles.sheet, { maxHeight: sheetMaxHeight }]}
           testID="coach-persona-details-modal"
         >
@@ -220,17 +221,17 @@ export function CoachPersonaDetailsModal({
                 </View>
 
                 {locked ? (
-                  <View
+                  <Squircle
                     style={styles.lockedCallout}
                     testID="coach-persona-details-locked-callout"
                   >
-                    <View style={styles.lockedCalloutIcon}>
+                    <Squircle style={styles.lockedCalloutIcon}>
                       <Lock
                         color={colors.gold ?? '#FFD700'}
                         size={16}
                         strokeWidth={2.4}
                       />
-                    </View>
+                    </Squircle>
                     <View style={styles.lockedCalloutCopy}>
                       <Text style={styles.lockedCalloutTitle}>
                         {t('coach.persona_locked_title')}
@@ -239,19 +240,19 @@ export function CoachPersonaDetailsModal({
                         {t('coach.persona_locked_body')}
                       </Text>
                     </View>
-                  </View>
+                  </Squircle>
                 ) : null}
 
                 <View style={styles.sections}>
                   {sections.map((section) => (
-                    <View
+                    <Squircle
                       key={section.key}
                       style={styles.detailCard}
                       testID={`coach-persona-details-${section.key}`}
                     >
                       <Text style={styles.detailLabel}>{section.label}</Text>
                       <Text style={styles.detailValue}>{section.value}</Text>
-                    </View>
+                    </Squircle>
                   ))}
                 </View>
               </ScrollView>
@@ -280,7 +281,7 @@ export function CoachPersonaDetailsModal({
               </View>
             </>
           ) : null}
-        </View>
+        </Squircle>
       </View>
     </Modal>
   );
@@ -304,7 +305,7 @@ const createStyles = (colors: any, footerBottomPadding: number) =>
       borderBottomWidth: 0,
       borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
       overflow: 'hidden',
-      ...SHADOWS.card,
+      ...SHADOWS.card, borderCurve: 'continuous',
     },
     sheetHeader: {
       minHeight: 50,
@@ -324,7 +325,7 @@ const createStyles = (colors: any, footerBottomPadding: number) =>
       justifyContent: 'center',
       backgroundColor: colors.surfaceMuted ?? withAlpha(colors.white, 0.06),
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08), borderCurve: 'continuous',
     },
     closeIconButtonPressed: {
       opacity: 0.72,
@@ -368,7 +369,7 @@ const createStyles = (colors: any, footerBottomPadding: number) =>
       borderRadius: BORDER_RADIUS.full,
       backgroundColor: withAlpha(colors.primary, 0.16),
       borderWidth: 1,
-      borderColor: withAlpha(colors.primary, 0.28),
+      borderColor: withAlpha(colors.primary, 0.28), borderCurve: 'continuous',
     },
     toneBadgeLabel: {
       fontSize: SIZES.text12,
@@ -382,7 +383,7 @@ const createStyles = (colors: any, footerBottomPadding: number) =>
       borderRadius: BORDER_RADIUS.full,
       backgroundColor: colors.surfaceMuted ?? withAlpha(colors.white, 0.08),
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08), borderCurve: 'continuous',
     },
     statusBadgeLabel: {
       fontSize: SIZES.text12,
@@ -396,7 +397,7 @@ const createStyles = (colors: any, footerBottomPadding: number) =>
       borderRadius: BORDER_RADIUS.full,
       backgroundColor: withAlpha(colors.gold, 0.14),
       borderWidth: 1,
-      borderColor: withAlpha(colors.gold, 0.26),
+      borderColor: withAlpha(colors.gold, 0.26), borderCurve: 'continuous',
     },
     lockedBadgeLabel: {
       fontSize: SIZES.text12,
@@ -411,7 +412,7 @@ const createStyles = (colors: any, footerBottomPadding: number) =>
       borderRadius: BORDER_RADIUS.xl,
       backgroundColor: withAlpha(colors.goldLight ?? '#FFF8E1', 0.16),
       borderWidth: 1,
-      borderColor: withAlpha(colors.gold ?? '#FFD700', 0.24),
+      borderColor: withAlpha(colors.gold ?? '#FFD700', 0.24), borderCurve: 'continuous',
     },
     lockedCalloutIcon: {
       width: 30,
@@ -420,7 +421,7 @@ const createStyles = (colors: any, footerBottomPadding: number) =>
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: withAlpha(colors.gold ?? '#FFD700', 0.14),
-      flexShrink: 0,
+      flexShrink: 0, borderCurve: 'continuous',
     },
     lockedCalloutCopy: {
       flex: 1,
@@ -457,7 +458,7 @@ const createStyles = (colors: any, footerBottomPadding: number) =>
       borderRadius: BORDER_RADIUS.xl,
       backgroundColor: colors.surfaceMuted ?? withAlpha(colors.white, 0.04),
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.07),
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.07), borderCurve: 'continuous',
     },
     detailLabel: {
       fontSize: SIZES.text12,
@@ -486,7 +487,7 @@ const createStyles = (colors: any, footerBottomPadding: number) =>
       justifyContent: 'center',
       backgroundColor: colors.surfaceMuted ?? withAlpha(colors.white, 0.05),
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.06),
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.06), borderCurve: 'continuous',
     },
     secondaryActionLabel: {
       fontSize: SIZES.text14,

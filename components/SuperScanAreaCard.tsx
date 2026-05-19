@@ -297,7 +297,7 @@ const createStyles = (
       borderRadius: layout.featureRadius,
       padding: layout.blockPadding,
       gap: layout.sectionGap,
-      borderWidth: 1,
+      borderWidth: 1, borderCurve: 'continuous',
     },
     headerRow: {
       flexDirection: layout.useSingleColumnResultCards ? 'column' : 'row',
@@ -333,7 +333,7 @@ const createStyles = (
       borderColor: isDark
         ? withAlpha(colors.primary, 0.32)
         : withAlpha(colors.primary, 0.18),
-      gap: 2,
+      gap: 2, borderCurve: 'continuous',
     },
     badgeLabel: {
       fontSize: SIZES.xs,
@@ -378,7 +378,7 @@ const createStyles = (
       borderColor: isDark
         ? withAlpha(colors.white, 0.06)
         : withAlpha(colors.primaryText, 0.06),
-      gap: 4,
+      gap: 4, borderCurve: 'continuous',
     },
     metricLabel: {
       fontSize: SIZES.xs,
@@ -409,7 +409,7 @@ const createStyles = (
       borderColor: isDark
         ? withAlpha(colors.white, 0.06)
         : withAlpha(colors.primaryText, 0.06),
-      gap: SPACING.xs,
+      gap: SPACING.xs, borderCurve: 'continuous',
     },
     sectionLabel: {
       fontSize: SIZES.xs,

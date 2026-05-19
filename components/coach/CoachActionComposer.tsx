@@ -22,6 +22,7 @@ import {
 } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { CoachPersonaVisual } from '@/shared/coachPersonaVisuals';
+import { Squircle } from '@/components/Squircle';
 
 interface CoachActionComposerProps {
   personaTitle: string;
@@ -63,7 +64,7 @@ export function CoachActionComposer({
     muted || disabled ? colors.primaryText : actionChrome.foregroundColor;
 
   return (
-    <View style={styles.container} testID={testID}>
+    <Squircle style={styles.container} testID={testID}>
       <View style={styles.summary} testID={`${testID}-summary`}>
         <CoachPersonaAvatar
           imageSource={personaVisual.imageSource}
@@ -125,7 +126,7 @@ export function CoachActionComposer({
           {actionLabel}
         </Text>
       </Pressable>
-    </View>
+    </Squircle>
   );
 }
 
@@ -261,7 +262,7 @@ const createStyles = (
       backgroundColor: floatingSurfaceBackground,
       borderWidth: 1,
       borderColor: floatingSurfaceBorder,
-      ...floatingShadowStyle,
+      ...floatingShadowStyle, borderCurve: 'continuous',
     },
     summary: {
       flex: 1,
@@ -304,7 +305,7 @@ const createStyles = (
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: isDark ? 0.035 : 0.02,
       shadowRadius: 8,
-      elevation: 1,
+      elevation: 1, borderCurve: 'continuous',
     },
     actionButtonMuted: {
       backgroundColor: isDark

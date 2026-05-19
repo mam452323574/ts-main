@@ -67,8 +67,6 @@ interface CoachSettingsInlineProps {
   questionMaxLength: number;
   promptTitle: (prompt: CoachPromptType) => string;
   promptSubtitle?: (prompt: CoachPromptType) => string;
-  title: string;
-  subtitle: string;
   accentColor?: string;
   personaSectionLabel: string;
   modeSectionLabel: string;
@@ -86,6 +84,13 @@ interface CoachSettingsInlineProps {
   busyPromptType?: CoachPromptType | null;
   busy?: boolean;
   disabled?: boolean;
+  /**
+   * When false, the legacy "Question libre" pressable is removed (Coach chat
+   * rollout — the free-form question now lives in the conversation screen
+   * instead of as a preset). Defaults to true to preserve the existing
+   * behaviour for tests and for the flagged-off rollout.
+   */
+  showFreeQuestionInput?: boolean;
   testID?: string;
 }
 
@@ -106,8 +111,6 @@ export function CoachSettingsInline({
   questionMaxLength,
   promptTitle,
   promptSubtitle,
-  title,
-  subtitle,
   accentColor,
   personaSectionLabel,
   modeSectionLabel,
@@ -125,6 +128,7 @@ export function CoachSettingsInline({
   busyPromptType,
   busy = false,
   disabled = false,
+  showFreeQuestionInput = true,
   testID = 'coach-settings-inline',
 }: CoachSettingsInlineProps) {
   const { colors, isDark } = useTheme();
@@ -141,31 +145,27 @@ export function CoachSettingsInline({
 
   return (
     <View style={styles.container} testID={testID}>
-      <View style={styles.heading}>
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.subtitle}>{subtitle}</Text>
-      </View>
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{
-          disabled: busy || disabled,
-          selected: isCustomQuestionSelected,
-        }}
-        disabled={busy || disabled}
-        onLayout={onQuestionInputLayout}
-        onPress={handleCustomQuestionFocus}
-        style={({ pressed }) => [
-          styles.questionInputSection,
-          styles.questionInputSectionFeatured,
-          isCustomQuestionSelected
-            ? styles.questionInputSectionSelected
-            : styles.questionInputSectionIdle,
-          pressed && !busy && !disabled ? styles.questionInputSectionPressed : null,
-          busy || disabled ? styles.questionInputSectionDisabled : null,
-        ]}
-        testID={`${testID}-question-input-card`}
-      >
+      {showFreeQuestionInput ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{
+            disabled: busy || disabled,
+            selected: isCustomQuestionSelected,
+          }}
+          disabled={busy || disabled}
+          onLayout={onQuestionInputLayout}
+          onPress={handleCustomQuestionFocus}
+          style={({ pressed }) => [
+            styles.questionInputSection,
+            styles.questionInputSectionFeatured,
+            isCustomQuestionSelected
+              ? styles.questionInputSectionSelected
+              : styles.questionInputSectionIdle,
+            pressed && !busy && !disabled ? styles.questionInputSectionPressed : null,
+            busy || disabled ? styles.questionInputSectionDisabled : null,
+          ]}
+          testID={`${testID}-question-input-card`}
+        >
         <View style={styles.questionInputHeader}>
           <View style={styles.questionInputTitleRow}>
             <Text
@@ -218,7 +218,8 @@ export function CoachSettingsInline({
           style={styles.questionInput}
           testID={`${testID}-question-input`}
         />
-      </Pressable>
+        </Pressable>
+      ) : null}
 
       <Text style={styles.sectionLabel}>{personaSectionLabel}</Text>
       <ScrollView
@@ -288,21 +289,6 @@ const createStyles = (colors: any, isDark: boolean, accentColor?: string) => {
     container: {
       gap: SPACING.sm + 2,
     },
-    heading: {
-      gap: 5,
-      marginBottom: SPACING.xs,
-    },
-    title: {
-      fontSize: 18,
-      lineHeight: 23,
-      fontWeight: FONT_WEIGHTS.bold,
-      color: colors.primaryText,
-    },
-    subtitle: {
-      fontSize: 13,
-      lineHeight: 19,
-      color: withAlpha(colors.primaryText, 0.7),
-    },
     sectionLabel: {
       fontSize: 11,
       lineHeight: 14,
@@ -332,7 +318,7 @@ const createStyles = (colors: any, isDark: boolean, accentColor?: string) => {
       padding: SPACING.md,
       borderRadius: BORDER_RADIUS.xl,
       borderWidth: 1,
-      marginBottom: SPACING.xs,
+      marginBottom: SPACING.xs, borderCurve: 'continuous',
     },
     questionInputSectionIdle: {
       borderColor: isDark
@@ -399,7 +385,7 @@ const createStyles = (colors: any, isDark: boolean, accentColor?: string) => {
       color: colors.primaryText,
       fontSize: 14,
       lineHeight: 20,
-      textAlignVertical: 'top',
+      textAlignVertical: 'top', borderCurve: 'continuous',
     },
     selectedBadge: {
       flexShrink: 0,
@@ -415,7 +401,7 @@ const createStyles = (colors: any, isDark: boolean, accentColor?: string) => {
       backgroundColor: withAlpha(
         accentColor ?? colors.primary,
         isDark ? 0.16 : 0.08,
-      ),
+      ), borderCurve: 'continuous',
     },
     selectedBadgeText: {
       fontSize: 11,

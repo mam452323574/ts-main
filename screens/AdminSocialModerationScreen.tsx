@@ -28,7 +28,7 @@ import {
   getOverflowActionDefinitions,
   getSectionCopy,
   isModerationItemApprovable,
-  parseSignedIntegerInput,
+  parseAdminReactionAdjustmentInput,
   resolveDefaultSortMode,
   searchModerationItems,
   sortModerationItems,
@@ -44,6 +44,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useAdminWhoami } from '@/hooks/queries/useAdminWhoami';
 import { useSocialAdminModeration } from '@/hooks/queries/useSocialAdminModeration';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import {
@@ -56,6 +57,7 @@ import type {
   SocialModerationAction,
   SocialReclassifyPostRequest,
 } from '@/types';
+import { Squircle } from '@/components/Squircle';
 
 interface PendingActionContext {
   itemId: string;
@@ -120,7 +122,15 @@ export default function AdminSocialModerationScreen() {
   const [dislikeAdjustmentInput, setDislikeAdjustmentInput] = useState('0');
   const [reactionAdjustmentNote, setReactionAdjustmentNote] = useState('');
   const autoExpandedErrorIdsRef = useRef<Set<string>>(new Set());
-  const isAdmin = userProfile?.account_tier === 'admin';
+  // S-07 — Le tier admin issu du userProfile (AuthContext) est cache cote
+  // client. On revalide cote serveur via admin-whoami : si le user a perdu
+  // son tier admin (demotion, ban), on bloque l'ecran avant de rendre les
+  // composants admin. La double check (client + server) ferme la fenetre
+  // d'observation des endpoints / payloads attendus pour un attaquant qui
+  // patcherait userProfile.account_tier en memoire.
+  const clientSideIsAdmin = userProfile?.account_tier === 'admin';
+  const adminWhoamiQuery = useAdminWhoami({ enabled: clientSideIsAdmin });
+  const isAdmin = clientSideIsAdmin && adminWhoamiQuery.data?.is_admin === true;
   const {
     moderationQueueQuery,
     moderateContentMutation,
@@ -132,10 +142,27 @@ export default function AdminSocialModerationScreen() {
   } = useSocialAdminModeration(selectedFilter, isAdmin);
 
   useEffect(() => {
-    if (!loading && userProfile && !isAdmin) {
+    if (loading || !userProfile) {
+      return;
+    }
+    // Redirige si le client cote profil n'est pas admin OU si admin-whoami
+    // a confirme un non-admin (403). On attend la fin du fetch whoami avant
+    // de rediriger pour eviter un flash UI.
+    if (!clientSideIsAdmin) {
+      router.replace('/(tabs)' as any);
+      return;
+    }
+    if (adminWhoamiQuery.isError || adminWhoamiQuery.data?.is_admin === false) {
       router.replace('/(tabs)' as any);
     }
-  }, [isAdmin, loading, router, userProfile]);
+  }, [
+    clientSideIsAdmin,
+    adminWhoamiQuery.isError,
+    adminWhoamiQuery.data?.is_admin,
+    loading,
+    router,
+    userProfile,
+  ]);
 
   const moderationItems = moderationQueueQuery.data?.items ?? [];
   const sectionCopy = getSectionCopy(selectedFilter);
@@ -190,8 +217,8 @@ export default function AdminSocialModerationScreen() {
     moderateUserMutation.isPending ||
     eradicateUserMutation.isPending ||
     adjustPostReactionsMutation.isPending;
-  const parsedLikeAdjustment = parseSignedIntegerInput(likeAdjustmentInput);
-  const parsedDislikeAdjustment = parseSignedIntegerInput(dislikeAdjustmentInput);
+  const parsedLikeAdjustment = parseAdminReactionAdjustmentInput(likeAdjustmentInput);
+  const parsedDislikeAdjustment = parseAdminReactionAdjustmentInput(dislikeAdjustmentInput);
   const hasValidReactionAdjustments =
     parsedLikeAdjustment !== null && parsedDislikeAdjustment !== null;
   const reactionPreview = reactionAdjustmentTarget && hasValidReactionAdjustments
@@ -542,8 +569,8 @@ export default function AdminSocialModerationScreen() {
       return;
     }
 
-    const parsedLikes = parseSignedIntegerInput(likeAdjustmentInput);
-    const parsedDislikes = parseSignedIntegerInput(dislikeAdjustmentInput);
+    const parsedLikes = parseAdminReactionAdjustmentInput(likeAdjustmentInput);
+    const parsedDislikes = parseAdminReactionAdjustmentInput(dislikeAdjustmentInput);
 
     if (parsedLikes === null || parsedDislikes === null) {
       showAlert(
@@ -694,9 +721,9 @@ export default function AdminSocialModerationScreen() {
 
   const renderQueueHeader = () => (
     <View style={styles.summaryStack}>
-      <View style={styles.summaryStrip} testID="admin-social-summary-strip">
-        <View style={styles.summaryGlowPrimary} />
-        <View style={styles.summaryGlowSecondary} />
+      <Squircle style={styles.summaryStrip} testID="admin-social-summary-strip">
+        <Squircle style={styles.summaryGlowPrimary} />
+        <Squircle style={styles.summaryGlowSecondary} />
         <View style={styles.summaryTopRow}>
           <View style={styles.summaryEyebrowRow}>
             <ShieldAlert color={chrome.filterAccent} size={14} />
@@ -722,14 +749,14 @@ export default function AdminSocialModerationScreen() {
             </Text>
           </View>
 
-          <View style={styles.summarySpotlight}>
+          <Squircle style={styles.summarySpotlight}>
             <Text style={styles.summarySpotlightValue}>{selectedFilterCount}</Text>
             <Text style={styles.summarySpotlightLabel}>
               {t(`social.admin.filters.${selectedFilter}`)}
             </Text>
-          </View>
+          </Squircle>
         </View>
-      </View>
+      </Squircle>
 
       <View style={styles.summaryGrid} testID="admin-social-summary-grid">
         {summaryCards.map((card) => {
@@ -743,7 +770,7 @@ export default function AdminSocialModerationScreen() {
                   : chrome.trustAccent;
 
           return (
-            <View
+            <Squircle
               key={card.key}
               style={[
                 styles.summaryMiniCard,
@@ -758,7 +785,7 @@ export default function AdminSocialModerationScreen() {
             <Text style={styles.summaryMiniLabel}>
               {t(`social.admin.summary.${card.key}`)}
             </Text>
-            </View>
+            </Squircle>
           );
         })}
       </View>
@@ -778,7 +805,7 @@ export default function AdminSocialModerationScreen() {
       />
 
       {selectedModerationItems.length > 0 ? (
-        <View style={styles.bulkActionBar} testID="admin-social-bulk-bar">
+        <Squircle style={styles.bulkActionBar} testID="admin-social-bulk-bar">
           <View style={styles.bulkHeaderRow}>
             <View style={styles.bulkSelectionPill}>
               <Text style={styles.bulkSelectionLabel}>
@@ -828,7 +855,7 @@ export default function AdminSocialModerationScreen() {
               </Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </Squircle>
       ) : null}
     </View>
   );
@@ -837,20 +864,20 @@ export default function AdminSocialModerationScreen() {
     if (moderationQueueQuery.isLoading && !moderationQueueQuery.data) {
       return (
         <View style={styles.stateShell}>
-          <View style={styles.loadingCard} testID="admin-social-loading-placeholder">
+          <Squircle style={styles.loadingCard} testID="admin-social-loading-placeholder">
             <View style={styles.loadingHeader}>
               <ActivityIndicator color={chrome.trustAccent} size="small" />
               <Text style={styles.loadingTitle}>{t('social.admin.title')}</Text>
             </View>
 
             {[0, 1].map((index) => (
-              <View key={index} style={styles.loadingPreviewCard}>
+              <Squircle key={index} style={styles.loadingPreviewCard}>
                 <View style={[styles.loadingBar, styles.loadingBarShort]} />
                 <View style={[styles.loadingBar, styles.loadingBarMedium]} />
                 <View style={[styles.loadingBar, styles.loadingBarLong]} />
-              </View>
+              </Squircle>
             ))}
-          </View>
+          </Squircle>
         </View>
       );
     }
@@ -858,7 +885,7 @@ export default function AdminSocialModerationScreen() {
     if (moderationQueueQuery.error) {
       return (
         <View style={styles.stateShell}>
-          <View style={styles.inlineErrorCard} testID="admin-social-error-state">
+          <Squircle style={styles.inlineErrorCard} testID="admin-social-error-state">
             <View style={styles.inlineMessageRow}>
               <AlertCircle color={chrome.dangerAccent} size={16} />
               <View style={styles.inlineMessageCopy}>
@@ -870,7 +897,7 @@ export default function AdminSocialModerationScreen() {
             </View>
 
             {showQueueLoadDebugInfo ? (
-              <View style={styles.debugBlock} testID="admin-social-error-debug">
+              <Squircle style={styles.debugBlock} testID="admin-social-error-debug">
                 <Text style={styles.debugLine}>
                   {`code: ${queueLoadErrorDebugInfo?.code ?? '-'}`}
                 </Text>
@@ -886,7 +913,7 @@ export default function AdminSocialModerationScreen() {
                 <Text style={styles.debugLine}>
                   {`message: ${queueLoadErrorDebugInfo?.message ?? '-'}`}
                 </Text>
-              </View>
+              </Squircle>
             ) : null}
 
             <TouchableOpacity
@@ -899,7 +926,7 @@ export default function AdminSocialModerationScreen() {
             >
               <Text style={styles.retryButtonLabel}>{t('common.retry')}</Text>
             </TouchableOpacity>
-          </View>
+          </Squircle>
         </View>
       );
     }
@@ -909,7 +936,7 @@ export default function AdminSocialModerationScreen() {
 
       return (
         <View style={styles.stateShell}>
-          <View style={styles.emptyCard} testID="admin-social-empty-state">
+          <Squircle style={styles.emptyCard} testID="admin-social-empty-state">
             <Text style={styles.emptyCardTitle}>
               {t(
                 isSearchActive
@@ -924,7 +951,7 @@ export default function AdminSocialModerationScreen() {
                   : sectionCopy.emptyBodyKey,
               )}
             </Text>
-          </View>
+          </Squircle>
         </View>
       );
     }
@@ -1054,7 +1081,7 @@ const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
       justifyContent: 'center',
       backgroundColor: chrome.headerButtonBackground,
       borderWidth: 1,
-      borderColor: chrome.headerButtonBorder,
+      borderColor: chrome.headerButtonBorder, borderCurve: 'continuous',
     },
     headerText: {
       flex: 1,
@@ -1080,7 +1107,7 @@ const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
       justifyContent: 'center',
       backgroundColor: chrome.filterAccentSoft,
       borderWidth: 1,
-      borderColor: chrome.filterAccentBorder,
+      borderColor: chrome.filterAccentBorder, borderCurve: 'continuous',
     },
     headerStateLabel: {
       fontSize: 11,
@@ -1106,7 +1133,7 @@ const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
       shadowOffset: { width: 0, height: 18 },
       shadowOpacity: 0.34,
       shadowRadius: 28,
-      elevation: 10,
+      elevation: 10, borderCurve: 'continuous',
     },
     summaryGlowPrimary: {
       position: 'absolute',
@@ -1115,7 +1142,7 @@ const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
       width: 164,
       height: 164,
       borderRadius: 82,
-      backgroundColor: chrome.filterAccentHalo,
+      backgroundColor: chrome.filterAccentHalo, borderCurve: 'continuous',
     },
     summaryGlowSecondary: {
       position: 'absolute',
@@ -1124,7 +1151,7 @@ const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
       width: 150,
       height: 150,
       borderRadius: 75,
-      backgroundColor: chrome.trustAccentSoft,
+      backgroundColor: chrome.trustAccentSoft, borderCurve: 'continuous',
     },
     summaryTopRow: {
       flexDirection: 'row',
@@ -1151,7 +1178,7 @@ const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
       justifyContent: 'center',
       backgroundColor: chrome.filterAccentSoft,
       borderWidth: 1,
-      borderColor: chrome.filterAccentBorder,
+      borderColor: chrome.filterAccentBorder, borderCurve: 'continuous',
     },
     summaryCountValue: {
       fontSize: 15,
@@ -1190,7 +1217,7 @@ const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
       justifyContent: 'center',
       backgroundColor: withAlpha(chrome.screenBackground, 0.34),
       borderWidth: 1,
-      borderColor: chrome.filterAccentBorder,
+      borderColor: chrome.filterAccentBorder, borderCurve: 'continuous',
     },
     summarySpotlightValue: {
       fontSize: 30,
@@ -1219,7 +1246,7 @@ const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
       paddingHorizontal: SPACING.sm + 2,
       paddingVertical: SPACING.sm,
       gap: 2,
-      borderWidth: 1,
+      borderWidth: 1, borderCurve: 'continuous',
     },
     summaryMiniValue: {
       fontSize: 16,
@@ -1242,7 +1269,7 @@ const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
       shadowOffset: { width: 0, height: 12 },
       shadowOpacity: 0.24,
       shadowRadius: 22,
-      elevation: 8,
+      elevation: 8, borderCurve: 'continuous',
     },
     bulkHeaderRow: {
       flexDirection: 'row',
@@ -1259,7 +1286,7 @@ const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
       justifyContent: 'center',
       backgroundColor: chrome.filterAccentSoft,
       borderWidth: 1,
-      borderColor: chrome.filterAccentBorder,
+      borderColor: chrome.filterAccentBorder, borderCurve: 'continuous',
     },
     bulkSelectionLabel: {
       fontSize: 12,
@@ -1285,7 +1312,7 @@ const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
       justifyContent: 'center',
       backgroundColor: chrome.trustAccent,
       borderWidth: 1,
-      borderColor: chrome.trustAccentBorder,
+      borderColor: chrome.trustAccentBorder, borderCurve: 'continuous',
     },
     bulkPrimaryButtonLabel: {
       fontSize: 12,
@@ -1300,7 +1327,7 @@ const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
       justifyContent: 'center',
       backgroundColor: chrome.surfaceMuted,
       borderWidth: 1,
-      borderColor: chrome.borderSubtle,
+      borderColor: chrome.borderSubtle, borderCurve: 'continuous',
     },
     bulkSecondaryButtonLabel: {
       fontSize: 12,
@@ -1324,7 +1351,7 @@ const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
       gap: SPACING.sm,
       backgroundColor: chrome.surfaceGlass,
       borderWidth: 1,
-      borderColor: chrome.borderSubtle,
+      borderColor: chrome.borderSubtle, borderCurve: 'continuous',
     },
     loadingHeader: {
       flexDirection: 'row',
@@ -1342,12 +1369,12 @@ const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
       gap: SPACING.xs + 2,
       backgroundColor: chrome.surfaceMuted,
       borderWidth: 1,
-      borderColor: chrome.borderSubtle,
+      borderColor: chrome.borderSubtle, borderCurve: 'continuous',
     },
     loadingBar: {
       height: 8,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: withAlpha(chrome.textPrimary, 0.08),
+      backgroundColor: withAlpha(chrome.textPrimary, 0.08), borderCurve: 'continuous',
     },
     loadingBarShort: {
       width: '34%',
@@ -1364,7 +1391,7 @@ const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
       gap: SPACING.sm,
       backgroundColor: chrome.surfaceGlass,
       borderWidth: 1,
-      borderColor: chrome.dangerAccentBorder,
+      borderColor: chrome.dangerAccentBorder, borderCurve: 'continuous',
     },
     inlineMessageRow: {
       flexDirection: 'row',
@@ -1391,7 +1418,7 @@ const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
       gap: 2,
       backgroundColor: chrome.surfaceMuted,
       borderWidth: 1,
-      borderColor: chrome.borderSubtle,
+      borderColor: chrome.borderSubtle, borderCurve: 'continuous',
     },
     debugLine: {
       fontSize: SIZES.text12,
@@ -1407,7 +1434,7 @@ const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
       justifyContent: 'center',
       backgroundColor: chrome.trustAccentSoft,
       borderWidth: 1,
-      borderColor: chrome.trustAccentBorder,
+      borderColor: chrome.trustAccentBorder, borderCurve: 'continuous',
     },
     retryButtonLabel: {
       fontSize: 12,
@@ -1420,7 +1447,7 @@ const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
       gap: SPACING.xs + 2,
       backgroundColor: chrome.surfaceGlass,
       borderWidth: 1,
-      borderColor: chrome.borderSubtle,
+      borderColor: chrome.borderSubtle, borderCurve: 'continuous',
     },
     emptyCardTitle: {
       fontSize: 15,

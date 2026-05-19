@@ -347,6 +347,19 @@
       ],
       "id": "b165066c-3b33-401b-b7e5-e057f6128e67",
       "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sign Webhook Response — HMAC-SHA256\n// Dual-mode: logs warning when secret is missing unless COACH_WEBHOOK_HMAC_ENFORCE=true.\n// Adds x-webhook-response-timestamp and x-webhook-response-signature headers\n// that the Supabase Edge Function verifies via verifyPhase2WebhookResponseSignature.\n\nconst crypto = require('crypto');\n\nconst ENFORCE = ($env.COACH_WEBHOOK_HMAC_ENFORCE || '').trim().toLowerCase() === 'true';\nconst SECRET = ($env.PHASE2_WEBHOOK_HMAC_SECRET || $env.COACH_WEBHOOK_HMAC_SECRET || '').trim();\n\nif (!SECRET) {\n  if (ENFORCE) {\n    throw new Error('sign_webhook_response_secret_missing');\n  }\n  console.warn('[sign-webhook-response] HMAC secret not configured (dual-mode, skipping signature)');\n  return $input.all();\n}\n\nconst rawBody = JSON.stringify($input.first().json);\nconst timestamp = new Date().toISOString();\nconst payload = timestamp + '.' + rawBody;\nconst sig = 'sha256=' + crypto.createHmac('sha256', SECRET).update(payload).digest('hex');\n\nreturn [{\n  json: $input.first().json,\n  binary: $input.first().binary,\n  headers: {\n    'x-webhook-response-timestamp': timestamp,\n    'x-webhook-response-signature': sig,\n    'Content-Type': 'application/json; charset=utf-8',\n  },\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1564,
+        16
+      ],
+      "id": "69275ebf-5bc5-4809-b3a2-ec178251f9ad",
+      "name": "Sign Webhook Response (analyse_1)"
     }
   ],
   "pinData": {},
@@ -499,6 +512,17 @@
       ]
     },
     "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Sign Webhook Response (analyse_1)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign Webhook Response (analyse_1)": {
       "main": [
         [
           {

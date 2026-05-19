@@ -63,7 +63,7 @@ const createStyles = (
       borderRadius: 999,
       backgroundColor: palette.surfaceGlass,
       borderWidth: 1,
-      borderColor: palette.divider,
+      borderColor: palette.divider, borderCurve: 'continuous',
     },
     brand: {
       fontSize: SIZES.text12,

@@ -31,6 +31,7 @@ import {
   createTrajectoryPreviewLineChartConfig,
 } from '@/utils/chartStyles';
 import type { ResultTrajectoryViewModel } from '@/utils/resultViewModels';
+import { Squircle } from '@/components/Squircle';
 
 const PREMIUM_TRAJECTORY_CHAMPAGNE = '#C7A369';
 const PREMIUM_TRAJECTORY_BRONZE = '#7E6241';
@@ -318,7 +319,7 @@ export function TrajectoryPreviewCard({
     : mixColors(colors.primaryText, colors.warning, isDark ? 0.66 : 0.82);
 
   return (
-    <View style={styles.shell} testID="trajectory-preview-card">
+    <Squircle style={styles.shell} testID="trajectory-preview-card">
       <View
         style={[
           styles.surface,
@@ -377,7 +378,7 @@ export function TrajectoryPreviewCard({
           </View>
         </View>
 
-        <View
+        <Squircle
           accessibilityElementsHidden={isLocked}
           importantForAccessibility={isLocked ? 'no-hide-descendants' : 'auto'}
           style={[
@@ -419,7 +420,7 @@ export function TrajectoryPreviewCard({
               <View
                 style={[styles.chartScrim, { backgroundColor: chartScrimColor }]}
               />
-              <View
+              <Squircle
                 style={[
                   styles.lockBadge,
                   {
@@ -430,7 +431,7 @@ export function TrajectoryPreviewCard({
                 testID="trajectory-preview-lock"
               >
                 <Lock color={premiumWarmAccent} size={28} strokeWidth={2.4} />
-              </View>
+              </Squircle>
             </View>
           ) : isLoading ? (
             <View
@@ -439,7 +440,7 @@ export function TrajectoryPreviewCard({
               testID="trajectory-preview-loading-state"
             />
           ) : null}
-        </View>
+        </Squircle>
 
         <View style={styles.copyBlock}>
           <Text
@@ -551,7 +552,7 @@ export function TrajectoryPreviewCard({
           </TouchableOpacity>
         ) : null}
       </View>
-    </View>
+    </Squircle>
   );
 }
 
@@ -562,14 +563,14 @@ const createStyles = (
 ) =>
   StyleSheet.create({
     shell: {
-      borderRadius: layout.featureRadius,
+      borderRadius: layout.featureRadius, borderCurve: 'continuous',
     },
     surface: {
       borderRadius: layout.featureRadius,
       padding: layout.blockPadding,
       borderWidth: 1,
       overflow: 'hidden',
-      gap: layout.contentGap,
+      gap: layout.contentGap, borderCurve: 'continuous',
     },
     headerRow: {
       flexDirection: 'row',
@@ -606,7 +607,7 @@ const createStyles = (
       flexShrink: 0,
       minHeight: 28,
       alignItems: 'center',
-      justifyContent: 'center',
+      justifyContent: 'center', borderCurve: 'continuous',
     },
     loadingTag: {
       minWidth: 74,
@@ -630,7 +631,7 @@ const createStyles = (
       shadowOffset: { width: 0, height: 10 },
       shadowOpacity: isDark ? 0.18 : 0.08,
       shadowRadius: 22,
-      elevation: 3,
+      elevation: 3, borderCurve: 'continuous',
     },
     chart: {
       marginLeft: layout.isCompact ? -SPACING.sm : -(SPACING.sm + 2),
@@ -666,7 +667,7 @@ const createStyles = (
       shadowOffset: { width: 0, height: 6 },
       shadowOpacity: isDark ? 0.24 : 0.12,
       shadowRadius: 16,
-      elevation: 4,
+      elevation: 4, borderCurve: 'continuous',
     },
     copyBlock: {
       gap: SPACING.xs,
@@ -704,7 +705,7 @@ const createStyles = (
       paddingHorizontal: SPACING.sm,
       paddingVertical: layout.isCompact ? SPACING.sm : SPACING.sm + 2,
       borderWidth: 1,
-      gap: 2,
+      gap: 2, borderCurve: 'continuous',
     },
     checkpointCardHighlighted: {
       shadowColor: colors.background,
@@ -739,14 +740,14 @@ const createStyles = (
     },
     ctaShell: {
       borderRadius: layout.ctaRadius,
-      overflow: 'hidden',
+      overflow: 'hidden', borderCurve: 'continuous',
     },
     ctaGradient: {
       minHeight: layout.ctaMinHeight,
       paddingHorizontal: layout.blockPadding,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: layout.ctaRadius,
+      borderRadius: layout.ctaRadius, borderCurve: 'continuous',
     },
     ctaText: {
       fontSize: layout.bodyTextFontSize,

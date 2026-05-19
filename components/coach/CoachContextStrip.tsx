@@ -19,6 +19,7 @@ import {
 import type { CoachPersonaVisual } from '@/shared/coachPersonaVisuals';
 import { getCoachPromptVisual } from '@/shared/coachPromptVisuals';
 import type { CoachPromptType } from '@/shared/coachPromptTypes';
+import { Squircle } from '@/components/Squircle';
 
 interface CoachContextStripProps {
   personaName: string;
@@ -53,13 +54,15 @@ export function CoachContextStrip({
   disabled = false,
   testID = 'coach-context-strip',
 }: CoachContextStripProps) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { icon: ModeIcon, accentColor: modeAccent } = getCoachPromptVisual(modeType);
-  const modeGlyphColor = mixColors(colors.white, modeAccent, 0.18);
+  const modeGlyphColor = isDark
+    ? mixColors(colors.white, modeAccent, 0.18)
+    : mixColors(modeAccent, colors.primaryText, 0.48);
 
   return (
-    <View style={styles.wrap} testID={testID}>
+    <Squircle style={styles.wrap} testID={testID}>
       <View style={styles.row}>
         <Pressable
           accessibilityRole="button"
@@ -101,7 +104,7 @@ export function CoachContextStrip({
           ]}
           testID={`${testID}-mode`}
         >
-          <View
+          <Squircle
             style={[
               styles.modeIcon,
               {
@@ -114,7 +117,7 @@ export function CoachContextStrip({
             ]}
           >
             <ModeIcon color={modeGlyphColor} size={14} strokeWidth={2.2} />
-          </View>
+          </Squircle>
           <Text numberOfLines={1} style={styles.modeName}>
             {modeName}
           </Text>
@@ -126,7 +129,7 @@ export function CoachContextStrip({
         label={statusLabel}
         testID={`${testID}-status`}
       />
-    </View>
+    </Squircle>
   );
 }
 
@@ -139,7 +142,7 @@ const createStyles = (colors: any) =>
       backgroundColor: withAlpha(colors.cardBackground, 0.96),
       borderWidth: 1,
       borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
-      ...SHADOWS.card,
+      ...SHADOWS.card, borderCurve: 'continuous',
     },
     row: {
       flexDirection: 'row',
@@ -154,7 +157,7 @@ const createStyles = (colors: any) =>
       paddingHorizontal: SPACING.xs,
       paddingVertical: SPACING.xs,
       borderRadius: BORDER_RADIUS.full,
-      minWidth: 0,
+      minWidth: 0, borderCurve: 'continuous',
     },
     personaName: {
       flex: 1,
@@ -172,14 +175,14 @@ const createStyles = (colors: any) =>
       paddingVertical: SPACING.xs + 2,
       borderRadius: BORDER_RADIUS.full,
       minWidth: 0,
-      maxWidth: '60%',
+      maxWidth: '60%', borderCurve: 'continuous',
     },
     modeIcon: {
       width: 24,
       height: 24,
       borderRadius: 12,
       alignItems: 'center',
-      justifyContent: 'center',
+      justifyContent: 'center', borderCurve: 'continuous',
     },
     modeName: {
       fontSize: SIZES.text12,

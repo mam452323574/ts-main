@@ -194,7 +194,7 @@ const createStyles = (colors: any) =>
       borderWidth: 1,
       borderBottomWidth: 0,
       borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
-      ...SHADOWS.card,
+      ...SHADOWS.card, borderCurve: 'continuous',
     },
     content: {
       paddingHorizontal: SPACING.lg,
@@ -227,7 +227,7 @@ const createStyles = (colors: any) =>
       borderRadius: BORDER_RADIUS.lg,
       backgroundColor: colors.surfaceMuted ?? withAlpha(colors.white, 0.04),
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.06),
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.06), borderCurve: 'continuous',
     },
     statCell: {
       flex: 1,
@@ -265,7 +265,7 @@ const createStyles = (colors: any) =>
       borderRadius: BORDER_RADIUS.lg,
       backgroundColor: colors.surfaceMuted ?? withAlpha(colors.white, 0.04),
       borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.06),
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.06), borderCurve: 'continuous',
     },
     stateTitle: {
       fontSize: SIZES.text14,
@@ -290,7 +290,7 @@ const createStyles = (colors: any) =>
       borderRadius: BORDER_RADIUS.lg,
       backgroundColor: colors.primary,
       borderWidth: 1,
-      borderColor: colors.primary,
+      borderColor: colors.primary, borderCurve: 'continuous',
     },
     followButtonActive: {
       backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.06),

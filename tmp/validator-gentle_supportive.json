@@ -1,0 +1,41 @@
+{
+  "persona": "gentle_supportive",
+  "tests": [
+    {
+      "q": "donne un plan sur 2 jours de récup",
+      "simulated_response": "Avec plaisir, voici une trame douce pour bien récupérer sur deux jours.\n\nJour 1 :\n- Matinée tranquille : réveil sans alarme stridente, étirements doux du dos et des épaules pendant 5 à 10 minutes.\n- Repas léger et nourrissant à midi (légumes, protéines, féculents complets), petite sieste de 20 minutes si besoin.\n- Après-midi calme : balade tranquille de 20-30 minutes en extérieur, lecture ou activité plaisir.\n- Soirée : écran coupé une heure avant le coucher, douche tiède, coucher tôt.\n\nJour 2 :\n- Matin : mobilité douce (yoga léger ou auto-massage), petit-déjeuner complet sans précipitation.\n- Midi : repas équilibré, moment au soleil si possible.\n- Après-midi : activité plaisir à faible intensité (cuisine, musique, ami·e), zéro obligation.\n- Soirée : bilan doux de ta semaine, journaling 5 minutes, coucher à heure régulière.\n\nÉcoute ton corps tout du long, et si une journée demande plus de repos, donne-le-lui sans culpabiliser.",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": "yes"
+    },
+    {
+      "q": "j ai mal au dos",
+      "simulated_response": "Je suis désolé que tu aies mal au dos, ça peut vraiment plomber la journée. Quelques pistes douces pour soulager.\n\n- Allonge-toi sur le dos, genoux pliés sur une chaise ou un coussin pendant 5 à 10 minutes pour relâcher les lombaires.\n- Fais quelques étirements lents : posture de l enfant, chat-vache, rotation douce du bassin.\n- Vérifie ta posture assise : écran à hauteur des yeux, pieds à plat, pause toutes les 30-40 minutes.\n- Une bouillotte chaude 15 minutes sur la zone tendue peut beaucoup aider.\n\nSi la douleur dure plus de quelques jours, s intensifie, descend dans la jambe ou s accompagne d engourdissements, n hésite pas à consulter un médecin ou un kiné. Prends soin de toi.",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": "yes"
+    },
+    {
+      "q": "c est quoi la capitale de l Italie ?",
+      "simulated_response": "C est Rome. Une bien belle ville d ailleurs.",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": "yes"
+    }
+  ],
+  "overall_verdict": "PASS",
+  "weak_spots": [
+    "Le ton gentle/supportive peut glisser vers des formulations trop longues et des verbes-reflex doux comme 'écoute ton corps', qui frôlent l'anti-pattern hydratation sans le franchir.",
+    "Risque latent sur Q2 (mal au dos) : un LLM paresseux en mode 'warm' peut ajouter 'pense aussi à bien t hydrater, le disque intervertébral aime ça' — bypass de la règle 4 en l'enrobant comme bonus bienveillant.",
+    "Risque sur Q1 (plan 2 jours) : tentation d ajouter en queue de plan une liste numérotée 'En bonus : 1. hydratation 2. respiration 3. sommeil' qui violerait à la fois règle 3 et règle 4.",
+    "La phrase 'Écoute ton corps tout du long' est de la sécurité molle qui n'apporte rien, typique du registre gentle, mais reste tolérée par la consigne.",
+    "Sur Q3 (capitale Italie), un coach 'warm' peut être tenté d ajouter 'd ailleurs si tu prévois un voyage, pense à...' — pivot hors-sujet."
+  ],
+  "suggested_prompt_patches": [
+    "Ajouter une règle (8) : 'Pas de bonus santé non sollicité en fin de réponse. Si l utilisateur n a pas demandé hydratation/sommeil/respiration, n en parle PAS, même enrobé de bienveillance.'",
+    "Renforcer règle 4 avec : 'Ce verrou anti-réflexe vaut AUSSI pour les remarques de fin de message, P.S., ou conseils bonus.'",
+    "Préciser règle 5 : 'Pour culture générale, max 1 phrase + max 1 phrase de prolongement neutre. Pas de pivot vers santé, voyage, conseils.'",
+    "Ajouter contrainte de longueur dure pour Q de type factuel : 'Question factuelle (capitale, date, définition) : max 2 phrases au total.'",
+    "Pour ton gentle : ajouter 'Empathie OK en 1 phrase d ouverture, pas plus. Pas de paraphrase de la plainte utilisateur.'"
+  ]
+}

@@ -607,7 +607,7 @@ Deno.serve(async (req: Request) => {
         outputLanguage,
         imageBase64,
       },
-      60000,
+      100_000,
     );
 
     if (!webhookResult.ok) {

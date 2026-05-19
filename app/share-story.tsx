@@ -314,7 +314,7 @@ export default function ShareStoryScreen() {
               previewCardWidth > 0 && {
                 width: previewCardWidth,
                 height: previewCardHeight,
-                borderRadius: getResultScaledRadius('hero', previewCardWidth / 360),
+                borderRadius: getResultScaledRadius('hero', previewCardWidth / 360), borderCurve: 'continuous',
               },
             ]}
             testID="share-story-capture-frame"
@@ -379,7 +379,7 @@ const createStyles = (
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: isDark
         ? withAlpha(colors.white, 0.08)
-        : withAlpha(colors.primaryText, 0.08),
+        : withAlpha(colors.primaryText, 0.08), borderCurve: 'continuous',
     },
     headerTitle: {
       textAlign: 'center',
@@ -410,7 +410,7 @@ const createStyles = (
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: isDark
         ? withAlpha(colors.primary, 0.22)
-        : withAlpha(colors.primary, 0.16),
+        : withAlpha(colors.primary, 0.16), borderCurve: 'continuous',
     },
     shareHeaderButtonText: {
       fontSize: layout.bodyTextFontSize,
@@ -472,7 +472,7 @@ const createStyles = (
       backgroundColor: colors.primaryText,
       marginTop: SPACING.sm,
       borderWidth: 1,
-      borderColor: isDark ? withAlpha(colors.white, 0.2) : withAlpha(colors.primaryText, 0.1),
+      borderColor: isDark ? withAlpha(colors.white, 0.2) : withAlpha(colors.primaryText, 0.1), borderCurve: 'continuous',
     },
     emptyButtonText: {
       color: colors.background,

@@ -1977,6 +1977,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     try {
+      // S-14 — Avant tout teardown, on tente de purger les reservations
+      // d'upload social pending. Best-effort : si la RPC echoue, la TTL de
+      // 30min prendra le relais. On le fait AVANT de clear les caches /
+      // setCurrentUser(null) pour avoir encore le user.id disponible.
+      const currentUserId = currentUser?.id ?? null;
+      if (currentUserId) {
+        try {
+          await supabase.rpc('release_pending_social_upload_reservations', {
+            p_user_id: currentUserId,
+          });
+        } catch (releaseError) {
+          // Non-bloquant : la TTL des reservations prend le relais.
+          logOperationalError(
+            '[SignOut] Failed to release pending social upload reservations',
+            releaseError,
+          );
+        }
+      }
+
       authVersionRef.current += 1;
       lastAuthHydrationSignatureRef.current = buildAuthHydrationSignature(null);
       setCurrentUserProfile(null);

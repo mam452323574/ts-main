@@ -32,6 +32,7 @@ import {
 import {
   markPostSignupOnboardingPending,
 } from '@/utils/postSignupOnboarding';
+import { Squircle } from '@/components/Squircle';
 
 const CODE_LENGTH = 6;
 const RESEND_COOLDOWN = 60;
@@ -361,9 +362,9 @@ export default function EmailVerificationScreen() {
     return (
       <AppScreen style={styles.successScreen}>
         <View style={styles.successContainer}>
-          <View style={styles.successIcon}>
+          <Squircle style={styles.successIcon}>
             <Check color={colors.white} size={48} />
-          </View>
+          </Squircle>
           <Text style={styles.successTitle}>
             {t('auth.verification_sent_title')}
           </Text>
@@ -394,9 +395,9 @@ export default function EmailVerificationScreen() {
         title={t('auth.verify_title')}
         subtitle={t('auth.verify_subtitle')}
         visual={
-          <View style={styles.iconBubble}>
+          <Squircle style={styles.iconBubble}>
             <Mail color={colors.primary} size={32} />
-          </View>
+          </Squircle>
         }
       />
       {email ? (
@@ -424,9 +425,9 @@ export default function EmailVerificationScreen() {
       </View>
 
       {error ? (
-        <View style={styles.errorContainer}>
+        <Squircle style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
-        </View>
+        </Squircle>
       ) : null}
 
       {avatarUploadFailed ? (
@@ -507,7 +508,7 @@ const createStyles = (colors: any, isDark: boolean) =>
       borderRadius: 40,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: mixColors(colors.cardBackground, colors.primary, isDark ? 0.18 : 0.10),
+      backgroundColor: mixColors(colors.cardBackground, colors.primary, isDark ? 0.18 : 0.10), borderCurve: 'continuous',
     },
     emailText: {
       fontSize: SIZES.md,
@@ -531,7 +532,7 @@ const createStyles = (colors: any, isDark: boolean) =>
       backgroundColor: withAlpha(colors.error, 0.10),
       paddingVertical: SPACING.md,
       paddingHorizontal: SPACING.lg,
-      borderRadius: BORDER_RADIUS.xl,
+      borderRadius: BORDER_RADIUS.xl, borderCurve: 'continuous',
     },
     errorText: {
       color: colors.error,
@@ -547,7 +548,7 @@ const createStyles = (colors: any, isDark: boolean) =>
       justifyContent: 'center',
       paddingVertical: SPACING.md,
       gap: SPACING.sm,
-      borderRadius: BORDER_RADIUS.pill,
+      borderRadius: BORDER_RADIUS.pill, borderCurve: 'continuous',
     },
     resendPressed: {
       backgroundColor: withAlpha(colors.primary, 0.08),
@@ -576,7 +577,7 @@ const createStyles = (colors: any, isDark: boolean) =>
       backgroundColor: colors.success,
       justifyContent: 'center',
       alignItems: 'center',
-      marginBottom: SPACING.lg,
+      marginBottom: SPACING.lg, borderCurve: 'continuous',
     },
     successTitle: {
       fontSize: SIZES.xxl,

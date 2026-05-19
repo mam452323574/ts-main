@@ -3,9 +3,12 @@ import { Phase2HttpError } from './phase2Errors.ts';
 import {
   buildPhase2WebhookHeaders,
   createPhase2WebhookSignature,
+  PHASE2_WEBHOOK_RESPONSE_SIGNATURE_HEADER,
+  PHASE2_WEBHOOK_RESPONSE_TIMESTAMP_HEADER,
   PHASE2_WEBHOOK_SIGNATURE_HEADER,
   PHASE2_WEBHOOK_TIMESTAMP_HEADER,
   postWebhookJson,
+  verifyPhase2WebhookResponseSignature,
 } from './phase2Webhook.ts';
 
 const PHASE2_WEBHOOK_ENV_NAMES = [
@@ -14,6 +17,12 @@ const PHASE2_WEBHOOK_ENV_NAMES = [
   'PHASE2_WEBHOOK_SECRET_HEADER_NAME',
   'PHASE2_WEBHOOK_SECRET_HEADER_VALUE',
   'PHASE2_WEBHOOK_HMAC_SECRET',
+  // S-01 / S-02 — env vars utilisees par les helpers d'allowlist et DNS check
+  'WEBHOOK_ALLOWED_HOSTS',
+  'WEBHOOK_ALLOW_PRIVATE_IPS',
+  'WEBHOOK_ALLOW_HTTP',
+  'WEBHOOK_VERIFY_RESPONSE',
+  'N8N_RESPONSE_HMAC_SECRET',
 ] as const;
 
 function assert(
@@ -58,6 +67,17 @@ async function assertRejectsPhase2HttpError(
   throw new Error('Expected the action to throw');
 }
 
+// S-02 — Pour ne pas casser les tests existants qui utilisent example.com en
+// dur, on configure par defaut une allowlist permissive et le bypass DNS prive.
+// Les tests qui veulent un comportement plus strict surchargent ces defauts
+// dans `overrides`.
+const PHASE2_WEBHOOK_TEST_DEFAULTS: Partial<
+  Record<(typeof PHASE2_WEBHOOK_ENV_NAMES)[number], string>
+> = {
+  WEBHOOK_ALLOWED_HOSTS: 'example.com,*.example.com',
+  WEBHOOK_ALLOW_PRIVATE_IPS: 'true',
+};
+
 async function withWebhookEnv(
   overrides: Partial<Record<(typeof PHASE2_WEBHOOK_ENV_NAMES)[number], string>>,
   action: () => Promise<void> | void,
@@ -68,6 +88,8 @@ async function withWebhookEnv(
     originalValues.set(envName, Deno.env.get(envName));
     if (Object.prototype.hasOwnProperty.call(overrides, envName)) {
       Deno.env.set(envName, overrides[envName] ?? '');
+    } else if (Object.prototype.hasOwnProperty.call(PHASE2_WEBHOOK_TEST_DEFAULTS, envName)) {
+      Deno.env.set(envName, PHASE2_WEBHOOK_TEST_DEFAULTS[envName] ?? '');
     } else {
       Deno.env.set(envName, '');
     }
@@ -86,6 +108,7 @@ async function withWebhookEnv(
 function installFetchSpy(
   responseBody = '{"success":true}',
   status = 200,
+  extraHeaders: Record<string, string> = {},
 ) {
   const originalFetch = globalThis.fetch;
   const calls: Array<{
@@ -99,6 +122,7 @@ function installFetchSpy(
       status,
       headers: {
         'Content-Type': 'application/json; charset=utf-8',
+        ...extraHeaders,
       },
     });
   };
@@ -108,6 +132,20 @@ function installFetchSpy(
     restore() {
       globalThis.fetch = originalFetch;
     },
+  };
+}
+
+// S-01 — Construit une reponse webhook signee comme le ferait n8n.
+async function buildSignedResponseHeaders(
+  rawBody: string,
+  secret: string,
+  options: { timestamp?: string } = {},
+): Promise<Record<string, string>> {
+  const timestamp = options.timestamp ?? new Date().toISOString();
+  const signature = await createPhase2WebhookSignature(timestamp, rawBody, secret);
+  return {
+    [PHASE2_WEBHOOK_RESPONSE_TIMESTAMP_HEADER]: timestamp,
+    [PHASE2_WEBHOOK_RESPONSE_SIGNATURE_HEADER]: signature,
   };
 }
 
@@ -421,6 +459,287 @@ Deno.test('postWebhookJson keeps non-JSON response text for fallback SuperScan p
         'Plain-text responses should still preserve the raw body text',
       );
       assert(result.bodyPresent, 'A non-empty plain-text body should be reported as present');
+    } finally {
+      fetchSpy.restore();
+    }
+  });
+});
+
+// =============================================================================
+// S-01 — Verification HMAC de la reponse webhook
+// =============================================================================
+
+Deno.test('S-01: postWebhookJson rejects unsigned webhook response in HMAC mode', async () => {
+  await withWebhookEnv({
+    PHASE2_WEBHOOK_AUTH_MODE: 'hmac',
+    PHASE2_WEBHOOK_HMAC_SECRET: 'test-hmac-secret',
+  }, async () => {
+    // Response sans header de signature → doit etre rejetee.
+    const fetchSpy = installFetchSpy('{"workflow_status":"dismissed"}', 200);
+    try {
+      await assertRejectsPhase2HttpError(
+        () => postWebhookJson('https://example.com/webhook', { ok: true }),
+        'webhook_response_unsigned',
+        'Webhook response is missing signature headers',
+      );
+    } finally {
+      fetchSpy.restore();
+    }
+  });
+});
+
+Deno.test('S-01: postWebhookJson rejects stale signature timestamp', async () => {
+  await withWebhookEnv({
+    PHASE2_WEBHOOK_AUTH_MODE: 'hmac',
+    PHASE2_WEBHOOK_HMAC_SECRET: 'test-hmac-secret',
+  }, async () => {
+    const rawBody = '{"workflow_status":"reviewing"}';
+    const staleTimestamp = new Date(Date.now() - 10 * 60 * 1000).toISOString(); // 10 min ago
+    const headers = await buildSignedResponseHeaders(rawBody, 'test-hmac-secret', {
+      timestamp: staleTimestamp,
+    });
+    const fetchSpy = installFetchSpy(rawBody, 200, headers);
+    try {
+      await assertRejectsPhase2HttpError(
+        () => postWebhookJson('https://example.com/webhook', { ok: true }),
+        'webhook_response_stale',
+        'outside the allowed window',
+      );
+    } finally {
+      fetchSpy.restore();
+    }
+  });
+});
+
+Deno.test('S-01: postWebhookJson rejects signature mismatch (tampered body)', async () => {
+  await withWebhookEnv({
+    PHASE2_WEBHOOK_AUTH_MODE: 'hmac',
+    PHASE2_WEBHOOK_HMAC_SECRET: 'test-hmac-secret',
+  }, async () => {
+    // Signe un body, sert un autre body : la signature ne correspond plus.
+    const honestBody = '{"workflow_status":"reviewing"}';
+    const tamperedBody = '{"workflow_status":"dismissed"}';
+    const headers = await buildSignedResponseHeaders(honestBody, 'test-hmac-secret');
+    const fetchSpy = installFetchSpy(tamperedBody, 200, headers);
+    try {
+      await assertRejectsPhase2HttpError(
+        () => postWebhookJson('https://example.com/webhook', { ok: true }),
+        'webhook_response_invalid_signature',
+        'signature mismatch',
+      );
+    } finally {
+      fetchSpy.restore();
+    }
+  });
+});
+
+Deno.test('S-01: postWebhookJson accepts a valid signed response', async () => {
+  await withWebhookEnv({
+    PHASE2_WEBHOOK_AUTH_MODE: 'hmac',
+    PHASE2_WEBHOOK_HMAC_SECRET: 'test-hmac-secret',
+  }, async () => {
+    const rawBody = '{"workflow_status":"reviewing","moderation_provider":"n8n"}';
+    const headers = await buildSignedResponseHeaders(rawBody, 'test-hmac-secret');
+    const fetchSpy = installFetchSpy(rawBody, 200, headers);
+    try {
+      const result = await postWebhookJson('https://example.com/webhook', { ok: true });
+      assertEquals(result.payload?.workflow_status, 'reviewing', 'Workflow status should be exposed');
+      assertEquals(fetchSpy.calls.length, 1, 'Fetch should have been called once');
+    } finally {
+      fetchSpy.restore();
+    }
+  });
+});
+
+Deno.test('S-01: postWebhookJson uses dedicated N8N_RESPONSE_HMAC_SECRET when set', async () => {
+  await withWebhookEnv({
+    PHASE2_WEBHOOK_AUTH_MODE: 'hmac',
+    PHASE2_WEBHOOK_HMAC_SECRET: 'outbound-secret',
+    N8N_RESPONSE_HMAC_SECRET: 'inbound-secret',
+  }, async () => {
+    // Signe avec le secret inbound dedie. Le secret outbound est different.
+    const rawBody = '{"ok":true}';
+    const headers = await buildSignedResponseHeaders(rawBody, 'inbound-secret');
+    const fetchSpy = installFetchSpy(rawBody, 200, headers);
+    try {
+      const result = await postWebhookJson('https://example.com/webhook', { ok: true });
+      assertEquals(result.status, 200, 'Should succeed with inbound secret signature');
+    } finally {
+      fetchSpy.restore();
+    }
+  });
+});
+
+Deno.test('S-01: postWebhookJson skips response signature when verifyResponseSignature=false', async () => {
+  await withWebhookEnv({
+    PHASE2_WEBHOOK_AUTH_MODE: 'hmac',
+    PHASE2_WEBHOOK_HMAC_SECRET: 'test-hmac-secret',
+  }, async () => {
+    // Migration en cours : on opt-out explicitement pour un caller specifique.
+    const fetchSpy = installFetchSpy('{"workflow_status":"dismissed"}', 200);
+    try {
+      const result = await postWebhookJson(
+        'https://example.com/webhook',
+        { ok: true },
+        10000,
+        { verifyResponseSignature: false },
+      );
+      assertEquals(result.payload?.workflow_status, 'dismissed',
+        'Unsigned response should be accepted when verifyResponseSignature=false');
+    } finally {
+      fetchSpy.restore();
+    }
+  });
+});
+
+Deno.test('S-01: WEBHOOK_VERIFY_RESPONSE=false acts as global kill-switch', async () => {
+  await withWebhookEnv({
+    PHASE2_WEBHOOK_AUTH_MODE: 'hmac',
+    PHASE2_WEBHOOK_HMAC_SECRET: 'test-hmac-secret',
+    WEBHOOK_VERIFY_RESPONSE: 'false',
+  }, async () => {
+    // Meme avec HMAC active, le kill-switch global desactive la verif.
+    // Permet un rollback urgent si n8n n'est pas encore configure.
+    const fetchSpy = installFetchSpy('{"workflow_status":"dismissed"}', 200);
+    try {
+      const result = await postWebhookJson('https://example.com/webhook', { ok: true });
+      assertEquals(result.payload?.workflow_status, 'dismissed',
+        'Unsigned response should be accepted when kill-switch is on');
+    } finally {
+      fetchSpy.restore();
+    }
+  });
+});
+
+Deno.test('S-01: WEBHOOK_VERIFY_RESPONSE=true forces check even without outbound HMAC', async () => {
+  await withWebhookEnv({
+    PHASE2_WEBHOOK_AUTH_MODE: 'bearer',
+    PHASE2_WEBHOOK_BEARER_TOKEN: 'phase2-bearer',
+    WEBHOOK_VERIFY_RESPONSE: 'true',
+    PHASE2_WEBHOOK_HMAC_SECRET: 'test-hmac-secret',
+  }, async () => {
+    // Bearer mode (pas de HMAC outbound) mais on force la verif inbound.
+    const fetchSpy = installFetchSpy('{"ok":true}', 200);
+    try {
+      await assertRejectsPhase2HttpError(
+        () => postWebhookJson('https://example.com/webhook', { ok: true }),
+        'webhook_response_unsigned',
+        'missing signature headers',
+      );
+    } finally {
+      fetchSpy.restore();
+    }
+  });
+});
+
+Deno.test('S-01: verifyPhase2WebhookResponseSignature reports missing timestamp', async () => {
+  const response = new Response('{}', {
+    status: 200,
+    headers: { [PHASE2_WEBHOOK_RESPONSE_SIGNATURE_HEADER]: 'sha256=abc' },
+  });
+  try {
+    await verifyPhase2WebhookResponseSignature(response, '{}', 'secret');
+    throw new Error('Expected an error');
+  } catch (error) {
+    assert(error instanceof Phase2HttpError, 'Expected Phase2HttpError');
+    assertEquals(error.code, 'webhook_response_unsigned', 'Should flag unsigned response');
+    assertEquals(
+      (error.details as Record<string, unknown>)?.timestamp_header_present,
+      false,
+      'Should report timestamp_header_present=false',
+    );
+  }
+});
+
+// =============================================================================
+// S-02 — Validation DNS / blocage des IPs privees
+// =============================================================================
+
+Deno.test('S-02: postWebhookJson rejects URL not in allowlist', async () => {
+  await withWebhookEnv({
+    WEBHOOK_ALLOWED_HOSTS: 'allowed.example.com',
+    WEBHOOK_ALLOW_PRIVATE_IPS: 'true',
+  }, async () => {
+    const fetchSpy = installFetchSpy();
+    try {
+      await assertRejectsPhase2HttpError(
+        () => postWebhookJson('https://attacker.evil.com/webhook', { ok: true }),
+        'webhook_url_host_not_allowed',
+        'rejected by host validation',
+      );
+      assertEquals(fetchSpy.calls.length, 0, 'Fetch should never be called for rejected host');
+    } finally {
+      fetchSpy.restore();
+    }
+  });
+});
+
+Deno.test('S-02: postWebhookJson rejects URL with forbidden protocol', async () => {
+  await withWebhookEnv({
+    WEBHOOK_ALLOWED_HOSTS: 'example.com',
+    WEBHOOK_ALLOW_PRIVATE_IPS: 'true',
+  }, async () => {
+    const fetchSpy = installFetchSpy();
+    try {
+      await assertRejectsPhase2HttpError(
+        () => postWebhookJson('http://example.com/webhook', { ok: true }),
+        'webhook_url_forbidden_protocol',
+        'forbidden_protocol',
+      );
+      assertEquals(fetchSpy.calls.length, 0, 'Fetch should never be called');
+    } finally {
+      fetchSpy.restore();
+    }
+  });
+});
+
+Deno.test('S-02: postWebhookJson rejects IPv4-literal URL pointing to loopback', async () => {
+  await withWebhookEnv({
+    WEBHOOK_ALLOWED_HOSTS: '127.0.0.1',
+    WEBHOOK_ALLOW_PRIVATE_IPS: '', // explicit OFF
+  }, async () => {
+    const fetchSpy = installFetchSpy();
+    try {
+      await assertRejectsPhase2HttpError(
+        () => postWebhookJson('https://127.0.0.1/webhook', { ok: true }),
+        'webhook_host_resolves_private',
+        'host validation',
+      );
+      assertEquals(fetchSpy.calls.length, 0, 'Fetch should never be called');
+    } finally {
+      fetchSpy.restore();
+    }
+  });
+});
+
+Deno.test('S-02: postWebhookJson rejects AWS metadata literal (169.254.169.254)', async () => {
+  await withWebhookEnv({
+    WEBHOOK_ALLOWED_HOSTS: '169.254.169.254',
+    WEBHOOK_ALLOW_PRIVATE_IPS: '',
+  }, async () => {
+    const fetchSpy = installFetchSpy();
+    try {
+      await assertRejectsPhase2HttpError(
+        () => postWebhookJson('https://169.254.169.254/latest/meta-data', { ok: true }),
+        'webhook_host_resolves_private',
+        'host validation',
+      );
+    } finally {
+      fetchSpy.restore();
+    }
+  });
+});
+
+Deno.test('S-02: WEBHOOK_ALLOW_PRIVATE_IPS=true bypasses the DNS resolution check', async () => {
+  await withWebhookEnv({
+    WEBHOOK_ALLOWED_HOSTS: '127.0.0.1',
+    WEBHOOK_ALLOW_PRIVATE_IPS: 'true',
+  }, async () => {
+    const fetchSpy = installFetchSpy();
+    try {
+      const result = await postWebhookJson('https://127.0.0.1/webhook', { ok: true });
+      assertEquals(result.status, 200, 'Should reach fetch when private IPs are allowed');
+      assertEquals(fetchSpy.calls.length, 1, 'Fetch should be called once');
     } finally {
       fetchSpy.restore();
     }

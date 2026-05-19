@@ -21,6 +21,7 @@ import type { SocialAdminModerationItem } from '@/types';
 
 import type { AdminOverflowActionDefinition } from './adminModerationUtils';
 import { buildAdminChromePalette } from './adminModerationTheme';
+import { SquirclePressable } from '@/components/Squircle';
 
 interface AdminOverflowMenuProps {
   item: SocialAdminModerationItem | null;
@@ -51,7 +52,7 @@ export function AdminOverflowMenu({
       onRequestClose={onClose}
     >
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable
+        <SquirclePressable
           style={styles.sheet}
           onPress={() => undefined}
           testID="admin-social-overflow-modal"
@@ -100,7 +101,7 @@ export function AdminOverflowMenu({
           >
             <Text style={styles.cancelLabel}>{t('common.cancel')}</Text>
           </TouchableOpacity>
-        </Pressable>
+        </SquirclePressable>
       </Pressable>
     </Modal>
   );
@@ -127,14 +128,14 @@ const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
       shadowOffset: { width: 0, height: -10 },
       shadowOpacity: 0.34,
       shadowRadius: 22,
-      elevation: 10,
+      elevation: 10, borderCurve: 'continuous',
     },
     handle: {
       alignSelf: 'center',
       width: 44,
       height: 5,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: chrome.handle,
+      backgroundColor: chrome.handle, borderCurve: 'continuous',
     },
     headerCopy: {
       gap: SPACING.xs,
@@ -163,7 +164,7 @@ const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
       justifyContent: 'center',
       backgroundColor: chrome.surfaceMuted,
       borderWidth: 1,
-      borderColor: chrome.borderSubtle,
+      borderColor: chrome.borderSubtle, borderCurve: 'continuous',
     },
     actionRowDanger: {
       backgroundColor: chrome.dangerAccentSoft,
@@ -184,7 +185,7 @@ const createStyles = (chrome: ReturnType<typeof buildAdminChromePalette>) =>
       justifyContent: 'center',
       backgroundColor: withAlpha(chrome.textPrimary, 0.05),
       borderWidth: 1,
-      borderColor: chrome.borderSubtle,
+      borderColor: chrome.borderSubtle, borderCurve: 'continuous',
     },
     cancelLabel: {
       fontSize: SIZES.text14,

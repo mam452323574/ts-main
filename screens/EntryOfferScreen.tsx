@@ -34,6 +34,7 @@ import {
   SPACING,
   withAlpha,
 } from '@/constants/theme';
+import { Squircle } from '@/components/Squircle';
 
 export default function EntryOfferScreen() {
   const router = useRouter();
@@ -342,12 +343,12 @@ export default function EntryOfferScreen() {
       {alertElement}
 
       <View style={styles.hero}>
-        <View style={styles.iconWrap}>
+        <Squircle style={styles.iconWrap}>
           <Gift color={colors.gold} size={28} />
-          <View style={styles.sparkleBadge}>
+          <Squircle style={styles.sparkleBadge}>
             <Sparkles color={colors.background} size={14} />
-          </View>
-        </View>
+          </Squircle>
+        </Squircle>
 
         <Text style={styles.eyebrow}>{t('entry_offer.eyebrow')}</Text>
         <Text style={styles.title}>{t('entry_offer.title')}</Text>
@@ -478,7 +479,7 @@ const createStyles = (colors: any) =>
       position: 'relative',
       borderWidth: 1,
       borderColor: withAlpha(colors.gold, 0.32),
-      ...SHADOWS.goldGlow,
+      ...SHADOWS.goldGlow, borderCurve: 'continuous',
     },
     sparkleBadge: {
       position: 'absolute',
@@ -489,7 +490,7 @@ const createStyles = (colors: any) =>
       borderRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.gold,
+      backgroundColor: colors.gold, borderCurve: 'continuous',
     },
     eyebrow: {
       fontSize: SIZES.text12,
@@ -572,7 +573,7 @@ const createStyles = (colors: any) =>
       borderRadius: BORDER_RADIUS.full,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: withAlpha(colors.primaryText, 0.06),
+      backgroundColor: withAlpha(colors.primaryText, 0.06), borderCurve: 'continuous',
     },
     dismissButtonLabel: {
       fontSize: SIZES.text14,

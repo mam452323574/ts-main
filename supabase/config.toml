@@ -31,6 +31,24 @@ verify_jwt = true
 [functions.coach-sync-profile-memory]
 verify_jwt = true
 
+[functions.coach-start-conversation]
+verify_jwt = true
+
+[functions.coach-send-message]
+verify_jwt = true
+
+[functions.coach-end-conversation]
+verify_jwt = true
+
+[functions.coach-archive-conversation]
+verify_jwt = true
+
+[functions.coach-conversation-quota-status]
+verify_jwt = true
+
+[functions.coach-conversations-list]
+verify_jwt = true
+
 [functions.social-reserve-upload]
 verify_jwt = true
 
@@ -68,9 +86,6 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.social-hide-author]
-verify_jwt = true
-
-[functions.social-set-save]
 verify_jwt = true
 
 [functions.social-list-moderation-queue]
@@ -114,6 +129,23 @@ verify_jwt = true
 
 [functions.social-admin-adjust-post-reactions]
 verify_jwt = true
+
+# === New Edge Functions added in social/security-audit-2026-05 ===
+
+# S-07 — admin-whoami : revalidation cote serveur du tier admin avant rendu
+# des ecrans destructifs (AdminSocialModerationScreen). Bearer JWT requis pour
+# pouvoir resoudre le user.id et le profile.account_tier.
+[functions.admin-whoami]
+verify_jwt = true
+
+# S-18 — purge-soft-deleted-social-assets : appelle la RPC
+# purge_old_soft_deleted_social_content puis supprime les asset_paths du bucket
+# social-posts. Protege par requireSocialModerationWorkerOrAdmin (signature
+# worker HMAC OU bearer JWT admin). verify_jwt=false car les workers signed
+# ne presentent pas de JWT user ; la verification d'auth est faite dans le
+# code de la fonction.
+[functions.purge-soft-deleted-social-assets]
+verify_jwt = false
 
 # === New Edge Functions added in security/post-pentest-fixes-2026-05 ===
 

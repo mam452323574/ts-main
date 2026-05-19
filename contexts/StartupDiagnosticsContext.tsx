@@ -12,6 +12,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { getRuntimeCapabilities, logStartupMarker } from '@/utils/runtimeCapabilities';
 import type { SafeObservabilityProperties } from '@/utils/observability';
+import { Squircle } from '@/components/Squircle';
 
 type StartupMarker =
   | 'root-mounted'
@@ -125,7 +126,7 @@ function StartupFallbackOverlay() {
 
   return (
     <View style={styles.overlay} testID="startup-fallback">
-      <View style={styles.card}>
+      <Squircle style={styles.card}>
         <ActivityIndicator size="large" color="#1E3A2B" />
         <Text style={styles.title}>Demarrage plus long que prevu</Text>
         <Text style={styles.body}>
@@ -135,7 +136,7 @@ function StartupFallbackOverlay() {
         <Text style={styles.footnote}>
           {runtime.platform} - {runtime.appOwnership}
         </Text>
-      </View>
+      </Squircle>
     </View>
   );
 }
@@ -158,7 +159,7 @@ const styles = StyleSheet.create({
     padding: 24,
     borderRadius: 24,
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FFFFFF', borderCurve: 'continuous',
   },
   title: {
     marginTop: 16,

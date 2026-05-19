@@ -13,6 +13,7 @@ import {
   mixColors,
   withAlpha,
 } from '@/constants/theme';
+import { Squircle } from '@/components/Squircle';
 
 export type AlertVariant = 'info' | 'success' | 'warning' | 'danger' | 'premium';
 export type AlertButtonTone = 'solid' | 'soft' | 'ghost';
@@ -225,9 +226,9 @@ export function CustomAlert({
               testID="custom-alert-container"
             >
               <View style={styles.headlineWrap}>
-                <View style={[styles.iconContainer, { backgroundColor: tokens.iconBg, borderColor: tokens.iconBorder }]}> 
+                <Squircle style={[styles.iconContainer, { backgroundColor: tokens.iconBg, borderColor: tokens.iconBorder }]}> 
                   {icon || renderVariantIcon(resolvedVariant, tokens.iconColor)}
-                </View>
+                </Squircle>
                 {emoji !== null ? (
                   <Text style={styles.emoji} testID="custom-alert-emoji">
                     {emoji ?? tokens.emoji}
@@ -296,7 +297,7 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => {
       shadowOffset: modalSurface.shadowOffset,
       shadowOpacity: modalSurface.shadowOpacity,
       shadowRadius: modalSurface.shadowRadius,
-      elevation: modalSurface.elevation,
+      elevation: modalSurface.elevation, borderCurve: 'continuous',
     },
     headlineWrap: {
       alignItems: 'center',
@@ -308,7 +309,7 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => {
       borderRadius: 36,
       justifyContent: 'center',
       alignItems: 'center',
-      borderWidth: 1,
+      borderWidth: 1, borderCurve: 'continuous',
     },
     emoji: {
       marginTop: SPACING.xs,
@@ -345,7 +346,7 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => {
       borderRadius: BORDER_RADIUS.lg,
       alignItems: 'center',
       minHeight: 46,
-      justifyContent: 'center',
+      justifyContent: 'center', borderCurve: 'continuous',
     },
     buttonSolid: {},
     buttonSoft: {

@@ -27,7 +27,6 @@ import {
   removeSocialCommentFromThread,
   reportSocialContent,
   setSocialCommentLike,
-  setSocialPostSave,
   setReactionOnSocialPost,
   updateSocialComment,
   updateSocialCommentLikeState,
@@ -244,7 +243,7 @@ describe('social service', () => {
     expect(supabase.rpc).toHaveBeenCalledWith('get_social_feed_page', {
       p_category: null,
       p_limit: 5,
-      p_cursor: null,
+      p_offset: 0,
       p_viewer_language_code: 'fr',
       p_viewer_country_code: 'FR',
     });
@@ -2293,39 +2292,6 @@ describe('social service', () => {
     await expect(hideSocialAuthor('author-self')).rejects.toMatchObject({
       code: 'social_hide_self',
       status: 400,
-    });
-  });
-
-  it('omits the action field when setSocialPostSave is called as a toggle', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      text: async () =>
-        JSON.stringify({ success: true, post_id: 'post-1', saved: true }),
-    });
-
-    const response = await setSocialPostSave('post-1');
-    expect(response).toEqual({ success: true, post_id: 'post-1', saved: true });
-
-    const sent = (global.fetch as jest.Mock).mock.calls.at(-1)?.[1] as {
-      body?: string;
-    };
-    expect(JSON.parse(sent.body ?? '{}')).toEqual({ post_id: 'post-1' });
-  });
-
-  it('propagates the explicit save action to the edge function payload', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      text: async () =>
-        JSON.stringify({ success: true, post_id: 'post-1', saved: false }),
-    });
-
-    await setSocialPostSave('post-1', 'unsave');
-    const sent = (global.fetch as jest.Mock).mock.calls.at(-1)?.[1] as {
-      body?: string;
-    };
-    expect(JSON.parse(sent.body ?? '{}')).toEqual({
-      post_id: 'post-1',
-      action: 'unsave',
     });
   });
 

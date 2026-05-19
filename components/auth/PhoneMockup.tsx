@@ -3,6 +3,7 @@ import { StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 
 import { SHADOWS, SIZES, SPACING } from '@/constants/theme';
 import { useOnboardingPalette, type OnboardingPalette } from './tokens';
+import { Squircle } from '@/components/Squircle';
 
 interface PhoneMockupProps {
   children: ReactNode;
@@ -45,7 +46,7 @@ export function PhoneMockup({
         style,
       ]}
     >
-      <View style={styles.bezel}>
+      <Squircle style={styles.bezel}>
         <View style={styles.notch} />
         <View style={styles.screen}>
           {showStatusBar ? (
@@ -60,7 +61,7 @@ export function PhoneMockup({
           ) : null}
           <View style={styles.screenContent}>{children}</View>
         </View>
-      </View>
+      </Squircle>
     </View>
   );
 }
@@ -83,7 +84,7 @@ const createStyles = (palette: OnboardingPalette) =>
       shadowColor: palette.accent,
       shadowOpacity: 0.22,
       shadowRadius: 22,
-      shadowOffset: { width: 0, height: 12 },
+      shadowOffset: { width: 0, height: 12 }, borderCurve: 'continuous',
     },
     notch: {
       position: 'absolute',
@@ -94,7 +95,7 @@ const createStyles = (palette: OnboardingPalette) =>
       marginLeft: -28,
       borderRadius: 999,
       backgroundColor: '#02050A',
-      zIndex: 2,
+      zIndex: 2, borderCurve: 'continuous',
     },
     screen: {
       flex: 1,
@@ -102,7 +103,7 @@ const createStyles = (palette: OnboardingPalette) =>
       overflow: 'hidden',
       backgroundColor: palette.surface,
       borderWidth: 1,
-      borderColor: palette.border,
+      borderColor: palette.border, borderCurve: 'continuous',
     },
     screenContent: {
       flex: 1,
@@ -131,13 +132,13 @@ const createStyles = (palette: OnboardingPalette) =>
       width: 3,
       height: 6,
       borderRadius: 1,
-      backgroundColor: palette.textSecondary,
+      backgroundColor: palette.textSecondary, borderCurve: 'continuous',
     },
     statusBarBattery: {
       width: 14,
       height: 7,
       borderRadius: 2,
       backgroundColor: palette.textSecondary,
-      marginLeft: 4,
+      marginLeft: 4, borderCurve: 'continuous',
     },
   });

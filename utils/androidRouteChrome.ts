@@ -27,13 +27,11 @@ export const THEMED_ANDROID_UI_ROUTES = new Set([
   '/premium-upgrade',
   '/privacy-policy',
   '/recipes',
-  '/scan-result',
   '/settings',
   '/share-story',
   '/social-comments',
   '/social-compose',
   '/social-post',
-  '/super-scan-result',
 ]);
 
 type StatusBarStyle = 'light' | 'dark';
@@ -125,6 +123,9 @@ export function getAndroidRouteChrome(
   const isScannerRoute =
     normalizedPathname === '/scanner' || normalizedPathname === '/(tabs)/scanner';
   const isScanPreviewRoute = normalizedPathname === '/scan-preview';
+  const isScanResultRoute =
+    normalizedPathname === '/scan-result' ||
+    normalizedPathname === '/super-scan-result';
   const isFridgeScanRoute = normalizedPathname === '/scan-frigo';
   const isThemedUiRoute = THEMED_ANDROID_UI_ROUTES.has(normalizedPathname);
   const systemBackgroundColor = isMainTabsRoute
@@ -137,7 +138,11 @@ export function getAndroidRouteChrome(
     systemBackgroundColor,
     navigationButtonStyle: isLightColor(systemBackgroundColor) ? 'dark' : 'light',
     statusBarStyle:
-      isScanPreviewRoute || isScannerRoute || isFridgeScanRoute || isDark
+      isScanPreviewRoute ||
+      isScanResultRoute ||
+      isScannerRoute ||
+      isFridgeScanRoute ||
+      isDark
         ? 'light'
         : 'dark',
     isMainTabsRoute,

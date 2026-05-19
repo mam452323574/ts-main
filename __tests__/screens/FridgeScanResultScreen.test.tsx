@@ -198,6 +198,27 @@ const mealResult = {
   caution_note: null,
 };
 
+function collectTestIds(node: any, acc: string[] = []): string[] {
+  if (!node) {
+    return acc;
+  }
+
+  if (Array.isArray(node)) {
+    node.forEach((child) => collectTestIds(child, acc));
+    return acc;
+  }
+
+  if (node.props?.testID) {
+    acc.push(node.props.testID);
+  }
+
+  if (node.children) {
+    collectTestIds(node.children, acc);
+  }
+
+  return acc;
+}
+
 function readDisplayedProgress() {
   const children = screen.getByTestId('fridge-scan-result-progress-value').props
     .children;
@@ -238,7 +259,11 @@ describe('FridgeScanResultScreen', () => {
   });
 
   it('shows a localized failure body instead of the raw provider error', () => {
-    render(<FridgeScanResultScreen />);
+    const rendered = render(<FridgeScanResultScreen />);
+    const testIds = collectTestIds(rendered.toJSON());
+    const topChromeStyle = StyleSheet.flatten(
+      screen.getByTestId('fridge-scan-result-top-chrome').props.style,
+    );
 
     expect(screen.getByText('Result unavailable')).toBeTruthy();
     expect(
@@ -249,10 +274,34 @@ describe('FridgeScanResultScreen', () => {
     expect(
       screen.queryByText('Provider raw failure should stay hidden'),
     ).toBeNull();
+    expect(screen.getByTestId('fridge-scan-result-top-chrome')).toBeTruthy();
+    expect(screen.queryByTestId('fridge-scan-result-top-chrome-handle')).toBeNull();
+    expect(screen.getByTestId('fridge-scan-result-top-chrome-left-action')).toBeTruthy();
+    expect(screen.getByTestId('fridge-scan-result-screen-header')).toBeTruthy();
+    expect(topChromeStyle.backgroundColor).toBe('transparent');
+    expect(topChromeStyle.borderBottomWidth).toBe(0);
+    expect(topChromeStyle.borderBottomColor).toBe('transparent');
+    expect(screen.getByTestId('fridge-scan-result-background-layer')).toBeTruthy();
+    expect(screen.getByTestId('fridge-scan-result-sheet')).toBeTruthy();
+    expect(testIds.indexOf('fridge-scan-result-background-layer')).toBeLessThan(
+      testIds.indexOf('fridge-scan-result-sheet'),
+    );
+    expect(testIds.indexOf('fridge-scan-result-sheet')).toBeLessThan(
+      testIds.indexOf('fridge-scan-result-scroll'),
+    );
+    expect(testIds.indexOf('fridge-scan-result-scroll')).toBeLessThan(
+      testIds.indexOf('fridge-scan-result-top-chrome'),
+    );
+    expect(testIds.indexOf('fridge-scan-result-top-chrome')).toBeLessThan(
+      testIds.indexOf('fridge-scan-result-state-container'),
+    );
   });
 
   it('routes failure actions through stable app destinations', () => {
     render(<FridgeScanResultScreen />);
+
+    fireEvent.press(screen.getByTestId('fridge-scan-result-top-chrome-left-action'));
+    expect(mockReplace).toHaveBeenCalledWith('/(tabs)');
 
     fireEvent.press(screen.getByText('New photo'));
     expect(mockReplace).toHaveBeenCalledWith('/scan-frigo');
@@ -274,12 +323,33 @@ describe('FridgeScanResultScreen', () => {
       isError: false,
     });
 
-    render(<FridgeScanResultScreen />);
+    const rendered = render(<FridgeScanResultScreen />);
+    const testIds = collectTestIds(rendered.toJSON());
+    const topChromeStyle = StyleSheet.flatten(
+      screen.getByTestId('fridge-scan-result-top-chrome').props.style,
+    );
 
     expect(screen.getByText('Your chef is preparing an idea')).toBeTruthy();
     expect(screen.getByText('Diet Chef')).toBeTruthy();
     expect(screen.getByText('0%')).toBeTruthy();
     expect(screen.getByTestId('fridge-scan-result-progress')).toBeTruthy();
+    expect(screen.getByTestId('fridge-scan-result-top-chrome')).toBeTruthy();
+    expect(topChromeStyle.backgroundColor).toBe('transparent');
+    expect(topChromeStyle.borderBottomWidth).toBe(0);
+    expect(screen.getByTestId('fridge-scan-result-background-layer')).toBeTruthy();
+    expect(screen.getByTestId('fridge-scan-result-sheet')).toBeTruthy();
+    expect(testIds.indexOf('fridge-scan-result-background-layer')).toBeLessThan(
+      testIds.indexOf('fridge-scan-result-sheet'),
+    );
+    expect(testIds.indexOf('fridge-scan-result-sheet')).toBeLessThan(
+      testIds.indexOf('fridge-scan-result-scroll'),
+    );
+    expect(testIds.indexOf('fridge-scan-result-scroll')).toBeLessThan(
+      testIds.indexOf('fridge-scan-result-top-chrome'),
+    );
+    expect(testIds.indexOf('fridge-scan-result-top-chrome')).toBeLessThan(
+      testIds.indexOf('fridge-scan-result-state-container'),
+    );
 
     act(() => {
       jest.advanceTimersByTime(450);
@@ -338,6 +408,52 @@ describe('FridgeScanResultScreen', () => {
     expect(pendingCard.props.colors).toEqual(modeTheme.gradient);
     expect(titleStyle.color).toBe(resolvedColors.primaryText);
     expect(modePillTextStyle.color).toBe(resolvedColors.primaryText);
+  });
+
+  it('renders ready results with the chef chrome inside the scroll flow', () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      fridgeScanId: 'fridge-scan-1',
+      selectedMode: 'diet',
+      imageUri: 'file:///fridge.jpg',
+    });
+    mockUseFridgeScanRecord.mockReturnValue({
+      data: {
+        ...queuedRecord,
+        status: 'processed',
+        meal_result: mealResult,
+        processed_at: '2026-04-12T10:00:00.000Z',
+      },
+      isLoading: false,
+      isError: false,
+    });
+
+    const rendered = render(<FridgeScanResultScreen />);
+    const testIds = collectTestIds(rendered.toJSON());
+    const topChromeStyle = StyleSheet.flatten(
+      screen.getByTestId('fridge-scan-result-top-chrome').props.style,
+    );
+
+    expect(screen.getByText('Crunch bowl')).toBeTruthy();
+    expect(screen.getByTestId('fridge-scan-result-top-chrome')).toBeTruthy();
+    expect(screen.getByTestId('fridge-scan-result-top-chrome-left-action')).toBeTruthy();
+    expect(screen.getByTestId('fridge-scan-result-content-stack')).toBeTruthy();
+    expect(topChromeStyle.backgroundColor).toBe('transparent');
+    expect(topChromeStyle.borderBottomWidth).toBe(0);
+    expect(topChromeStyle.borderBottomColor).toBe('transparent');
+    expect(screen.getByTestId('fridge-scan-result-background-layer')).toBeTruthy();
+    expect(screen.getByTestId('fridge-scan-result-sheet')).toBeTruthy();
+    expect(testIds.indexOf('fridge-scan-result-background-layer')).toBeLessThan(
+      testIds.indexOf('fridge-scan-result-sheet'),
+    );
+    expect(testIds.indexOf('fridge-scan-result-sheet')).toBeLessThan(
+      testIds.indexOf('fridge-scan-result-scroll'),
+    );
+    expect(testIds.indexOf('fridge-scan-result-scroll')).toBeLessThan(
+      testIds.indexOf('fridge-scan-result-top-chrome'),
+    );
+    expect(testIds.indexOf('fridge-scan-result-top-chrome')).toBeLessThan(
+      testIds.indexOf('fridge-scan-result-content-stack'),
+    );
   });
 
   it('finishes the progress animation before revealing the processed meal result', () => {

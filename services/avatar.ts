@@ -5,7 +5,7 @@ import { decode as decodeBase64 } from 'base64-arraybuffer';
 
 import { supabase } from '@/services/supabase';
 import { uploadAuthenticatedStorageObject } from '@/services/authenticatedStorage';
-import { logOperationalError } from '@/utils/observability';
+import { logExpectedFailure, logOperationalError } from '@/utils/observability';
 import { normalizeTrustedImageUri } from '@/utils/urlSecurity';
 import {
   AVATAR_OUTPUT_SIZE,
@@ -19,6 +19,33 @@ const MAX_AVATAR_SIZE_BYTES = 5 * 1024 * 1024;
 // Cache expire 60 s avant l'URL signée elle-même pour éviter de servir une
 // URL périmée juste après un cache hit (P2-H Phase 2).
 const AVATAR_SIGNED_URL_CACHE_TTL_MS = (AVATAR_SIGNED_URL_TTL_SECONDS - 60) * 1000;
+const AVATAR_SIGNED_URL_RETRY_DELAY_MS = 400;
+
+function isAvatarNetworkError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  const message = typeof (error as { message?: unknown }).message === 'string'
+    ? (error as { message: string }).message
+    : '';
+  const name = typeof (error as { name?: unknown }).name === 'string'
+    ? (error as { name: string }).name
+    : '';
+  return (
+    name === 'StorageUnknownError' ||
+    name === 'TypeError' ||
+    name === 'AbortError' ||
+    /network request failed/i.test(message) ||
+    /fetch failed/i.test(message) ||
+    /network request timed out/i.test(message)
+  );
+}
+
+async function requestAvatarSignedUrl(path: string) {
+  return supabase.storage
+    .from(AVATAR_BUCKET)
+    .createSignedUrl(path, AVATAR_SIGNED_URL_TTL_SECONDS);
+}
 
 const LOCAL_AVATAR_URI_PATTERN = /^(file|content):/i;
 
@@ -257,12 +284,16 @@ export async function resolveAvatarUrl(avatarReference?: string | null) {
     return cachedResult.signedUrl;
   }
 
-  const { data, error } = await supabase.storage
-    .from(AVATAR_BUCKET)
-    .createSignedUrl(normalizedReference, AVATAR_SIGNED_URL_TTL_SECONDS);
+  let { data, error } = await requestAvatarSignedUrl(normalizedReference);
+
+  if ((error || !data?.signedUrl) && isAvatarNetworkError(error)) {
+    await new Promise((resolve) => setTimeout(resolve, AVATAR_SIGNED_URL_RETRY_DELAY_MS));
+    ({ data, error } = await requestAvatarSignedUrl(normalizedReference));
+  }
 
   if (error || !data?.signedUrl) {
-    logOperationalError('[Avatar] Failed to resolve avatar URL', error, {
+    const logFn = isAvatarNetworkError(error) ? logExpectedFailure : logOperationalError;
+    logFn('[Avatar] Failed to resolve avatar URL', error, {
       bucket: AVATAR_BUCKET,
       context: 'avatar_signed_url',
     });

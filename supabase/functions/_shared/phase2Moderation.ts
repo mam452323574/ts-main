@@ -97,11 +97,18 @@ export function resolveModerationStateForAction(
   }
 }
 
-export function shouldAutoHideForReports(
-  uniqueReportCount24h: number,
-  threshold = 3,
-) {
-  return uniqueReportCount24h >= threshold;
+// S-08 — Seuil d'auto-hide hardcode. Le parametre `threshold` precedemment expose
+// permettait a un caller fautif (ou compromis) de passer 0 (auto-hide immediat)
+// ou Infinity (jamais d'auto-hide). Si la valeur doit varier dans le futur, lire
+// d'une config table avec auth, pas d'un parametre passe par l'appelant.
+export const SOCIAL_AUTO_HIDE_THRESHOLD = 3;
+
+export function shouldAutoHideForReports(uniqueReportCount24h: number): boolean {
+  // Validation defensive : compteur doit etre un entier positif.
+  if (!Number.isFinite(uniqueReportCount24h) || uniqueReportCount24h < 0) {
+    return false;
+  }
+  return uniqueReportCount24h >= SOCIAL_AUTO_HIDE_THRESHOLD;
 }
 
 export function buildInitialSocialModerationFields(

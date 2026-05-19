@@ -1,12 +1,15 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 import { useLanguage } from '@/contexts/LanguageContext';
 
-import { FloatDodgeGame } from './FloatDodgeGame';
-import { ReflexDotsGame } from './ReflexDotsGame';
-import { TapTargetsGame } from './TapTargetsGame';
+import {
+  loadLoadingMiniGameHistory,
+  pickLoadingMiniGameKey,
+  recordLoadingMiniGamePlayed,
+} from './miniGames/pickGame';
+import { LOADING_MINI_GAMES, getLoadingMiniGameEntry } from './miniGames/registry';
 
-export type LoadingMiniGameVariant = 'coach' | 'superScan';
+export type LoadingMiniGameVariant = 'coach' | 'scan';
 
 export interface LoadingMiniGameProps {
   accentColor?: string;
@@ -16,14 +19,13 @@ export interface LoadingMiniGameProps {
   variant?: LoadingMiniGameVariant;
   compact?: boolean;
   onComplete?: () => void;
+  cardHeight?: number;
 }
 
 export interface LoadingMiniGameLabels {
   title: string;
   score: string;
-  tapTargetsPrompt: string;
-  floatDodgePrompt: string;
-  reflexDotsPrompt: string;
+  prompt: string;
 }
 
 export interface LoadingMiniGameGameProps {
@@ -34,21 +36,33 @@ export interface LoadingMiniGameGameProps {
   labels: LoadingMiniGameLabels;
   onComplete?: () => void;
   variant: LoadingMiniGameVariant;
+  cardHeight?: number;
 }
 
-type GameKey = 'tapTargets' | 'floatDodge' | 'reflexDots';
-type GameComponent = React.ComponentType<LoadingMiniGameGameProps>;
+let cachedHistory: string[] | undefined;
+let pendingHistoryLoad: Promise<string[]> | undefined;
 
-const GAME_KEYS: readonly GameKey[] = ['tapTargets', 'floatDodge', 'reflexDots'];
+function ensureHistoryLoaded(): void {
+  if (cachedHistory !== undefined || pendingHistoryLoad) {
+    return;
+  }
+  pendingHistoryLoad = loadLoadingMiniGameHistory().then((history) => {
+    cachedHistory = history;
+    return history;
+  });
+  void pendingHistoryLoad.catch(() => {
+    cachedHistory = [];
+  });
+}
 
-const GAME_COMPONENTS: Record<GameKey, GameComponent> = {
-  tapTargets: TapTargetsGame,
-  floatDodge: FloatDodgeGame,
-  reflexDots: ReflexDotsGame,
-};
+export function __resetLoadingMiniGameStateForTests(): void {
+  cachedHistory = undefined;
+  pendingHistoryLoad = undefined;
+}
 
-function pickGame(): GameKey {
-  return GAME_KEYS[Math.floor(Math.random() * GAME_KEYS.length)] ?? 'tapTargets';
+function pickInitialGameKey(): string {
+  const history = cachedHistory ?? [];
+  return pickLoadingMiniGameKey(history);
 }
 
 export function LoadingMiniGame({
@@ -59,26 +73,40 @@ export function LoadingMiniGame({
   variant = 'coach',
   compact = false,
   onComplete,
+  cardHeight,
 }: LoadingMiniGameProps) {
-  const [gameKey] = useState<GameKey>(() => pickGame());
+  ensureHistoryLoaded();
+  const [gameKey] = useState<string>(() => pickInitialGameKey());
   const { t } = useLanguage();
+
+  useEffect(() => {
+    if (!active || enabled === false) {
+      return;
+    }
+    const history = cachedHistory ?? [];
+    cachedHistory = [...history.filter((entry) => entry !== gameKey), gameKey].slice(-3);
+    void recordLoadingMiniGamePlayed(gameKey);
+  }, [active, enabled, gameKey]);
+
+  const entry = useMemo(
+    () => getLoadingMiniGameEntry(gameKey) ?? LOADING_MINI_GAMES[0],
+    [gameKey],
+  );
 
   const labels = useMemo<LoadingMiniGameLabels>(
     () => ({
       title: t('loading_mini_game.title'),
       score: t('loading_mini_game.score'),
-      tapTargetsPrompt: t('loading_mini_game.tap_targets_prompt'),
-      floatDodgePrompt: t('loading_mini_game.float_dodge_prompt'),
-      reflexDotsPrompt: t('loading_mini_game.reflex_dots_prompt'),
+      prompt: entry ? t(entry.promptI18nKey) : '',
     }),
-    [t],
+    [t, entry],
   );
 
-  if (!active || enabled === false) {
+  if (!active || enabled === false || !entry) {
     return null;
   }
 
-  const SelectedGame = GAME_COMPONENTS[gameKey];
+  const SelectedGame = entry.component;
 
   return (
     <SelectedGame
@@ -89,6 +117,7 @@ export function LoadingMiniGame({
       labels={labels}
       onComplete={onComplete}
       variant={variant}
+      cardHeight={cardHeight}
     />
   );
 }

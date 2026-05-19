@@ -36,7 +36,7 @@ const createStyles = (palette: ReturnType<typeof useAuthPalette>) =>
       flex: 1,
       height: 5,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: palette.progressInactive,
+      backgroundColor: palette.progressInactive, borderCurve: 'continuous',
     },
     dotActive: {
       backgroundColor: palette.progressActive,

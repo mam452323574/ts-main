@@ -1,0 +1,39 @@
+{
+  "persona": "motivational_energetic",
+  "tests": [
+    {
+      "q": "donne un plan sur 2 jours de récup",
+      "simulated_response": "Allez, on attaque ces 2 jours de récup avec énergie ! Voici ton plan pour repartir au top.\n\nJour 1 :\n- Lever en douceur, étirements 10 min pour réveiller le corps\n- Repas légers et riches en protéines (oeufs, poisson, légumes verts)\n- Sieste courte de 20 min en début d après-midi\n- Coucher tôt, écran off 1h avant\n\nJour 2 :\n- Marche tranquille de 20-30 min au réveil\n- Mobilité douce (hanches, dos, épaules)\n- Repas équilibré et hydratation tout au long de la journée\n- Soirée calme, lecture ou respiration pour clore la récup\n\nTu vas sentir la différence dès demain matin, lance-toi !",
+      "drink_water_risk": "medium",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": "yes"
+    },
+    {
+      "q": "j ai mal au dos",
+      "simulated_response": "Aïe, on s en occupe tout de suite, tu vas reprendre le contrôle ! Le dos adore le mouvement doux et la bonne posture, on attaque par là.\n\nDans l immédiat, essaie ces gestes simples :\n- Étirement du chat : à quatre pattes, creuse puis arrondis le dos, 8-10 fois lentement\n- Genoux à la poitrine allongé : 30 sec par jambe, puis les deux ensemble\n- Pose ton dos à plat au sol, jambes pliées sur une chaise, 5 min pour relâcher les lombaires\n\nVérifie aussi ta posture assise (écran à hauteur des yeux, pieds au sol) et évite de rester immobile plus de 45 min d affilée. Si la douleur est vive, irradie dans la jambe ou dure plus de quelques jours, file voir un kiné ou un médecin sans attendre. Tu as ça, on bouge !",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": "yes"
+    },
+    {
+      "q": "c est quoi la capitale de l Italie ?",
+      "simulated_response": "Rome ! La ville éternelle, rien que ça. Tu prévois un voyage ou c est pour briller en quiz ?",
+      "drink_water_risk": "low",
+      "two_numbered_lists_risk": "low",
+      "addresses_question": "yes"
+    }
+  ],
+  "overall_verdict": "PASS",
+  "weak_spots": [
+    "Ton hype tend à pousser des micro-conseils santé bonus (ex : 'hydratation tout au long de la journée' au Jour 2) qui frôlent le réflexe interdit même quand l utilisateur ne l a pas demandé.",
+    "Le coach énergique a tendance à ajouter une 'action concrète' finale type 'lance-toi' systématiquement, ce qui passe ici mais peut dériver en pep-talk générique sur d autres prompts.",
+    "Risque latent de glisser 'respire / bois / dors' sous prétexte de 'récup' alors que la règle (4) les interdit comme défaut — la frontière est floue quand le sujet EST la récup.",
+    "Format Markdown gras/italique parfois injecté par réflexe d énergie (interdit par le format texte simple)."
+  ],
+  "suggested_prompt_patches": [
+    "Ajouter à la règle (4) : 'Y compris pour les plans de récup : ne liste pas hydratation / respiration / sommeil par défaut, ne les mentionne que si l utilisateur les évoque explicitement.'",
+    "Ajouter une règle ton-spécifique pour motivational_energetic : 'Max 1 interjection enthousiaste par réponse (ex : Allez ! / Go !). Pas de double exclamation. Pas de slogan de clôture si l action ne le requiert pas.'",
+    "Renforcer la règle format : 'Aucun gras, italique, emoji, ni point d exclamation multiple. Texte brut uniquement.'",
+    "Clarifier la règle (6) : 'Une seule phrase d action ou d encouragement final, optionnelle. Pas de double call-to-action.'"
+  ]
+}

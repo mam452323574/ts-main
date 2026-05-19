@@ -1,7 +1,10 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
 
-import { BORDER_RADIUS, SPACING, getThemeTokens } from '@/constants/theme';
+import {
+  SPACING,
+  getThemeTokens,
+} from '@/constants/theme';
 import {
   MAIN_TAB_BAR_CONTENT_HEIGHT,
   getMainTabBarMetrics,
@@ -88,6 +91,14 @@ jest.mock('@/contexts/BadgeContext', () => ({
   useBadges: () => mockUseBadges(),
 }));
 
+jest.mock('@/contexts/ScannerCameraSessionContext', () => ({
+  ScannerCameraSessionProvider: ({ children }: { children: React.ReactNode }) => children,
+  ScannerCameraSessionHost: () => {
+    const React = require('react');
+    return React.createElement('ScannerCameraSessionHost');
+  },
+}));
+
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => mockUseSafeAreaInsets(),
   SafeAreaProvider: ({ children }: { children: React.ReactNode }) => children,
@@ -154,14 +165,23 @@ describe('TabLayout', () => {
 
   it('keeps the premium floating tab bar layout and always includes the social tab', () => {
     const element = TabLayout();
-    const screenOptions = element.props.screenOptions;
-    const screenElements = React.Children.toArray(
+    const layoutRoot = React.Children.only(
       element.props.children
+    ) as React.ReactElement<any, any>;
+    const layoutChildren = React.Children.toArray(
+      layoutRoot.props.children
+    ) as React.ReactElement<any, any>[];
+    const sessionHostElement = layoutChildren[0];
+    const tabsElement = layoutChildren[1];
+    const screenOptions = tabsElement.props.screenOptions;
+    const screenElements = React.Children.toArray(
+      tabsElement.props.children
     ) as React.ReactElement<
       {
         name: string;
         options: {
           title: string;
+          sceneStyle?: { backgroundColor: string };
           tabBarIcon: ({ color }: { color: string }) => React.ReactElement<any, any>;
         };
       }
@@ -174,8 +194,24 @@ describe('TabLayout', () => {
       marginTop: 0,
     };
     const expectedSceneStyle = {
-      backgroundColor: mockUseTheme().colors.background,
+      backgroundColor: 'transparent',
     };
+    const tabBarRoot = tabsElement.props.tabBar({
+      position: {
+        addListener: jest.fn(() => 'listener-id'),
+        removeListener: jest.fn(),
+      },
+      state: {
+        index: 1,
+        routes: [
+          { key: 'index', name: 'index' },
+          { key: 'coach', name: 'coach' },
+          { key: 'scanner', name: 'scanner' },
+          { key: 'social', name: 'social' },
+        ],
+      },
+    });
+    const tabBarElement = resolveElement(tabBarRoot);
 
     const homeIcon = resolveElement(
       screenElements[0].props.options.tabBarIcon({ color: '#007AFF' })
@@ -192,7 +228,6 @@ describe('TabLayout', () => {
     const socialChildren = React.Children.toArray(
       socialIcon.props.children
     ) as React.ReactElement<any, any>[];
-    const tabBarElement = resolveElement(element.props.tabBar({} as any));
     const tabBarHostStyle = StyleSheet.flatten(tabBarElement.props.style);
     const tabBarShadow = React.Children.toArray(
       tabBarElement.props.children
@@ -217,6 +252,14 @@ describe('TabLayout', () => {
         child.type.name === 'MaterialTopTabBar'
     );
 
+    expect(layoutRoot.props.style).toEqual(expect.objectContaining({ flex: 1 }));
+    expect(sessionHostElement.type).toBeDefined();
+    expect(tabsElement.props.style).toEqual(
+      expect.objectContaining({ backgroundColor: 'transparent' })
+    );
+    expect(tabsElement.props.pagerStyle).toEqual(
+      expect.objectContaining({ backgroundColor: 'transparent' })
+    );
     expect(screenOptions.tabBarStyle).toEqual(
       expect.objectContaining({
         backgroundColor: 'transparent',
@@ -227,7 +270,7 @@ describe('TabLayout', () => {
         borderTopColor: 'transparent',
       })
     );
-    expect(typeof element.props.tabBar).toBe('function');
+    expect(typeof tabsElement.props.tabBar).toBe('function');
     expect(tabBarElement.props.testID).toBe('main-tab-bar-host');
     expect(tabBarHostStyle).toEqual(
       expect.objectContaining({
@@ -241,7 +284,7 @@ describe('TabLayout', () => {
     expect(tabBarShadowStyle).toEqual(
       expect.objectContaining({
         height: MAIN_TAB_BAR_CONTENT_HEIGHT,
-        borderRadius: BORDER_RADIUS.full,
+        borderRadius: MAIN_TAB_BAR_CONTENT_HEIGHT / 2,
         shadowOpacity: 0.26,
         shadowRadius: 24,
         elevation: 8,
@@ -250,7 +293,7 @@ describe('TabLayout', () => {
     expect(tabBarSurface.props.testID).toBe('main-tab-bar-surface');
     expect(tabBarSurfaceStyle).toEqual(
       expect.objectContaining({
-        borderRadius: BORDER_RADIUS.full,
+        borderRadius: MAIN_TAB_BAR_CONTENT_HEIGHT / 2,
         borderWidth: 1,
         borderColor: expectedTokens.tabBar.border,
         overflow: 'hidden',
@@ -276,6 +319,9 @@ describe('TabLayout', () => {
     expect(screenElements).toHaveLength(4);
     expect(screenElements[1].props.name).toBe('coach');
     expect(screenElements[1].props.options.title).toBe('tabs.coach');
+    expect(screenElements[2].props.options.sceneStyle).toEqual({
+      backgroundColor: 'transparent',
+    });
     expect(screenElements[3].props.options.title).toBe('tabs.social');
     expect(screenElements[3].props.options).not.toHaveProperty('tabBarItemStyle');
     expect(screenElements[3].props.options).not.toHaveProperty('tabBarShowIcon');
@@ -318,8 +364,14 @@ describe('TabLayout', () => {
     });
 
     const element = TabLayout();
-    const screenElements = React.Children.toArray(
+    const layoutRoot = React.Children.only(
       element.props.children
+    ) as React.ReactElement<any, any>;
+    const tabsElement = React.Children.toArray(
+      layoutRoot.props.children
+    )[1] as React.ReactElement<any, any>;
+    const screenElements = React.Children.toArray(
+      tabsElement.props.children
     ) as React.ReactElement<
       {
         options: {
