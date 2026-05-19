@@ -9,9 +9,12 @@ import {
   generateCoachGuidance,
   getCoachEntryFailureDebugInfo,
   getCoachQuotaFromError,
+  getCoachServiceErrorDebugInfo,
   resolveCoachFailureKindFromEntry,
   resolveCoachFailureKindFromError,
   isCoachQuotaExhaustedError,
+  sanitizeCoachServiceErrorDebugInfo,
+  shouldDebugCoachService,
   CoachServiceError,
 } from '@/services/coach';
 import { DEFAULT_COACH_PERSONA_KEY } from '@/shared/coachPersonas';
@@ -2513,7 +2516,7 @@ describe('coach service', () => {
       next_cursor: null,
     });
 
-    expect(supabase.rpc).toHaveBeenCalledWith('get_coach_history_page', {
+    expect(supabase.rpc).toHaveBeenCalledWith('get_coach_history_page_v2', {
       p_limit: 11,
       p_cursor_sort_at: null,
       p_cursor_created_at: null,
@@ -2593,7 +2596,23 @@ describe('coach service', () => {
     });
   });
 
-  it('surfaces a precise coach history pagination error when the RPC is unavailable', async () => {
+  it('surfaces a precise coach history pagination error when the v2 RPC is unavailable', async () => {
+    supabase.rpc.mockResolvedValueOnce({
+      data: null,
+      error: {
+        code: 'PGRST202',
+        message: 'Could not find function public.get_coach_history_page_v2',
+      },
+    });
+
+    await expect(fetchCoachHistoryPage()).rejects.toMatchObject({
+      code: 'coach_history_page_unavailable',
+      status: 503,
+      message: expect.stringContaining('get_coach_history_page_v2'),
+    });
+  });
+
+  it('also recognises the legacy v1 missing-function error during the rollout window', async () => {
     supabase.rpc.mockResolvedValueOnce({
       data: null,
       error: {
@@ -2605,7 +2624,6 @@ describe('coach service', () => {
     await expect(fetchCoachHistoryPage()).rejects.toMatchObject({
       code: 'coach_history_page_unavailable',
       status: 503,
-      message: expect.stringContaining('get_coach_history_page'),
     });
   });
 
@@ -3130,6 +3148,91 @@ describe('coach service', () => {
       status: 404,
       functionName: 'coach-generate-response',
       message: expect.stringContaining('coach-generate-response'),
+    });
+  });
+
+  describe('shouldDebugCoachService (N-G)', () => {
+    // NODE_ENV is typed as a readonly string union in @types/node; cast the
+    // process.env handle through a mutable record so the test can flip it
+    // without fighting the type system.
+    const env = process.env as unknown as Record<string, string | undefined>;
+    const originalNodeEnv = env.NODE_ENV;
+
+    afterEach(() => {
+      env.NODE_ENV = originalNodeEnv;
+    });
+
+    it('returns false in test environment regardless of __DEV__', () => {
+      env.NODE_ENV = 'test';
+      expect(shouldDebugCoachService()).toBe(false);
+    });
+
+    it('returns false when NODE_ENV is production even if __DEV__ is true', () => {
+      // Simulate a release build that happens to ship with __DEV__=true
+      // (Xcode debug variant installed on a real device).
+      env.NODE_ENV = 'production';
+      expect(shouldDebugCoachService()).toBe(false);
+    });
+
+    it('returns true only when __DEV__=true and NODE_ENV=development', () => {
+      env.NODE_ENV = 'development';
+      // __DEV__ is injected as a global by the RN runtime / Jest setup; Jest
+      // setups in this repo typically define it as true. Read it via globalThis
+      // so this test does not depend on the dts shim.
+      const devGlobal = (globalThis as { __DEV__?: boolean }).__DEV__;
+      if (devGlobal !== true) {
+        // Jest harness here may set __DEV__=false. Skip the positive path in
+        // that case but make sure the negative path still passes.
+        expect(shouldDebugCoachService()).toBe(false);
+        return;
+      }
+      expect(shouldDebugCoachService()).toBe(true);
+    });
+  });
+
+  describe('sanitizeCoachServiceErrorDebugInfo (N-G)', () => {
+    it('redacts provider-topology fields while keeping the message and code', () => {
+      const error = new CoachServiceError('boom', {
+        code: 'coach_webhook_failed',
+        status: 502,
+        details: {
+          provider_failure_kind: 'json_parse_failed',
+          provider_failure_stage: 'n8n_chain_llm',
+          provider_node_type: '@n8n/n8n-nodes-langchain.chainLlm',
+          provider_node_name: 'Coach DeepSeek Generation',
+          provider_response: 'raw provider blob',
+          some_safe_field: 'ok',
+        },
+      });
+
+      const sanitized = sanitizeCoachServiceErrorDebugInfo(
+        getCoachServiceErrorDebugInfo(error),
+      );
+
+      expect(sanitized.message).toBe('boom');
+      expect(sanitized.code).toBe('coach_webhook_failed');
+      expect(sanitized.status).toBe(502);
+      expect(sanitized.providerFailureKind).toBe('<redacted>');
+      expect(sanitized.providerFailureStage).toBe('<redacted>');
+      expect(sanitized.providerNodeType).toBe('<redacted>');
+      expect(sanitized.providerNodeName).toBe('<redacted>');
+      expect(sanitized.details).toMatchObject({
+        provider_failure_kind: '<redacted>',
+        provider_failure_stage: '<redacted>',
+        provider_node_type: '<redacted>',
+        provider_node_name: '<redacted>',
+        provider_response: '<redacted>',
+        some_safe_field: 'ok',
+      });
+    });
+
+    it('passes through info that has no provider details', () => {
+      const info = getCoachServiceErrorDebugInfo(new Error('plain'));
+      const sanitized = sanitizeCoachServiceErrorDebugInfo(info);
+
+      expect(sanitized.message).toBe('plain');
+      expect(sanitized.providerFailureKind).toBeNull();
+      expect(sanitized.providerNodeName).toBeNull();
     });
   });
 });

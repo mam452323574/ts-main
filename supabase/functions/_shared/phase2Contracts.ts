@@ -25,7 +25,6 @@ import type {
   SocialDeletePostRequest,
   SocialFollowAuthorRequest,
   SocialHideAuthorRequest,
-  SocialSetSaveRequest,
   SocialModerateContentRequest,
   SocialProcessModerationQueueRequest,
   SocialReclassifyPostRequest,
@@ -174,9 +173,6 @@ const SOCIAL_RECORD_IMPRESSIONS_ALLOWED_KEYS = [
   'dwell_ms_by_post',
 ] as const;
 
-const SOCIAL_SET_SAVE_ALLOWED_KEYS = ['post_id', 'action'] as const;
-const ALLOWED_SAVE_ACTIONS = new Set(['save', 'unsave']);
-
 const MAX_DWELL_MS_PER_SAMPLE = 300_000;
 const SOCIAL_RECORD_POST_VIEWS_ALLOWED_KEYS = ['post_ids'] as const;
 
@@ -209,6 +205,27 @@ const SOCIAL_ADMIN_ADJUST_POST_REACTIONS_ALLOWED_KEYS = [
   'admin_dislike_adjustment',
   'note',
 ] as const;
+
+// S-15 — Bornes hardcoded sur les ajustements admin des compteurs de reactions.
+// PostgreSQL `integer` accepte +/-2.1B mais une borne realiste empeche les
+// overflows lors d'additions raw_count + admin_adjustment dans le SQL.
+// Aussi propage en CHECK constraint sur social_posts.admin_*_adjustment (migration
+// 20260521_clamp_social_admin_reaction_adjustments.sql).
+export const SOCIAL_ADMIN_REACTION_ADJUSTMENT_MIN = -10_000;
+export const SOCIAL_ADMIN_REACTION_ADJUSTMENT_MAX = 10_000;
+
+function assertReactionAdjustmentRange(value: number, fieldName: string) {
+  if (
+    value < SOCIAL_ADMIN_REACTION_ADJUSTMENT_MIN ||
+    value > SOCIAL_ADMIN_REACTION_ADJUSTMENT_MAX
+  ) {
+    throw new Phase2HttpError(
+      400,
+      'invalid_payload',
+      `${fieldName} must be between ${SOCIAL_ADMIN_REACTION_ADJUSTMENT_MIN} and ${SOCIAL_ADMIN_REACTION_ADJUSTMENT_MAX}`,
+    );
+  }
+}
 
 const COACH_GENERATE_ALLOWED_KEYS = [
   'payload',
@@ -248,6 +265,26 @@ const COACH_INNER_PAYLOAD_MAX_PRIOR_SCANS = 16;
 const COACH_INNER_PAYLOAD_MAX_ARRAY_LENGTH = 64;
 const COACH_INNER_PAYLOAD_MAX_KEYS_PER_OBJECT = 80;
 const COACH_SELECTED_SCAN_ID_MAX_LENGTH = 120;
+
+// CO-02 (cf. SCANNER_COACH_AUDIT_2026_05.md §6) — defense-in-depth contre
+// l'injection de cles malveillantes dans les sous-objets du payload coach
+// (ex: `latest_scan.digest.metrics.system_override`). La whitelist top-level
+// (`COACH_INNER_PAYLOAD_ALLOWED_KEYS`) ne contraint que les cles racine ;
+// `assertCoachInnerPayloadDepth` accepte n'importe quelles cles imbriquees.
+// Ici on rejette les cles ressemblant a des marqueurs d'instruction LLM.
+const COACH_PAYLOAD_FORBIDDEN_KEY_PATTERN =
+  /(^_|system_?(override|instruction|prompt|role)|prompt_?override|jailbreak|ignore_?(instructions?|previous)|disregard_?(rules?|instructions?)|^role$|^assistant$|^developer$|^im_(start|end)$|<\|.+\|>)/i;
+
+function assertCoachPayloadKey(key: string, path: string) {
+  if (COACH_PAYLOAD_FORBIDDEN_KEY_PATTERN.test(key)) {
+    throw new Phase2HttpError(
+      400,
+      'invalid_coach_payload',
+      `payload key at ${path} matches a forbidden pattern`,
+      { forbidden_key: key.slice(0, 64) },
+    );
+  }
+}
 
 function isFreeQuestionPromptType(
   promptType: CoachGenerationPromptType | null,
@@ -502,6 +539,9 @@ function assertCoachInnerPayloadDepth(
       );
     }
     for (const key of keys) {
+      // CO-02 — rejette les cles imbriquees ressemblant a des marqueurs
+      // d'injection LLM (system_override, prompt_override, role, etc.).
+      assertCoachPayloadKey(key, `${path}.${key}`);
       assertCoachInnerPayloadDepth(
         (value as Record<string, unknown>)[key],
         remainingDepth - 1,
@@ -1214,33 +1254,6 @@ export function parseSocialRecordImpressionsRequest(
   };
 }
 
-export function parseSocialSetSaveRequest(payload: unknown): SocialSetSaveRequest {
-  if (!isRecord(payload)) {
-    throw new Phase2HttpError(400, 'invalid_payload', 'Request body must be an object');
-  }
-
-  assertNoUnknownKeys(payload, SOCIAL_SET_SAVE_ALLOWED_KEYS);
-
-  const postId = readRequiredTrimmedString(payload.post_id, 'post_id');
-  assertUuidLike(postId, 'post_id');
-
-  const rawAction = readOptionalString(payload.action);
-  if (rawAction !== null && rawAction !== undefined && !ALLOWED_SAVE_ACTIONS.has(rawAction)) {
-    throw new Phase2HttpError(
-      400,
-      'invalid_save_action',
-      'action must be save, unsave, or omitted',
-    );
-  }
-
-  return {
-    post_id: postId,
-    ...(rawAction
-      ? { action: rawAction as SocialSetSaveRequest['action'] }
-      : {}),
-  };
-}
-
 export function parseSocialRecordPostViewsRequest(
   payload: unknown,
 ): SocialRecordPostViewsRequest {
@@ -1447,6 +1460,7 @@ export function parseSocialAdminAdjustPostReactionsRequest(
       'admin_like_adjustment must be an integer',
     );
   }
+  assertReactionAdjustmentRange(adminLikeAdjustment, 'admin_like_adjustment');
 
   if (adminDislikeAdjustment === null || !Number.isInteger(adminDislikeAdjustment)) {
     throw new Phase2HttpError(
@@ -1455,6 +1469,7 @@ export function parseSocialAdminAdjustPostReactionsRequest(
       'admin_dislike_adjustment must be an integer',
     );
   }
+  assertReactionAdjustmentRange(adminDislikeAdjustment, 'admin_dislike_adjustment');
 
   return {
     post_id: postId,

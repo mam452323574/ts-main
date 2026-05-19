@@ -24,6 +24,44 @@ import {
   LEGACY_CHECK_AND_RECORD_SCAN_REQUEST_KEYS,
   isAppScanType,
 } from '../../../shared/scanContract.ts';
+import { isRecord } from '../_shared/phase2Utils.ts';
+
+// SC-01 (cf. SCANNER_COACH_AUDIT_2026_05.md §4) — defaults 10/min, 60/h, 200/jour.
+const SCAN_CREATION_RATE_LIMIT_PER_MINUTE = 10;
+const SCAN_CREATION_RATE_LIMIT_PER_HOUR = 60;
+const SCAN_CREATION_RATE_LIMIT_PER_DAY = 200;
+const SCAN_CREATION_RATE_LIMIT_ERROR_CODE = 'scan_creation_rate_limit_exceeded';
+
+async function enforceScanCreationRateLimit(
+  client: ReturnType<typeof createServiceRoleClient>,
+  userId: string,
+) {
+  const { data, error } = await client.rpc('record_scan_creation_attempt', {
+    p_user_id: userId,
+    p_per_minute: SCAN_CREATION_RATE_LIMIT_PER_MINUTE,
+    p_per_hour: SCAN_CREATION_RATE_LIMIT_PER_HOUR,
+    p_per_day: SCAN_CREATION_RATE_LIMIT_PER_DAY,
+  });
+
+  if (error) {
+    throw new Phase2HttpError(
+      500,
+      'scan_creation_rate_limit_check_failed',
+      'Failed to evaluate scan creation rate limit',
+    );
+  }
+
+  if (isRecord(data) && data.allowed === false) {
+    const windowExceeded =
+      typeof data.window_exceeded === 'string' ? data.window_exceeded : 'unknown';
+    throw new Phase2HttpError(
+      429,
+      SCAN_CREATION_RATE_LIMIT_ERROR_CODE,
+      `Scan creation rate limit exceeded for window: ${windowExceeded}`,
+      { window_exceeded: windowExceeded },
+    );
+  }
+}
 
 function parseScanCheckRequest(payload: unknown) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
@@ -78,6 +116,11 @@ Deno.serve(async (req: Request) => {
     const { scanType, checkOnly } = parseScanCheckRequest(
       await readJsonBody(req, { maxBytes: 4 * 1024 }),
     );
+
+    // SC-01 — applique le rate limit AVANT le RPC quota afin de ne pas faturer
+    // une RPC pour chaque burst attaquant. `check_only` est tout aussi rate-limite
+    // (un attaquant pourrait sonder le quota sans creer le scan).
+    await enforceScanCreationRateLimit(client, user.id);
 
     const { data: reservedScan, error: reservationError } = await client.rpc(
       'reserve_scan_quota',

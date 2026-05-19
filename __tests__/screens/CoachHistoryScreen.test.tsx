@@ -441,7 +441,7 @@ describe('CoachHistoryScreen', () => {
     mockCoachHistoryState = {
       data: [],
       error: new Error(
-        'Coach history pagination function "get_coach_history_page" is unavailable.',
+        'Coach history pagination function "get_coach_history_page_v2" is unavailable.',
       ),
       isFetching: false,
       isFetchingNextPage: false,

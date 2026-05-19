@@ -205,6 +205,66 @@ export function normalizeTrustedImageUri(value?: string | null) {
   }
 }
 
+// CO-06 (cf. SCANNER_COACH_AUDIT_2026_05.md §6) — schemes autorisees pour
+// les URL retournees par le coach LLM (CTA, knowledge cards, action steps).
+// Bloque `javascript:`, `data:`, `intent:`, `file:`, `tel:`, `sms:` et tout
+// scheme inconnu. Whitelist : `https:`, `mailto:`, `app:` (deep link app
+// interne), `exp:` (Expo Go pendant le dev).
+const SAFE_COACH_URL_SCHEME_PATTERN = /^(https:|mailto:|app:|exp:)/i;
+
+export function resolveSafeCoachUrl(value?: string | null) {
+  const normalizedValue = normalizeString(value);
+  if (!normalizedValue || normalizedValue.startsWith('//')) {
+    return null;
+  }
+
+  if (!SAFE_COACH_URL_SCHEME_PATTERN.test(normalizedValue)) {
+    return null;
+  }
+
+  // Pour https, refuser user:pass et port custom (anti tracking, anti
+  // reverse-shell exposed dev servers).
+  if (/^https:/i.test(normalizedValue)) {
+    try {
+      const parsedUrl = new URL(normalizedValue);
+      if (parsedUrl.username || parsedUrl.password || parsedUrl.port) {
+        return null;
+      }
+      return parsedUrl.toString();
+    } catch {
+      return null;
+    }
+  }
+
+  return normalizedValue;
+}
+
+export async function safeOpenCoachUrl(
+  value?: string | null,
+  options: { context?: string } = {},
+) {
+  const safeUrl = resolveSafeCoachUrl(value);
+  if (!safeUrl) {
+    logOperationalError(
+      options.context ?? '[CoachUrl] Blocked unsafe coach URL',
+      null,
+      { url_preview: typeof value === 'string' ? value.slice(0, 80) : null },
+    );
+    return false;
+  }
+
+  try {
+    await Linking.openURL(safeUrl);
+    return true;
+  } catch (error) {
+    logOperationalError(
+      options.context ?? '[CoachUrl] Failed to open coach URL',
+      error,
+    );
+    return false;
+  }
+}
+
 export function normalizeTrustedHttpsImageUri(value?: string | null) {
   const normalizedValue = normalizeString(value);
   if (!normalizedValue || normalizedValue.startsWith('//')) {

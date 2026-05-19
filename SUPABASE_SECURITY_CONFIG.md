@@ -112,6 +112,93 @@ The following security measures have been implemented via migrations:
 
 ---
 
+## Coach webhook HMAC enforcement (C-04)
+
+**Status:** Requires ops + n8n configuration after the 2026-05-19 audit fixes
+are merged. The Edge Function code is already wired to send HMAC headers when
+`PHASE2_WEBHOOK_AUTH_MODE` includes `hmac`. The two n8n workflows
+(`coach.json`, `coach-conversation.json`) contain a verification node that
+runs in *dual-mode* by default (log violations, accept the request) so we can
+roll out without an outage.
+
+### Staged rollout
+
+1. **T+0** — merge the audit-fix PR. No env var changes yet. Edge does not
+   send HMAC headers, n8n does not enforce. Stable.
+2. **T+0+config** — set in prod:
+   - `PHASE2_WEBHOOK_AUTH_MODE=bearer+hmac`
+   - `PHASE2_WEBHOOK_HMAC_SECRET=<openssl rand -hex 32>`
+   - Mirror the same secret in n8n as `COACH_WEBHOOK_HMAC_SECRET`.
+   - Keep `COACH_WEBHOOK_HMAC_ENFORCE=false` on n8n.
+   → Edge sends signatures, n8n logs violations but accepts.
+3. **T+24h** — inspect n8n execution logs. Expect **zero**
+   `[coach-webhook-hmac]` warnings. If any: debug the secret / format
+   mismatch before continuing.
+4. **T+24h+verified** — flip n8n env var `COACH_WEBHOOK_HMAC_ENFORCE=true`.
+   Unsigned or mismatched requests are now rejected with
+   `coach_webhook_signature_invalid` / `coach_webhook_signature_missing` /
+   `coach_webhook_timestamp_invalid`.
+5. **T+48h** — confirm the Edge function success rate on
+   `coach-generate-response` and `coach-send-message` is unchanged.
+
+### Rollback
+
+- Fast: set `COACH_WEBHOOK_HMAC_ENFORCE=false` on n8n. Effect is immediate.
+- Wider: set `PHASE2_WEBHOOK_AUTH_MODE=bearer` (or `none`) on Supabase Edge
+  to stop sending the headers entirely.
+
+### Ops checklist
+
+- [ ] Secret generated (`openssl rand -hex 32`, length ≥ 32 bytes).
+- [ ] Stored in Supabase Edge Function secrets:
+      `supabase secrets set PHASE2_WEBHOOK_HMAC_SECRET=...`.
+- [ ] Mirrored in n8n as `COACH_WEBHOOK_HMAC_SECRET` (env var or node
+      credential).
+- [ ] `PHASE2_WEBHOOK_AUTH_MODE=bearer+hmac` set in Supabase secrets.
+- [ ] HMAC verification node present on **both** workflows (`coach.json`,
+      `coach-conversation.json`).
+- [ ] 24 h dual-mode observation completed with zero warnings before
+      `COACH_WEBHOOK_HMAC_ENFORCE=true`.
+
+---
+
+## n8n logging hygiene (N-E)
+
+The two Coach workflows handle PII (user_id, conversation content) at run
+time. By default, n8n persists every node's input/output for the configured
+retention window — so a leak of the n8n log store would expose user content.
+
+### Required settings (prod)
+
+| Env var | Recommended value | Rationale |
+|---|---|---|
+| `N8N_LOG_LEVEL` | `warn` | Skip per-execution INFO traces that include payloads |
+| `EXECUTIONS_DATA_PRUNE` | `true` | Prune old executions automatically |
+| `EXECUTIONS_DATA_MAX_AGE` | `72` (hours) | Cap retention to 3 days |
+| `EXECUTIONS_DATA_SAVE_ON_SUCCESS` | `none` | Don't persist successful runs (we have the DB record) |
+| `EXECUTIONS_DATA_SAVE_ON_ERROR` | `all` | Keep error runs for debugging |
+| `EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS` | `false` | Don't persist manual test runs |
+
+### Code-level mitigation
+
+The normaliser Code node truncates `user_id` to its first 8 chars in the
+node's return payload so it shows as `0a4b1c2d…` in any downstream node log.
+The full UUID is not needed downstream of normalization (n8n routes by
+`persona_route` after that point).
+
+### Verification
+
+After applying the env config:
+
+```bash
+# Should return no recent execution data older than 72h
+n8n executionData:prune --dryRun
+
+# Sample a recent execution → user_id should be redacted in node 2+ inputs
+```
+
+---
+
 ## Verification
 
 After enabling leaked password protection, verify it's working by:
