@@ -1,0 +1,761 @@
+{
+  "name": "coach-conversation (manual DeepSeek credential rebind required)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "coach-conversation",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "9a3b6b62-0001-4f1e-8000-00000000c001",
+      "name": "Webhook Coach Conversation",
+      "webhookId": "coach-conversation-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Verify HMAC signature on the incoming Coach webhook.\n// Phase E (C-04) of COACH_SECURITY_AUDIT_2026_05.\n//\n// Dual-mode by default: log violations but accept the request. Flip the n8n\n// env var COACH_WEBHOOK_HMAC_ENFORCE=true to switch to strict enforcement.\n//\n// Expected headers (set by supabase/functions/_shared/phase2Webhook.ts when\n// PHASE2_WEBHOOK_AUTH_MODE includes hmac):\n//   x-webhook-timestamp: ISO-8601 date\n//   x-webhook-signature: \"sha256=\" + hex(HMAC-SHA256(`${ts}.${rawBody}`, SECRET))\n\nconst crypto = require('crypto');\n\nconst ENFORCE = (process.env.COACH_WEBHOOK_HMAC_ENFORCE || '').trim().toLowerCase() === 'true';\nconst SECRET = (process.env.COACH_WEBHOOK_HMAC_SECRET || '').trim();\nconst MAX_SKEW_SECONDS = 300;\n\nfunction fail(code) {\n  if (ENFORCE) {\n    throw new Error(code);\n  }\n  console.warn('[coach-webhook-hmac] ' + code + ' (dual-mode, allowing)');\n}\n\nif (!SECRET) {\n  // Missing secret means we cannot verify anything; in enforce mode this is a\n  // hard failure. In dual-mode we log and let the request through so we don't\n  // break the workflow during the rollout window.\n  fail('coach_webhook_hmac_secret_missing');\n  return $input.all();\n}\n\nconst first = $input.first();\nconst headers = (first && first.json && first.json.headers) || (first && first.headers) || {};\nconst timestamp = headers['x-webhook-timestamp'] || headers['X-Webhook-Timestamp'];\nconst signature = headers['x-webhook-signature'] || headers['X-Webhook-Signature'];\n\nif (!timestamp || !signature) {\n  fail('coach_webhook_signature_missing');\n  return $input.all();\n}\n\nconst tsDate = new Date(String(timestamp));\nif (Number.isNaN(tsDate.getTime())) {\n  fail('coach_webhook_timestamp_invalid');\n  return $input.all();\n}\nconst skewMs = Math.abs(Date.now() - tsDate.getTime());\nif (skewMs > MAX_SKEW_SECONDS * 1000) {\n  fail('coach_webhook_timestamp_out_of_skew');\n  return $input.all();\n}\n\nconst rawBody = JSON.stringify(\n  (first && first.json && first.json.body) || (first && first.body) || (first && first.json) || {},\n);\nconst expected = 'sha256=' + crypto\n  .createHmac('sha256', SECRET)\n  .update(String(timestamp) + '.' + rawBody)\n  .digest('hex');\n\nconst expectedBuf = Buffer.from(expected, 'utf8');\nconst providedBuf = Buffer.from(String(signature), 'utf8');\nconst valid =\n  expectedBuf.length === providedBuf.length &&\n  crypto.timingSafeEqual(expectedBuf, providedBuf);\n\nif (!valid) {\n  fail('coach_webhook_signature_invalid');\n  return $input.all();\n}\n\nreturn $input.all();\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        120.0,
+        0
+      ],
+      "id": "9a3b6b62-0091-4f1e-8000-00000000c091",
+      "name": "Verify Coach Conversation Webhook HMAC"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize Coach Conversation Input\n// Accepts: { conversation_id, user_id, persona_key, locale, output_contract_version, persona: { tone_instructions, style_guide }, messages: [{ role, content }], user_context }\n// Produces:\n//   $json.persona_route                       — used by the persona switch\n//   $json.coach_conversation_system_prompt    — full system prompt for the chain\n//   $json.coach_conversation_chat_history     — array of { role, content } for assistant context\n//   $json.coach_conversation_user_text        — last user message text fed to the LLM\nconst PERSONA_TONES = {\n  gentle_supportive: 'Use a gentle, supportive, reassuring wellness coaching tone. Warm, practical, encouraging, non-judgmental.',\n  strict_tough: 'Use a strict, tough-love coaching tone. Direct, disciplined, accountability-focused.',\n  motivational_energetic: 'Use a motivational, energetic coaching tone. Upbeat, momentum-building, action-oriented.',\n  patient_calm: 'Use a patient, calm coaching tone. Steady, empathetic, low pressure.',\n  analytical_precise: 'Use an analytical, precise coaching tone. Clear, structured, evidence-minded.',\n  playful_light: 'Use a playful, light coaching tone. Witty, friendly, breezy while remaining useful and respectful.',\n};\n\n// N-A of COACH_SECURITY_AUDIT_2026_05: hard-coded style guides keyed on the\n// persona key. Never read `payload.persona.style_guide` from the request body\n// — that field is attacker-controlled if the webhook is reached directly\n// (cf. C-04). Mirror of shared/coachPersonas.ts COACH_PERSONAS — keep in sync\n// when adding a new persona.\nconst PERSONA_STYLE_GUIDES = {\n  gentle_supportive: {\n    opening: 'Ouvre avec une observation chaleureuse et apaisante, sans jargon.',\n    cadence: 'Phrases courtes, 1–2 idées max par paragraphe. Laisse respirer le texte.',\n    avoid: ['ordres secs', 'pression', 'vocabulaire médical dur'],\n    emphasize: ['encouragement concret', 'micro-victoires', 'permission de ralentir'],\n  },\n  strict_tough: {\n    opening: 'Va droit au but, cadre la situation sans détour.',\n    cadence: \"Phrases directes, verbes à l'impératif, rythme serré.\",\n    avoid: ['smileys', 'formulations chaleureuses gratuites', 'édulcoration des constats'],\n    emphasize: ['engagement mesurable', 'deadline courte', 'responsabilité'],\n  },\n  motivational_energetic: {\n    opening: 'Célèbre brièvement un élan ou un gain possible dès la première ligne.',\n    cadence: \"Tempo rapide, verbes d'action, une idée percutante par phrase.\",\n    avoid: ['fatalisme', 'longs préambules', 'hésitations'],\n    emphasize: ['momentum', 'prochaine petite victoire', 'confiance'],\n  },\n  patient_calm: {\n    opening: 'Pose le décor calmement, sans presser.',\n    cadence: 'Phrases posées, ton apaisé, peu de superlatifs.',\n    avoid: ['urgence', 'pression de performance', 'culpabilisation'],\n    emphasize: ['acceptation', 'progression douce', 'respiration'],\n  },\n  analytical_precise: {\n    opening: 'Commence par une lecture factuelle des signaux disponibles.',\n    cadence: 'Structure claire, chiffres si pertinents, peu d’adjectifs.',\n    avoid: ['superlatifs', 'généralités vagues', 'recommandations sans rationale'],\n    emphasize: ['causes plausibles', 'critères mesurables', 'prochaine vérification'],\n  },\n  playful_light: {\n    opening: 'Démarre avec une touche légère, sans manquer de respect au sujet.',\n    cadence: 'Phrases enlevées, métaphores simples, humour bienveillant.',\n    avoid: ['sarcasme', 'moquerie', 'jargon lourd'],\n    emphasize: ['plaisir', 'jeu', 'curiosité'],\n  },\n};\n\nfunction asString(value) {\n  if (typeof value !== 'string') return '';\n  return value.trim();\n}\n\nfunction isRecord(value) {\n  return value !== null && typeof value === 'object' && !Array.isArray(value);\n}\n\nfunction clamp(text, max) {\n  const value = asString(text);\n  return value.length > max ? value.slice(0, max) : value;\n}\n\nconst inputItem = items[0] && items[0].json ? items[0].json : {};\nconst payload = isRecord(inputItem.body)\n  ? inputItem.body\n  : isRecord(inputItem.payload)\n    ? inputItem.payload\n    : inputItem;\n\nconst personaKeyRaw = asString(payload.persona_key || (payload.persona && payload.persona.key));\nconst personaKey = PERSONA_TONES[personaKeyRaw] ? personaKeyRaw : 'gentle_supportive';\nconst locale = asString(payload.locale) || 'fr';\nconst conversationId = asString(payload.conversation_id);\nconst userId = asString(payload.user_id);\n\nconst messagesArrayRaw = Array.isArray(payload.messages) ? payload.messages : [];\nconst messages = [];\nfor (const message of messagesArrayRaw) {\n  if (!isRecord(message)) continue;\n  const role = asString(message.role);\n  const content = clamp(message.content, role === 'user' ? 2000 : 8000);\n  if (!content) continue;\n  if (role !== 'user' && role !== 'assistant' && role !== 'system') continue;\n  messages.push({ role, content });\n}\n\nif (messages.length === 0) {\n  throw new Error('coach_conversation_messages_missing');\n}\n\n// Build sliding window history (drop the last user message, fed separately as text).\nconst lastUserIndex = (() => {\n  for (let i = messages.length - 1; i >= 0; i -= 1) {\n    if (messages[i].role === 'user') return i;\n  }\n  return -1;\n})();\n\nif (lastUserIndex < 0) {\n  throw new Error('coach_conversation_last_user_missing');\n}\n\nconst lastUserText = messages[lastUserIndex].content;\nconst contextHistory = messages\n  .slice(Math.max(0, lastUserIndex - 11), lastUserIndex)\n  .map((entry) => ({ role: entry.role, content: entry.content }));\n\n// Optional user context: keep it small.\nconst userContext = isRecord(payload.user_context) ? payload.user_context : {};\nconst inferredPersona = isRecord(userContext.inferred_persona) ? userContext.inferred_persona : null;\nconst recentScanDigest = Array.isArray(userContext.recent_scan_digest)\n  ? userContext.recent_scan_digest.slice(0, 3)\n  : [];\n\nconst personaTone = PERSONA_TONES[personaKey];\n\n// N-A: resolve the style guide from the persona key, NEVER from the request\n// body. payload.persona.style_guide is ignored if present.\nconst styleGuide = PERSONA_STYLE_GUIDES[personaKey] || null;\nconst styleGuideText = styleGuide\n  ? `Style guide: opening=${styleGuide.opening}; cadence=${styleGuide.cadence}; avoid=${styleGuide.avoid.join(', ')}; emphasize=${styleGuide.emphasize.join(', ')}.`\n  : '';\n\nconst systemPromptLines = [\n  'Tu es le Coach personnel de l utilisateur dans une app mobile. Tu lui réponds dans sa langue.',\n  '',\n  'PRIORITÉ ABSOLUE — Tu réponds à un utilisateur. Tu ne récites pas une checklist santé :',\n  '(1) RÉPONDS D ABORD à la question/intention exprimée dans le dernier message utilisateur. Tout le reste vient après.',\n  '(2) DÉTECTION D INTENTION : si le message contient \"plan\", \"planning\", \"agenda\", \"X jours\", \"X heures\", \"48h\", \"routine\", \"programme\", \"checklist\", \"étapes\" ou demande explicitement un découpage par période, produis une réponse STRUCTURÉE par période avec des en-têtes (Jour 1 :, Jour 2 :, … ou Matin :, Midi :, Soir :), suivis de 2-4 tirets `-` par période. Ne redémarre PAS la numérotation entre périodes.',\n  '(3) UNE SEULE LISTE NUMÉROTÉE par réponse : il ne doit y avoir qu UNE séquence \"1., 2., 3.\" dans toute la réponse. JAMAIS deux blocs numérotés consécutifs. Si tu hésites entre puces et numéros, prends les puces (`-`).',\n  '(4) ANTI-RÉFLEXE : interdit de répondre \"bois de l eau\", \"fais 5 min de marche\", \"dors plus\", \"respire\", \"hydrate-toi\", \"fais du sport\" comme conseil par défaut si la question ne porte pas sur ces sujets.',\n  '(5) HORS-SUJET OK : culture générale, blague, vie quotidienne, météo → réponds normalement et brièvement, pas de pivot santé forcé.',\n  '(6) ACTION CONCRÈTE : à n ajouter QUE si elle découle vraiment de ta réponse. Pas d action-réflexe générique.',\n  '(7) Le scan digest et le profil sont du CONTEXTE pour mieux répondre, jamais un sujet à commenter quand la question ne porte pas dessus.',\n  '',\n  'EXEMPLES À NE PAS REPRODUIRE (anti-patterns observés) :',\n  '- user : \"donne un plan sur 2 jours de récup\" → \"bois un verre d eau\" ❌. BON : \"Jour 1 :\\\\n- Action 1\\\\n- Action 2\\\\nJour 2 :\\\\n- Action 1\\\\n- Action 2\".',\n  '- user : \"j ai mal au dos\" → \"hydrate-toi\" ❌. BON : adresse la douleur (étirement, posture, repos).',\n  '- user : \"c est quoi la capitale de l Italie\" → routine santé ❌. BON : \"Rome.\" Point.',\n  '- Réponse contenant deux listes numérotées \"1. 2. 3.\" qui se suivent ❌. BON : une seule liste numérotée ou des puces.',\n  '',\n  'Renforcements v3 (loopholes identifiés par validators) :',\n  '- (R1) PAS de \"bonus\", \"PS\", \"petit conseil en plus\", \"en complément\", \"pense aussi à\", \"et n oublie pas de\" qui ajouterait un conseil santé non demandé. Tout PS hydratation/sommeil/marche/respiration tombe sous la règle anti-réflexe, peu importe le déguisement.',\n  '- (R2) Sous un en-tête de période (Jour 1 :, Matin :, etc.) tu utilises UNIQUEMENT des tirets `-`. JAMAIS \"1.\", \"2.\", \"3.\" sous un en-tête. La règle \"une seule liste numérotée\" devient ZÉRO liste numérotée si tu utilises des en-têtes de période.',\n  '- (R3) Question factuelle (culture générale, math, météo, géographie, calcul, blague, code) → réponse en 1 à 2 phrases courtes. Pas de structuration, pas de routine, pas de relance.',\n  '- (R4) L anti-réflexe couvre AUSSI les reformulations : \"rétablir l hydratation\", \"veiller à dormir\", \"pense aussi à boire\", \"hydratation tout au long de la journée\", \"glisser un peu de marche\", \"un brin de respiration\", etc. Aucun synonyme ne contourne la règle.',\n  '- (R5) Pour une question sur un symptôme physique (douleur, fatigue, etc.), donne au moins 1 action concrète AVANT de poser des questions de clarification. Pas d échange purement interrogatif.',\n  '',\n  `Ton : ${personaTone}`,\n  styleGuideText,\n  'Format : texte simple sans Markdown ni JSON ni code fences. Max 4 paragraphes courts OU une structure par période (Jour 1 :, Jour 2 :, …) avec tirets.',\n  'Sécurité : pas de diagnostic médical/psy — recommande un pro en cas de doute clinique ou si la situation semble grave.',\n  `Locale: ${locale}.`,\n  inferredPersona ? `Contexte utilisateur inféré (informatif — NE PAS commenter sauf si la question le demande) : ${JSON.stringify(inferredPersona).slice(0, 1200)}` : '',\n  recentScanDigest.length > 0 ? `Digest scans récents (informatif — NE PAS commenter sauf si la question le demande) : ${JSON.stringify(recentScanDigest).slice(0, 1200)}` : '',\n  `Conversation id: ${conversationId || '(unknown)'}.`,\n  '',\n  'RAPPEL FINAL : la question/demande utilisateur est ta priorité. Adresse-la directement. Pas de conseil par défaut.',\n];\nconst systemPrompt = systemPromptLines.filter(Boolean).join('\\n\\n');\n\n// N-E of COACH_SECURITY_AUDIT_2026_05: mask user_id in the downstream payload.\n// No node beyond this one reads the full UUID; the LLM call doesn't need it,\n// and n8n logs each node's input/output by default — emitting the full UUID\n// here would leak it to whoever can read the execution log store.\nconst userIdMasked = userId ? `${userId.slice(0, 8)}…` : '(unknown)';\n\nreturn [\n  {\n    json: {\n      persona_route: personaKey,\n      conversation_id: conversationId,\n      user_id: userIdMasked,\n      locale,\n      coach_conversation_system_prompt: systemPrompt,\n      coach_conversation_chat_history: contextHistory,\n      coach_conversation_user_text: lastUserText,\n      coach_conversation_total_messages: messages.length,\n      coach_conversation_metadata: {\n        persona_key: personaKey,\n        history_size: contextHistory.length,\n      },\n    },\n  },\n];\n"
+      },
+      "id": "9a3b6b62-0002-4f1e-8000-00000000c002",
+      "name": "Normalize Coach Conversation Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true
+                },
+                "conditions": [
+                  {
+                    "id": "rule-gentle",
+                    "leftValue": "={{ $json.persona_route }}",
+                    "rightValue": "gentle_supportive",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "outputKey": "gentle"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true
+                },
+                "conditions": [
+                  {
+                    "id": "rule-strict",
+                    "leftValue": "={{ $json.persona_route }}",
+                    "rightValue": "strict_tough",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "outputKey": "strict"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true
+                },
+                "conditions": [
+                  {
+                    "id": "rule-motivational",
+                    "leftValue": "={{ $json.persona_route }}",
+                    "rightValue": "motivational_energetic",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "outputKey": "motivational"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true
+                },
+                "conditions": [
+                  {
+                    "id": "rule-calm",
+                    "leftValue": "={{ $json.persona_route }}",
+                    "rightValue": "patient_calm",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "outputKey": "calm"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true
+                },
+                "conditions": [
+                  {
+                    "id": "rule-analytical",
+                    "leftValue": "={{ $json.persona_route }}",
+                    "rightValue": "analytical_precise",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "outputKey": "analytical"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true
+                },
+                "conditions": [
+                  {
+                    "id": "rule-playful",
+                    "leftValue": "={{ $json.persona_route }}",
+                    "rightValue": "playful_light",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "outputKey": "playful"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        520,
+        0
+      ],
+      "id": "9a3b6b62-0003-4f1e-8000-00000000c003",
+      "name": "Route Conversation Persona"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.coach_conversation_user_text }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "={{ $json.coach_conversation_system_prompt }}"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        880,
+        -360
+      ],
+      "id": "9a3b6b62-0010-4f1e-8000-00000000c010",
+      "name": "Coach Conversation / gentle_supportive"
+    },
+    {
+      "parameters": {
+        "model": "deepseek-v4-flash",
+        "options": {
+          "maxTokens": 1200,
+          "temperature": 0.4,
+          "topP": 0.9,
+          "requestTimeout": 30000
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatDeepSeek",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        -440
+      ],
+      "id": "9a3b6b62-0011-4f1e-8000-00000000c011",
+      "name": "DeepSeek Conversation Gentle",
+      "credentials": {
+        "deepSeekApi": {
+          "id": "REPLACE_WITH_YOUR_DEEPSEEK_CREDENTIAL_ID",
+          "name": "REBIND_REQUIRED__DeepSeek Api account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.coach_conversation_user_text }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "={{ $json.coach_conversation_system_prompt }}"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        880,
+        -200
+      ],
+      "id": "9a3b6b62-0020-4f1e-8000-00000000c020",
+      "name": "Coach Conversation / strict_tough"
+    },
+    {
+      "parameters": {
+        "model": "deepseek-v4-flash",
+        "options": {
+          "maxTokens": 1200,
+          "temperature": 0.3,
+          "topP": 0.9,
+          "requestTimeout": 30000
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatDeepSeek",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        -280
+      ],
+      "id": "9a3b6b62-0021-4f1e-8000-00000000c021",
+      "name": "DeepSeek Conversation Strict",
+      "credentials": {
+        "deepSeekApi": {
+          "id": "REPLACE_WITH_YOUR_DEEPSEEK_CREDENTIAL_ID",
+          "name": "REBIND_REQUIRED__DeepSeek Api account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.coach_conversation_user_text }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "={{ $json.coach_conversation_system_prompt }}"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        880,
+        -40
+      ],
+      "id": "9a3b6b62-0030-4f1e-8000-00000000c030",
+      "name": "Coach Conversation / motivational_energetic"
+    },
+    {
+      "parameters": {
+        "model": "deepseek-v4-flash",
+        "options": {
+          "maxTokens": 1200,
+          "temperature": 0.5,
+          "topP": 0.9,
+          "requestTimeout": 30000
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatDeepSeek",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        -120
+      ],
+      "id": "9a3b6b62-0031-4f1e-8000-00000000c031",
+      "name": "DeepSeek Conversation Motivational",
+      "credentials": {
+        "deepSeekApi": {
+          "id": "REPLACE_WITH_YOUR_DEEPSEEK_CREDENTIAL_ID",
+          "name": "REBIND_REQUIRED__DeepSeek Api account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.coach_conversation_user_text }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "={{ $json.coach_conversation_system_prompt }}"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        880,
+        120
+      ],
+      "id": "9a3b6b62-0040-4f1e-8000-00000000c040",
+      "name": "Coach Conversation / patient_calm"
+    },
+    {
+      "parameters": {
+        "model": "deepseek-v4-flash",
+        "options": {
+          "maxTokens": 1200,
+          "temperature": 0.3,
+          "topP": 0.9,
+          "requestTimeout": 30000
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatDeepSeek",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        40
+      ],
+      "id": "9a3b6b62-0041-4f1e-8000-00000000c041",
+      "name": "DeepSeek Conversation Calm",
+      "credentials": {
+        "deepSeekApi": {
+          "id": "REPLACE_WITH_YOUR_DEEPSEEK_CREDENTIAL_ID",
+          "name": "REBIND_REQUIRED__DeepSeek Api account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.coach_conversation_user_text }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "={{ $json.coach_conversation_system_prompt }}"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        880,
+        280
+      ],
+      "id": "9a3b6b62-0050-4f1e-8000-00000000c050",
+      "name": "Coach Conversation / analytical_precise"
+    },
+    {
+      "parameters": {
+        "model": "deepseek-v4-flash",
+        "options": {
+          "maxTokens": 1200,
+          "temperature": 0.2,
+          "topP": 0.9,
+          "requestTimeout": 30000
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatDeepSeek",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        200
+      ],
+      "id": "9a3b6b62-0051-4f1e-8000-00000000c051",
+      "name": "DeepSeek Conversation Analytical",
+      "credentials": {
+        "deepSeekApi": {
+          "id": "REPLACE_WITH_YOUR_DEEPSEEK_CREDENTIAL_ID",
+          "name": "REBIND_REQUIRED__DeepSeek Api account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.coach_conversation_user_text }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "={{ $json.coach_conversation_system_prompt }}"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        880,
+        440
+      ],
+      "id": "9a3b6b62-0060-4f1e-8000-00000000c060",
+      "name": "Coach Conversation / playful_light"
+    },
+    {
+      "parameters": {
+        "model": "deepseek-v4-flash",
+        "options": {
+          "maxTokens": 1200,
+          "temperature": 0.55,
+          "topP": 0.9,
+          "requestTimeout": 30000
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatDeepSeek",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        360
+      ],
+      "id": "9a3b6b62-0061-4f1e-8000-00000000c061",
+      "name": "DeepSeek Conversation Playful",
+      "credentials": {
+        "deepSeekApi": {
+          "id": "REPLACE_WITH_YOUR_DEEPSEEK_CREDENTIAL_ID",
+          "name": "REBIND_REQUIRED__DeepSeek Api account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Finalize Coach Conversation Output\n// Normalizes the LLM response into a single JSON contract for the Edge Function.\nfunction asString(value) {\n  if (typeof value === 'string') return value.trim();\n  if (value && typeof value === 'object' && typeof value.text === 'string') return value.text.trim();\n  if (value && typeof value === 'object' && typeof value.content === 'string') return value.content.trim();\n  return '';\n}\n\nconst incoming = items[0] && items[0].json ? items[0].json : {};\nlet content = asString(incoming.text);\nif (!content) content = asString(incoming.response);\nif (!content) content = asString(incoming.output);\nif (!content && incoming.choices && incoming.choices[0]) {\n  const choice = incoming.choices[0];\n  content = asString(choice.message ? choice.message.content : '');\n  if (!content) content = asString(choice.text);\n}\n\nif (!content) {\n  throw new Error('coach_conversation_empty_response');\n}\n\nconst metadata = (incoming.coach_conversation_metadata && typeof incoming.coach_conversation_metadata === 'object')\n  ? incoming.coach_conversation_metadata\n  : {};\n\nreturn [\n  {\n    json: {\n      success: true,\n      content,\n      role: 'assistant',\n      model: 'deepseek-v4-flash',\n      provider: 'n8n',\n      persona_key: metadata.persona_key || null,\n      conversation_id: incoming.conversation_id || null,\n      generated_at: new Date().toISOString(),\n    },\n  },\n];"
+      },
+      "id": "9a3b6b62-0070-4f1e-8000-00000000c070",
+      "name": "Finalize Coach Conversation Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1400,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1660,
+        0
+      ],
+      "id": "9a3b6b62-0080-4f1e-8000-00000000c080",
+      "name": "Respond Coach Conversation"
+    }
+  ],
+  "connections": {
+    "Webhook Coach Conversation": {
+      "main": [
+        [
+          {
+            "node": "Verify Coach Conversation Webhook HMAC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Coach Conversation Input": {
+      "main": [
+        [
+          {
+            "node": "Route Conversation Persona",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Conversation Persona": {
+      "main": [
+        [
+          {
+            "node": "Coach Conversation / gentle_supportive",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Coach Conversation / strict_tough",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Coach Conversation / motivational_energetic",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Coach Conversation / patient_calm",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Coach Conversation / analytical_precise",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Coach Conversation / playful_light",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Coach Conversation / gentle_supportive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeepSeek Conversation Gentle": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Coach Conversation / gentle_supportive",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeepSeek Conversation Strict": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Coach Conversation / strict_tough",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeepSeek Conversation Motivational": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Coach Conversation / motivational_energetic",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeepSeek Conversation Calm": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Coach Conversation / patient_calm",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeepSeek Conversation Analytical": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Coach Conversation / analytical_precise",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeepSeek Conversation Playful": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Coach Conversation / playful_light",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Coach Conversation / gentle_supportive": {
+      "main": [
+        [
+          {
+            "node": "Finalize Coach Conversation Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Coach Conversation / strict_tough": {
+      "main": [
+        [
+          {
+            "node": "Finalize Coach Conversation Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Coach Conversation / motivational_energetic": {
+      "main": [
+        [
+          {
+            "node": "Finalize Coach Conversation Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Coach Conversation / patient_calm": {
+      "main": [
+        [
+          {
+            "node": "Finalize Coach Conversation Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Coach Conversation / analytical_precise": {
+      "main": [
+        [
+          {
+            "node": "Finalize Coach Conversation Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Coach Conversation / playful_light": {
+      "main": [
+        [
+          {
+            "node": "Finalize Coach Conversation Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finalize Coach Conversation Output": {
+      "main": [
+        [
+          {
+            "node": "Respond Coach Conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Coach Conversation Webhook HMAC": {
+      "main": [
+        [
+          {
+            "node": "Normalize Coach Conversation Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "versionId": "00000000-0000-0000-0000-000000000001"
+}

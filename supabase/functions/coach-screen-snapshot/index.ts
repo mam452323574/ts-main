@@ -9,6 +9,7 @@ import {
   requireAuthenticatedUser,
 } from '../_shared/phase2Auth.ts';
 import {
+  createPhase2DatabaseError,
   getPhase2ErrorStatus,
   Phase2HttpError,
   toPhase2ErrorPayload,
@@ -19,13 +20,79 @@ import {
 } from '../_shared/phase2Observability.ts';
 import {
   assertNoUnknownKeys,
+  isRecord,
   readJsonBody,
 } from '../_shared/phase2Utils.ts';
 import { isCoachPersonaKey } from '../../../shared/coachPersonas.ts';
 
+// N-D of COACH_SECURITY_AUDIT_2026_05: rate limit. The UI calls this endpoint
+// ~1× per Coach screen open; defaults are generous (30/min, 600/h, 2000/day)
+// to absorb fast swipe / pull-to-refresh without blocking real users.
+const COACH_SNAPSHOT_RATE_LIMIT_PER_MINUTE = 30;
+const COACH_SNAPSHOT_RATE_LIMIT_PER_HOUR = 600;
+const COACH_SNAPSHOT_RATE_LIMIT_PER_DAY = 2000;
+const COACH_SNAPSHOT_RATE_LIMIT_ERROR_CODE = 'coach_snapshot_rate_limit_exceeded';
+
+async function enforceCoachSnapshotRateLimit(client: any, userId: string) {
+  const { data, error } = await client.rpc('record_coach_snapshot_attempt', {
+    p_user_id: userId,
+    p_per_minute: COACH_SNAPSHOT_RATE_LIMIT_PER_MINUTE,
+    p_per_hour: COACH_SNAPSHOT_RATE_LIMIT_PER_HOUR,
+    p_per_day: COACH_SNAPSHOT_RATE_LIMIT_PER_DAY,
+  });
+
+  if (error) {
+    throw createPhase2DatabaseError(error, {
+      contextLabel: 'Coach snapshot rate limit check',
+      fallbackCode: 'coach_snapshot_rate_limit_check_failed',
+      fallbackMessage: 'Failed to evaluate coach snapshot quota',
+      relationName: 'coach_snapshot_attempts',
+    });
+  }
+
+  if (isRecord(data) && data.allowed === false) {
+    const windowExceeded =
+      typeof data.window_exceeded === 'string' ? data.window_exceeded : 'unknown';
+    throw new Phase2HttpError(
+      429,
+      COACH_SNAPSHOT_RATE_LIMIT_ERROR_CODE,
+      `Coach snapshot rate limit exceeded for window: ${windowExceeded}`,
+      { window_exceeded: windowExceeded },
+    );
+  }
+}
+
 const DEFAULT_ENTRIES_LIMIT = 10;
 const MAX_ENTRIES_LIMIT = 20;
 const RECENT_SCAN_ROWS_LIMIT = 64;
+
+// C-05 of COACH_SECURITY_AUDIT_2026_05: explicit column list so we never leak
+// internal fields (request_payload_json, response_payload_json, cache_key,
+// input_hash, error_code) to authenticated clients. Mirrors the surface of
+// get_coach_history_page_v2 plus the few extra fields the snapshot UI uses
+// (e.g. user_id, updated_at).
+const COACH_ENTRY_PUBLIC_COLUMNS = [
+  'id',
+  'user_id',
+  'status',
+  'title',
+  'body',
+  'disclaimer',
+  'persona_key',
+  'prompt_type',
+  'question_key',
+  'question_text',
+  'response_version',
+  'content_json',
+  'cta_label',
+  'cta_route',
+  'source',
+  'locale',
+  'created_at',
+  'updated_at',
+  'generated_at',
+  'expires_at',
+].join(', ');
 
 function readOptionalString(value: unknown) {
   return typeof value === 'string' && value.trim().length > 0
@@ -93,7 +160,7 @@ function applyReadyEntryFilters(query: any) {
 async function fetchCoachEntries(client: any, userId: string, limit: number) {
   const { data, error } = await client
     .from('coach_entries')
-    .select('*')
+    .select(COACH_ENTRY_PUBLIC_COLUMNS)
     .eq('user_id', userId)
     .order('updated_at', { ascending: false })
     .order('created_at', { ascending: false })
@@ -117,7 +184,7 @@ async function fetchLatestReadyEntry(
   let query = applyReadyEntryFilters(
     client
       .from('coach_entries')
-      .select('*')
+      .select(COACH_ENTRY_PUBLIC_COLUMNS)
       .eq('user_id', options.userId),
   );
 
@@ -239,6 +306,9 @@ Deno.serve(async (req: Request) => {
     );
     const client = createServiceRoleClient();
     const user = await requireAuthenticatedUser(client, req);
+
+    // N-D rate limit check, must run before the heavy parallel reads.
+    await enforceCoachSnapshotRateLimit(client, user.id);
 
     const [
       entries,
