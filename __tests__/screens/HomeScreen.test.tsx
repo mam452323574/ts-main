@@ -61,6 +61,9 @@ jest.mock('lucide-react-native', () => ({
   Check: 'Check',
   X: 'X',
   AlertCircle: 'AlertCircle',
+  AlertTriangle: 'AlertTriangle',
+  CloudOff: 'CloudOff',
+  HelpCircle: 'HelpCircle',
 }));
 
 jest.mock('expo-router', () => ({

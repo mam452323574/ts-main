@@ -763,6 +763,9 @@ export const EN_TRANSLATIONS = {
       'Wellness guidance only. This is not a diagnosis or medical advice.',
     locked_badge: 'Premium',
     locked_tap_hint: 'Tap to unlock this personality.',
+    conversation_hero: {
+      title_with_coach: 'Free conversation with {{coachName}}',
+    },
     free_persona_hint: 'Noah is included on the free plan.',
     active_persona_label: 'Coach personality',
     selected_persona_label: 'Selected coach',
@@ -810,6 +813,24 @@ export const EN_TRANSLATIONS = {
     no_scan_title: 'Start with a scan',
     no_scan_body:
       'Start with a scan to unlock personalized coaching.',
+    scan_downgrade: {
+      title: 'A deeper read is available',
+      body_default:
+        'For a more detailed analysis of your scan, Premium unlocks targeted coaching. Here is a free first read.',
+      body_body_focus:
+        'For a detailed body plan (posture, mobility, recovery), Premium is required. Here is a free read of your scan.',
+      body_nutrition_focus:
+        'For a targeted nutrition plan (meals, swaps, groceries), Premium is required. Here is a free read of your scan.',
+      body_sleep_coach:
+        'For a detailed sleep/recovery protocol, Premium is required. Here is a free read of your scan.',
+      body_risk_watch:
+        'For detailed signal monitoring, Premium is required. Here is a free read of your scan.',
+      body_trend_review:
+        'For a fine-grained analysis of your evolution, Premium is required. Here is a free read of your scan.',
+      body_weekly_plan:
+        'For a full weekly plan (skincare + nutrition + training), Premium is required. Here is a free read of your scan.',
+      cta: 'Discover Premium',
+    },
     history_title: 'Previous guidance',
     view_history_cta: 'View history',
     history_cta_count: '{{count}} previous guidance item(s)',
@@ -1602,7 +1623,7 @@ export const EN_TRANSLATIONS = {
   },
   auth: {
     login_title: 'Health Scan',
-    login_subtitle: 'Sign in to your account',
+    login_subtitle: 'Sign in or recover your account',
     email_placeholder: 'Email',
     password_placeholder: 'Password',
     password_confirm: 'Confirm Password',
@@ -1805,6 +1826,8 @@ export const EN_TRANSLATIONS = {
       chef: 'Chef',
       used: 'Used',
       detected: 'Detected',
+      detected_preview: 'Detected in your fridge',
+      detected_preview_more: '+{{count}}',
       calories: 'Energy',
       protein: 'Protein',
       note: 'Note',
@@ -1870,7 +1893,9 @@ export const EN_TRANSLATIONS = {
     intro_step_subtitle:
       'Scan, understand, then track what changes. We are just setting up the essentials first.',
     intro_step_note:
-      'Pick a username, choose a look, then confirm your email. One more step before your first scan.',
+      'Pick a username and a look, then link your profile with Google or email.',
+    intro_cta: 'Get started',
+    existing_account_cta: 'I already have an account / Recover my account',
     profile_step_title: 'Set up your scan profile',
     profile_step_subtitle:
       'Choose your username, add a photo if you want, and keep a theme that feels like you.',
@@ -1895,6 +1920,9 @@ export const EN_TRANSLATIONS = {
     account_step_title: 'Create your account',
     account_step_subtitle:
       'Email, password, then one code before your first scan.',
+    account_method_title: 'Save your profile',
+    account_method_subtitle: 'Choose how to link your profile to your account.',
+    account_email_cta: 'Sign up with email',
     username_label: 'Username *',
     username_placeholder: 'username123',
     profile_theme_title: 'Appearance',
@@ -1919,6 +1947,13 @@ export const EN_TRANSLATIONS = {
     next_btn: 'Next',
     start_btn: 'Start Adventure',
     enter_app: 'Open the app',
+    finalize_profile_title: 'Finish your profile',
+    finalize_profile_subtitle:
+      'Confirm your username to link your choices to your account.',
+    finalize_profile_btn: 'Finish my profile',
+    final_title: 'Your profile is ready',
+    final_subtitle: 'Everything is set. You can now enter the app.',
+    profile_ready_label: 'Active profile',
     slide_1_eyebrow: 'Scanner',
     slide_1_title: 'Scan first. Guess less.',
     slide_1_subtitle:

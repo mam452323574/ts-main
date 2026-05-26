@@ -13,9 +13,8 @@ import {
 } from 'react-native';
 import { AlertCircle, Check, X } from 'lucide-react-native';
 
-import { BORDER_RADIUS, FONT_FAMILIES, SHADOWS, SIZES, SPACING, withAlpha } from '@/constants/theme';
+import { BORDER_RADIUS, FONT_FAMILIES, SIZES, SPACING, withAlpha } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useAuthPalette } from '@/components/auth/tokens';
 
 export type AuthInputStatus = 'idle' | 'checking' | 'success' | 'error' | 'info';
 
@@ -81,11 +80,7 @@ function AuthInputBase({
   onBlur,
 }: AuthInputProps) {
   const { colors } = useTheme();
-  const palette = useAuthPalette();
-  const styles = useMemo(
-    () => createStyles(colors, palette),
-    [colors, palette],
-  );
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   // iOS Expo Go SDK 54+ : un setState dans onFocus déclenche un re-render
   // synchrone pendant que iOS établit le focus du TextInput, ce qui fait perdre
@@ -184,7 +179,7 @@ function AuthInputBase({
 // TextInput (le clavier flash puis disparaît). Le memo réduit la surface.
 export const AuthInput = memo(AuthInputBase);
 
-const createStyles = (colors: any, palette: ReturnType<typeof useAuthPalette>) =>
+const createStyles = (colors: any) =>
   StyleSheet.create({
     wrapper: {
       gap: SPACING.xs,
@@ -200,18 +195,13 @@ const createStyles = (colors: any, palette: ReturnType<typeof useAuthPalette>) =
     container: {
       flexDirection: 'row',
       alignItems: 'center',
-      minHeight: 60,
-      backgroundColor: palette.surfaceGlass,
+      minHeight: 56,
+      backgroundColor: colors.cardBackground,
       borderRadius: BORDER_RADIUS.xl,
       borderWidth: 1,
-      borderColor: palette.secondaryActionBorder,
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
       paddingHorizontal: SPACING.md,
-      ...SHADOWS.soft,
-      shadowColor: palette.shadowColor,
-      shadowOpacity: 0.08,
-      shadowRadius: 14,
-      shadowOffset: { width: 0, height: 6 },
-      elevation: 2, borderCurve: 'continuous',
+      borderCurve: 'continuous',
     },
     containerError: {
       borderColor: withAlpha(colors.error, 0.5),

@@ -1290,3 +1290,71 @@ export interface CoachPaperSurface {
 export function getCoachPaperSurface(isDark: boolean): CoachPaperSurface {
   return isDark ? COACH_PAPER_PALETTE.dark : COACH_PAPER_PALETTE.light;
 }
+
+// Tokens for text and overlays rendered ON TOP of imagery (coach portraits,
+// prompt artworks). Centralising them here keeps the contrast strategy
+// consistent across Hero/Persona/Prompt cards instead of having each card
+// invent its own rgba scrim. The values are calibrated to match the
+// existing Coach look — applying these tokens does not visibly change the
+// current rendering, but every new surface on imagery can now opt-in.
+export const COACH_ON_MEDIA_PALETTE = {
+  light: {
+    textPrimary: '#FFFFFF',
+    textSecondary: 'rgba(255, 255, 255, 0.88)',
+    scrimTransparent: 'rgba(0, 0, 0, 0)',
+    scrimSoft: 'rgba(0, 0, 0, 0.32)',
+    scrimMedium: 'rgba(0, 0, 0, 0.5)',
+    scrimStrong: 'rgba(0, 0, 0, 0.7)',
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  dark: {
+    textPrimary: '#FFFFFF',
+    textSecondary: 'rgba(255, 255, 255, 0.86)',
+    scrimTransparent: 'rgba(0, 0, 0, 0)',
+    scrimSoft: 'rgba(0, 0, 0, 0.4)',
+    scrimMedium: 'rgba(0, 0, 0, 0.55)',
+    scrimStrong: 'rgba(0, 0, 0, 0.78)',
+    textShadowColor: 'rgba(0, 0, 0, 0.55)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+} as const;
+
+export interface CoachOnMediaTokens {
+  textPrimary: string;
+  textSecondary: string;
+  scrimTransparent: string;
+  scrimSoft: string;
+  scrimMedium: string;
+  scrimStrong: string;
+  textShadowColor: string;
+  textShadowOffset: { width: number; height: number };
+  textShadowRadius: number;
+}
+
+export type CoachOnMediaScrimIntensity = 'soft' | 'medium' | 'strong';
+
+export function getCoachOnMediaTokens(isDark: boolean): CoachOnMediaTokens {
+  return isDark ? COACH_ON_MEDIA_PALETTE.dark : COACH_ON_MEDIA_PALETTE.light;
+}
+
+/**
+ * Returns a `[transparent, scrim]` tuple ready to feed `LinearGradient` so a
+ * surface can protect text rendered over an image. Pass `intensity` to pick
+ * the scrim strength.
+ */
+export function getCoachOnMediaGradient(
+  isDark: boolean,
+  intensity: CoachOnMediaScrimIntensity = 'medium',
+): readonly [string, string] {
+  const tokens = getCoachOnMediaTokens(isDark);
+  const end =
+    intensity === 'soft'
+      ? tokens.scrimSoft
+      : intensity === 'strong'
+        ? tokens.scrimStrong
+        : tokens.scrimMedium;
+  return [tokens.scrimTransparent, end] as const;
+}

@@ -1,13 +1,14 @@
 import { useMemo } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
-import { Check, ChevronRight, Crown, Lock } from 'lucide-react-native';
+import { Check, ChevronRight } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useTheme } from '@/contexts/ThemeContext';
 import {
   BORDER_RADIUS,
   FONT_WEIGHTS,
+  getCoachOnMediaTokens,
   mixColors,
   SHADOWS,
   SIZES,
@@ -19,7 +20,12 @@ import {
   getCoachPromptVisual,
 } from '@/shared/coachPromptVisuals';
 import type { CoachPromptType } from '@/types';
+import { CoachLockBadge } from '@/components/coach/CoachLockBadge';
 import { Squircle } from '@/components/Squircle';
+
+// Historical scale used by the artwork — preserved as the fallback when no
+// per-prompt `imageScale` is supplied.
+const ARTWORK_DEFAULT_SCALE = 1.06;
 
 interface CoachPromptCardProps {
   promptType: CoachPromptType;
@@ -58,11 +64,15 @@ export function CoachPromptCard({
 }: CoachPromptCardProps) {
   const { colors, isDark } = useTheme();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const onMedia = useMemo(() => getCoachOnMediaTokens(isDark), [isDark]);
   const {
     icon: PromptIcon,
     accentColor,
     artworkSource,
+    crop: artworkCrop,
   } = getCoachPromptVisual(promptType);
+  const artworkScale = artworkCrop?.imageScale ?? ARTWORK_DEFAULT_SCALE;
+  const artworkContentPosition = artworkCrop?.contentPosition;
   const promptPalette = useMemo(
     () => getCoachPromptPalette(promptType, colors, isDark),
     [colors, isDark, promptType],
@@ -257,14 +267,20 @@ export function CoachPromptCard({
             <Image
               source={artworkSource}
               contentFit="cover"
-              style={styles.selectorArtwork}
+              contentPosition={artworkContentPosition}
+              style={[
+                styles.selectorArtwork,
+                { transform: [{ scale: artworkScale }] },
+              ]}
               testID={testID ? `${testID}-artwork` : undefined}
             />
             <LinearGradient
               colors={[
-                withAlpha(colors.background, 0),
-                withAlpha(colors.background, isDark ? 0.84 : 0.46),
+                onMedia.scrimTransparent,
+                onMedia.scrimMedium,
+                withAlpha(colors.background, isDark ? 0.92 : 0.78),
               ]}
+              locations={[0, 0.55, 1]}
               pointerEvents="none"
               style={styles.selectorArtworkGradient}
             />
@@ -404,32 +420,11 @@ export function CoachPromptCard({
             ]}
             testID={testID ? `${testID}-lock-scrim` : undefined}
           />
-          <View
-            pointerEvents="none"
-            style={[
-              styles.lockBadge,
-              {
-                backgroundColor: withAlpha(colors.goldLight ?? '#4D3F00', 0.92),
-                borderColor: withAlpha(goldColor, 0.36),
-              },
-            ]}
-            testID={testID ? `${testID}-lock-badge` : undefined}
-          >
-            <Crown
-              color={goldColor}
-              fill={goldColor}
-              size={11}
-              testID={testID ? `${testID}-lock-crown` : undefined}
-            />
-            <Lock
-              color={goldColor}
-              size={11}
-              testID={testID ? `${testID}-lock-icon` : undefined}
-            />
-            {lockedBadgeLabel ? (
-              <Text style={styles.lockBadgeText}>{lockedBadgeLabel}</Text>
-            ) : null}
-          </View>
+          <CoachLockBadge
+            label={lockedBadgeLabel}
+            style={styles.lockBadge}
+            testID={testID}
+          />
         </>
       ) : null}
     </Pressable>
@@ -494,22 +489,7 @@ const createStyles = (colors: any, isDark: boolean) =>
       position: 'absolute',
       top: 8,
       right: 8,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      paddingHorizontal: SPACING.sm,
-      paddingVertical: 4,
-      borderRadius: BORDER_RADIUS.full,
-      borderWidth: 1,
-      zIndex: 3, borderCurve: 'continuous',
-    },
-    lockBadgeText: {
-      fontSize: 10,
-      lineHeight: 12,
-      fontWeight: FONT_WEIGHTS.bold,
-      color: colors.gold ?? '#FFD700',
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
+      zIndex: 3,
     },
     accentRail: {
       position: 'absolute',
@@ -714,14 +694,13 @@ const createStyles = (colors: any, isDark: boolean) =>
     selectorArtwork: {
       width: '100%',
       height: '100%',
-      transform: [{ scale: 1.06 }],
     },
     selectorArtworkGradient: {
       position: 'absolute',
       left: 0,
       right: 0,
       bottom: 0,
-      height: 72,
+      height: 96,
     },
     titleSelectorTile: {
       fontSize: SIZES.text14,

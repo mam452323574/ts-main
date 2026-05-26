@@ -12,11 +12,9 @@ import { Check, ChevronDown, Globe, X } from 'lucide-react-native';
 
 import {
   BORDER_RADIUS,
-  SHADOWS,
   SIZES,
   SPACING,
   getThemeTokens,
-  getThemedSurface,
   withAlpha,
 } from '@/constants/theme';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -91,7 +89,6 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({ style }) => 
               <Squircle style={styles.modalHeaderIconBadge}>
                 <Globe color={colors.primary} size={22} />
               </Squircle>
-              <Text style={styles.modalEmoji}>🌐</Text>
             </View>
 
             <View style={styles.modalHeader}>
@@ -119,13 +116,6 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({ style }) => 
 
 const createStyles = (colors: any, isDark: boolean) => {
   const tokens = getThemeTokens(isDark);
-  const modalSurface = getThemedSurface({
-    colors,
-    isDark,
-    variant: 'glass',
-    border: true,
-    shadow: true,
-  });
 
   return StyleSheet.create({
     button: {
@@ -135,9 +125,9 @@ const createStyles = (colors: any, isDark: boolean) => {
       paddingVertical: 8,
       borderRadius: BORDER_RADIUS.full,
       borderWidth: 1,
-      borderColor: tokens.border.subtle,
-      backgroundColor: tokens.surfaceGlass.base,
-      ...SHADOWS.header, borderCurve: 'continuous',
+      borderColor: colors.borderSubtle ?? tokens.border.subtle,
+      backgroundColor: colors.cardBackground,
+      borderCurve: 'continuous',
     },
     flag: {
       fontSize: 18,
@@ -168,14 +158,9 @@ const createStyles = (colors: any, isDark: boolean) => {
       maxWidth: 360,
       borderRadius: BORDER_RADIUS.hero,
       paddingVertical: SPACING.lg,
-      backgroundColor: modalSurface.backgroundColor,
+      backgroundColor: colors.cardBackground,
       borderWidth: 1,
-      borderColor: modalSurface.borderColor,
-      shadowColor: modalSurface.shadowColor,
-      shadowOffset: modalSurface.shadowOffset,
-      shadowOpacity: modalSurface.shadowOpacity,
-      shadowRadius: modalSurface.shadowRadius,
-      elevation: modalSurface.elevation,
+      borderColor: colors.borderSubtle ?? tokens.border.subtle,
       maxHeight: '72%', borderCurve: 'continuous',
     },
     modalHeaderIconRow: {
@@ -188,13 +173,10 @@ const createStyles = (colors: any, isDark: boolean) => {
       borderRadius: 27,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: withAlpha(colors.primary, isDark ? 0.16 : 0.1),
+      backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.05),
       borderWidth: 1,
-      borderColor: withAlpha(colors.primary, isDark ? 0.34 : 0.2), borderCurve: 'continuous',
-    },
-    modalEmoji: {
-      marginTop: SPACING.xs,
-      fontSize: 18,
+      borderColor: colors.borderSubtle ?? tokens.border.subtle,
+      borderCurve: 'continuous',
     },
     modalHeader: {
       flexDirection: 'row',
@@ -212,7 +194,8 @@ const createStyles = (colors: any, isDark: boolean) => {
     closeButton: {
       padding: 6,
       borderRadius: 16,
-      backgroundColor: tokens.surfaceMuted.base, borderCurve: 'continuous',
+      backgroundColor: colors.surfaceMuted ?? tokens.surfaceMuted.base,
+      borderCurve: 'continuous',
     },
     listContent: {
       paddingHorizontal: SPACING.lg,
@@ -225,12 +208,12 @@ const createStyles = (colors: any, isDark: boolean) => {
       padding: SPACING.md,
       borderRadius: 16,
       borderWidth: 1,
-      borderColor: tokens.border.subtle,
-      backgroundColor: tokens.surface.base, borderCurve: 'continuous',
+      borderColor: colors.borderSubtle ?? tokens.border.subtle,
+      backgroundColor: colors.cardBackground, borderCurve: 'continuous',
     },
     languageOptionSelected: {
       borderColor: withAlpha(colors.primary, 0.34),
-      backgroundColor: withAlpha(colors.primary, isDark ? 0.14 : 0.1),
+      backgroundColor: colors.primaryLight ?? withAlpha(colors.primary, isDark ? 0.14 : 0.1),
     },
     flagLarge: {
       fontSize: 24,

@@ -2,10 +2,14 @@ import { supabase } from './supabase';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { decode } from 'base64-arraybuffer';
 import { Platform } from 'react-native';
-import { DashboardData, AnalyticsData, AnalyticsPeriod, ScanType, ScanEligibilityResponse, AnalysisResult, ScanBodyResult, ScanFaceResult, ScanNutritionResult, SuperScanResult, BodyScoreHistoryItem, FaceScoreHistoryItem, NutritionHistoryItem, SuperScanHistoryItem, PremiumPotentialHistoryPoint, PremiumPotentialInputs, Scan, GamificationData } from '@/types';
+import { DashboardData, AnalyticsData, AnalyticsPeriod, ScanType, ScanEligibilityResponse, AnalysisResult, ScanBodyResult, ScanFaceResult, ScanNutritionResult, SuperScanResult, BodyScoreHistoryItem, FaceScoreHistoryItem, NutritionHistoryItem, SuperScanHistoryItem, PremiumPotentialHistoryPoint, PremiumPotentialInputs, Scan, GamificationData, AccountTier } from '@/types';
+import { hasPremiumAccess } from '@/utils/subscription';
 import type { CoachPersonaKey } from '@/shared/coachPersonas';
 import { resolveGamification } from '@/constants/gamification';
 import { STORAGE_BUCKET_NAME } from '@/constants/scan';
+import {
+  PREMIUM_LOCKED_ANALYTICS_HISTORY_FIELDS,
+} from '@/constants/premiumFields';
 import {
   buildAnalyzeScanRequest,
   buildCanonicalScanImagePath,
@@ -770,6 +774,93 @@ async function rollbackReservedScanAfterUploadFailure(scanId: string, scanType: 
   }
 }
 
+/**
+ * Périodes Analytics réservées aux comptes Premium / Admin.
+ * Aligné avec `PERIODS` dans `screens/AnalyticsScreen.tsx` (les options marquées
+ * `premium: true`). Toute modification ici DOIT être synchronisée avec l'UI
+ * pour ne pas casser l'expérience d'un compte premium légitime.
+ */
+const PREMIUM_ANALYTICS_PERIODS: ReadonlySet<AnalyticsPeriod> = new Set<AnalyticsPeriod>([
+  '3months',
+  '1year',
+]);
+
+/**
+ * Listes des champs Analytics réservés aux comptes Premium — dérivées de la
+ * source unique `PREMIUM_LOCKED_ANALYTICS_METRIC_MAP` dans
+ * `constants/premiumFields.ts`. Cela garantit que la liste UI (onglets de
+ * sélection dans `AnalyticsScreen`) et la sanitation backend ci-dessous restent
+ * cohérentes sans dérive possible.
+ *
+ * Les noms sont en camelCase car ils correspondent au shape des items renvoyés
+ * par `getAnalytics`, pas aux colonnes brutes de `scan_metrics`.
+ */
+const ANALYTICS_PREMIUM_BODY_FIELDS = PREMIUM_LOCKED_ANALYTICS_HISTORY_FIELDS.body;
+const ANALYTICS_PREMIUM_FACE_FIELDS = PREMIUM_LOCKED_ANALYTICS_HISTORY_FIELDS.health;
+const ANALYTICS_PREMIUM_NUTRITION_FIELDS = PREMIUM_LOCKED_ANALYTICS_HISTORY_FIELDS.nutrition;
+
+/**
+ * Lit le tier du user pour décider de l'accès aux analytics premium.
+ * Fail-closed : toute erreur de lecture dégrade vers 'free' (plus restrictif).
+ * Exporté pour les tests uniquement.
+ */
+export async function loadAccountTierForAnalytics(userId: string): Promise<AccountTier> {
+  try {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select('account_tier')
+      .eq('id', userId)
+      .maybeSingle();
+    if (error || !data) {
+      return 'free';
+    }
+    const tier = (data as { account_tier?: unknown }).account_tier;
+    if (tier === 'premium' || tier === 'admin' || tier === 'free') {
+      return tier;
+    }
+    return 'free';
+  } catch {
+    return 'free';
+  }
+}
+
+/**
+ * Strip / zero out des métriques premium dans la réponse Analytics pour
+ * un compte non-premium. Garde les scores globaux (faceScore, bodyScore,
+ * nutritionScore, caloriesEstimate) qui restent gratuits.
+ *
+ * La liste des champs à zéroïser provient de la source unique
+ * `PREMIUM_LOCKED_ANALYTICS_HISTORY_FIELDS` pour garantir la cohérence avec
+ * le gating UI dans `AnalyticsScreen`. Exporté pour les tests.
+ */
+export function sanitizeAnalyticsForFreeTier(data: AnalyticsData): AnalyticsData {
+  const zeroFields = <T>(item: T, fields: ReadonlyArray<string>): T => {
+    const next = { ...(item as unknown as Record<string, unknown>) };
+    for (const field of fields) {
+      if (field in next) {
+        next[field] = 0;
+      }
+    }
+    return next as unknown as T;
+  };
+
+  return {
+    ...data,
+    bodyScoreHistory: data.bodyScoreHistory.map((item) =>
+      zeroFields(item, ANALYTICS_PREMIUM_BODY_FIELDS),
+    ),
+    faceScoreHistory: data.faceScoreHistory.map((item) =>
+      zeroFields(item, ANALYTICS_PREMIUM_FACE_FIELDS),
+    ),
+    nutritionHistory: data.nutritionHistory.map((item) =>
+      zeroFields(item, ANALYTICS_PREMIUM_NUTRITION_FIELDS),
+    ),
+    // Super scan est entièrement premium : vider plutôt que zéroïser, sinon
+    // un downgrade premium→gratuit afficherait une ligne plate à 0.
+    superScanHistory: [],
+  };
+}
+
 export class ApiService {
   static async getDashboard(): Promise<DashboardData> {
     const { data: { user } } = await supabase.auth.getUser();
@@ -828,6 +919,26 @@ export class ApiService {
 
     if (!user) {
       throw new Error('api_errors.unauthorized');
+    }
+
+    // Defense-in-depth premium gating.
+    // NOTE: ce filtrage tier vit côté client par défaut car aucune Edge Function
+    // dédiée n'expose les analytics. Un client modifié peut toujours appeler
+    // directement `scan_metrics` via supabase-js et lire les colonnes premium
+    // (RLS Postgres ne permet pas un filtrage colonne-par-colonne facilement).
+    // Le vrai fix backend est documenté dans REPORT_PREMIUM_LOGIC.md : à terme,
+    // créer une RPC `get_analytics_trends(period)` qui agrège et filtre selon
+    // `user_profiles.account_tier`, puis retirer le SELECT direct ci-dessous.
+    const accountTier = await loadAccountTierForAnalytics(user.id);
+    const isPremium = hasPremiumAccess(accountTier);
+
+    if (!isPremium && PREMIUM_ANALYTICS_PERIODS.has(period)) {
+      throw new ApiError(
+        'analytics.premium_period_locked',
+        'AUTH',
+        null,
+        { period, account_tier: accountTier },
+      );
     }
 
     // Map period to days
@@ -1018,7 +1129,7 @@ export class ApiService {
       value: item.faceScore,
     }));
 
-    return {
+    const aggregated: AnalyticsData = {
       period,
       healthScoreHistory, // Contient maintenant le Global Score unifié
       calorieHistory, // Legacy, non utilisé
@@ -1028,6 +1139,8 @@ export class ApiService {
       nutritionHistory,
       superScanHistory,
     };
+
+    return isPremium ? aggregated : sanitizeAnalyticsForFreeTier(aggregated);
   }
 
   /**

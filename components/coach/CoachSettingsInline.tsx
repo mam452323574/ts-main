@@ -25,7 +25,10 @@ import {
 } from '@/constants/theme';
 import type { CoachPersonaKey } from '@/shared/coachPersonas';
 import type { CoachQuestionKey } from '@/shared/coachQuestions';
-import type { CoachPersonaVisual } from '@/shared/coachPersonaVisuals';
+import {
+  getCoachPersonaCrop,
+  type CoachPersonaVisual,
+} from '@/shared/coachPersonaVisuals';
 import type {
   CoachPromptCategory,
   CoachPromptType,
@@ -237,6 +240,7 @@ export function CoachSettingsInline({
             avatarImageSource={persona.visual.imageSource}
             avatarFallbackLabel={persona.visual.fallbackLabel}
             avatarHaloTint={persona.visual.haloTint}
+            imageCrop={getCoachPersonaCrop(persona.visual, 'card')}
             variant="portrait"
             active={persona.key === activePersonaKey}
             locked={persona.locked}

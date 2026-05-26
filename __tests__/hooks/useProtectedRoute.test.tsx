@@ -69,6 +69,11 @@ jest.mock('@/contexts/AuthContext', () => ({
   useAuth: () => mockUseAuth(),
 }));
 
+const mockClearPreAuthOnboardingDraft = jest.fn();
+jest.mock('@/utils/preAuthOnboarding', () => ({
+  clearPreAuthOnboardingDraft: () => mockClearPreAuthOnboardingDraft(),
+}));
+
 describe('useProtectedRoute', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -273,6 +278,7 @@ describe('useProtectedRoute', () => {
     await waitFor(() => {
       expect(mockReplace).toHaveBeenCalledWith('/(tabs)');
     });
+    expect(mockClearPreAuthOnboardingDraft).toHaveBeenCalledTimes(1);
   });
 
   it('does not redirect to (tabs) when fully authenticated on privacy-policy', () => {

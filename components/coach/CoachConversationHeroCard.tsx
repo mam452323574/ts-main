@@ -1,21 +1,29 @@
-import { memo, useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { ChevronRight, MessageCircle, Sparkles } from 'lucide-react-native';
+import { memo, useEffect, useMemo, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MessageCircle } from 'lucide-react-native';
+import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 
 import { CoachPersonaAvatar } from '@/components/coach/CoachPersonaAvatar';
-import { Squircle } from '@/components/Squircle';
+import { Squircle, SquirclePressable } from '@/components/Squircle';
 import {
   BORDER_RADIUS,
   FONT_WEIGHTS,
   SIZES,
   SPACING,
+  getCoachOnMediaTokens,
+  getVisualMoodSurface,
   mixColors,
   withAlpha,
 } from '@/constants/theme';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { COACH_CONVERSATION_FREE_USER_LIMIT } from '@/shared/coachConversation';
-import type { CoachPersonaKey } from '@/shared/coachPersonas';
-import { getCoachPersonaVisual } from '@/shared/coachPersonaVisuals';
+import { getCoachPersona, type CoachPersonaKey } from '@/shared/coachPersonas';
+import {
+  getCoachPersonaCrop,
+  getCoachPersonaVisual,
+} from '@/shared/coachPersonaVisuals';
 
 export type CoachConversationHeroVariant =
   | 'free_available'
@@ -38,6 +46,13 @@ interface CoachConversationHeroCardProps {
   testID?: string;
 }
 
+const GRADIENT_ANCHOR = '#0F1A2A';
+const CARD_MIN_HEIGHT = 286;
+const PORTRAIT_WIDTH = 187;
+const PORTRAIT_HEIGHT = 280;
+const PORTRAIT_SPACER_WIDTH = 165;
+const PORTRAIT_HALO_SIZE = 260;
+
 function CoachConversationHeroCardComponent({
   personaKey,
   variant,
@@ -50,240 +65,372 @@ function CoachConversationHeroCardComponent({
   testID = 'coach-conversation-hero-card',
 }: CoachConversationHeroCardProps) {
   const { colors, isDark } = useTheme();
+  const { t } = useLanguage();
   const visual = getCoachPersonaVisual(personaKey);
-  const styles = useMemo(
-    () => createStyles(colors, isDark, variant, visual.haloTint),
-    [colors, isDark, variant, visual.haloTint],
+  const persona = getCoachPersona(personaKey);
+  const heroCrop = getCoachPersonaCrop(visual, 'hero');
+  const heroContentPosition = heroCrop.contentPosition ?? 'bottom';
+  const heroImageScale = heroCrop.imageScale;
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [visual.imageSource]);
+
+  const isLimitState =
+    variant === 'free_exhausted' || variant === 'premium_exhausted';
+  const accent = isLimitState ? colors.gold : visual.haloTint;
+
+  const tone = useMemo(
+    () => buildTone(colors, isDark, accent),
+    [colors, isDark, accent],
   );
-  const MetaIcon =
-    variant === 'free_exhausted' || variant === 'premium_exhausted'
-      ? Sparkles
-      : MessageCircle;
-  const metaLabel = resolveMetaLabel(variant, hint);
-  const accessibilityLabel = [title, subtitle, hint, ctaLabel]
-    .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+  const cardSurface = useMemo(
+    () =>
+      getVisualMoodSurface(colors, isDark, {
+        mood: 'obsidian',
+        accentColor: accent,
+        intensity: 'card',
+      }),
+    [colors, isDark, accent],
+  );
+  const styles = useMemo(
+    () => createStyles(tone, cardSurface),
+    [tone, cardSurface],
+  );
+
+  const coachName = t(persona.titleTranslationKey);
+  const showWithCoachName =
+    variant === 'free_available' || variant === 'premium_available';
+  const heroTitle = showWithCoachName
+    ? t('coach.conversation_hero.title_with_coach', { coachName })
+    : title;
+
+  const accessibilityLabel = [heroTitle, subtitle, hint, ctaLabel]
+    .filter(
+      (value): value is string =>
+        typeof value === 'string' && value.trim().length > 0,
+    )
     .join('. ');
 
   return (
-    <Pressable
+    <Squircle
+      style={[styles.shell, disabled ? styles.shellDisabled : null]}
+      testID={`${testID}-shell`}
+    >
+    <SquirclePressable
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [styles.pressable, pressed && !disabled ? styles.pressed : null]}
+      style={({ pressed }) => [
+        styles.card,
+        pressed && !disabled ? styles.pressed : null,
+      ]}
       testID={testID}
     >
-      <Squircle
-        style={[styles.card, disabled ? styles.cardDisabled : null]}
-        testID={`${testID}-surface`}
+      <LinearGradient
+        colors={[tone.gradientTop, tone.gradientMid, tone.gradientBottom]}
+        locations={[0, 0.55, 1]}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={styles.gradient}
+        testID={`${testID}-gradient`}
+      />
+      <Svg
+        width={PORTRAIT_HALO_SIZE}
+        height={PORTRAIT_HALO_SIZE}
+        style={styles.portraitHalo}
+        pointerEvents="none"
+        testID={`${testID}-halo`}
       >
-        <CoachPersonaAvatar
-          imageSource={visual.imageSource}
-          fallbackLabel={visual.fallbackLabel}
-          haloTint={visual.haloTint}
-          size={42}
-          emphasis="subtle"
-          testID={`${testID}-avatar`}
-        />
-        <View style={styles.copy}>
-          <View style={styles.metaPill} testID={`${testID}-meta`}>
-            <MetaIcon
-              color={styles.iconColor.color}
-              size={13}
-              strokeWidth={2.2}
-              testID={`${testID}-meta-icon`}
+        <Defs>
+          <RadialGradient id="coachHeroHalo" cx="50%" cy="50%" r="50%">
+            <Stop
+              offset="0%"
+              stopColor={accent}
+              stopOpacity={isDark ? 0.55 : 0.45}
             />
-            <Text numberOfLines={1} style={styles.metaText}>
-              {metaLabel}
-            </Text>
-          </View>
-          <Text numberOfLines={1} style={styles.title} testID={`${testID}-title`}>
-            {title}
-          </Text>
-          <View style={styles.subtitleRow}>
-            <Text
-              numberOfLines={2}
-              style={styles.subtitle}
-              testID={`${testID}-subtitle`}
-            >
-              {subtitle}
-            </Text>
-            {hint && !metaLabel.includes(hint) ? (
-              <Text numberOfLines={1} style={styles.hint} testID={`${testID}-hint`}>
-                {hint}
-              </Text>
-            ) : null}
-          </View>
-        </View>
-        <View style={styles.actionIconShell} testID={`${testID}-action`}>
-          <ChevronRight
-            color={styles.actionIconColor.color}
-            size={18}
-            strokeWidth={2.5}
-            testID={`${testID}-action-icon`}
+            <Stop
+              offset="45%"
+              stopColor={accent}
+              stopOpacity={isDark ? 0.24 : 0.2}
+            />
+            <Stop offset="100%" stopColor={accent} stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+        <Circle
+          cx={PORTRAIT_HALO_SIZE / 2}
+          cy={PORTRAIT_HALO_SIZE / 2}
+          r={PORTRAIT_HALO_SIZE / 2}
+          fill="url(#coachHeroHalo)"
+        />
+      </Svg>
+      {visual.imageSource && !imageFailed ? (
+        <Image
+          source={visual.imageSource}
+          style={[
+            styles.portraitImage,
+            heroImageScale ? { transform: [{ scale: heroImageScale }] } : null,
+          ]}
+          contentFit="contain"
+          contentPosition={heroContentPosition}
+          onError={() => setImageFailed(true)}
+          testID={`${testID}-portrait`}
+        />
+      ) : (
+        <View
+          style={styles.portraitFallback}
+          testID={`${testID}-portrait-fallback`}
+        >
+          <CoachPersonaAvatar
+            fallbackLabel={visual.fallbackLabel}
+            haloTint={visual.haloTint}
+            size={90}
+            emphasis="featured"
           />
         </View>
-      </Squircle>
-    </Pressable>
+      )}
+      <View style={styles.surfaceContent} testID={`${testID}-surface`}>
+        <View style={styles.portraitSpacer} />
+        <View style={styles.rightColumn} testID={`${testID}-content`}>
+          <Text
+            numberOfLines={2}
+            style={styles.title}
+            testID={`${testID}-title`}
+          >
+            {heroTitle}
+          </Text>
+          <View style={styles.ctaButton} testID={`${testID}-cta`}>
+            <MessageCircle
+              color={tone.ctaText}
+              size={16}
+              strokeWidth={2.2}
+              testID={`${testID}-cta-icon`}
+            />
+            <Text numberOfLines={1} style={styles.ctaLabel}>
+              Parler au coach
+            </Text>
+          </View>
+        </View>
+      </View>
+      <View
+        style={styles.selectedCoachPill}
+        pointerEvents="none"
+        testID={`${testID}-selected-coach-pill`}
+      >
+        <View style={styles.selectedCoachPillInner}>
+          <Text style={styles.selectedCoachPillLabel} numberOfLines={1}>
+            {t('coach.selected_persona_label')}
+          </Text>
+          <View style={styles.selectedCoachPillNameLayer}>
+            <Text
+              style={styles.selectedCoachPillNameGlow}
+              numberOfLines={1}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            >
+              {coachName}
+            </Text>
+            <Text style={styles.selectedCoachPillName} numberOfLines={1}>
+              {coachName}
+            </Text>
+          </View>
+        </View>
+      </View>
+    </SquirclePressable>
+    </Squircle>
   );
 }
 
-function resolveMetaLabel(variant: CoachConversationHeroVariant, hint?: string | null) {
-  switch (variant) {
-    case 'free_available':
-      return `Conversation gratuite • ${COACH_CONVERSATION_FREE_USER_LIMIT} questions incluses`;
-    case 'free_resume':
-    case 'premium_resume':
-      return hint ? `Conversation en cours • ${hint}` : 'Conversation en cours';
-    case 'free_exhausted':
-      return 'Limite gratuite atteinte';
-    case 'premium_available':
-      return hint ? `Premium • ${hint}` : 'Parler au coach';
-    case 'premium_exhausted':
-      return 'Limite quotidienne atteinte';
-    case 'unknown':
-    default:
-      return 'Parler au coach';
-  }
-}
-
-function resolveTone(
-  colors: any,
-  isDark: boolean,
-  variant: CoachConversationHeroVariant,
-  personaAccent: string,
-) {
-  const accent =
-    variant === 'free_exhausted' || variant === 'premium_exhausted'
-      ? colors.gold
-      : personaAccent ?? colors.primary;
-  const baseSurface = isDark
-    ? colors.surfaceElevated ?? colors.cardBackground ?? '#121212'
-    : colors.cardBackground ?? '#FFFFFF';
-  const neutralBorder = isDark
-    ? withAlpha(colors.white ?? colors.primaryText, 0.1)
-    : withAlpha(colors.primaryText, 0.07);
-  const backgroundMix =
-    variant === 'free_exhausted' || variant === 'premium_exhausted'
-      ? isDark ? 0.06 : 0.025
-      : isDark ? 0.04 : 0.016;
-  const metaAlpha =
-    variant === 'free_exhausted' || variant === 'premium_exhausted'
-      ? isDark ? 0.15 : 0.1
-      : isDark ? 0.12 : 0.07;
+function buildTone(colors: any, isDark: boolean, accent: string) {
+  const gradientTop = GRADIENT_ANCHOR;
+  const gradientMid = mixColors(gradientTop, accent, 0.25);
+  const gradientBottom = mixColors(gradientTop, accent, 0.5);
+  const onMedia = getCoachOnMediaTokens(isDark);
 
   return {
-    background: mixColors(baseSurface, accent, backgroundMix),
-    border: neutralBorder,
-    iconColor: accent,
-    metaBackground: withAlpha(accent, metaAlpha),
-    actionBackground: isDark
-      ? withAlpha(colors.white ?? colors.primaryText, 0.055)
-      : withAlpha(colors.primaryText, 0.035),
-    actionBorder: isDark
-      ? withAlpha(colors.white ?? colors.primaryText, 0.1)
-      : withAlpha(colors.primaryText, 0.06),
-    shadowColor: isDark ? accent : mixColors(colors.gray ?? colors.primaryText, accent, 0.16),
+    gradientTop,
+    gradientMid,
+    gradientBottom,
+    ctaBg: mixColors(accent, GRADIENT_ANCHOR, isDark ? 0.42 : 0.3),
+    ctaBorder: withAlpha(colors.white, isDark ? 0.34 : 0.28),
+    ctaText: onMedia.textPrimary,
+    ctaTextShadow: onMedia.textShadowColor,
+    titleColor: withAlpha(colors.white, 0.96),
+    shadowColor: accent,
+    cardBorder: withAlpha(colors.white, isDark ? 0.22 : 0.16),
+    // Pill background stays tinted with GRADIENT_ANCHOR (the card's own
+    // palette) rather than pure black — keeps the look cohesive with the
+    // hero gradient while remaining opaque enough for contrast.
+    selectedPillBg: withAlpha(GRADIENT_ANCHOR, isDark ? 0.78 : 0.7),
+    selectedPillBorder: withAlpha(accent, isDark ? 0.45 : 0.4),
+    selectedPillLabel: onMedia.textSecondary,
+    selectedPillNameColor: onMedia.textPrimary,
+    selectedPillGlow: withAlpha(accent, isDark ? 0.85 : 0.55),
+    selectedPillHalo: onMedia.textShadowColor,
+    selectedPillLabelShadow: onMedia.textShadowColor,
   };
 }
 
 const createStyles = (
-  colors: any,
-  isDark: boolean,
-  variant: CoachConversationHeroVariant,
-  personaAccent: string,
-) => {
-  const tone = resolveTone(colors, isDark, variant, personaAccent);
-  return StyleSheet.create({
-    pressable: {
+  tone: ReturnType<typeof buildTone>,
+  cardSurface: ReturnType<typeof getVisualMoodSurface>,
+) =>
+  StyleSheet.create({
+    shell: {
       width: '100%',
+      borderRadius: BORDER_RADIUS.hero,
+      ...cardSurface,
+    },
+    shellDisabled: {
+      opacity: 0.55,
+    },
+    card: {
+      width: '100%',
+      minHeight: CARD_MIN_HEIGHT,
+      borderRadius: BORDER_RADIUS.hero,
+      borderWidth: 1,
+      borderColor: tone.cardBorder,
+      backgroundColor: tone.gradientTop,
+      overflow: 'hidden',
     },
     pressed: {
       opacity: 0.92,
       transform: [{ scale: 0.995 }],
     },
-    card: {
-      minHeight: 86,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: SPACING.sm + 2,
-      paddingHorizontal: SPACING.md,
-      paddingVertical: SPACING.sm + 2,
-      borderRadius: BORDER_RADIUS.md,
-      backgroundColor: tone.background,
-      borderWidth: 1,
-      borderColor: tone.border,
-      shadowColor: tone.shadowColor,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: isDark ? 0.04 : 0.025,
-      shadowRadius: 10,
-      elevation: 1,
+    gradient: {
+      ...StyleSheet.absoluteFillObject,
     },
-    cardDisabled: {
-      opacity: 0.68,
+    portraitHalo: {
+      position: 'absolute',
+      left: PORTRAIT_WIDTH / 2 - PORTRAIT_HALO_SIZE / 2 - 4,
+      bottom: PORTRAIT_HEIGHT / 2 - PORTRAIT_HALO_SIZE / 2 - 8,
     },
-    copy: {
-      flex: 1,
-      minWidth: 0,
-      gap: 3,
+    portraitImage: {
+      position: 'absolute',
+      left: -10,
+      bottom: 0,
+      width: PORTRAIT_WIDTH,
+      height: PORTRAIT_HEIGHT,
     },
-    metaPill: {
-      maxWidth: '100%',
-      minHeight: 24,
-      flexDirection: 'row',
-      alignItems: 'center',
-      alignSelf: 'flex-start',
-      gap: 4,
-      paddingHorizontal: SPACING.sm,
-      paddingVertical: 3,
-      borderRadius: BORDER_RADIUS.pill,
-      backgroundColor: tone.metaBackground,
-    },
-    metaText: {
-      flexShrink: 1,
-      fontSize: SIZES.text12,
-      lineHeight: 16,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      color: tone.iconColor,
-    },
-    iconColor: { color: tone.iconColor },
-    actionIconColor: {
-      color: colors.primaryText,
-    },
-    title: {
-      fontSize: SIZES.text16,
-      lineHeight: 21,
-      fontWeight: FONT_WEIGHTS.bold,
-      color: colors.primaryText,
-    },
-    subtitleRow: {
-      gap: 2,
-    },
-    subtitle: {
-      fontSize: SIZES.text14,
-      lineHeight: 18,
-      fontWeight: FONT_WEIGHTS.medium,
-      color: withAlpha(colors.primaryText, isDark ? 0.7 : 0.62),
-    },
-    hint: {
-      fontSize: SIZES.text12,
-      lineHeight: 16,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      color: tone.iconColor,
-    },
-    actionIconShell: {
-      width: 34,
-      height: 34,
-      flexShrink: 0,
+    portraitFallback: {
+      position: 'absolute',
+      left: SPACING.md,
+      top: 0,
+      bottom: 0,
+      width: PORTRAIT_SPACER_WIDTH - SPACING.md,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: BORDER_RADIUS.full,
-      backgroundColor: tone.actionBackground,
+    },
+    surfaceContent: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'stretch',
+    },
+    portraitSpacer: {
+      width: PORTRAIT_SPACER_WIDTH,
+      flexShrink: 0,
+    },
+    rightColumn: {
+      flex: 1,
+      paddingTop: SPACING.lg,
+      paddingBottom: SPACING.lg + 40,
+      paddingRight: SPACING.md,
+      gap: SPACING.sm,
+      justifyContent: 'center',
+    },
+    title: {
+      fontSize: SIZES.text18,
+      lineHeight: 23,
+      fontWeight: FONT_WEIGHTS.bold,
+      color: tone.titleColor,
+    },
+    ctaButton: {
+      marginTop: 4,
+      alignSelf: 'stretch',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.sm + 2,
+      borderRadius: BORDER_RADIUS.pill,
+      backgroundColor: tone.ctaBg,
       borderWidth: 1,
-      borderColor: tone.actionBorder,
+      borderColor: tone.ctaBorder,
+    },
+    ctaLabel: {
+      fontSize: SIZES.text14,
+      lineHeight: 18,
+      fontWeight: FONT_WEIGHTS.bold,
+      color: tone.ctaText,
+      letterSpacing: 0.2,
+      textShadowColor: tone.ctaTextShadow,
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 3,
+    },
+    selectedCoachPill: {
+      position: 'absolute',
+      bottom: SPACING.sm + 2,
+      right: SPACING.md,
+      zIndex: 5,
+      elevation: 5,
+    },
+    selectedCoachPillInner: {
+      minWidth: 112,
+      paddingHorizontal: SPACING.sm + 2,
+      paddingVertical: 4,
+      borderRadius: BORDER_RADIUS.pill,
+      backgroundColor: tone.selectedPillBg,
+      borderWidth: 1,
+      borderColor: tone.selectedPillBorder,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 1,
+    },
+    selectedCoachPillLabel: {
+      fontSize: 9,
+      lineHeight: 11,
+      fontWeight: FONT_WEIGHTS.bold,
+      letterSpacing: 0.9,
+      textTransform: 'uppercase',
+      color: tone.selectedPillLabel,
+      textAlign: 'center',
+      textShadowColor: tone.selectedPillLabelShadow,
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 2,
+    },
+    selectedCoachPillNameLayer: {
+      position: 'relative',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 18,
+    },
+    selectedCoachPillNameGlow: {
+      ...StyleSheet.absoluteFillObject,
+      fontSize: SIZES.text14,
+      lineHeight: 18,
+      fontWeight: FONT_WEIGHTS.bold,
+      color: 'transparent',
+      textAlign: 'center',
+      letterSpacing: 0.3,
+      textShadowColor: tone.selectedPillGlow,
+      textShadowOffset: { width: 0, height: 0 },
+      textShadowRadius: 12,
+    },
+    selectedCoachPillName: {
+      fontSize: SIZES.text14,
+      lineHeight: 18,
+      fontWeight: FONT_WEIGHTS.bold,
+      color: tone.selectedPillNameColor,
+      textAlign: 'center',
+      letterSpacing: 0.3,
+      textShadowColor: tone.selectedPillHalo,
+      textShadowOffset: { width: 0, height: 0 },
+      textShadowRadius: 4,
     },
   });
-};
 
 export const CoachConversationHeroCard = memo(CoachConversationHeroCardComponent);

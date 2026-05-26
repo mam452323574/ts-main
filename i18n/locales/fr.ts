@@ -716,6 +716,9 @@ export const FR_TRANSLATIONS = {
       'Conseil bien-être uniquement. Ceci ne remplace ni un diagnostic ni un avis médical.',
     locked_badge: 'Premium',
     locked_tap_hint: 'Touchez pour débloquer cette personnalité.',
+    conversation_hero: {
+      title_with_coach: 'Conversation Libre avec {{coachName}}',
+    },
     free_persona_hint: "Noah est inclus dans l'offre gratuite.",
     active_persona_label: 'Personnalité du Coach',
     selected_persona_label: 'Coach sélectionné',
@@ -762,6 +765,24 @@ export const FR_TRANSLATIONS = {
     no_scan_title: 'Commence par un scan',
     no_scan_body:
       'Lance un scan pour démarrer ton coaching personnalisé.',
+    scan_downgrade: {
+      title: 'Une lecture plus approfondie est disponible',
+      body_default:
+        'Pour une analyse plus détaillée de ton scan, Premium débloque un coaching ciblé. Voici déjà une première lecture gratuite.',
+      body_body_focus:
+        'Pour un plan corps détaillé (posture, mobilité, récupération), Premium est requis. Voici une lecture gratuite de ton scan.',
+      body_nutrition_focus:
+        'Pour un plan nutrition ciblé (repas, swaps, courses), Premium est requis. Voici une lecture gratuite de ton scan.',
+      body_sleep_coach:
+        'Pour un protocole sommeil/récupération détaillé, Premium est requis. Voici une lecture gratuite de ton scan.',
+      body_risk_watch:
+        'Pour un suivi des signaux vigilance détaillé, Premium est requis. Voici une lecture gratuite de ton scan.',
+      body_trend_review:
+        'Pour une analyse fine de ton évolution, Premium est requis. Voici une lecture gratuite de ton scan.',
+      body_weekly_plan:
+        'Pour un plan hebdo skincare + nutrition + sport, Premium est requis. Voici une lecture gratuite de ton scan.',
+      cta: 'Découvrir Premium',
+    },
     history_title: 'Conseils précédents',
     view_history_cta: "Voir l'historique",
     history_cta_count: '{{count}} conseil(s) précédents',
@@ -1510,7 +1531,7 @@ export const FR_TRANSLATIONS = {
   },
   auth: {
     login_title: 'Health Scan',
-    login_subtitle: 'Connectez-vous à votre compte',
+    login_subtitle: 'Connectez-vous ou récupérez votre compte',
     email_placeholder: 'Votre email',
     password_placeholder: 'Votre mot de passe',
     password_confirm: 'Confirmer le mot de passe',
@@ -1721,6 +1742,8 @@ export const FR_TRANSLATIONS = {
       chef: 'Chef',
       used: 'Utilisés',
       detected: 'Détectés',
+      detected_preview: 'Détectés dans ton frigo',
+      detected_preview_more: '+{{count}}',
       calories: 'Énergie',
       protein: 'Protéines',
       note: 'Note',
@@ -1900,7 +1923,9 @@ export const FR_TRANSLATIONS = {
     intro_step_subtitle:
       "Scannez, comprenez, puis suivez ce qui change. On prépare juste l'essentiel.",
     intro_step_note:
-      "Choisissez un pseudo, une apparence, puis confirmez votre email. Encore une étape avant votre premier scan.",
+      'Choisissez un pseudo et une apparence, puis rattachez votre profil avec Google ou email.',
+    intro_cta: 'Commencer',
+    existing_account_cta: "J'ai déjà un compte / Récupérer mon compte",
     profile_step_title: 'Préparez votre profil de scan',
     profile_step_subtitle:
       'Choisissez votre pseudo, ajoutez une photo si vous voulez, puis gardez un thème clair pour vous.',
@@ -1925,6 +1950,10 @@ export const FR_TRANSLATIONS = {
     account_step_title: 'Créez votre compte',
     account_step_subtitle:
       'Un email, un mot de passe, puis un code avant votre premier scan.',
+    account_method_title: 'Sauvegardez votre profil',
+    account_method_subtitle:
+      'Choisissez comment rattacher votre profil à votre compte.',
+    account_email_cta: "S'inscrire avec email",
     username_label: "Nom d'utilisateur *",
     username_placeholder: 'pseudo123',
     profile_theme_title: 'Apparence',
@@ -1949,6 +1978,14 @@ export const FR_TRANSLATIONS = {
     next_btn: 'Suivant',
     start_btn: "Commencer l'aventure",
     enter_app: "Ouvrir l'app",
+    finalize_profile_title: 'Finalisez votre profil',
+    finalize_profile_subtitle:
+      'Confirmez votre pseudo pour rattacher vos choix à votre compte.',
+    finalize_profile_btn: 'Finaliser mon profil',
+    final_title: 'Votre profil est prêt',
+    final_subtitle:
+      "Tout est configuré. Vous pouvez maintenant entrer dans l'application.",
+    profile_ready_label: 'Profil actif',
     slide_1_eyebrow: 'Scanner',
     slide_1_title: "Scanne d'abord. Devine moins.",
     slide_1_subtitle:

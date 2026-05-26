@@ -1,26 +1,19 @@
 import { ReactNode, useMemo } from 'react';
 import {
-  Platform,
   StyleProp,
   StyleSheet,
   TouchableOpacity,
-  useWindowDimensions,
   View,
   ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 
 import { AppScreen } from '@/components/AppScreen';
 import { LanguageSelector } from '@/components/LanguageSelector';
-import { buildOnboardingPalette, useAuthPalette } from '@/components/auth/tokens';
 import {
   BORDER_RADIUS,
-  SHADOWS,
   SPACING,
-  getVisualMoodGradient,
-  withAlpha,
 } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getMinimumBottomInsetPadding } from '@/utils/mobileLayout';
@@ -41,75 +34,27 @@ export function AuthShell({
   showBack = false,
   onBack,
   showLanguage = true,
-  scroll = true,
+  scroll = false,
   contentStyle,
   testID,
   backTestID,
 }: AuthShellProps) {
   const insets = useSafeAreaInsets();
-  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
-  const { colors, isDark } = useTheme();
-  const palette = useAuthPalette();
-  const onboardingPalette = useMemo(
-    () => buildOnboardingPalette(colors, isDark),
-    [colors, isDark],
-  );
-  const isCompactAndroidLayout =
-    Platform.OS === 'android' && windowHeight < 780;
-  const isLandscape = windowWidth > windowHeight;
-  const backgroundGradient = useMemo(
-    () =>
-      getVisualMoodGradient(
-        colors,
-        isDark,
-        'softClinical',
-        onboardingPalette.accent,
-      ),
-    [colors, isDark, onboardingPalette.accent],
-  );
+  const { colors } = useTheme();
   const styles = useMemo(
-    () =>
-      createStyles(
-        colors,
-        palette,
-        onboardingPalette,
-        insets,
-        isCompactAndroidLayout,
-        isDark,
-        isLandscape,
-      ),
-    [colors, palette, onboardingPalette, insets, isCompactAndroidLayout, isDark, isLandscape]
+    () => createStyles(colors, insets),
+    [colors, insets],
   );
 
   return (
-    <AppScreen scroll={scroll} keyboard topInset={false} bottomInset={false}>
+    <AppScreen
+      scroll={scroll}
+      scrollBounces={false}
+      keyboard={scroll}
+      topInset={false}
+      bottomInset={false}
+    >
       <View style={styles.root} testID={testID ?? 'auth-shell-root'}>
-        <LinearGradient
-          colors={backgroundGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.backgroundGradient}
-        />
-        <LinearGradient
-          colors={[
-            onboardingPalette.heroScrimSoft,
-            withAlpha(onboardingPalette.background, 0),
-          ]}
-          start={{ x: 0.85, y: 0 }}
-          end={{ x: 0.15, y: 1 }}
-          style={styles.topWash}
-        />
-        <LinearGradient
-          colors={[
-            withAlpha(onboardingPalette.background, 0),
-            onboardingPalette.heroScrimSoft,
-          ]}
-          start={{ x: 0.05, y: 0 }}
-          end={{ x: 0.95, y: 1 }}
-          style={styles.bottomWash}
-        />
-        <View style={styles.primaryGlow} />
-        <View style={styles.secondaryGlow} />
         {showBack ? (
           <TouchableOpacity
             accessibilityRole="button"
@@ -136,58 +81,12 @@ export function AuthShell({
 
 const createStyles = (
   colors: any,
-  palette: ReturnType<typeof useAuthPalette>,
-  onboardingPalette: ReturnType<typeof buildOnboardingPalette>,
   insets: any,
-  isCompactAndroidLayout: boolean,
-  isDark: boolean,
-  isLandscape: boolean,
 ) =>
   StyleSheet.create({
     root: {
       flex: 1,
-      backgroundColor: palette.background,
-    },
-    backgroundGradient: {
-      ...StyleSheet.absoluteFillObject,
-    },
-    topWash: {
-      position: 'absolute',
-      top: -34,
-      left: -24,
-      right: -24,
-      height: 210,
-      borderBottomLeftRadius: 68,
-      borderBottomRightRadius: 68,
-      opacity: 0.95, borderCurve: 'continuous',
-    },
-    bottomWash: {
-      position: 'absolute',
-      bottom: -42,
-      left: -24,
-      right: -24,
-      height: 220,
-      borderTopLeftRadius: 72,
-      borderTopRightRadius: 72,
-      opacity: 0.9, borderCurve: 'continuous',
-    },
-    primaryGlow: {
-      position: 'absolute',
-      top: -84,
-      right: -36,
-      width: 240,
-      height: 240,
-      borderRadius: 999,
-      backgroundColor: palette.heroGlowPrimary, borderCurve: 'continuous',
-    },
-    secondaryGlow: {
-      position: 'absolute',
-      bottom: -100,
-      left: -52,
-      width: 280,
-      height: 280,
-      borderRadius: 999,
-      backgroundColor: palette.heroGlowSecondary, borderCurve: 'continuous',
+      backgroundColor: colors.background,
     },
     backButton: {
       position: 'absolute',
@@ -196,9 +95,10 @@ const createStyles = (
       zIndex: 10,
       padding: SPACING.sm,
       borderRadius: BORDER_RADIUS.full,
-      backgroundColor: withAlpha(palette.surfaceStrong, isDark ? 0.82 : 0.92),
+      backgroundColor: colors.cardBackground,
       borderWidth: 1,
-      borderColor: palette.heroBorder, borderCurve: 'continuous',
+      borderColor: colors.borderSubtle,
+      borderCurve: 'continuous',
     },
     languageContainer: {
       position: 'absolute',
@@ -209,35 +109,12 @@ const createStyles = (
       overflow: 'hidden', borderCurve: 'continuous',
     },
     content: {
-      flexGrow: 1,
+      flex: 1,
       width: '100%',
-      maxWidth: 580,
-      alignSelf: 'center',
-      paddingHorizontal: isCompactAndroidLayout ? SPACING.lg : SPACING.xl,
-      paddingTop:
-        insets.top +
-        (isCompactAndroidLayout
-          ? SPACING.xxl + SPACING.md
-          : SPACING.xxxl + SPACING.lg),
+      paddingHorizontal: SPACING.lg,
+      paddingTop: insets.top + SPACING.xxxl + SPACING.sm,
       paddingBottom:
-        getMinimumBottomInsetPadding(insets.bottom, SPACING.sm) +
-        (isLandscape
-          ? SPACING.md
-          : isCompactAndroidLayout
-            ? SPACING.lg
-            : SPACING.xl),
-      gap: isCompactAndroidLayout ? SPACING.lg : SPACING.xl,
-      justifyContent: isCompactAndroidLayout ? 'flex-start' : 'center',
-      borderRadius: BORDER_RADIUS.hero,
-      backgroundColor: onboardingPalette.surfaceGlass,
-      borderWidth: 1,
-      borderColor: onboardingPalette.borderStrong,
-      ...SHADOWS.soft,
-      shadowColor: onboardingPalette.shadowColor,
-      shadowOpacity: isDark ? 0.18 : 0.1,
-      shadowRadius: isDark ? 28 : 18,
-      shadowOffset: { width: 0, height: isDark ? 16 : 10 },
-      elevation: 4,
-      overflow: 'hidden', borderCurve: 'continuous',
+        getMinimumBottomInsetPadding(insets.bottom, SPACING.sm) + SPACING.lg,
+      gap: SPACING.lg,
     },
   });

@@ -57,7 +57,7 @@ rate limit `record_coach_conversation_attempt`.
 | `N8N_COACH_CONVERSATION_WEBHOOK_URL` | **OBLIGATOIRE** | URL publique du workflow conversation |
 | `N8N_COACH_CONVERSATION_FALLBACK_WEBHOOK_URL` | optionnel | Fallback si dispo |
 | `WEBHOOK_ALLOWED_HOSTS` | OBLIGATOIRE | Doit inclure l'hôte n8n conversation |
-| `PHASE2_WEBHOOK_AUTH_MODE` | recommandé `bearer+hmac` | Sécurise le webhook |
+| `PHASE2_WEBHOOK_AUTH_MODE` | recommandé `hmac` | Sécurise le webhook (HMAC seul ; bearer drop 2026-05-19) |
 | `PHASE2_WEBHOOK_HMAC_SECRET` | requis si `hmac` activé | Identique côté n8n |
 
 ## Étapes de rollout

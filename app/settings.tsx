@@ -216,7 +216,7 @@ export default function SettingsScreen() {
           testID="settings-top-chrome"
           title={t('settings.title')}
           titleTestID="settings-screen-header"
-          variant="result"
+          variant="settings"
         />
         <View style={styles.header} testID="settings-profile-header">
           <View style={styles.avatarContainer}>

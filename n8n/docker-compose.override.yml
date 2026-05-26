@@ -3,3 +3,5 @@ services:
     environment:
       SUPABASE_URL: ${SUPABASE_URL:-https://qpogulljnnacrxdjbwiz.supabase.co}
       PHASE2_WEBHOOK_HMAC_SECRET: ${PHASE2_WEBHOOK_HMAC_SECRET:?Set PHASE2_WEBHOOK_HMAC_SECRET in your n8n .env}
+      COACH_WEBHOOK_HMAC_SECRET: ${COACH_WEBHOOK_HMAC_SECRET:-}
+      COACH_WEBHOOK_HMAC_ENFORCE: ${COACH_WEBHOOK_HMAC_ENFORCE:-false}

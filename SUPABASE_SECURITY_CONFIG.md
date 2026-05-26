@@ -126,7 +126,7 @@ roll out without an outage.
 1. **T+0** — merge the audit-fix PR. No env var changes yet. Edge does not
    send HMAC headers, n8n does not enforce. Stable.
 2. **T+0+config** — set in prod:
-   - `PHASE2_WEBHOOK_AUTH_MODE=bearer+hmac`
+   - `PHASE2_WEBHOOK_AUTH_MODE=hmac`
    - `PHASE2_WEBHOOK_HMAC_SECRET=<openssl rand -hex 32>`
    - Mirror the same secret in n8n as `COACH_WEBHOOK_HMAC_SECRET`.
    - Keep `COACH_WEBHOOK_HMAC_ENFORCE=false` on n8n.
@@ -144,8 +144,10 @@ roll out without an outage.
 ### Rollback
 
 - Fast: set `COACH_WEBHOOK_HMAC_ENFORCE=false` on n8n. Effect is immediate.
-- Wider: set `PHASE2_WEBHOOK_AUTH_MODE=bearer` (or `none`) on Supabase Edge
-  to stop sending the headers entirely.
+- Wider: set `PHASE2_WEBHOOK_AUTH_MODE=none` on Supabase Edge to stop
+  sending the headers entirely. (`bearer` is **not** a valid fallback —
+  the bearer token was dropped 2026-05-19; flipping back to `bearer`
+  triggers `invalid_webhook_auth_configuration` until the token is re-set.)
 
 ### Ops checklist
 
@@ -154,7 +156,8 @@ roll out without an outage.
       `supabase secrets set PHASE2_WEBHOOK_HMAC_SECRET=...`.
 - [ ] Mirrored in n8n as `COACH_WEBHOOK_HMAC_SECRET` (env var or node
       credential).
-- [ ] `PHASE2_WEBHOOK_AUTH_MODE=bearer+hmac` set in Supabase secrets.
+- [ ] `PHASE2_WEBHOOK_AUTH_MODE=hmac` set in Supabase secrets (pre-flight
+      `sh scripts/check-webhook-secrets.sh hmac <ref>` exit 0).
 - [ ] HMAC verification node present on **both** workflows (`coach.json`,
       `coach-conversation.json`).
 - [ ] 24 h dual-mode observation completed with zero warnings before

@@ -257,12 +257,12 @@ export const COACH_QUESTION_DEFINITIONS: readonly CoachQuestionDefinition[] = [
     'latest_scan__top_priority_today',
     'latest_scan',
     {
-      fr: "A partir de mon dernier scan, quelle est la priorite n°1 aujourd'hui ?",
-      en: 'Based on my latest scan, what is the number one priority today?',
-      de: 'Was ist auf Basis meines letzten Scans heute die Prioritat Nummer eins?',
-      it: 'In base al mio ultimo scan, qual e la priorita numero uno di oggi?',
-      es: 'Segun mi ultimo scan, cual es la prioridad numero uno de hoy?',
-      pt: 'Com base no meu ultimo scan, qual e a prioridade numero um de hoje?',
+      fr: "Quelle priorite n°1 traiter aujourd'hui ?",
+      en: 'What is the number one priority to tackle today?',
+      de: 'Welche Prioritat Nummer eins sollte ich heute angehen?',
+      it: 'Quale priorita numero uno affrontare oggi?',
+      es: 'Cual es la prioridad numero uno a abordar hoy?',
+      pt: 'Qual a prioridade numero um para encarar hoje?',
     },
     {
       intent_key: 'latest_scan_priority_today',

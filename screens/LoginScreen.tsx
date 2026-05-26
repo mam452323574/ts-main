@@ -12,6 +12,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useStartupDiagnostics } from '@/contexts/StartupDiagnosticsContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { LoginCredentialsSchema } from '@/utils/authSchemas';
+import { updatePreAuthOnboardingDraft } from '@/utils/preAuthOnboarding';
 import { Squircle } from '@/components/Squircle';
 
 export default function LoginScreen() {
@@ -49,6 +50,10 @@ export default function LoginScreen() {
     try {
       setLoading(true);
       setError(null);
+      await updatePreAuthOnboardingDraft({
+        completionIntent: null,
+        createdUserId: null,
+      });
       const { nextStep, userId } = await signIn(email, password);
 
       if (nextStep === 'email_verification') {
@@ -97,6 +102,10 @@ export default function LoginScreen() {
     try {
       setGoogleLoading(true);
       setError(null);
+      await updatePreAuthOnboardingDraft({
+        completionIntent: null,
+        createdUserId: null,
+      });
       await signInWithGoogle();
     } catch (err) {
       setError(
@@ -110,8 +119,9 @@ export default function LoginScreen() {
   };
 
   return (
-    <AuthShell>
+    <AuthShell scroll>
       <AuthHero
+        variant="step"
         brand="HEALTH SCAN"
         title={t('auth.login_title')}
         subtitle={t('auth.login_subtitle')}
@@ -178,6 +188,7 @@ export default function LoginScreen() {
           loading={loading}
           variant="primary"
           size="lg"
+          flat
         />
 
         <Pressable

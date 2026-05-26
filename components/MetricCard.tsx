@@ -248,10 +248,15 @@ export const MetricCard: React.FC<MetricCardProps> = ({
             },
           ]}
         >
+          {/*
+           * Badge "Premium" : on garde le fond or translucide (signature
+           * premium) mais on force le texte à `primaryText` pour passer
+           * d'un contraste ~1.1:1 (or sur or) à >7:1 (texte sur or pâle).
+           */}
           <Text
             {...RESULT_TEXT_PROPS}
             numberOfLines={1}
-            style={[styles.statusText, { color: colors.gold }]}
+            style={[styles.statusText, { color: colors.primaryText }]}
           >
             {premiumLabel}
           </Text>

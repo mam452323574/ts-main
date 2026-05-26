@@ -11,6 +11,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react-native';
 
 import CoachScreen from '@/screens/CoachScreen';
@@ -25,6 +26,7 @@ const mockUseCoachEntries = jest.fn();
 const mockUseCoachGeneration = jest.fn();
 const mockUseCoachHistorySummary = jest.fn();
 const mockUseCoachQuota = jest.fn();
+const mockUseCoachConversationQuota = jest.fn();
 const mockUseCoachScreenSnapshot = jest.fn();
 const mockUseLatestReadyCoachEntry = jest.fn();
 const mockUseCoachScans = jest.fn();
@@ -258,12 +260,7 @@ jest.mock('@/hooks/queries/useCoachScreenSnapshot', () => ({
   useCoachScreenSnapshot: (...args: unknown[]) => mockUseCoachScreenSnapshot(...args),
 }));
 jest.mock('@/hooks/queries/useCoachConversationQuota', () => ({
-  useCoachConversationQuota: () => ({
-    data: undefined,
-    isPending: false,
-    isFetching: false,
-    error: null,
-  }),
+  useCoachConversationQuota: () => mockUseCoachConversationQuota(),
 }));
 
 jest.mock('@/services/growthExperience', () => ({
@@ -314,6 +311,12 @@ jest.spyOn(require('react-native').Animated, 'loop').mockImplementation(animated
 describe('CoachScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseCoachConversationQuota.mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isFetching: false,
+      error: null,
+    });
     mockResetCoachGeneration.mockImplementation(() => {
       mockCoachGenerationState = {
         data: null,
@@ -477,7 +480,7 @@ describe('CoachScreen', () => {
     mockUpdateCoachPersona.mockResolvedValue(undefined);
   });
 
-  it('renders inline coach settings with the full persona rail at cold start', () => {
+  it('renders inline coach settings with alternative personas only (active coach excluded)', () => {
     render(<CoachScreen />);
     const personaRail = screen.getByTestId('coach-settings-inline-persona-rail');
     const personaRailViewportStyle = StyleSheet.flatten(personaRail.props.style);
@@ -497,14 +500,11 @@ describe('CoachScreen', () => {
     expect(personaRailContentStyle.paddingRight).toBe(SPACING.page);
 
     expect(
-      screen.getByTestId('coach-settings-inline-persona-gentle_supportive'),
-    ).toBeTruthy();
+      screen.queryByTestId('coach-settings-inline-persona-gentle_supportive'),
+    ).toBeNull();
     expect(
       screen.getByTestId('coach-settings-inline-persona-strict_tough'),
     ).toBeTruthy();
-    expect(
-      screen.queryByTestId('coach-settings-inline-persona-gentle_supportive-lock-badge'),
-    ).toBeNull();
     expect(
       screen.getByTestId('coach-settings-inline-persona-strict_tough-lock-badge'),
     ).toBeTruthy();
@@ -542,6 +542,30 @@ describe('CoachScreen', () => {
     expect(
       screen.getByTestId('coach-settings-inline-persona-playful_light-portrait-image'),
     ).toBeTruthy();
+  });
+
+  it('renders the selected coach pill inside the hero, showing the selected coach name', () => {
+    mockUseCoachConversationQuota.mockReturnValue({
+      data: {
+        tier: 'free',
+        free_used: false,
+        free_conversation_id: null,
+        free_remaining_messages: 5,
+        premium_today_available: 0,
+      },
+      isPending: false,
+      isFetching: false,
+      error: null,
+    });
+
+    render(<CoachScreen />);
+
+    const selectedCoachPill = screen.getByTestId(
+      'coach-conversation-hero-card-selected-coach-pill',
+    );
+    expect(selectedCoachPill).toBeTruthy();
+    expect(within(selectedCoachPill).getByText('Coach sélectionné')).toBeTruthy();
+    expect(within(selectedCoachPill).getAllByText('Noah').length).toBeGreaterThan(0);
   });
 
   it('keeps free_question hidden from presets and submits typed free text', async () => {
@@ -783,7 +807,7 @@ describe('CoachScreen', () => {
     }
   });
 
-  it('keeps the inline persona rail aligned with the resolved active persona', () => {
+  it('excludes the active persona from the inline rail and surfaces it via the active coach line', () => {
     mockAuthState = {
       ...mockAuthState,
       userProfile: {
@@ -804,43 +828,22 @@ describe('CoachScreen', () => {
     };
 
     const screen = render(<CoachScreen />);
-    const testIds = collectTestIds(screen.toJSON());
 
-    const activeCard = screen.getByTestId(
-      'coach-settings-inline-persona-analytical_precise',
-    );
-    expect(activeCard).toBeTruthy();
-    expect(activeCard.props.accessibilityState?.selected).toBe(true);
     expect(
-      testIds.indexOf('coach-settings-inline-persona-analytical_precise'),
-    ).toBeLessThan(
-      testIds.indexOf('coach-settings-inline-persona-gentle_supportive'),
-    );
+      screen.queryByTestId('coach-settings-inline-persona-analytical_precise'),
+    ).toBeNull();
     expect(
-      testIds.indexOf('coach-settings-inline-persona-analytical_precise'),
-    ).toBeLessThan(
-      testIds.indexOf('coach-settings-inline-persona-strict_tough'),
-    );
-  });
-
-  it('reopens the selected coach details and lets the user keep the current coach without mutating it', async () => {
-    const screen = render(<CoachScreen />);
-
-    fireEvent.press(
       screen.getByTestId('coach-settings-inline-persona-gentle_supportive'),
-    );
-
-    expect(screen.getByTestId('coach-persona-details-modal')).toBeTruthy();
-
-    fireEvent.press(screen.getByTestId('coach-persona-details-primary-cta'));
-
-    await waitFor(() => {
-      expect(screen.queryByTestId('coach-persona-details-modal')).toBeNull();
-    });
-    expect(mockUpdateCoachPersona).not.toHaveBeenCalled();
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId('coach-settings-inline-persona-strict_tough'),
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId('coach-action-composer-persona-title').props.children,
+    ).toBe('Elias');
   });
 
-  it('exposes both the active and other personas in the inline rail regardless of saved guidance persona', () => {
+  it('exposes alternative personas in the inline rail regardless of saved guidance persona', () => {
     mockAuthState = {
       ...mockAuthState,
       userProfile: {
@@ -873,12 +876,11 @@ describe('CoachScreen', () => {
       screen.getByTestId('coach-settings-inline-persona-strict_tough'),
     ).toBeTruthy();
     expect(
-      screen.getByTestId('coach-settings-inline-persona-playful_light'),
-    ).toBeTruthy();
+      screen.queryByTestId('coach-settings-inline-persona-playful_light'),
+    ).toBeNull();
     expect(
-      screen.getByTestId('coach-settings-inline-persona-playful_light').props
-        .accessibilityState?.selected,
-    ).toBe(true);
+      screen.getByTestId('coach-action-composer-persona-title').props.children,
+    ).toBe('Milo');
   });
 
   it('does not render legacy latest-ready guidance at cold start', () => {
@@ -1158,6 +1160,7 @@ describe('CoachScreen', () => {
         personaKey: 'gentle_supportive',
       }),
     );
+    expect(mockMutateAsync.mock.calls[0]?.[0]?.forceRefresh).toBeUndefined();
   });
 
   it('keeps cached Coach UI stable when a background refetch reports errors', () => {
@@ -1405,6 +1408,7 @@ describe('CoachScreen', () => {
           personaKey: 'gentle_supportive',
           questionKey: 'weekly_plan__realistic_week',
           questionText: selectedWeeklyQuestion,
+          forceRefresh: true,
         }),
       );
     });
@@ -1732,16 +1736,15 @@ describe('CoachScreen', () => {
 
     screen.rerender(<CoachScreen />);
     enterCoachQuestion(screen);
-    const testIds = collectTestIds(screen.toJSON());
     expect(
-      testIds.indexOf('coach-settings-inline-persona-analytical_precise'),
-    ).toBeLessThan(
-      testIds.indexOf('coach-settings-inline-persona-gentle_supportive'),
-    );
+      screen.queryByTestId('coach-settings-inline-persona-analytical_precise'),
+    ).toBeNull();
     expect(
-      screen.getByTestId('coach-settings-inline-persona-analytical_precise')
-        .props.accessibilityState?.selected,
-    ).toBe(true);
+      screen.getByTestId('coach-settings-inline-persona-gentle_supportive'),
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId('coach-action-composer-persona-title').props.children,
+    ).toBe('Elias');
 
     fireEvent.press(screen.getByTestId('coach-action-primary'));
 
@@ -2135,7 +2138,7 @@ describe('CoachScreen', () => {
     expect(screen.queryByTestId('coach-history-icon-button')).toBeNull();
   });
 
-  it('keeps loading active after a pending response until the tracked coach entry becomes ready', async () => {
+  it('shows a ready free-account result even after its reserved quota is exhausted while pending', async () => {
     const olderReadyEntry = createCoachEntry({
       id: 'entry-older-ready',
       title: 'Older ready guidance',
@@ -2175,6 +2178,19 @@ describe('CoachScreen', () => {
         isPending: false,
         isError: false,
         error: null,
+      };
+      mockCoachQuotaState = {
+        ...mockCoachQuotaState,
+        data: {
+          account_tier: 'free',
+          limit: 1,
+          used_count: 1,
+          available: 0,
+          next_recharge_at: '2026-04-07T10:00:00.000Z',
+          unlimited: false,
+          window_seconds: 86400,
+          as_of: '2026-04-06T10:00:00.000Z',
+        },
       };
       return pendingResponse;
     });
@@ -2247,6 +2263,11 @@ describe('CoachScreen', () => {
     expect(
       screen.getByText('Stay steady and keep the routine simple this week.'),
     ).toBeTruthy();
+    expect(mockCoachQuotaState.data).toMatchObject({
+      account_tier: 'free',
+      available: 0,
+      used_count: 1,
+    });
   }, 15_000);
 
   it('shows a generation error when the tracked pending entry becomes stale', async () => {
@@ -2299,7 +2320,7 @@ describe('CoachScreen', () => {
     ).toBeTruthy();
   });
 
-  it('does not show an error during a normal pending wait and only surfaces one after the tracked entry fails', async () => {
+  it('allows another free-account request after a pending generation fails and its quota is refunded', async () => {
     const olderReadyEntry = createCoachEntry({
       id: 'entry-ready-before-error',
       title: 'Previous advice before error',
@@ -2339,6 +2360,19 @@ describe('CoachScreen', () => {
         isPending: false,
         isError: false,
         error: null,
+      };
+      mockCoachQuotaState = {
+        ...mockCoachQuotaState,
+        data: {
+          account_tier: 'free',
+          limit: 1,
+          used_count: 1,
+          available: 0,
+          next_recharge_at: '2026-04-07T10:00:00.000Z',
+          unlimited: false,
+          window_seconds: 86400,
+          as_of: '2026-04-06T10:00:00.000Z',
+        },
       };
       return pendingResponse;
     });
@@ -2382,6 +2416,19 @@ describe('CoachScreen', () => {
         olderReadyEntry,
       ],
     };
+    mockCoachQuotaState = {
+      ...mockCoachQuotaState,
+      data: {
+        account_tier: 'free',
+        limit: 1,
+        used_count: 0,
+        available: 1,
+        next_recharge_at: null,
+        unlimited: false,
+        window_seconds: 86400,
+        as_of: '2026-04-06T10:00:01.000Z',
+      },
+    };
 
     screen.rerender(<CoachScreen />);
 
@@ -2396,6 +2443,16 @@ describe('CoachScreen', () => {
         "Le service Coach n'a pas pu répondre pour le moment. Réessayez dans un instant.",
       ),
     ).toBeTruthy();
+
+    fireEvent.press(screen.getByText('Réessayer'));
+
+    await waitFor(() => {
+      expect(mockMutateAsync).toHaveBeenCalledTimes(2);
+    });
+    expect(mockShowAlert).not.toHaveBeenCalledWith(
+      'Quota Coach atteint',
+      expect.anything(),
+    );
   });
 
   it('maps an invalid tracked provider payload to a friendly error body even when n8n answered 500', async () => {
@@ -3904,6 +3961,7 @@ describe('CoachScreen', () => {
     });
 
     expect(mockMutateAsync).toHaveBeenCalledTimes(1);
+    expect(mockMutateAsync.mock.calls[0]?.[0]?.forceRefresh).toBeUndefined();
     expect(mockTrackEvent).toHaveBeenCalledWith(
       'coach_scan_result_auto_submit_started',
       expect.objectContaining({

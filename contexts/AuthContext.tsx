@@ -41,6 +41,7 @@ import { queryClient } from '@/services/queryClient';
 import { createOAuthState } from '@/utils/oauthState';
 import { invalidateScanEligibilityQueries } from '@/utils/scanEligibilityQuery';
 import { syncDeviceLocaleToProfile } from '@/services/userProfile';
+import { invalidateCoachProfileMemoryCache } from '@/services/coach';
 import { isPostgresUniqueViolation } from '@/utils/postgrestErrors';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -1981,7 +1982,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // d'upload social pending. Best-effort : si la RPC echoue, la TTL de
       // 30min prendra le relais. On le fait AVANT de clear les caches /
       // setCurrentUser(null) pour avoir encore le user.id disponible.
-      const currentUserId = currentUser?.id ?? null;
+      const currentUserId = user?.id ?? null;
       if (currentUserId) {
         try {
           await supabase.rpc('release_pending_social_upload_reservations', {
@@ -2002,6 +2003,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setCurrentUser(null);
       setCurrentSession(null);
       subscriptionSyncAttemptedAtRef.current.clear();
+      invalidateCoachProfileMemoryCache();
 
       await syncRevenueCatIdentity(null);
 

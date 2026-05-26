@@ -9,7 +9,7 @@ interface ResultSheetTopChromeProps {
   title: string;
   testID?: string;
   titleTestID?: string;
-  variant?: 'default' | 'result';
+  variant?: 'default' | 'result' | 'settings';
   onLeftAction?: () => void;
   leftActionAccessibilityLabel?: string;
   leftActionTestID?: string;
@@ -28,16 +28,20 @@ export function ResultSheetTopChrome({
 }: ResultSheetTopChromeProps) {
   const { colors, isDark } = useTheme();
   const isResultVariant = variant === 'result';
+  const isSettingsVariant = variant === 'settings';
+  const isFlushVariant = isResultVariant || isSettingsVariant;
   const defaultContainerBackgroundColor = isResultVariant
     ? (isDark && colors.background === '#000000' ? colors.background : '#000000')
-    : isDark
-      ? withAlpha(colors.surfaceElevated ?? colors.cardBackground, 0.96)
-      : withAlpha(colors.cardBackground ?? colors.background, 0.985);
+    : isSettingsVariant
+      ? colors.background
+      : isDark
+        ? withAlpha(colors.surfaceElevated ?? colors.cardBackground, 0.96)
+        : withAlpha(colors.cardBackground ?? colors.background, 0.985);
   const containerBackgroundColor = surfaceColor ?? defaultContainerBackgroundColor;
-  const containerBorderBottomColor = isResultVariant
+  const containerBorderBottomColor = isFlushVariant
     ? 'transparent'
     : withAlpha(colors.primaryText, isDark ? 0.08 : 0.06);
-  const containerBorderBottomWidth = isResultVariant ? 0 : StyleSheet.hairlineWidth;
+  const containerBorderBottomWidth = isFlushVariant ? 0 : StyleSheet.hairlineWidth;
 
   return (
     <View

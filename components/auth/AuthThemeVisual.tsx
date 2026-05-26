@@ -1,10 +1,8 @@
 import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Moon, Sun } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 
-import { withAlpha } from '@/constants/theme';
-import { useAuthPalette } from './tokens';
+import { DARK_COLORS, LIGHT_COLORS, withAlpha } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 
 interface AuthThemeVisualProps {
@@ -17,38 +15,30 @@ interface AuthThemeVisualProps {
  * Factorise le pattern utilisé dans SignUpScreen et UsernameSetupScreen.
  */
 export function AuthThemeVisual({ theme, size = 56 }: AuthThemeVisualProps) {
-  const palette = useAuthPalette();
   const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(size, palette, colors), [size, palette, colors]);
+  const styles = useMemo(() => createStyles(size, colors), [size, colors]);
 
   if (theme === 'dark') {
     return (
-      <LinearGradient
-        colors={[palette.surfaceStrong, palette.surface]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+      <View
         style={[styles.badge, styles.badgeDark]}
       >
-        <Moon color={palette.inverseText} size={size * 0.46} />
-      </LinearGradient>
+        <Moon color={DARK_COLORS.primaryText} size={size * 0.46} />
+      </View>
     );
   }
 
   return (
-    <LinearGradient
-      colors={[withAlpha(colors.white, 0.98), palette.surface]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
+    <View
       style={[styles.badge, styles.badgeLight]}
     >
-      <Sun color={colors.primaryText} size={size * 0.46} />
-    </LinearGradient>
+      <Sun color={LIGHT_COLORS.primary} size={size * 0.46} />
+    </View>
   );
 }
 
 const createStyles = (
   size: number,
-  palette: ReturnType<typeof useAuthPalette>,
   colors: any,
 ) =>
   StyleSheet.create({
@@ -61,9 +51,11 @@ const createStyles = (
       borderWidth: 1, borderCurve: 'continuous',
     },
     badgeDark: {
-      borderColor: palette.heroBorder,
+      backgroundColor: DARK_COLORS.surfaceElevated,
+      borderColor: DARK_COLORS.borderSubtle,
     },
     badgeLight: {
-      borderColor: withAlpha(colors.primaryText, 0.08),
+      backgroundColor: LIGHT_COLORS.cardBackground,
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
     },
   });

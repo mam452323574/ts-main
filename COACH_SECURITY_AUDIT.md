@@ -30,7 +30,7 @@ Les correctifs P0 et P1 (C-01, C-02, C-03) sont implémentés dans cette passe ;
 | C-01 | P0 | ✅ Corrigé | Pas de rate limit → cost amplification LLM par user authentifié |
 | C-02 | P1 | ✅ Corrigé | Contenu de `payload.payload` non validé → prompt injection vers LLM |
 | C-03 | P1 | ✅ Corrigé | Pas de limite sur la réponse webhook n8n → DoS / inflation BD |
-| C-04 | P1 | ⏳ Config ops | HMAC sur webhook coach non garanti en prod (config `PHASE2_WEBHOOK_AUTH_MODE`) |
+| C-04 | P1 | ✅ Activé 2026-05-19 | HMAC bidirectionnel activé : signing Supabase→n8n + vérification réponse n8n→Supabase (défaut) + enforcement n8n `COACH_WEBHOOK_HMAC_ENFORCE=true` |
 | C-05 | P2 | ⏳ À durcir | RPC `get_coach_history_page` expose `request_payload_json`, `response_payload_json`, `cache_key`, `input_hash` au client |
 | C-06 | P2 | ⏳ À durcir | RLS `coach_entries` sans policy explicite INSERT/UPDATE/DELETE (defense-in-depth) |
 | C-07 | P2 | ⏳ À durcir | `coach_persona_key` modifiable par l'utilisateur sans log d'audit |
@@ -141,7 +141,7 @@ Bien que [coachContentParser.ts](shared/coachContentParser.ts) clampe les chaîn
 **Impact.** Cost amplification côté n8n/LLM via accès direct au webhook (si exfiltration).
 
 **Recommandation.**
-1. Activer `PHASE2_WEBHOOK_AUTH_MODE=bearer+hmac` (ou `hmac` seul) en production et configurer `PHASE2_WEBHOOK_HMAC_SECRET`.
+1. Activer `PHASE2_WEBHOOK_AUTH_MODE=hmac` en production et configurer `PHASE2_WEBHOOK_HMAC_SECRET`.
 2. Côté n8n, vérifier la signature : recalculer HMAC-SHA256 sur `${x-webhook-timestamp}.${rawBody}` avec le secret partagé, comparer en temps constant. Rejeter si timestamp > 5 min.
 3. Documenter dans [SUPABASE_SECURITY_CONFIG.md](SUPABASE_SECURITY_CONFIG.md) que cette configuration est obligatoire pour les webhooks coach.
 
@@ -286,7 +286,7 @@ CREATE POLICY "service_role only deletes coach entries"
 1. ✅ C-01 — Migration `20260426120000_add_coach_generation_rate_limit.sql` + check dans handler.
 2. ✅ C-02 — `assertCoachInnerPayload` dans `phase2Contracts.ts` ; ajout aux tests.
 3. ✅ C-03 — Paramètre `maxResponseBytes` sur `postWebhookJson` ; activation à 32 KB pour le coach.
-4. ⏳ C-04 — Configuration ops : activer `PHASE2_WEBHOOK_AUTH_MODE=bearer+hmac` + `PHASE2_WEBHOOK_HMAC_SECRET` en prod et côté n8n.
+4. ✅ C-04 — Activé 2026-05-19 : `PHASE2_WEBHOOK_AUTH_MODE` inclut `hmac`, secrets déployés et vérifiés (SHA-256 match), `COACH_WEBHOOK_HMAC_ENFORCE=true` côté n8n.
 
 ### Prochaines passes (P2)
 

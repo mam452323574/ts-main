@@ -25,7 +25,7 @@ import {
   parseCoachSendMessageRequest,
   type CoachConversationStoredMessage,
 } from '../_shared/coachConversation.ts';
-import { buildCoachUserContext } from '../_shared/coachConversationContext.ts';
+import { getCachedOrFreshUserContext } from '../_shared/coachConversationContext.ts';
 import {
   attachCoachConversationQuotaEvent,
   mapCoachConversationReservationToHttpError,
@@ -411,7 +411,12 @@ export async function runCoachSendMessageHandler(req: Request): Promise<Response
     const historyWithoutLatest = history.filter((message) => message.id !== userMessage.id);
     const slidingWindow = buildSlidingWindowMessages(historyWithoutLatest, parsed.content);
 
-    const userContext = await buildCoachUserContext(supabase, user.id, requestId);
+    const userContext = await getCachedOrFreshUserContext(
+      supabase,
+      user.id,
+      conversation.id,
+      requestId,
+    );
 
     const assistantMessage = await insertAssistantPendingMessage(supabase, {
       conversationId: conversation.id,

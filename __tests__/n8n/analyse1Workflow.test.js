@@ -51,6 +51,15 @@ describe('analyse_1 n8n workflow export', () => {
       responseMode: 'responseNode',
     });
     expect(workflow.connections.Webhook.main[0][0].node).toBe(
+      'Verify Coach Webhook HMAC (analyse_1)',
+    );
+    expect(
+      workflow.connections['Verify Coach Webhook HMAC (analyse_1)'].main[0][0].node,
+    ).toBe('Smoke Switch (analyse_1)');
+    expect(workflow.connections['Smoke Switch (analyse_1)'].main[0][0].node).toBe(
+      'Sign Webhook Response (analyse_1)',
+    );
+    expect(workflow.connections['Smoke Switch (analyse_1)'].main[1][0].node).toBe(
       'Normalize Analyse Input',
     );
     expect(
@@ -82,8 +91,22 @@ describe('analyse_1 n8n workflow export', () => {
       'Switch scan_route',
     );
     expect(workflow.connections['Code in JavaScript'].main[0][0].node).toBe(
+      'Sign Webhook Response (analyse_1)',
+    );
+    expect(workflow.connections['Sign Webhook Response (analyse_1)'].main[0][0].node).toBe(
       'Respond to Webhook1',
     );
+    expect(getNode(workflow, 'Respond to Webhook1').parameters).toMatchObject({
+      responseBody: '={{ $json.body }}',
+      options: {
+        responseHeaders: {
+          entries: expect.arrayContaining([
+            expect.objectContaining({ name: 'x-webhook-response-timestamp' }),
+            expect.objectContaining({ name: 'x-webhook-response-signature' }),
+          ]),
+        },
+      },
+    });
   });
 
   it('uses a switch node with explicit face/body/nutrition rules and a fallback output', () => {

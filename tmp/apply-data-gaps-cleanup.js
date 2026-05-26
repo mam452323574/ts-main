@@ -1,10 +1,19 @@
 #!/usr/bin/env node
-// One-shot script to clean up data_gaps disclaimer prompts in coach.json.
+// OBSOLETE — do not re-run as-is. Entry "aucun scan exploitable rule" (#11
+// in the replacements table below) injected a problematic "mini-action générale
+// utile (sommeil, hydratation, posture, repas équilibré, respiration)"
+// suggestion that contradicted the anti-réflexe (4) rule and was the upstream
+// cause of the "Bois de l'eau dans 5 minutes" output. It has been replaced by
+// the R-12 hotfix (see COACH_BUG_HYDRATATION_AUDIT_2026_05_20.md).
+// The `to:` value of entry #11 has been updated to the new context-asking
+// reformulation so that, if the script is ever re-run against an old export,
+// it lays down the post-hotfix value. The other entries (1-10, 12) remain
+// historically accurate but should not be re-applied as a batch.
 //
-// Rationale: the front-end no longer renders content.data_gaps. The N8N prompt
-// still encourages the LLM to fill it (and to disclaim missing data to the
-// user) which wastes tokens and produces sentences the user never sees. This
-// pass:
+// Original rationale (kept for context):
+//   - the front-end no longer renders content.data_gaps. The N8N prompt
+//     still encourages the LLM to fill it (and to disclaim missing data to the
+//     user) which wastes tokens and produces sentences the user never sees.
 //   - keeps the schema field (data_gaps: []) for backward compatibility ;
 //   - replaces every instruction that asks the LLM to populate it with a
 //     STRICT-EMPTY rule + a silent-fallback policy ;
@@ -109,7 +118,7 @@ const replacements = [
   {
     label: 'aucun scan exploitable rule',
     from: "'- Si aucun scan exploitable n’existe, explique simplement qu’il n’y a pas encore de scan récent exploitable et propose une mini-action utile.',",
-    to: "'- Si aucun scan exploitable n’existe, propose directement une mini-action générale utile (sommeil, hydratation, posture, repas équilibré, respiration) sans mentionner l’absence de scan a l’utilisateur.',",
+    to: "'- Si aucun scan exploitable n’existe ou si le contexte est trop maigre, formule une réponse utile centrée sur la question posée (ou pose UNE question courte de clarification dans content.summary si la question est trop vague). N énumère JAMAIS d actions génériques de remplissage (interdit notamment : suggérer un grand verre d eau, une marche de quelques minutes, une heure de coucher, une respiration ou une \\\"mini-action\\\" santé non demandée). Reste fidèle à l intention de l utilisateur et à la persona active.',",
   },
 
   // 12) Inject the new product rule right after "ne formule aucune

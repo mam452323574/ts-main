@@ -49,6 +49,11 @@ import { paywallSession } from '@/utils/paywallSession';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { hasPremiumAccessFromProfile } from '@/utils/subscription';
 import { Squircle } from '@/components/Squircle';
+import {
+  PREMIUM_LOCKED_ANALYTICS_METRIC_IDS,
+  isAnalyticsMetricLocked,
+  type PremiumAnalyticsGroup,
+} from '@/constants/premiumFields';
 
 const PERIODS: { value: AnalyticsPeriod; labelKey: string; premium: boolean }[] = [
   { value: '7days', labelKey: 'analytics.periods.days_7', premium: false },
@@ -593,31 +598,68 @@ export default function AnalyticsScreen() {
     };
   }, [period, data]);
 
+  const triggerPremiumGate = useCallback(() => {
+    if (paywallSession.canShowPaywall()) {
+      setPaywallVisible(true);
+      paywallSession.markPaywallShown();
+    } else {
+      showAlert(
+        t('premium.subscription_page.contextual_analytics_title'),
+        t('premium.subscription_page.contextual_analytics_body'),
+        [
+          { text: t('common.later'), style: 'cancel' },
+          {
+            text: t('premium.upgrade_premium'),
+            onPress: () => router.push('/premium-upgrade'),
+          },
+        ],
+        undefined,
+        { variant: 'premium', emoji: '\u2728' }
+      );
+    }
+  }, [router, showAlert, t]);
+
   const handlePeriodSelect = (selectedPeriod: AnalyticsPeriod, requiresPremium: boolean) => {
     if (requiresPremium && !isPremium) {
-      if (paywallSession.canShowPaywall()) {
-        setPaywallVisible(true);
-        paywallSession.markPaywallShown();
-      } else {
-        showAlert(
-          t('premium.subscription_page.contextual_analytics_title'),
-          t('premium.subscription_page.contextual_analytics_body'),
-          [
-            { text: t('common.later'), style: 'cancel' },
-            {
-              text: t('premium.upgrade_premium'),
-              onPress: () => router.push('/premium-upgrade'),
-            },
-          ],
-          undefined,
-          { variant: 'premium', emoji: '\u2728' }
-        );
-      }
+      triggerPremiumGate();
       return;
     }
 
     setPeriod(selectedPeriod);
   };
+
+  const handleMetricSelect = useCallback(
+    (
+      group: PremiumAnalyticsGroup,
+      metricId: string,
+      setter: (next: string) => void,
+    ) => {
+      if (isAnalyticsMetricLocked(group, metricId, isPremium)) {
+        triggerPremiumGate();
+        return;
+      }
+
+      setter(metricId);
+    },
+    [isPremium, triggerPremiumGate],
+  );
+
+  // Si l'utilisateur (re)devient gratuit en cours de session \u2014 ou si l'\u00e9tat
+  // initial reposait sur un tier cache stale \u2014 on s'assure qu'aucune m\u00e9trique
+  // verrouill\u00e9e n'est s\u00e9lectionn\u00e9e par d\u00e9faut. Sans ce reset, la courbe
+  // afficherait une ligne sanitis\u00e9e \u00e0 0 (cf. sanitizeAnalyticsForFreeTier).
+  useEffect(() => {
+    if (isPremium) return;
+    if (isAnalyticsMetricLocked('health', healthMetricId, isPremium)) {
+      setHealthMetricId(HEALTH_CHART_METRICS[0].id);
+    }
+    if (isAnalyticsMetricLocked('body', bodyMetricId, isPremium)) {
+      setBodyMetricId(BODY_CHART_METRICS[0].id);
+    }
+    if (isAnalyticsMetricLocked('nutrition', nutritionMetricId, isPremium)) {
+      setNutritionMetricId(NUTRITION_CHART_METRICS[0].id);
+    }
+  }, [isPremium, healthMetricId, bodyMetricId, nutritionMetricId]);
 
   const healthScoreHistory = data?.healthScoreHistory ?? EMPTY_ANALYTICS_HISTORY;
   const bodyScoreHistory = data?.bodyScoreHistory ?? EMPTY_ANALYTICS_HISTORY;
@@ -958,6 +1000,7 @@ export default function AnalyticsScreen() {
             {HEALTH_CHART_METRICS.map((metric) => {
               const isSelected = selectedHealthMetric.id === metric.id;
               const metricAccent = getMetricAccent(metric.accentKey);
+              const isMetricLocked = isAnalyticsMetricLocked('health', metric.id, isPremium);
 
               return (
                 <TouchableOpacity
@@ -965,6 +1008,7 @@ export default function AnalyticsScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={t(metric.labelKey)}
                   accessibilityState={{ selected: isSelected }}
+                  accessibilityHint={isMetricLocked ? t('analytics.premium_feature') : undefined}
                   style={[
                     styles.metricButton,
                     { borderColor: withAlpha(metricAccent.lineColor, isDark ? 0.16 : 0.11) },
@@ -973,10 +1017,14 @@ export default function AnalyticsScreen() {
                       backgroundColor: metricAccent.chipActiveBackgroundColor,
                       borderColor: metricAccent.chipActiveBorderColor,
                     },
+                    isMetricLocked && styles.metricButtonLocked,
                   ]}
                   testID={`analytics-health-metric-${metric.id}`}
-                  onPress={() => setHealthMetricId(metric.id)}
+                  onPress={() => handleMetricSelect('health', metric.id, setHealthMetricId)}
                 >
+                  {isMetricLocked ? (
+                    <Crown size={12} color={colors.gold} fill={colors.gold} />
+                  ) : null}
                   <Text
                     style={[
                       styles.metricButtonText,
@@ -1035,6 +1083,7 @@ export default function AnalyticsScreen() {
             {BODY_CHART_METRICS.map((metric) => {
               const isSelected = selectedBodyMetric.id === metric.id;
               const metricAccent = getMetricAccent(metric.accentKey);
+              const isMetricLocked = isAnalyticsMetricLocked('body', metric.id, isPremium);
 
               return (
                 <TouchableOpacity
@@ -1042,6 +1091,7 @@ export default function AnalyticsScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={t(metric.labelKey)}
                   accessibilityState={{ selected: isSelected }}
+                  accessibilityHint={isMetricLocked ? t('analytics.premium_feature') : undefined}
                   style={[
                     styles.metricButton,
                     { borderColor: withAlpha(metricAccent.lineColor, isDark ? 0.16 : 0.11) },
@@ -1050,10 +1100,14 @@ export default function AnalyticsScreen() {
                       backgroundColor: metricAccent.chipActiveBackgroundColor,
                       borderColor: metricAccent.chipActiveBorderColor,
                     },
+                    isMetricLocked && styles.metricButtonLocked,
                   ]}
                   testID={`analytics-body-metric-${metric.id}`}
-                  onPress={() => setBodyMetricId(metric.id)}
+                  onPress={() => handleMetricSelect('body', metric.id, setBodyMetricId)}
                 >
+                  {isMetricLocked ? (
+                    <Crown size={12} color={colors.gold} fill={colors.gold} />
+                  ) : null}
                   <Text
                     style={[
                       styles.metricButtonText,
@@ -1111,6 +1165,7 @@ export default function AnalyticsScreen() {
             {NUTRITION_CHART_METRICS.map((metric) => {
               const isSelected = selectedNutritionMetric.id === metric.id;
               const metricAccent = getMetricAccent(metric.accentKey);
+              const isMetricLocked = isAnalyticsMetricLocked('nutrition', metric.id, isPremium);
 
               return (
                 <TouchableOpacity
@@ -1118,6 +1173,7 @@ export default function AnalyticsScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={t(metric.labelKey)}
                   accessibilityState={{ selected: isSelected }}
+                  accessibilityHint={isMetricLocked ? t('analytics.premium_feature') : undefined}
                   style={[
                     styles.metricButton,
                     { borderColor: withAlpha(metricAccent.lineColor, isDark ? 0.16 : 0.11) },
@@ -1126,10 +1182,14 @@ export default function AnalyticsScreen() {
                       backgroundColor: metricAccent.chipActiveBackgroundColor,
                       borderColor: metricAccent.chipActiveBorderColor,
                     },
+                    isMetricLocked && styles.metricButtonLocked,
                   ]}
                   testID={`analytics-nutrition-metric-${metric.id}`}
-                  onPress={() => setNutritionMetricId(metric.id)}
+                  onPress={() => handleMetricSelect('nutrition', metric.id, setNutritionMetricId)}
                 >
+                  {isMetricLocked ? (
+                    <Crown size={12} color={colors.gold} fill={colors.gold} />
+                  ) : null}
                   <Text
                     style={[
                       styles.metricButtonText,
@@ -1225,8 +1285,12 @@ const createStyles = (colors: any, isDark: boolean) => {
     color: colors.primaryText,
   },
   headerSubtitle: {
+    // Idem que `emptyChartText` : `colors.gray` tombait trop bas en
+    // luminance sur le fond sombre. `secondaryText` rétablit un contraste
+    // lisible sans monter au niveau `primaryText` (le sous-titre doit
+    // rester hiérarchiquement secondaire).
     fontSize: SIZES.text14,
-    color: colors.gray,
+    color: colors.secondaryText,
     marginTop: SPACING.xs,
   },
   periodSelectorContainer: {
@@ -1321,10 +1385,16 @@ const createStyles = (colors: any, isDark: boolean) => {
     backgroundColor: chrome.chip.backgroundColor,
     borderWidth: 1,
     borderColor: chrome.chip.borderColor, borderCurve: 'continuous',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
   },
   metricButtonActive: {
     backgroundColor: chrome.chipActive.backgroundColor,
     borderColor: chrome.chipActive.borderColor,
+  },
+  metricButtonLocked: {
+    opacity: 0.8,
   },
   metricButtonText: {
     fontSize: SIZES.text12,
@@ -1372,8 +1442,12 @@ const createStyles = (colors: any, isDark: boolean) => {
     borderColor: chrome.chip.borderColor, borderCurve: 'continuous',
   },
   emptyChartText: {
+    // `colors.gray` était trop pâle en thème sombre (contraste limite avec
+    // le fond `chrome.chart.emptyBackground`). `secondaryText` a une
+    // luminance ajustée par mode (light: #63666D, dark: #B8B8BE) → lisible
+    // dans les deux modes sans casser le look discret de l'empty state.
     fontSize: SIZES.text14,
-    color: colors.gray,
+    color: colors.secondaryText,
     textAlign: 'center',
   },
   });

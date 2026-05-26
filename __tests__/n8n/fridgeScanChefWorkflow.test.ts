@@ -37,14 +37,48 @@ describe('fridge scan n8n workflow', () => {
       path: 'frigo',
     });
     expect(workflow.connections.Webhook.main[0][0].node).toBe(
+      'Verify Coach Webhook HMAC (fridge-scan)',
+    );
+    expect(
+      workflow.connections['Verify Coach Webhook HMAC (fridge-scan)'].main[0][0].node,
+    ).toBe('Smoke Switch (fridge-scan)');
+    expect(workflow.connections['Smoke Switch (fridge-scan)'].main[0][0].node).toBe(
+      'Sign Webhook Response (fridge-scan-chef)',
+    );
+    expect(workflow.connections['Smoke Switch (fridge-scan)'].main[1][0].node).toBe(
       'Normalize inbound fridge scan',
     );
     expect(
       workflow.connections['Normalize inbound fridge scan'].main[0][0].node,
+    ).toBe('Sign Webhook Response (fridge-scan-chef)');
+    expect(
+      workflow.connections['Sign Webhook Response (fridge-scan-chef)'].main[0][0].node,
     ).toBe('Respond to App');
     expect(workflow.connections['Respond to App'].main[0][0].node).toBe(
       'If normalized payload',
     );
+  });
+
+  it('signs the immediate app response without dropping normalized context', () => {
+    const workflow = readWorkflow();
+    const signNode = getNode(workflow, 'Sign Webhook Response (fridge-scan-chef)');
+    const respondNode = getNode(workflow, 'Respond to App');
+
+    expect(signNode.parameters?.jsCode).toContain('const originalJson = $input.first().json');
+    expect(signNode.parameters?.jsCode).toContain('...originalJson');
+    expect(signNode.parameters?.jsCode).toContain('body: bodyToSign');
+    expect(respondNode.parameters).toMatchObject({
+      responseBody: '={{ $json.body }}',
+      options: {
+        responseCode: '={{ $json.normalized_ok ? 200 : 400 }}',
+        responseHeaders: {
+          entries: expect.arrayContaining([
+            expect.objectContaining({ name: 'x-webhook-response-timestamp' }),
+            expect.objectContaining({ name: 'x-webhook-response-signature' }),
+          ]),
+        },
+      },
+    });
   });
 
   it('normalizes both n8n webhook body and root payload shapes', () => {

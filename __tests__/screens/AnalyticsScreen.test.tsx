@@ -302,19 +302,129 @@ describe('AnalyticsScreen', () => {
     });
   });
 
-  it('changes the rendered chart color when a metric tab is selected', () => {
+  it('changes the rendered chart color when a free metric tab is selected', () => {
     mockUseAnalytics.mockImplementation((period: string) => makeQueryState(period));
 
     render(<AnalyticsScreen />);
 
-    const initialHealthColor = getLatestLineCharts()[0].data.datasets[0].color(1);
+    // 'calories' est gratuit et a un accent différent de 'score' (la métrique
+    // par défaut) — ce qui permet de vérifier que la sélection change bien le
+    // rendu. (Côté health, les 3 métriques gratuites partagent l'accent 'blue',
+    // d'où le passage par nutrition.) Les onglets premium déclencheraient le
+    // paywall (cf. tests de gating ci-dessous).
+    const initialNutritionColor = getLatestLineCharts()[2].data.datasets[0].color(1);
 
-    fireEvent.press(screen.getByTestId('analytics-health-metric-collagen'));
+    fireEvent.press(screen.getByTestId('analytics-nutrition-metric-calories'));
 
-    const updatedHealthColor = getLatestLineCharts()[0].data.datasets[0].color(1);
+    const updatedNutritionColor = getLatestLineCharts()[2].data.datasets[0].color(1);
 
-    expect(updatedHealthColor).not.toBe(initialHealthColor);
-    expect(updatedHealthColor).toBe(getLatestLineCharts()[0].chartConfig.color(1));
+    expect(updatedNutritionColor).not.toBe(initialNutritionColor);
+    expect(updatedNutritionColor).toBe(getLatestLineCharts()[2].chartConfig.color(1));
+  });
+
+  describe('premium metric gating', () => {
+    it('does not switch metric when a free user taps a locked health metric (collagen)', () => {
+      mockUseAnalytics.mockImplementation((period: string) => makeQueryState(period));
+
+      render(<AnalyticsScreen />);
+
+      const initialHealthColor = getLatestLineCharts()[0].data.datasets[0].color(1);
+
+      fireEvent.press(screen.getByTestId('analytics-health-metric-collagen'));
+
+      // La métrique sélectionnée ne doit pas changer (toujours 'score' par défaut).
+      const updatedHealthColor = getLatestLineCharts()[0].data.datasets[0].color(1);
+      expect(updatedHealthColor).toBe(initialHealthColor);
+    });
+
+    it('does not switch metric when a free user taps a locked body metric (body_fat)', () => {
+      mockUseAnalytics.mockImplementation((period: string) => makeQueryState(period));
+
+      render(<AnalyticsScreen />);
+
+      const initialBodyColor = getLatestLineCharts()[1].data.datasets[0].color(1);
+
+      fireEvent.press(screen.getByTestId('analytics-body-metric-body_fat'));
+
+      const updatedBodyColor = getLatestLineCharts()[1].data.datasets[0].color(1);
+      expect(updatedBodyColor).toBe(initialBodyColor);
+    });
+
+    it('does not switch metric when a free user taps a locked nutrition metric (satiety)', () => {
+      mockUseAnalytics.mockImplementation((period: string) => makeQueryState(period));
+
+      render(<AnalyticsScreen />);
+
+      const initialNutritionColor = getLatestLineCharts()[2].data.datasets[0].color(1);
+
+      fireEvent.press(screen.getByTestId('analytics-nutrition-metric-satiety'));
+
+      const updatedNutritionColor = getLatestLineCharts()[2].data.datasets[0].color(1);
+      expect(updatedNutritionColor).toBe(initialNutritionColor);
+    });
+
+    it('shows the premium paywall when a free user taps a locked metric', () => {
+      mockUseAnalytics.mockImplementation((period: string) => makeQueryState(period));
+
+      render(<AnalyticsScreen />);
+
+      fireEvent.press(screen.getByTestId('analytics-health-metric-collagen'));
+
+      expect(screen.getByText('Suivez votre progression santé')).toBeTruthy();
+      expect(
+        screen.getByText(
+          'Débloquez les graphiques 3 mois et 1 an pour suivre votre évolution complète.',
+        ),
+      ).toBeTruthy();
+    });
+
+    it('lets a premium user switch to a locked health metric (collagen)', () => {
+      mockUseAuth.mockReturnValue({
+        userProfile: { account_tier: 'premium' },
+      });
+      mockUseAnalytics.mockImplementation((period: string) => makeQueryState(period));
+
+      render(<AnalyticsScreen />);
+
+      const initialHealthColor = getLatestLineCharts()[0].data.datasets[0].color(1);
+
+      fireEvent.press(screen.getByTestId('analytics-health-metric-collagen'));
+
+      const updatedHealthColor = getLatestLineCharts()[0].data.datasets[0].color(1);
+      expect(updatedHealthColor).not.toBe(initialHealthColor);
+    });
+
+    it('lets a premium user switch to a locked body metric (body_fat)', () => {
+      mockUseAuth.mockReturnValue({
+        userProfile: { account_tier: 'premium' },
+      });
+      mockUseAnalytics.mockImplementation((period: string) => makeQueryState(period));
+
+      render(<AnalyticsScreen />);
+
+      const initialBodyColor = getLatestLineCharts()[1].data.datasets[0].color(1);
+
+      fireEvent.press(screen.getByTestId('analytics-body-metric-body_fat'));
+
+      const updatedBodyColor = getLatestLineCharts()[1].data.datasets[0].color(1);
+      expect(updatedBodyColor).not.toBe(initialBodyColor);
+    });
+
+    it('lets a premium user switch to a locked nutrition metric (satiety)', () => {
+      mockUseAuth.mockReturnValue({
+        userProfile: { account_tier: 'premium' },
+      });
+      mockUseAnalytics.mockImplementation((period: string) => makeQueryState(period));
+
+      render(<AnalyticsScreen />);
+
+      const initialNutritionColor = getLatestLineCharts()[2].data.datasets[0].color(1);
+
+      fireEvent.press(screen.getByTestId('analytics-nutrition-metric-satiety'));
+
+      const updatedNutritionColor = getLatestLineCharts()[2].data.datasets[0].color(1);
+      expect(updatedNutritionColor).not.toBe(initialNutritionColor);
+    });
   });
 
   it('changes period when free period button is pressed', () => {

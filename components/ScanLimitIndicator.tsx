@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Gift } from 'lucide-react-native';
 import { ScanEligibilityResponse } from '@/types';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -29,6 +30,7 @@ function parseTimestampMs(value: number | string | undefined): number | undefine
 
 export function ScanLimitIndicator({
   eligibility,
+  isPremium,
   onLimitReachedPress,
   onTimerComplete,
 }: ScanLimitIndicatorProps) {
@@ -58,19 +60,37 @@ export function ScanLimitIndicator({
     parseTimestampMs(eligibility.next_available_date);
   const showRechargeTimer = limit > 0 && !hasRemainingScans && !!nextRechargeAt;
 
+  // Crédits "welcome" : bonus gratuits offerts à l'inscription. Affichés en
+  // parité avec le Scanner (badge Gift vert) pour que l'utilisateur sache
+  // qu'il a des scans gratuits supplémentaires en plus du quota régulier.
+  const welcomeCredits =
+    typeof eligibility.welcome_credits === 'number'
+      ? Math.max(0, eligibility.welcome_credits)
+      : typeof eligibility.remaining_welcome_credits === 'number'
+        ? Math.max(0, eligibility.remaining_welcome_credits)
+        : 0;
+  const showWelcomeBadge = welcomeCredits > 0 && !isPremium;
+
 
   return (
     <View style={styles.container}>
-      {hasRemainingScans ? (
-        <View style={styles.countContainer}>
-          {/* Affiche les scans DISPONIBLES / limite totale */}
-          <Text style={[styles.countText, isLimitReached && styles.countTextDisabled]}>
-            {remaining}
-          </Text>
-          <Text style={styles.countSeparator}>/</Text>
-          <Text style={styles.limitText}>{limit}</Text>
-        </View>
-      ) : null}
+      {/*
+       * Compteur "remaining/limit" affiché EN PERMANENCE.
+       * Auparavant masqué quand le quota était épuisé, ce qui rendait l'état
+       * "0/1 + cooldown" illisible (audit 2026-05). Maintenant on le garde
+       * en muet quand isLimitReached pour que l'utilisateur voie clairement
+       * "0/1" + le timer en-dessous.
+       */}
+      <View style={styles.countContainer} testID="scan-limit-count">
+        <Text
+          style={[styles.countText, isLimitReached && styles.countTextDisabled]}
+          testID="scan-limit-remaining"
+        >
+          {remaining}
+        </Text>
+        <Text style={styles.countSeparator}>/</Text>
+        <Text style={styles.limitText}>{limit}</Text>
+      </View>
 
       <View style={styles.progressContainer}>
         <Squircle style={styles.progressBar}>
@@ -84,30 +104,46 @@ export function ScanLimitIndicator({
         </Squircle>
       </View>
 
+      {showWelcomeBadge ? (
+        <View style={styles.welcomeBadge} testID="scan-limit-welcome">
+          <Gift color={colors.success} size={10} strokeWidth={2} />
+          <Text style={styles.welcomeBadgeText}>+{welcomeCredits}</Text>
+        </View>
+      ) : null}
+
       {showRechargeTimer ? (
-        <View style={styles.statusTimerContainer}>
+        <View style={styles.statusTimerContainer} testID="scan-limit-cooldown">
           <NextScanTimer
             nextAvailableDate={nextRechargeAt}
             scanLabel={t('scan_limit.next_scan_in')}
             textColor={colors.gray}
             iconColor={colors.gray}
-            mode="scannerCompact"
+            mode="homeCompact"
             serverClockOffsetMs={eligibility.server_clock_offset_ms}
             padHours
             onTimerComplete={onTimerComplete}
           />
         </View>
       ) : isLimitReached && onLimitReachedPress ? (
-        <TouchableOpacity onPress={onLimitReachedPress} activeOpacity={0.7} style={styles.statusButton}>
+        <TouchableOpacity
+          onPress={onLimitReachedPress}
+          activeOpacity={0.7}
+          style={styles.statusButton}
+          testID="scan-limit-upgrade"
+        >
           <Text
             style={[styles.statusText, { color: colors.primary, textDecorationLine: 'underline' }]}
-            numberOfLines={1}
+            numberOfLines={2}
           >
             {t('scan_limit.upgrade')}
           </Text>
         </TouchableOpacity>
       ) : (
-        <Text style={[styles.statusText, isLimitReached && styles.statusTextDisabled]} numberOfLines={1}>
+        <Text
+          style={[styles.statusText, isLimitReached && styles.statusTextDisabled]}
+          numberOfLines={2}
+          testID="scan-limit-status"
+        >
           {isLimitReached ? t('scan_limit.limit_reached') : t('scan_limit.available')}
         </Text>
       )}
@@ -183,5 +219,21 @@ const createStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
     width: '100%',
     minWidth: 0,
+  },
+  welcomeBadge: {
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: SPACING.xs,
+    paddingVertical: 2,
+    borderRadius: 9999,
+    backgroundColor: 'rgba(34, 197, 94, 0.12)',
+    marginBottom: SPACING.xs,
+  },
+  welcomeBadgeText: {
+    fontSize: SIZES.text10,
+    fontWeight: FONT_WEIGHTS.semiBold,
+    color: colors.success,
   },
 });

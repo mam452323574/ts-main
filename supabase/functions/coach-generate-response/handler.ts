@@ -4,8 +4,10 @@ import {
   validateCorsOrigin,
 } from '../_shared/cors.ts';
 import {
+  buildInsufficientDataCoachResponseEntryValues,
   buildInvalidCoachResponseEntryValues,
   buildReadyCoachEntryValues,
+  COACH_INSUFFICIENT_DATA_ERROR_CODE,
   INVALID_COACH_RESPONSE_ERROR_CODE,
   resolveCoachPayload,
 } from '../_shared/coachPayload.ts';
@@ -19,9 +21,12 @@ import {
 import {
   attachCoachQuotaEvent,
   buildCoachQuotaErrorDetails,
+  coachQuotaBucketForSource,
   COACH_QUOTA_EXHAUSTED_ERROR_CODE,
+  type CoachQuotaSource,
+  projectCoachQuotaForSource,
   reserveCoachQuota,
-  refundCoachQuotaEvent,
+  refundCoachQuotaEventWithRetry,
   type CoachQuotaStatus,
 } from '../_shared/coachQuota.ts';
 import { createServiceRoleClient, requireAuthenticatedUser } from '../_shared/phase2Auth.ts';
@@ -36,6 +41,7 @@ import {
 import {
   createRequestId,
   logPhase2Error,
+  logPhase2Info,
   summarizeProviderPayload,
   summarizeWebhookResult,
 } from '../_shared/phase2Observability.ts';
@@ -52,6 +58,10 @@ import {
   resolveCoachQuestionSelection,
 } from '../../../shared/coachQuestions.ts';
 import { normalizeCoachGenerationPromptType } from '../../../shared/coachPromptTypes.ts';
+import {
+  COACH_RESPONSE_FORMAT_INSTRUCTIONS,
+  applyResponseFormatToPersona,
+} from '../../../shared/coachResponseFormatRules.ts';
 import type {
   CoachGenerateRequest,
   CoachGenerateResponse,
@@ -80,6 +90,25 @@ const MEDICAL_REFERRAL_PROMPT_PREFIX =
   '(3) keep general wellness suggestions short and conservative, ' +
   '(4) never minimize the signal, never claim certainty about diagnosis. ' +
   'Begin your reply with a clear referral statement before any other content. ';
+
+/**
+ * Suffixe append au tone_instructions persona pour cadrer le FORMAT de la
+ * reponse coach. Aligne avec les nouvelles questions plus attractives
+ * (top 3, action n°1, 10 min, ce soir, plan 24h) sans modifier le workflow n8n.
+ *
+ * Pourquoi append et pas prepend :
+ *  - L'urgency override (MEDICAL_REFERRAL_PROMPT_PREFIX) doit rester en tete
+ *    pour que le LLM le lise en priorite.
+ *  - Le ton du persona doit rester intact (warmth, strictness, etc.).
+ *  - Les regles de format viennent en dernier comme un rappel structurel.
+ *
+ * Note : ces regles sont des HINTS pour le LLM. Le rendu final depend du
+ * workflow n8n + du parser cote handler (`resolveCoachPayload`). Si le LLM
+ * ignore les hints, la reponse reste fonctionnelle (juste moins structuree).
+ */
+// Re-export pour préserver la surface API actuelle (le handler exposait ces
+// symboles avant le refactor vers `shared/coachResponseFormatRules.ts`).
+export { COACH_RESPONSE_FORMAT_INSTRUCTIONS, applyResponseFormatToPersona };
 
 function hasUrgencySignal(payload: unknown): boolean {
   if (!payload || typeof payload !== 'object') return false;
@@ -125,7 +154,7 @@ type CoachPromptTypeValue = NonNullable<
   ReturnType<typeof normalizeCoachGenerationPromptType>
 >;
 
-export const COACH_GENERATE_REQUEST_MAX_BYTES = 64 * 1024;
+export const COACH_GENERATE_REQUEST_MAX_BYTES = 256 * 1024;
 
 // Rate limit defaults for coach generation (C-01 of COACH_SECURITY_AUDIT).
 // Tuned conservatively: a typical session triggers 1-3 generations, so 5/min
@@ -203,6 +232,12 @@ interface RunPendingCoachGenerationTaskOptions {
   // refund this event so the user is not charged for an unusable response.
   // Optional so existing tests (which never debited a quota) keep compiling.
   usageEventId?: string | null;
+  // Diagnostic context preserved across retries: when the request's upsert
+  // overwrote an existing errored entry (same user_id + cache_key), the prior
+  // error_code/updated_at are captured here so the eventual finalize (ready or
+  // error) can merge them into response_payload_json. Without this the retry
+  // wipes the original error and makes incident triage impossible.
+  previousErrorContext?: Record<string, unknown> | null;
 }
 
 interface CoachWebhookInvalidResponseMetadata {
@@ -361,12 +396,22 @@ function coachPayloadHasUsableScan(payload: Record<string, unknown>) {
   return !!byType && Object.values(byType).some(hasRecordValue);
 }
 
-function throwCoachQuotaExhausted(quota: CoachQuotaStatus): never {
+function throwCoachQuotaExhausted(
+  quota: CoachQuotaStatus,
+  source: CoachQuotaSource,
+): never {
+  // The reserved quota snapshot has top-level fields that mirror the GENERAL
+  // bucket (legacy contract). When the exhaustion is on the scan_cta bucket
+  // we project the snapshot so `available` and `next_recharge_at` reflect the
+  // bucket the user actually tried to hit — otherwise the 24h countdown shown
+  // by the UI would be misleading (it could even be `null` if general still
+  // has slots left while scan_cta is exhausted).
+  const projected = projectCoachQuotaForSource(quota, source);
   throw new Phase2HttpError(
     429,
     COACH_QUOTA_EXHAUSTED_ERROR_CODE,
     'Coach quota exhausted',
-    buildCoachQuotaErrorDetails(quota),
+    buildCoachQuotaErrorDetails(projected, source),
   );
 }
 
@@ -376,7 +421,7 @@ async function attachCoachQuotaEventBestEffort(
     usageEventId: string | null;
     userId: string;
     coachEntryId: string;
-    source: 'coach_generation' | 'coach_cache';
+    source: CoachQuotaSource;
     requestId: string;
   },
 ) {
@@ -390,6 +435,66 @@ async function attachCoachQuotaEventBestEffort(
   }
 }
 
+// Returns true when the incoming Coach generation request originates from a
+// scanner result CTA (i.e. payload.scan_intent is a populated object). This
+// drives bucket selection — scan_cta vs general — so the two flows do not
+// share a single counter. Free users get 1+1, premium 8+8, admin unlimited.
+function isCoachScanCtaRequest(payload: unknown): boolean {
+  return isRecord(payload) && isRecord((payload as Record<string, unknown>).scan_intent);
+}
+
+function pickCoachQuotaSource(
+  payload: unknown,
+  kind: 'generation' | 'cache',
+): CoachQuotaSource {
+  const scanCta = isCoachScanCtaRequest(payload);
+  if (kind === 'generation') {
+    return scanCta ? 'coach_scan_cta_generation' : 'coach_generation';
+  }
+  return scanCta ? 'coach_scan_cta_cache' : 'coach_cache';
+}
+
+// Single structured log line emitted right after the bucket decision so we
+// can quantify, in production logs, the split between general vs scan_cta
+// flows and correlate quota exhaustion / refund events with the request that
+// caused them. Kept minimal (no payload echoes) so it stays under the
+// SENSITIVE_KEY_PATTERN guards and never carries scan content.
+function logCoachQuotaDecision(options: {
+  requestId: string;
+  source: CoachQuotaSource;
+  payload: unknown;
+  kind: 'generation' | 'cache';
+}) {
+  const promptType =
+    isRecord(options.payload) &&
+    typeof (options.payload as Record<string, unknown>).prompt_type === 'string'
+      ? ((options.payload as Record<string, unknown>).prompt_type as string)
+      : null;
+  logPhase2Info('[coach-generate-response] quota-decision', {
+    request_id: options.requestId,
+    quota_source: options.source,
+    quota_bucket: coachQuotaBucketForSource(options.source),
+    quota_kind: options.kind,
+    has_scan_intent: isCoachScanCtaRequest(options.payload),
+    prompt_type: promptType,
+  });
+}
+
+function buildPreviousErrorContext(
+  existingEntry:
+    | { status?: unknown; error_code?: unknown; updated_at?: unknown }
+    | null
+    | undefined,
+): Record<string, unknown> | null {
+  if (!existingEntry || existingEntry.status !== 'error') return null;
+  const previousErrorCode = readOptionalString(existingEntry.error_code);
+  if (!previousErrorCode) return null;
+  return {
+    previous_error_code: previousErrorCode,
+    previous_errored_at: readOptionalString(existingEntry.updated_at) ?? null,
+  };
+}
+
 function resolveCoachBackgroundErrorCode(error: unknown) {
   if (error instanceof Phase2HttpError) {
     if (error.code === COACH_RESPONSE_TOO_LARGE_ERROR_CODE) {
@@ -398,6 +503,10 @@ function resolveCoachBackgroundErrorCode(error: unknown) {
 
     if (error.code === INVALID_COACH_RESPONSE_ERROR_CODE) {
       return INVALID_COACH_RESPONSE_ERROR_CODE;
+    }
+
+    if (error.code === COACH_INSUFFICIENT_DATA_ERROR_CODE) {
+      return COACH_INSUFFICIENT_DATA_ERROR_CODE;
     }
 
     if (error.code) {
@@ -585,6 +694,60 @@ export async function runPendingCoachGenerationTask(
     usageEventId,
   } = options;
 
+  let usedFallback = false;
+
+  let webhookResult: Awaited<
+    ReturnType<typeof postCoachGenerateWebhook>
+  >['webhookResult'];
+  let terminalEntryWritten = false;
+  const previousErrorContext = options.previousErrorContext ?? null;
+  const decoratePayload = (
+    payload: Record<string, unknown>,
+  ): Record<string, unknown> =>
+    previousErrorContext ? { ...payload, ...previousErrorContext } : payload;
+  const markPendingEntryError = async (values: {
+    status: 'error';
+    error_code: string;
+    response_payload_json: Record<string, unknown>;
+  }) => {
+    // Refund the credit when the background task cannot produce useful
+    // coaching for the user before clients can observe the terminal failure.
+    // The refund is retried a few times with short backoff to ride out
+    // transient DB contention. On final failure, emit a CRITICAL log so ops
+    // can spot leaked credits — the entry is still flipped to `error` so the
+    // user never gets stuck on a permanently-pending state.
+    if (usageEventId) {
+      const refundResult = await refundCoachQuotaEventWithRetry(client, {
+        usageEventId,
+        userId,
+        reason: values.error_code,
+      });
+      if (!refundResult.success) {
+        logPhase2Error(
+          '[coach-generate-response][CRITICAL] Failed to refund quota after retries',
+          refundResult.lastError,
+          {
+            request_id: requestId,
+            user_id: userId,
+            entry_id: pendingEntry.id,
+            usage_event_id: usageEventId,
+            error_code: values.error_code,
+            attempt_count: refundResult.attempts,
+          },
+        );
+      }
+    }
+
+    await updateCoachEntryToError(client, pendingEntry.id, {
+      ...values,
+      response_payload_json: decoratePayload(values.response_payload_json),
+    });
+    terminalEntryWritten = true;
+  };
+
+  // Toute operation post-reservation doit terminer l'entree et rembourser le
+  // quota en cas d'echec, y compris la preparation du payload.
+  try {
   // CO-05 — flag observable cote n8n pour declencher un disclaimer renforce.
   // `persona.toneInstructions` est deja override (cf. applyUrgencyOverrideToPersona)
   // donc le LLM coach voit le prefix medical en tete du tone meme si n8n
@@ -609,49 +772,15 @@ export async function runPendingCoachGenerationTask(
     ...(urgencyMode ? { urgency_mode: true, force_disclaimer: true } : {}),
   };
 
-  let usedFallback = false;
-
-  let webhookResult: Awaited<
-    ReturnType<typeof postCoachGenerateWebhook>
-  >['webhookResult'];
-  let terminalEntryWritten = false;
-  const markPendingEntryError = async (values: {
-    status: 'error';
-    error_code: string;
-    response_payload_json: Record<string, unknown>;
-  }) => {
-    await updateCoachEntryToError(client, pendingEntry.id, values);
-    terminalEntryWritten = true;
-    // Refund the credit when the background task cannot produce useful
-    // coaching for the user. Best-effort: failure to refund must not mask the
-    // original error (the user already sees the front-end error message).
-    if (usageEventId) {
-      try {
-        await refundCoachQuotaEvent(client, {
-          usageEventId,
-          userId,
-          reason: values.error_code,
-        });
-      } catch (refundError) {
-        logPhase2Error(
-          '[coach-generate-response] Failed to refund quota after background error',
-          refundError,
-          {
-            request_id: requestId,
-            entry_id: pendingEntry.id,
-            error_code: values.error_code,
-          },
-        );
-      }
-    }
-  };
-
   // CO-07 (cf. SCANNER_COACH_AUDIT_2026_05.md §6) — borne la taille du payload
   // OUTBOUND apres expansion serveur (la requete entrante est plafonnee a 64KB
   // mais le handler enrichit avec persona/contracts/etc, et le payload final
   // peut atteindre 100+ KB sur les cas pathologiques recent_scans=32 * digest
-  // complet). 50KB est confortable pour l'usage normal et borne les couts LLM.
-  const COACH_OUTBOUND_PAYLOAD_MAX_BYTES = 50 * 1024;
+  // complet). Cap bumpe a 1000KB (2026-05-20) suite aux 3 incidents
+  // `coach_payload_too_large` sur 24h : prior_scans + rich contexts depassent
+  // les 200KB precedents pour les super-users. 1000KB couvre le pire cas
+  // mesure et reste dans les limites raisonnables pour le LLM en aval.
+  const COACH_OUTBOUND_PAYLOAD_MAX_BYTES = 1000 * 1024;
   const serializedPayload = JSON.stringify(webhookPayload);
   const serializedPayloadBytes = serializedPayload.length;
   if (serializedPayloadBytes > COACH_OUTBOUND_PAYLOAD_MAX_BYTES) {
@@ -728,7 +857,6 @@ export async function runPendingCoachGenerationTask(
     );
   }
 
-  try {
   try {
     const webhookCall = await postCoachGenerateWebhook({
       endpoints: webhookEndpoints,
@@ -843,6 +971,21 @@ export async function runPendingCoachGenerationTask(
           responseBodyPresent: webhookResult.bodyPresent,
         }),
       );
+    } else if (
+      error instanceof Phase2HttpError &&
+      error.code === COACH_INSUFFICIENT_DATA_ERROR_CODE
+    ) {
+      // n8n could not produce a useful reply (LLM refusal or empty content
+      // fell back to a generic message). Treat as a non-consuming failure:
+      // markPendingEntryError refunds the quota event before persisting the
+      // error entry, so the user is not charged for a fabricated response.
+      await markPendingEntryError(
+        buildInsufficientDataCoachResponseEntryValues({
+          payload: webhookResult.payload,
+          usedFallback,
+          requestId,
+        }),
+      );
     }
 
     throw error;
@@ -855,18 +998,20 @@ export async function runPendingCoachGenerationTask(
     ).toISOString();
   const generatedAt = new Date().toISOString();
 
+  const readyValues = buildReadyCoachEntryValues({
+    payload: webhookResult.payload,
+    normalizedResponse,
+    locale: resolvedLocale,
+    usedFallback,
+    generatedAt,
+    expiresAt,
+  });
   const { data: finalEntry, error: finalEntryError } = await client
     .from('coach_entries')
-    .update(
-      buildReadyCoachEntryValues({
-        payload: webhookResult.payload,
-        normalizedResponse,
-        locale: resolvedLocale,
-        usedFallback,
-        generatedAt,
-        expiresAt,
-      }),
-    )
+    .update({
+      ...readyValues,
+      response_payload_json: decoratePayload(readyValues.response_payload_json),
+    })
     .eq('id', pendingEntry.id)
     .select('*')
     .single();
@@ -981,7 +1126,13 @@ export async function handleCoachGenerateResponseRequest(req: Request) {
     // CO-05 — applique l'override "medical referral" si un scan recent flagge
     // `urgency_flag=true` (cf. hasUrgencySignal).
     const urgencyDetected = hasUrgencySignal(requestBody.payload);
-    const persona = applyUrgencyOverrideToPersona(basePersona, urgencyDetected);
+    // Pipeline d'enrichissement du tone_instructions :
+    //   urgency (prepend)  →  persona base  →  format rules (append)
+    // Le format rules est append APRES l'urgency pour que le disclaimer
+    // medical reste en tete du system prompt vu par le LLM coach.
+    const persona = applyResponseFormatToPersona(
+      applyUrgencyOverrideToPersona(basePersona, urgencyDetected),
+    );
     const resolvedLocale = normalizeCoachLocale(requestBody.locale);
     const inputHash = await buildNormalizedPayloadHash(
       resolvedLocale
@@ -1014,21 +1165,28 @@ export async function handleCoachGenerateResponseRequest(req: Request) {
     }
 
     if (!requestBody.force_refresh && isFreshCoachEntry(existingEntry)) {
+      const cacheSource = pickCoachQuotaSource(requestBody.payload, 'cache');
+      logCoachQuotaDecision({
+        requestId,
+        source: cacheSource,
+        payload: requestBody.payload,
+        kind: 'cache',
+      });
       const quotaReservation = await reserveCoachQuota(supabase, {
         userId: user.id,
-        source: 'coach_cache',
+        source: cacheSource,
         requestId,
       });
 
       if (!quotaReservation.allowed) {
-        throwCoachQuotaExhausted(quotaReservation.quota);
+        throwCoachQuotaExhausted(quotaReservation.quota, cacheSource);
       }
 
       await attachCoachQuotaEventBestEffort(supabase, {
         usageEventId: quotaReservation.usage_event_id,
         userId: user.id,
         coachEntryId: existingEntry.id,
-        source: 'coach_cache',
+        source: cacheSource,
         requestId,
       });
 
@@ -1043,22 +1201,50 @@ export async function handleCoachGenerateResponseRequest(req: Request) {
       null,
       requestId,
     );
+    const generationSource = pickCoachQuotaSource(
+      requestBody.payload,
+      'generation',
+    );
+    logCoachQuotaDecision({
+      requestId,
+      source: generationSource,
+      payload: requestBody.payload,
+      kind: 'generation',
+    });
     const quotaReservation = await reserveCoachQuota(supabase, {
       userId: user.id,
-      source: 'coach_generation',
+      source: generationSource,
       requestId,
     });
 
     if (!quotaReservation.allowed) {
-      throwCoachQuotaExhausted(quotaReservation.quota);
+      throwCoachQuotaExhausted(quotaReservation.quota, generationSource);
     }
+
+    const previousErrorContext = buildPreviousErrorContext(existingEntry);
+
+    // Fix Bug B (2026-05-21) — quand force_refresh=true et qu'une entry ready
+    // existe deja avec ce cacheKey, l'UPSERT (onConflict: user_id,cache_key)
+    // ECRASE cette row en remettant status='pending', body=null, title=null.
+    // Si le background task echoue, l'utilisateur perd l'ancien conseil ET
+    // l'historique en perd la trace (puisqu'il lit la meme table). On evite
+    // ca en utilisant une cache_key unique pour la nouvelle row pending quand
+    // force_refresh est arme : l'INSERT cree une nouvelle ligne, l'ancienne
+    // entry ready reste intacte et reste visible dans l'historique meme si
+    // n8n echoue. Le cold-start suivant (sans force_refresh) recupere la
+    // derniere entry ready via fetchLatestReadyCoachEntry qui trie par
+    // generated_at desc — donc bien la nouvelle quand elle aura abouti.
+    const writeCacheKey =
+      requestBody.force_refresh && existingEntry?.status === 'ready'
+        ? `${cacheKey}__fr_${Date.now().toString(36)}_${crypto.randomUUID().slice(0, 8)}`
+        : cacheKey;
 
     const pendingValues = {
       user_id: user.id,
-      cache_key: cacheKey,
+      cache_key: writeCacheKey,
       input_hash: inputHash,
       request_payload_json: requestBody.payload,
-      response_payload_json: {},
+      response_payload_json: previousErrorContext ?? {},
       status: 'pending',
       error_code: null,
       source: 'n8n',
@@ -1094,17 +1280,22 @@ export async function handleCoachGenerateResponseRequest(req: Request) {
       .single();
 
     if (pendingEntryError || !pendingEntry) {
-      try {
-        await refundCoachQuotaEvent(supabase, {
-          usageEventId: quotaReservation.usage_event_id,
-          userId: user.id,
-          reason: 'coach_entry_upsert_failed',
-        });
-      } catch (refundError) {
+      const refundResult = await refundCoachQuotaEventWithRetry(supabase, {
+        usageEventId: quotaReservation.usage_event_id,
+        userId: user.id,
+        reason: 'coach_entry_upsert_failed',
+      });
+      if (!refundResult.success) {
         logPhase2Error(
-          '[coach-generate-response] Failed to refund quota after preparation error',
-          refundError,
-          { request_id: requestId },
+          '[coach-generate-response][CRITICAL] Failed to refund quota after retries',
+          refundResult.lastError,
+          {
+            request_id: requestId,
+            user_id: user.id,
+            usage_event_id: quotaReservation.usage_event_id,
+            error_code: 'coach_entry_upsert_failed',
+            attempt_count: refundResult.attempts,
+          },
         );
       }
 
@@ -1120,7 +1311,7 @@ export async function handleCoachGenerateResponseRequest(req: Request) {
       usageEventId: quotaReservation.usage_event_id,
       userId: user.id,
       coachEntryId: pendingEntry.id,
-      source: 'coach_generation',
+      source: generationSource,
       requestId,
     });
 
@@ -1128,7 +1319,7 @@ export async function handleCoachGenerateResponseRequest(req: Request) {
       client: supabase,
       featureFlags,
       userId: user.id,
-      cacheKey,
+      cacheKey: writeCacheKey,
       inputHash,
       requestBody,
       pendingEntry,
@@ -1137,6 +1328,7 @@ export async function handleCoachGenerateResponseRequest(req: Request) {
       persona,
       webhookEndpoints,
       usageEventId: quotaReservation.usage_event_id ?? null,
+      previousErrorContext,
     }).catch((error) => {
       logPhase2Error('[coach-generate-response] Background generation failed', error, {
         request_id: requestId,

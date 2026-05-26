@@ -282,9 +282,9 @@ When adoption reaches ≥99% and you're ready to actually close AUTH-VULN-01 + 0
 |---|-----------|-------|
 | S.2.1 | `20260520120000_admin_idempotency_keys.sql` | `admin_audit_events.idempotency_key` UNIQUE + RPC eradicate v2 |
 | S.2.2 | `20260521120000_clamp_social_admin_reaction_adjustments.sql` | CHECK constraint + clamp RPC adjust |
-| S.2.3 | `20260522120000_weighted_report_count.sql` | `compute_weighted_report_count` + table shadow (mode shadow, trigger inchangée) |
+| S.2.3 | `20260522121000_weighted_report_count.sql` | `compute_weighted_report_count` + table shadow (mode shadow, trigger inchangée) |
 | S.2.4 | `20260523120000_release_pending_social_upload_reservations.sql` | RPC purge reservations logout |
-| S.2.5 | `20260524130000_social_report_threshold_shadow_logging.sql` | Trigger modifiée pour log shadow (décision toujours raw) |
+| S.2.5 | `20260524131000_social_report_threshold_shadow_logging.sql` | Trigger modifiée pour log shadow (décision toujours raw) |
 | S.2.6 | `20260525120000_harden_social_feed_cursor.sql` | Helper `is_valid_social_feed_keyset_cursor` |
 | S.2.7 | `20260601120000_social_soft_delete_retention.sql` | RPC purge soft-delete + planification pg_cron (free plan → `RAISE WARNING` attendu) |
 
@@ -329,7 +329,7 @@ Couvre S-07, S-09, S-10, S-11, S-15. Tests S-08, S-12, S-18 à faire via SQL/obs
 
 ### Phase S.5 — Coordination n8n (avant retrait du kill-switch)
 
-Voir [n8n/SOCIAL_WEBHOOK_RESPONSE_SIGNING.md](n8n/SOCIAL_WEBHOOK_RESPONSE_SIGNING.md) pour le détail.
+Voir [n8n/WEBHOOK_RESPONSE_SIGNING.md](n8n/WEBHOOK_RESPONSE_SIGNING.md) pour le détail (renommé depuis SOCIAL_WEBHOOK_RESPONSE_SIGNING.md le 2026-05-19 — couvre désormais les 5 callers, pas que social) et [n8n/RESPONSE_SIGNING_REGISTRY.md](n8n/RESPONSE_SIGNING_REGISTRY.md) pour le statut par workflow.
 
 | # | Action | Qui |
 |---|--------|-----|

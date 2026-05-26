@@ -822,7 +822,7 @@ $$;
 
 Puis dans le trigger : utiliser `public.compute_weighted_report_count(...) >= 3` au lieu du COUNT DISTINCT.
 
-**Statut :** ✅ Livré en shadow mode 2026-05-19 (Wave 3, PR #14). Migration [20260522120000_weighted_report_count.sql](supabase/migrations/20260522120000_weighted_report_count.sql) ajoute la fonction SQL `compute_weighted_report_count` avec les coefficients (compte <1j=0.25, <7j=0.5, dismissed≥10=0.25, sinon 1.0) + table `social_report_threshold_shadow` pour logger pendant 7+ jours raw vs weighted. **La trigger `apply_social_report_thresholds` n'est PAS encore basculée** : activation à faire dans une migration ultérieure après validation produit des coefficients via analyse du log shadow.
+**Statut :** ✅ Livré en shadow mode 2026-05-19 (Wave 3, PR #14). Migration [20260522121000_weighted_report_count.sql](supabase/migrations/20260522121000_weighted_report_count.sql) ajoute la fonction SQL `compute_weighted_report_count` avec les coefficients (compte <1j=0.25, <7j=0.5, dismissed≥10=0.25, sinon 1.0) + table `social_report_threshold_shadow` pour logger pendant 7+ jours raw vs weighted. **La trigger `apply_social_report_thresholds` n'est PAS encore basculée** : activation à faire dans une migration ultérieure après validation produit des coefficients via analyse du log shadow.
 
 ---
 
@@ -1204,7 +1204,7 @@ SELECT public.set_social_post_admin_reaction_adjustments(
 - [x] `components/social/admin/adminModerationUtils.ts` (S-15 UI bounds) — 2026-05-19
 - [x] `supabase/functions/_shared/cors.ts` (S-10 null Origin + S-11 case-insensitive) — 2026-05-19
 - [x] `supabase/functions/_shared/cors.test.ts` (S-10 + S-11 tests, nouveau) — 2026-05-19
-- [x] `supabase/migrations/20260522120000_weighted_report_count.sql` (S-12 shadow) — 2026-05-19
+- [x] `supabase/migrations/20260522121000_weighted_report_count.sql` (S-12 shadow) — 2026-05-19
 - [x] `supabase/migrations/20260523120000_release_pending_social_upload_reservations.sql` (S-14) — 2026-05-19
 - [x] `supabase/migrations/20260525120000_harden_social_feed_cursor.sql` (S-16 helper) — 2026-05-19
 - [x] `supabase/migrations/20260601120000_social_soft_delete_retention.sql` (S-18) — 2026-05-19

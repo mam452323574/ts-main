@@ -75,11 +75,16 @@ export function ResultPillBadge({
       ? isDark
         ? withAlpha(colors.white, 0.82)
         : mixColors(colors.primaryText, colors.gray, 0.22)
-      : mixColors(
-          resolvedAccent,
-          colors.primaryText,
-          isDark ? 0.08 : 0.18,
-        );
+      : variant === 'premium'
+        ? // Inversion du mélange : majorité `primaryText`, simple teinte
+          // dorée. Évite le précédent or-sur-or (contraste ~2:1) tout en
+          // gardant un soupçon de chaleur premium dans le texte.
+          mixColors(colors.primaryText, resolvedAccent, isDark ? 0.18 : 0.22)
+        : mixColors(
+            resolvedAccent,
+            colors.primaryText,
+            isDark ? 0.08 : 0.18,
+          );
 
   return (
     <View

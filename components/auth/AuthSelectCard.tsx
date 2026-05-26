@@ -5,13 +5,11 @@ import { Check } from 'lucide-react-native';
 import {
   BORDER_RADIUS,
   FONT_FAMILIES,
-  SHADOWS,
   SIZES,
   SPACING,
   withAlpha,
 } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useAuthPalette } from '@/components/auth/tokens';
 import { Squircle } from '@/components/Squircle';
 
 interface AuthSelectCardProps {
@@ -34,11 +32,7 @@ export function AuthSelectCard({
   disabled,
 }: AuthSelectCardProps) {
   const { colors } = useTheme();
-  const palette = useAuthPalette();
-  const styles = useMemo(
-    () => createStyles(colors, palette),
-    [colors, palette],
-  );
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   return (
     <TouchableOpacity
@@ -55,64 +49,58 @@ export function AuthSelectCard({
         {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       </View>
       <View style={[styles.checkSlot, selected && styles.checkSlotSelected]}>
-        {selected ? <Check color={colors.primaryText} size={22} /> : null}
+        {selected ? <Check color={colors.white} size={18} /> : null}
       </View>
     </TouchableOpacity>
   );
 }
 
-const createStyles = (colors: any, palette: ReturnType<typeof useAuthPalette>) =>
+const createStyles = (colors: any) =>
   StyleSheet.create({
     card: {
-      minHeight: 108,
+      minHeight: 78,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: SPACING.lg,
-      paddingHorizontal: SPACING.lg,
-      paddingVertical: SPACING.lg,
-      borderRadius: BORDER_RADIUS.hero,
-      backgroundColor: palette.surfaceGlass,
+      gap: SPACING.md,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.md,
+      borderRadius: BORDER_RADIUS.xl,
+      backgroundColor: colors.cardBackground,
       borderWidth: 1,
-      borderColor: palette.secondaryActionBorder,
-      ...SHADOWS.soft,
-      shadowColor: palette.shadowColor,
-      shadowOpacity: 0.07,
-      shadowRadius: 14,
-      shadowOffset: { width: 0, height: 6 },
-      elevation: 2, borderCurve: 'continuous',
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderCurve: 'continuous',
     },
     cardSelected: {
-      borderColor: palette.accentRing,
-      backgroundColor: palette.surfaceStrong,
-      shadowColor: palette.accentRing,
-      shadowOpacity: 0.12,
+      borderColor: withAlpha(colors.primary, 0.52),
+      backgroundColor: colors.primaryLight,
     },
     cardDisabled: {
       opacity: 0.5,
     },
     visual: {
-      width: 60,
-      height: 60,
-      borderRadius: 30,
+      width: 48,
+      height: 48,
+      borderRadius: 24,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: palette.accentSofter,
+      backgroundColor: colors.surfaceMuted ?? colors.cardBackground,
       borderWidth: 1,
-      borderColor: withAlpha(palette.accentRing, 0.16), borderCurve: 'continuous',
+      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
+      borderCurve: 'continuous',
     },
     copy: {
       flex: 1,
       gap: 4,
     },
     title: {
-      fontSize: SIZES.lg,
+      fontSize: SIZES.md,
       fontFamily: FONT_FAMILIES.display,
       color: colors.primaryText,
       letterSpacing: -0.2,
     },
     subtitle: {
-      fontSize: SIZES.text14,
-      lineHeight: 20,
+      fontSize: SIZES.text12,
+      lineHeight: 18,
       color: withAlpha(colors.gray, 0.96),
     },
     checkSlot: {
@@ -123,6 +111,6 @@ const createStyles = (colors: any, palette: ReturnType<typeof useAuthPalette>) =
       justifyContent: 'center', borderCurve: 'continuous',
     },
     checkSlotSelected: {
-      backgroundColor: palette.accentSoft,
+      backgroundColor: colors.primary,
     },
   });

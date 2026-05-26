@@ -167,7 +167,9 @@ describe('CoachPromptCard', () => {
     expect(selectorArtworkFrameStyle.backgroundColor).toBeUndefined();
     expect(selectorArtworkFrameStyle.height).toBe(142);
     expect(selectorArtwork).toBeTruthy();
-    expect(selectorArtworkStyle.transform).toEqual([{ scale: 1.06 }]);
+    // `latest_scan` declares `crop: { imageScale: 1.1 }` to give the centred
+    // compass artwork more presence inside the frame.
+    expect(selectorArtworkStyle.transform).toEqual([{ scale: 1.1 }]);
     expect(screen.queryByTestId('coach-prompt-selector-subtitle-chevron')).toBeNull();
   });
 

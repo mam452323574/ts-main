@@ -4,9 +4,14 @@ import type { ThemeType } from '@/constants/theme';
 
 export type PreAuthOnboardingStep =
   | 'intro'
-  | 'profile'
-  | 'account'
+  | 'username'
+  | 'avatar'
+  | 'appearance'
+  | 'accountMethod'
+  | 'emailCredentials'
   | 'verification';
+
+export type PreAuthCompletionIntent = 'signup-email' | 'signup-google';
 
 export interface PreAuthOnboardingDraft {
   selectedTheme: ThemeType | null;
@@ -15,6 +20,7 @@ export interface PreAuthOnboardingDraft {
   avatarSkipped: boolean;
   email: string;
   createdUserId: string | null;
+  completionIntent: PreAuthCompletionIntent | null;
   lastStep: PreAuthOnboardingStep;
 }
 
@@ -27,13 +33,17 @@ const DEFAULT_PRE_AUTH_ONBOARDING_DRAFT: PreAuthOnboardingDraft = {
   avatarSkipped: false,
   email: '',
   createdUserId: null,
+  completionIntent: null,
   lastStep: 'intro',
 };
 
 const VALID_STEPS: ReadonlySet<string> = new Set([
   'intro',
-  'profile',
-  'account',
+  'username',
+  'avatar',
+  'appearance',
+  'accountMethod',
+  'emailCredentials',
   'verification',
 ]);
 
@@ -50,6 +60,10 @@ function readTheme(value: unknown): ThemeType | null {
   return value === 'light' || value === 'dark' ? value : null;
 }
 
+function readCompletionIntent(value: unknown): PreAuthCompletionIntent | null {
+  return value === 'signup-email' || value === 'signup-google' ? value : null;
+}
+
 function readStep(value: unknown): PreAuthOnboardingStep {
   if (typeof value !== 'string') {
     return 'intro';
@@ -61,10 +75,15 @@ function readStep(value: unknown): PreAuthOnboardingStep {
 
   switch (value) {
     case 'theme':
-      return 'intro';
+      return 'appearance';
     case 'username':
+      return 'username';
     case 'avatar':
-      return 'profile';
+      return 'avatar';
+    case 'profile':
+      return 'username';
+    case 'account':
+      return 'accountMethod';
     default:
       return 'intro';
   }
@@ -85,6 +104,7 @@ export function sanitizePreAuthOnboardingDraft(
     avatarSkipped: record.avatarSkipped === true,
     email: readString(record.email),
     createdUserId: readOptionalString(record.createdUserId),
+    completionIntent: readCompletionIntent(record.completionIntent),
     lastStep: readStep(record.lastStep),
   };
 }

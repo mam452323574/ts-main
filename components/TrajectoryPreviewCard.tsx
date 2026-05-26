@@ -314,9 +314,15 @@ export function TrajectoryPreviewCard({
             mixColors(colors.gold, colors.white, 0.24),
             mixColors(colors.warning, colors.gold, 0.58),
           ] as const));
-  const ctaTextColor = isSuperScanPremium
-    ? mixColors(colors.primaryText, colors.warning, isDark ? 0.58 : 0.76)
-    : mixColors(colors.primaryText, colors.warning, isDark ? 0.66 : 0.82);
+  // Texte du CTA "Projection 30 jours".
+  // AVANT : un mélange `primaryText`/`warning` (66-82 %) qui produisait un
+  // brun-doré quasi indiscernable du dégradé or de fond → contraste ~2:1.
+  // APRÈS : on force un foreground **sombre** (presque noir) dans les deux
+  // modes, qui contraste à >7:1 avec n'importe quel dégradé or chaud tout
+  // en gardant le rendu "noir sur or" caractéristique d'un CTA premium.
+  // - En dark mode, `colors.background` est sombre → utilisé directement.
+  // - En light mode, `colors.primaryText` est sombre → utilisé directement.
+  const ctaTextColor = isDark ? colors.background : colors.primaryText;
 
   return (
     <Squircle style={styles.shell} testID="trajectory-preview-card">

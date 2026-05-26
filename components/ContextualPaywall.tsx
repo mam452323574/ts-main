@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Modal, Platform, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Check, Crown, Sparkles, X } from 'lucide-react-native';
+import { Check, Crown, X } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import {
   BORDER_RADIUS,
@@ -94,11 +94,11 @@ export const ContextualPaywall: React.FC<ContextualPaywallProps> = ({
 
                 <View style={styles.heroWrap}>
                   <Squircle style={styles.iconContainer}>
-                    {icon || <Crown color={colors.gold} size={31} />}
+                    {icon || <Crown color={colors.gold} size={32} />}
                   </Squircle>
-                  {badgeIcon !== null ? (
+                  {badgeIcon ? (
                     <Squircle style={styles.sparkleBadge} testID="contextual-paywall-badge">
-                      {badgeIcon ?? <Sparkles color={colors.gold} size={14} />}
+                      {badgeIcon}
                     </Squircle>
                   ) : null}
                 </View>
@@ -140,6 +140,7 @@ export const ContextualPaywall: React.FC<ContextualPaywallProps> = ({
                       title={primaryButtonText || defaultPrimaryText}
                       onPress={handlePrimaryPress}
                       variant="premium"
+                      flat
                     />
                   </View>
                   <TouchableOpacity onPress={onClose} style={styles.secondaryButton}>
@@ -175,24 +176,24 @@ const createStyles = (
         accentColor: colors.primary,
         shadowColor: colors.gray,
         backgroundAlpha: 0.04,
-        borderAlpha: 0.12,
-        overlayAlpha: 0.08,
-        shadowOpacity: 0.12,
-        shadowRadius: 20,
-        shadowOffsetY: 10,
-        elevation: 8,
+        borderAlpha: 0.08,
+        overlayAlpha: 0.04,
+        shadowOpacity: 0.04,
+        shadowRadius: 10,
+        shadowOffsetY: 4,
+        elevation: 1,
       })
     : null;
   const obsidianSurface = isDark
     ? getObsidianSurface(colors, {
         accentColor: colors.gold,
-        intensity: 'premium',
-        backgroundAlpha: 0.08,
-        borderAlpha: 0.26,
-        shadowOpacity: 0.24,
-        shadowRadius: 30,
-        shadowOffsetY: 14,
-        elevation: 10,
+        intensity: 'flat',
+        backgroundAlpha: 0.025,
+        borderAlpha: 0.12,
+        shadowOpacity: 0.06,
+        shadowRadius: 12,
+        shadowOffsetY: 4,
+        elevation: 1,
       })
     : null;
 
@@ -214,10 +215,10 @@ const createStyles = (
         ? androidLightSurface?.shadowStyle
         : (obsidianSurface?.shadowStyle ?? {
             shadowColor: premiumHealth.shadowColor,
-            shadowOffset: { width: 0, height: 14 },
-            shadowOpacity: 0.14,
-            shadowRadius: 24,
-            elevation: 11,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.06,
+            shadowRadius: 10,
+            elevation: 1,
           })),
       position: 'relative', borderCurve: 'continuous',
     },

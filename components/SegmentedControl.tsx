@@ -108,7 +108,17 @@ export function SegmentedControl<T extends string>({
                 {React.isValidElement(option.icon) && typeof option.icon.type !== 'string'
                   ? React.cloneElement(
                       option.icon as React.ReactElement<{ color?: string; size?: number }>,
-                      { color: foreground, size: 13 },
+                      {
+                        // Pour les options premium NON sélectionnées (typiquement la
+                        // couronne or des tabs Analytics "3 Mois" / "1 An"), on
+                        // préserve la couleur originale fournie par le parent.
+                        // Sinon, le cloneElement appliquait `color: foreground`
+                        // (gris) au-dessus d'un `fill: gold` déjà présent → ça
+                        // produisait un contour gris autour d'un intérieur or,
+                        // perçu comme une "aura" non maîtrisée.
+                        ...(option.premium && !selected ? {} : { color: foreground }),
+                        size: 13,
+                      },
                     )
                   : option.icon}
               </View>

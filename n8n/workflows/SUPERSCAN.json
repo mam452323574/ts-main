@@ -1,0 +1,270 @@
+{
+  "name": "SUPERSCAN",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "SUPERSCAN",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -160,
+        0
+      ],
+      "id": "434705b5-4a09-4d42-b9af-a38f22c12bf5",
+      "name": "Webhook",
+      "webhookId": "a9b4a85b-23f6-448e-ab78-9e69e32e05fe"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.body }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              },
+              {
+                "name": "x-webhook-response-timestamp",
+                "value": "={{ $json.headers['x-webhook-response-timestamp'] }}"
+              },
+              {
+                "name": "x-webhook-response-signature",
+                "value": "={{ $json.headers['x-webhook-response-signature'] }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1152,
+        0
+      ],
+      "id": "24e2f920-fb4b-481f-98b7-863334d6f5b2",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "jsCode": "function cleanupJsonString(text) {\n  if (typeof text !== \"string\") return \"\";\n\n  let cleaned = text\n    .replace(/^```(?:json)?\\s*/i, \"\")\n    .replace(/\\s*```$/i, \"\")\n    .trim();\n\n  const firstBrace = cleaned.indexOf(\"{\");\n  if (firstBrace > 0) cleaned = cleaned.slice(firstBrace);\n\n  cleaned = cleaned.replace(/,\\s*([}\\]])/g, \"$1\");\n\n  return cleaned;\n}\n\nfunction extractJsonFromText(text) {\n  if (typeof text !== \"string\") return null;\n\n  let candidate = cleanupJsonString(text);\n\n  try {\n    return JSON.parse(candidate);\n  } catch {}\n\n  for (let i = 0; i < 20; i++) {\n    try {\n      return JSON.parse(candidate);\n    } catch {}\n\n    candidate = candidate.replace(/,\\s*([}\\]])/g, \"$1\");\n\n    const quoteCount = (candidate.match(/\"/g) || []).length;\n    const openBraces = (candidate.match(/{/g) || []).length;\n    const closeBraces = (candidate.match(/}/g) || []).length;\n    const openBrackets = (candidate.match(/\\[/g) || []).length;\n    const closeBrackets = (candidate.match(/]/g) || []).length;\n\n    if (quoteCount % 2 !== 0) {\n      candidate += '\"';\n      continue;\n    }\n\n    if (openBrackets > closeBrackets) {\n      candidate += \"]\";\n      continue;\n    }\n\n    if (openBraces > closeBraces) {\n      candidate += \"}\";\n      continue;\n    }\n\n    break;\n  }\n\n  try {\n    return JSON.parse(candidate);\n  } catch {}\n\n  return null;\n}\n\nfunction clampNumber(value, min = 0, max = 100, fallback = 0) {\n  if (typeof value !== \"number\" || Number.isNaN(value)) return fallback;\n  return Math.max(min, Math.min(max, value));\n}\n\nfunction nullablePercent(value) {\n  if (value === null) return null;\n  if (typeof value !== \"number\" || Number.isNaN(value)) return null;\n  return Math.max(0, Math.min(100, value));\n}\n\nfunction asString(value, fallback = \"\") {\n  return typeof value === \"string\" ? value : fallback;\n}\n\nconst SUPPORTED_LANGUAGES = new Set(['fr', 'en', 'es', 'de', 'it', 'pt']);\nconst DEFAULT_LANGUAGE = 'fr';\nconst OUTPUT_LANGUAGE_ALIASES = {\n  french: 'fr',\n  francais: 'fr',\n  'français': 'fr',\n  english: 'en',\n  spanish: 'es',\n  espanol: 'es',\n  'español': 'es',\n  german: 'de',\n  deutsch: 'de',\n  italian: 'it',\n  italiano: 'it',\n  portuguese: 'pt',\n  portugues: 'pt',\n  'português': 'pt',\n};\n\nfunction normalizeLanguageCandidate(value) {\n  if (typeof value !== \"string\") return null;\n\n  const normalized = value.trim().toLowerCase();\n  if (!normalized) return null;\n\n  const alias = OUTPUT_LANGUAGE_ALIASES[normalized];\n  if (alias) return alias;\n\n  const [baseLocale] = normalized.split(/[-_]/);\n  return SUPPORTED_LANGUAGES.has(baseLocale) ? baseLocale : null;\n}\n\nfunction normalizeWorkflowLanguageFromCandidates(...values) {\n  for (const value of values) {\n    const normalized = normalizeLanguageCandidate(value);\n    if (normalized) return normalized;\n  }\n\n  return DEFAULT_LANGUAGE;\n}\n\nfunction getNodeLanguage(nodeName) {\n  try {\n    return $(nodeName).first().json.language;\n  } catch (e) {\n    return undefined;\n  }\n}\n\nfunction getLocalizedFallbacks(lang) {\n  switch (lang) {\n    case \"fr\":\n    default:\n      return {\n        invalidFormat: \"Impossible de récupérer les données du scan. Format invalide.\",\n        genericError: \"Erreur d'analyse.\",\n        fallbackDisclaimer:\n          \"Ceci est une estimation visuelle automatisée à titre indicatif et non une mesure médicale.\"\n      };\n    case \"de\":\n      return {\n        invalidFormat: \"Scandaten konnten nicht abgerufen werden. Ungültiges Format.\",\n        genericError: \"Analysefehler.\",\n        fallbackDisclaimer:\n          \"Dies ist eine automatisierte visuelle Schätzung zu Informationszwecken und keine medizinische Messung.\"\n      };\n    case \"it\":\n      return {\n        invalidFormat: \"Impossibile recuperare i dati della scansione. Formato non valido.\",\n        genericError: \"Errore di analisi.\",\n        fallbackDisclaimer:\n          \"Questa è una stima visiva automatizzata a scopo informativo e non una misurazione medica.\"\n      };\n    case \"es\":\n      return {\n        invalidFormat: \"No se pudieron recuperar los datos del escaneo. Formato inválido.\",\n        genericError: \"Error de análisis.\",\n        fallbackDisclaimer:\n          \"Esta es una estimación visual automatizada con fines informativos y no una medición médica.\"\n      };\n    case \"pt\":\n      return {\n        invalidFormat: \"Não foi possível recuperar os dados da análise. Formato inválido.\",\n        genericError: \"Erro de análise.\",\n        fallbackDisclaimer:\n          \"Esta é uma estimativa visual automatizada apenas para fins informativos e não constitui uma medição médica.\"\n      };\n    case \"en\":\n      return {\n        invalidFormat: \"Unable to retrieve scan data. Invalid format.\",\n        genericError: \"Analysis error.\",\n        fallbackDisclaimer:\n          \"This is an automated visual estimate for informational purposes and not a medical measurement.\"\n      };\n  }\n}\n\nfunction normalizeArea(area) {\n  return {\n    area_name: asString(area?.area_name),\n    subcutaneous_fat_percent: clampNumber(area?.subcutaneous_fat_percent),\n    water_retention_percent: clampNumber(area?.water_retention_percent),\n    definition_percent: clampNumber(area?.definition_percent),\n    dominant_type: asString(area?.dominant_type),\n    confidence: clampNumber(area?.confidence),\n    explanation: asString(area?.explanation),\n    actionable_advice: asString(area?.actionable_advice)\n  };\n}\n\nfunction collectTextCandidates(obj) {\n  const out = [];\n\n  function visit(value) {\n    if (value == null) return;\n\n    if (typeof value === \"string\") {\n      out.push(value);\n      return;\n    }\n\n    if (Array.isArray(value)) {\n      for (const item of value) visit(item);\n      return;\n    }\n\n    if (typeof value === \"object\") {\n      if (typeof value.text === \"string\") out.push(value.text);\n      if (typeof value.content === \"string\") out.push(value.content);\n      if (typeof value.output === \"string\") out.push(value.output);\n      if (typeof value.response === \"string\") out.push(value.response);\n\n      for (const key of Object.keys(value)) {\n        visit(value[key]);\n      }\n    }\n  }\n\n  visit(obj);\n  return out.filter(Boolean);\n}\n\nconst userLanguage = normalizeWorkflowLanguageFromCandidates(\n  getNodeLanguage('Code in JavaScript3'),\n  getNodeLanguage('Code in JavaScript1'),\n  $json.language,\n  $json.locale,\n  $json.outputLanguage,\n  $json.body?.language,\n  $json.body?.locale,\n  $json.body?.outputLanguage\n);\nconst messages = getLocalizedFallbacks(userLanguage);\n\nconst j = $input.item.json || $json;\n\nconst textCandidates = collectTextCandidates(j);\nconst objectCandidates = [j, j?.data, j?.response, j?.output].filter(\n  (v) => v && typeof v === \"object\"\n);\n\nlet rawObj = null;\n\nfor (const obj of objectCandidates) {\n  if (obj?.scan_type) {\n    rawObj = obj;\n    break;\n  }\n  if (obj?.data && typeof obj.data === \"object\" && obj.data?.scan_type) {\n    rawObj = obj.data;\n    break;\n  }\n}\n\nif (!rawObj) {\n  for (const text of textCandidates) {\n    const parsed = extractJsonFromText(text);\n    if (parsed && typeof parsed === \"object\") {\n      rawObj =\n        parsed?.data && typeof parsed.data === \"object\"\n          ? parsed.data\n          : parsed;\n\n      if (rawObj?.scan_type) break;\n    }\n  }\n}\n\nif (!rawObj || typeof rawObj !== \"object\") {\n  return [{\n    json: {\n      success: false,\n      error: messages.invalidFormat,\n      raw_output: textCandidates[0] || JSON.stringify(j)\n    }\n  }];\n}\n\nif (rawObj.scan_type === \"error\") {\n  return [{\n    json: {\n      success: false,\n      error: asString(rawObj.message, messages.genericError),\n      data: {\n        scan_type: \"error\",\n        message: asString(rawObj.message, messages.genericError)\n      }\n    }\n  }];\n}\n\nconst finalData = {\n  scan_type: \"fat_distribution_scan_v2\",\n  global_body_fat_estimate_percent: nullablePercent(rawObj.global_body_fat_estimate_percent),\n  global_facial_fat_estimate_percent: nullablePercent(rawObj.global_facial_fat_estimate_percent),\n  global_water_retention_estimate_percent: clampNumber(\n    rawObj.global_water_retention_estimate_percent,\n    0,\n    100,\n    0\n  ),\n  analysis_summary: asString(rawObj.analysis_summary),\n  dominant_storage_pattern: asString(rawObj.dominant_storage_pattern),\n  areas_analysis: Array.isArray(rawObj.areas_analysis)\n    ? rawObj.areas_analysis.map(normalizeArea)\n    : [],\n  priority_zones: Array.isArray(rawObj.priority_zones)\n    ? rawObj.priority_zones.map((z) => asString(z)).filter(Boolean)\n    : [],\n  disclaimer_text: asString(rawObj.disclaimer_text, messages.fallbackDisclaimer)\n};\n\nreturn [{\n  json: {\n    success: true,\n    data: finalData\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        0
+      ],
+      "id": "b676f195-bdf6-4ad7-90aa-57141f78cfe2",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.item;\nlet base64Data = item.json.body?.imageBase64 || '';\n\nconst SUPPORTED_LANGUAGES = new Set(['fr', 'en', 'es', 'de', 'it', 'pt']);\nconst DEFAULT_LANGUAGE = 'fr';\nconst OUTPUT_LANGUAGE_BY_CODE = {\n  fr: 'French',\n  en: 'English',\n  es: 'Spanish',\n  de: 'German',\n  it: 'Italian',\n  pt: 'Portuguese',\n};\nconst OUTPUT_LANGUAGE_ALIASES = {\n  french: 'fr',\n  francais: 'fr',\n  'français': 'fr',\n  english: 'en',\n  spanish: 'es',\n  espanol: 'es',\n  'español': 'es',\n  german: 'de',\n  deutsch: 'de',\n  italian: 'it',\n  italiano: 'it',\n  portuguese: 'pt',\n  portugues: 'pt',\n  'português': 'pt',\n};\n\nfunction normalizeLanguageCandidate(value) {\n  if (typeof value !== 'string') return null;\n\n  const normalized = value.trim().toLowerCase();\n  if (!normalized) return null;\n\n  const alias = OUTPUT_LANGUAGE_ALIASES[normalized];\n  if (alias) return alias;\n\n  const [baseLocale] = normalized.split(/[-_]/);\n  return SUPPORTED_LANGUAGES.has(baseLocale) ? baseLocale : null;\n}\n\nfunction normalizeWorkflowLanguageFromCandidates(...values) {\n  for (const value of values) {\n    const normalized = normalizeLanguageCandidate(value);\n    if (normalized) return normalized;\n  }\n\n  return DEFAULT_LANGUAGE;\n}\n\nconst userLanguage = normalizeWorkflowLanguageFromCandidates(\n  item.json.body?.language,\n  item.json.body?.locale,\n  item.json.body?.outputLanguage,\n  item.json.language,\n  item.json.locale,\n  item.json.outputLanguage\n);\nconst outputLanguage = OUTPUT_LANGUAGE_BY_CODE[userLanguage];\n\nif (base64Data.includes(',')) {\n  base64Data = base64Data.split(',')[1];\n}\n\nreturn {\n  json: {\n    ...item.json,\n    language: userLanguage,\n    locale: userLanguage,\n    outputLanguage,\n  },\n  binary: {\n    data: {\n      data: base64Data,\n      mimeType: 'image/jpeg',\n      fileName: 'scan.jpg',\n    }\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        144,
+        0
+      ],
+      "id": "513c1f90-a5bc-40e6-94a2-d7f1b1ac1d77",
+      "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "text": "=ABSOLUTE PRIORITY RULES:\nReturn only one complete valid JSON object.\nDo not write text before or after the JSON.\nDo not use markdown.\nDo not use code fences.\nDo not add comments.\nDo not truncate the JSON.\n\nYou are an expert AI visual scanner for apparent fat distribution, water retention, and visual definition in the face and body.\nAnalyze only what is truly visible in the image.\n\n## MANDATORY LANGUAGE POLICY\nThe requested output language code is: {{ $json.language }}.\nThe requested output language is: {{ $json.outputLanguage }}.\nSupported language codes are exactly: fr, en, es, de, it, pt.\nIf the requested output language is missing, empty, or not one of those six codes, write all user-visible text in French.\nYou must answer only in {{ $json.outputLanguage }}. Do not switch language. Translate every title, label, advice, explanation and recommendation into {{ $json.outputLanguage }}.\nKeep every JSON key, schema field name, and the value of scan_type in English exactly as shown in the schema.\nTranslate only user-visible string values: analysis_summary, dominant_storage_pattern, areas_analysis[].area_name, areas_analysis[].dominant_type, areas_analysis[].explanation, areas_analysis[].actionable_advice, priority_zones[], disclaimer_text, and the error message.\nDo not translate numbers, booleans, null, arrays, object keys, or structural schema values.\n\nOBJECTIVE:\nVisually estimate:\n- apparent subcutaneous fat\n- apparent water retention\n- visual definition\n- the dominant storage pattern\n\nANALYSIS RULES:\n1. All numeric values must be JSON numbers, never strings.\n2. scan_type must be exactly \"fat_distribution_scan_v2\".\n3. areas_analysis and priority_zones must always be present, even when empty.\n4. If the body is not visible enough, global_body_fat_estimate_percent must be null.\n5. If the face is not visible enough, global_facial_fat_estimate_percent must be null.\n6. global_water_retention_estimate_percent must always be a number from 0 to 100.\n7. Never invent a non-visible area.\n8. Analyze at most the 4 most relevant visible areas.\n9. analysis_summary must be 1 short sentence.\n10. dominant_storage_pattern must be 1 very short sentence.\n11. explanation must be at most 12 words.\n12. actionable_advice must be at most 12 words.\n13. If an area looks very dry: low fat, low water, high definition.\n14. If an area looks swollen, puffy, smooth, or poorly defined: raise water retention.\n15. If an area looks thicker, softer, or structurally less defined: raise subcutaneous fat.\n\nDOMINANT TYPE CONCEPTS:\nFor areas_analysis[].dominant_type, choose exactly one of these four concepts and translate the visible value into the requested output language:\n- subcutaneous fat\n- water retention\n- mixed fat + water\n- dry / well-defined zone\nDo not copy these English concept labels unless the requested output language is en.\n\nAREA CONCEPTS TO ANALYZE IF VISIBLE:\nFace concepts:\n- cheeks\n- lower cheeks\n- jawline\n- under chin\n- under eyes\n- eyelids\n- face contour\n\nBody concepts:\n- upper abdomen\n- lower abdomen\n- flanks\n- chest / pectorals\n- arms\n- thighs\n- hips\n- waist\nTranslate area_name and priority_zones values into the requested output language.\n\nREQUIRED RESPONSE SCHEMA:\n{\n  \"scan_type\": \"fat_distribution_scan_v2\",\n  \"global_body_fat_estimate_percent\": null,\n  \"global_facial_fat_estimate_percent\": null,\n  \"global_water_retention_estimate_percent\": 0,\n  \"analysis_summary\": \"\",\n  \"dominant_storage_pattern\": \"\",\n  \"areas_analysis\": [\n    {\n      \"area_name\": \"\",\n      \"subcutaneous_fat_percent\": 0,\n      \"water_retention_percent\": 0,\n      \"definition_percent\": 0,\n      \"dominant_type\": \"\",\n      \"confidence\": 0,\n      \"explanation\": \"\",\n      \"actionable_advice\": \"\"\n    }\n  ],\n  \"priority_zones\": [],\n  \"disclaimer_text\": \"\"\n}\n\nVALUE CONSTRAINTS:\n- subcutaneous_fat_percent, water_retention_percent, definition_percent, and confidence: 0 to 100\n- global_water_retention_estimate_percent: 0 to 100\n- global_body_fat_estimate_percent: 0 to 100 or null\n- global_facial_fat_estimate_percent: 0 to 100 or null\n- disclaimer_text must be the exact translation into the requested output language of: \"This is an automated visual estimate for informational purposes and not a medical measurement.\"\n\nIF THE IMAGE IS BLURRY, TOO DARK, POORLY FRAMED, OR UNUSABLE:\nReturn exactly:\n{\n  \"scan_type\": \"error\",\n  \"message\": \"...\"\n}\nwhere message is the translation into the requested output language of: \"Visual analysis is not possible. Please provide a clearer image.\"\n\nFINAL REMINDER:\nReturn only a complete, closed, valid JSON object and nothing else.",
+        "inputType": "binary",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        0
+      ],
+      "id": "739e4832-68e1-4808-aed1-f3c2e8cb81d7",
+      "name": "Analyze an image1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "Ps2GfAmYQ6zQuQH3",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const TOLERANCE_MS = 5 * 60 * 1000;\nconst SIGNATURE_PREFIX = 'sha256=';\n\nconst first = $input.first();\nconst headers = (first && first.json && first.json.headers) || (first && first.headers) || {};\nconst bodyObj = (first && first.json && first.json.body) || (first && first.body) || (first && first.json) || {};\nconst rawBody = JSON.stringify(bodyObj);\n\nconst timestamp = headers['x-webhook-timestamp'] || headers['X-Webhook-Timestamp'];\nconst signature = headers['x-webhook-signature'] || headers['X-Webhook-Signature'];\nconst secret = ($env.PHASE2_WEBHOOK_HMAC_SECRET || $env.COACH_WEBHOOK_HMAC_SECRET || '').trim();\n\nif (!secret) {\n  throw new Error('PHASE2_WEBHOOK_HMAC_SECRET missing on n8n side');\n}\nif (!timestamp || !signature) {\n  throw new Error('Webhook missing x-webhook-timestamp or x-webhook-signature');\n}\n\n// Anti-replay : timestamp dans une fenêtre de 5 min\nconst tsDate = new Date(String(timestamp));\nif (Number.isNaN(tsDate.getTime())) {\n  throw new Error('Invalid x-webhook-timestamp format');\n}\nconst drift = Math.abs(Date.now() - tsDate.getTime());\nif (drift > TOLERANCE_MS) {\n  throw new Error(`Webhook timestamp drift ${drift}ms exceeds tolerance`);\n}\n\n// Recalcul de la signature\nconst textEncoder = new TextEncoder();\nfunction arrayBufferToHex(buffer) {\n  return Array.from(new Uint8Array(buffer)).map((value) => value.toString(16).padStart(2, '0')).join('');\n}\n\nasync function verifyHmac(payload, secret, providedSig) {\n  let expectedHex;\n  try {\n    const crypto = require('crypto');\n    expectedHex = crypto.createHmac('sha256', secret).update(payload).digest('hex');\n  } catch (nodeError) {\n    const subtle = globalThis.crypto && globalThis.crypto.subtle;\n    if (!subtle) {\n      throw new Error('Neither Node crypto nor Web Crypto is available. ' + nodeError.message);\n    }\n    const signingKey = await subtle.importKey('raw', textEncoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);\n    const signatureBuffer = await subtle.sign('HMAC', signingKey, textEncoder.encode(payload));\n    expectedHex = arrayBufferToHex(signatureBuffer);\n  }\n\n  const expected = SIGNATURE_PREFIX + expectedHex;\n  \n  // Constant-time comparison\n  let mismatch = expected.length ^ providedSig.length;\n  const maxLength = Math.max(expected.length, providedSig.length);\n  for (let index = 0; index < maxLength; index += 1) {\n    mismatch |= (expected.charCodeAt(index) || 0) ^ (providedSig.charCodeAt(index) || 0);\n  }\n  if (mismatch !== 0) {\n    throw new Error('Webhook signature mismatch');\n  }\n}\n\nawait verifyHmac(String(timestamp) + '.' + rawBody, secret, String(signature));\n\nconst isSmoke = typeof bodyObj._smoke_test === 'string' && bodyObj._smoke_test.startsWith('check_signing_');\n\nreturn [{\n  json: {\n    ...$input.first().json,\n    _is_smoke_test: isSmoke\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        120,
+        -160
+      ],
+      "id": "8c4f0ef1-78b1-4d92-9cd3-900000000001",
+      "name": "Verify Coach Webhook HMAC (SUPERSCAN)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "smoke-test-condition",
+              "leftValue": "={{ $json._is_smoke_test }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        300,
+        -160
+      ],
+      "id": "8c4f0ef1-78b1-4d92-9cd3-900000000002",
+      "name": "Smoke Switch (SUPERSCAN)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const ENFORCE = ($env.COACH_WEBHOOK_HMAC_ENFORCE || '').trim().toLowerCase() === 'true';\nconst SECRET = ($env.PHASE2_WEBHOOK_HMAC_SECRET || $env.COACH_WEBHOOK_HMAC_SECRET || '').trim();\n\nif (!SECRET) {\n  if (ENFORCE) {\n    throw new Error('sign_webhook_response_secret_missing');\n  }\n  console.warn('[sign-webhook-response] HMAC secret not configured (dual-mode, skipping signature)');\n  return $input.all();\n}\n\nconst rawBody = JSON.stringify($input.first().json);\nconst timestamp = new Date().toISOString();\nconst payload = timestamp + '.' + rawBody;\n\nconst textEncoder = new TextEncoder();\nfunction arrayBufferToHex(buffer) {\n  return Array.from(new Uint8Array(buffer)).map((value) => value.toString(16).padStart(2, '0')).join('');\n}\n\nasync function signResponse(payload, secret) {\n  try {\n    const crypto = require('crypto');\n    return 'sha256=' + crypto.createHmac('sha256', secret).update(payload).digest('hex');\n  } catch (nodeError) {\n    const subtle = globalThis.crypto && globalThis.crypto.subtle;\n    if (!subtle) {\n      throw new Error('Neither Node crypto nor Web Crypto is available. ' + nodeError.message);\n    }\n    const signingKey = await subtle.importKey('raw', textEncoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);\n    const signatureBuffer = await subtle.sign('HMAC', signingKey, textEncoder.encode(payload));\n    return 'sha256=' + arrayBufferToHex(signatureBuffer);\n  }\n}\n\nconst sig = await signResponse(payload, SECRET);\n\nreturn [{\n  json: {\n    body: $input.first().json,\n    headers: {\n      'x-webhook-response-timestamp': timestamp,\n      'x-webhook-response-signature': sig,\n    }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1260,
+        0
+      ],
+      "id": "8c4f0ef1-78b1-4d92-9cd3-900000000003",
+      "name": "Sign Webhook Response (SUPERSCAN)"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify Coach Webhook HMAC (SUPERSCAN)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Sign Webhook Response (SUPERSCAN)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "Analyze an image1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze an image1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Coach Webhook HMAC (SUPERSCAN)": {
+      "main": [
+        [
+          {
+            "node": "Smoke Switch (SUPERSCAN)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Smoke Switch (SUPERSCAN)": {
+      "main": [
+        [
+          {
+            "node": "Sign Webhook Response (SUPERSCAN)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign Webhook Response (SUPERSCAN)": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "8c4f7fd9-7575-4d87-9b5a-b88b9198ac19",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "00431bea7c112c6c03ed10860af49e6e791fd93819e027c15313a8e313bdaff9"
+  },
+  "id": "aVU3L7RukhnC8ns4Wcq0K",
+  "tags": []
+}

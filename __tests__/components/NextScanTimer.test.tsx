@@ -74,6 +74,33 @@ describe('NextScanTimer', () => {
     expect(screen.getByText(/dans/)).toBeTruthy();
   });
 
+  it('renders the homeCompact mode on two lines without a Clock icon', () => {
+    const futureDate = NOW + (23 * 60 * 60 * 1000) + (59 * 60 * 1000);
+    const { UNSAFE_queryByType, UNSAFE_getAllByType } = render(
+      <NextScanTimer
+        nextAvailableDate={futureDate}
+        mode="homeCompact"
+        scanLabel="Nouveau scan dans"
+        padHours
+      />,
+    );
+
+    // Texte concaténé "label + durée", pas le "dans" du mode par défaut
+    expect(screen.getByText('Nouveau scan dans 23h 59m')).toBeTruthy();
+    // Pas d'icône Clock en homeCompact (gain de place dans la mini-card)
+    expect(UNSAFE_queryByType('Clock' as any)).toBeNull();
+    // Le rendu doit autoriser 2 lignes pour éviter le tronquage du texte long
+    const TextComp = require('react-native').Text;
+    const allTexts = UNSAFE_getAllByType(TextComp);
+    const cooldown = allTexts.find(
+      (node: { props: { children?: unknown } }) =>
+        typeof node.props.children === 'string' &&
+        node.props.children.includes('Nouveau scan dans'),
+    );
+    expect(cooldown).toBeTruthy();
+    expect(cooldown!.props.numberOfLines).toBe(2);
+  });
+
   it('renders the compact scanner mode on a single line without the default prefix', () => {
     const futureDate = NOW + (23 * 60 * 60 * 1000) + (59 * 60 * 1000);
     const { UNSAFE_queryByType } = render(

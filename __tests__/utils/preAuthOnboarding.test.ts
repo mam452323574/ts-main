@@ -21,6 +21,7 @@ describe('preAuthOnboarding draft helpers', () => {
       avatarSkipped: false,
       email: '',
       createdUserId: null,
+      completionIntent: null,
       lastStep: 'intro',
     });
   });
@@ -33,6 +34,7 @@ describe('preAuthOnboarding draft helpers', () => {
       avatarSkipped: false,
       email: 'test@example.com',
       createdUserId: 'user-123',
+      completionIntent: 'signup-email',
       lastStep: 'verification',
       password: 'secret-password',
     } as any);
@@ -45,6 +47,7 @@ describe('preAuthOnboarding draft helpers', () => {
       avatarSkipped: false,
       email: 'test@example.com',
       createdUserId: 'user-123',
+      completionIntent: 'signup-email',
       lastStep: 'verification',
     });
 
@@ -65,6 +68,7 @@ describe('preAuthOnboarding draft helpers', () => {
         avatarSkipped: 'yes',
         email: null,
         createdUserId: '',
+        completionIntent: 'login-google',
         lastStep: 'done',
       }),
     ).toEqual({
@@ -74,11 +78,12 @@ describe('preAuthOnboarding draft helpers', () => {
       avatarSkipped: false,
       email: '',
       createdUserId: null,
+      completionIntent: null,
       lastStep: 'intro',
     });
   });
 
-  it('maps legacy stored steps to the new flow', () => {
+  it('maps legacy stored steps and accepts atomic mobile pages', () => {
     expect(
       sanitizePreAuthOnboardingDraft({
         username: 'friendly',
@@ -91,20 +96,31 @@ describe('preAuthOnboarding draft helpers', () => {
       avatarSkipped: false,
       email: '',
       createdUserId: null,
-      lastStep: 'profile',
+      completionIntent: null,
+      lastStep: 'avatar',
     });
+
+    expect(
+      sanitizePreAuthOnboardingDraft({ lastStep: 'profile' }).lastStep,
+    ).toBe('username');
+    expect(
+      sanitizePreAuthOnboardingDraft({ lastStep: 'account' }).lastStep,
+    ).toBe('accountMethod');
   });
 
   it('clears and detects profile draft fields', async () => {
     const draft = await updatePreAuthOnboardingDraft({
       selectedTheme: 'dark',
       username: 'friendly',
-      lastStep: 'profile',
+      completionIntent: 'signup-google',
+      lastStep: 'appearance',
     });
 
     expect(hasPreAuthProfileDraft(draft)).toBe(true);
 
     await clearPreAuthOnboardingDraft();
-    expect(hasPreAuthProfileDraft(await loadPreAuthOnboardingDraft())).toBe(false);
+    const clearedDraft = await loadPreAuthOnboardingDraft();
+    expect(hasPreAuthProfileDraft(clearedDraft)).toBe(false);
+    expect(clearedDraft.completionIntent).toBeNull();
   });
 });

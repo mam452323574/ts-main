@@ -26,14 +26,28 @@ Sauvegarder ce secret dans le gestionnaire de mots de passe d'équipe (1Password
 
 ### Étape 2 — Configurer les secrets Supabase (Edge Functions)
 
+Provisionner d'abord le secret HMAC :
+
 ```bash
 # Depuis le poste de l'opérateur, après `supabase login`
-supabase secrets set PHASE2_WEBHOOK_AUTH_MODE=bearer+hmac
 supabase secrets set PHASE2_WEBHOOK_HMAC_SECRET=<secret-généré-étape-1>
+```
+
+> 🛑 **Pre-flight check obligatoire avant de flipper le mode.** Sans ce contrôle, basculer `PHASE2_WEBHOOK_AUTH_MODE` casse instantanément toutes les Edge Functions sortantes (`coach-send-message`, `coach-generate-response`, `analyze-scan`, `social-report-content`, `fridge-scan-complete`) avec `invalid_webhook_auth_configuration` au prochain cold start. C'est exactement la régression observée le 2026-05-19 quand `bearer+hmac` a été activé sans `PHASE2_WEBHOOK_BEARER_TOKEN`.
+
+```bash
+sh scripts/check-webhook-secrets.sh hmac <your-project-ref>
+# → exit 0 attendu. Si exit 1, corriger les secrets manquants avant de continuer.
+```
+
+Puis activer le mode :
+
+```bash
+supabase secrets set PHASE2_WEBHOOK_AUTH_MODE=hmac
 
 # Vérifier
 supabase secrets list | grep PHASE2_WEBHOOK
-# Doit afficher PHASE2_WEBHOOK_AUTH_MODE et PHASE2_WEBHOOK_HMAC_SECRET
+# Doit afficher PHASE2_WEBHOOK_AUTH_MODE=hmac et PHASE2_WEBHOOK_HMAC_SECRET
 ```
 
 ### Étape 3 — Configurer la variable HMAC côté n8n
@@ -165,7 +179,6 @@ Côté n8n : importer les workflows modifiés via l'UI ou l'API n8n. Activer cha
 ```bash
 # 1. Sans HMAC — doit échouer (test négatif)
 curl -X POST "$N8N_COACH_WEBHOOK_URL" \
-  -H "Authorization: Bearer $BEARER" \
   -H "Content-Type: application/json" \
   -d '{"payload":{}}'
 # → Attendu : erreur n8n "Webhook missing x-webhook-timestamp or x-webhook-signature"
@@ -173,7 +186,6 @@ curl -X POST "$N8N_COACH_WEBHOOK_URL" \
 # 2. Avec HMAC invalide — doit échouer
 TS="$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"
 curl -X POST "$N8N_COACH_WEBHOOK_URL" \
-  -H "Authorization: Bearer $BEARER" \
   -H "Content-Type: application/json" \
   -H "x-webhook-timestamp: $TS" \
   -H "x-webhook-signature: sha256=baadbeef" \
@@ -211,17 +223,29 @@ Le secret doit être tourné **annuellement** (ou immédiatement si compromissio
 
 ## Rollback (si le HMAC casse en prod)
 
+**Méthode rapide — désactiver l'enforcement côté n8n** (les Edge Functions continuent d'envoyer les signatures, le nœud "Verify HMAC" passe en log-only) :
+
 ```bash
-# Si une régression côté n8n bloque les appels coach légitimes, désactiver
-# immédiatement le check pour rétablir le service :
-supabase secrets set PHASE2_WEBHOOK_AUTH_MODE=bearer
-supabase functions deploy coach-generate-response coach-conversation-send
-# Les Edge Functions arrêtent d'envoyer la signature → n8n n'attend plus la valider
-# (à condition que le nœud n8n "Verify HMAC" soit conditionnel — sinon il
-# rejettera quand même les requêtes sans signature).
+# Dans n8n/.env ou env vars du déploiement n8n :
+COACH_WEBHOOK_HMAC_ENFORCE=false
+docker compose -f n8n/docker-compose.yml restart n8n
 ```
 
-**Mieux** : avant le go-live, déployer le nœud n8n en mode "log-only" (loggue les mismatches mais ne rejette pas). Observer 24h. Puis basculer en mode strict.
+**Méthode complète — désactiver aussi la signature côté Supabase** (si la régression vient des Edge Functions : signature malformée, drift d'horloge, etc.) :
+
+```bash
+supabase secrets set PHASE2_WEBHOOK_AUTH_MODE=none
+supabase functions deploy coach-generate-response coach-send-message analyze-scan social-report-content fridge-scan-complete
+# Garder COACH_WEBHOOK_HMAC_ENFORCE=false côté n8n pour qu'il n'attende plus la signature.
+```
+
+> ⚠️ **Ne pas tenter `PHASE2_WEBHOOK_AUTH_MODE=bearer` comme rollback.** Le bearer token n'est plus configuré côté Supabase (décision 2026-05-19, voir [SUPABASE_SECURITY_CONFIG.md](SUPABASE_SECURITY_CONFIG.md)) et basculer en bearer-only re-déclencherait `invalid_webhook_auth_configuration`. Si tu dois vraiment ré-introduire bearer, run le pre-flight check d'abord :
+>
+> ```bash
+> sh scripts/check-webhook-secrets.sh bearer <your-project-ref>
+> ```
+
+**Bonne pratique** : avant chaque go-live HMAC, déployer le nœud n8n en mode log-only (`COACH_WEBHOOK_HMAC_ENFORCE=false`). Observer 24 h. Puis basculer `=true`.
 
 ## Dépendances et risques
 

@@ -159,11 +159,14 @@ describe('result view models', () => {
       'amber',
       'rose',
     ]);
-    expect(viewModel.macros?.items.every((item) => item.value === '••••••')).toBe(
-      true,
-    );
+    // Macros (protéines/glucides/lipides) ouvertes en gratuit depuis 2026-05.
+    expect(viewModel.macros?.items.map((item) => item.value)).toEqual([
+      '28 g',
+      '33 g',
+      '14 g',
+    ]);
     expect(
-      viewModel.macros?.items.every((item) => item.premiumRenderState === 'locked'),
+      viewModel.macros?.items.every((item) => item.premiumRenderState === 'unlocked'),
     ).toBe(true);
     expect(viewModel.metrics[0]).toMatchObject({
       premiumRenderState: 'locked',
@@ -521,10 +524,17 @@ describe('result view models', () => {
     ]);
     expect(bodyViewModel).not.toHaveProperty('heroInsight');
     expect(bodyViewModel).not.toHaveProperty('keyInsight');
+    // `posture` est désormais une métrique gratuite (déplacée vers `metrics`).
     expect(bodyViewModel.premiumMetrics.map((item) => item.icon)).toEqual([
       'body_fat',
-      'posture',
       'body_symmetry',
+    ]);
+    expect(bodyViewModel.metrics.map((item) => item.icon)).toEqual([
+      'waist',
+      'strength',
+      'bmi',
+      'metabolic_age',
+      'posture',
     ]);
     expect(nutritionViewModel.quickStats.map((item) => item.icon)).toEqual([
       'calories',

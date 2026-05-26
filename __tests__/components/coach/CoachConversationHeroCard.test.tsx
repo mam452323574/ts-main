@@ -30,7 +30,7 @@ describe('CoachConversationHeroCard', () => {
     mockThemeState.isDark = false;
   });
 
-  it('renders the free available state as a compact conversation row', () => {
+  it('renders portrait, gradient, and a visible CTA pill for free_available', () => {
     render(
       <CoachConversationHeroCard
         {...baseProps}
@@ -39,75 +39,103 @@ describe('CoachConversationHeroCard', () => {
       />,
     );
 
-    const surfaceStyle = StyleSheet.flatten(
-      screen.getByTestId('coach-conversation-hero-card-surface').props.style,
+    expect(screen.getByTestId('coach-conversation-hero-card-portrait')).toBeTruthy();
+    expect(screen.getByTestId('coach-conversation-hero-card-gradient')).toBeTruthy();
+    expect(screen.getByTestId('coach-conversation-hero-card-halo')).toBeTruthy();
+    expect(screen.getByTestId('coach-conversation-hero-card-cta')).toBeTruthy();
+    expect(screen.getByTestId('coach-conversation-hero-card-cta-icon')).toBeTruthy();
+    expect(screen.getByText('Parler au coach')).toBeTruthy();
+
+    const cardStyle = getPressableStyle('coach-conversation-hero-card');
+    expect(cardStyle.borderRadius).toBe(BORDER_RADIUS.hero);
+    expect(cardStyle.overflow).toBe('hidden');
+    expect(cardStyle.minHeight).toBeGreaterThanOrEqual(280);
+  });
+
+  it('injects the coach name from i18n into the title for free_available', () => {
+    render(
+      <CoachConversationHeroCard {...baseProps} variant="free_available" />,
     );
 
-    expect(screen.getByTestId('coach-conversation-hero-card-avatar')).toBeTruthy();
-    expect(screen.getByTestId('coach-conversation-hero-card-action-icon')).toBeTruthy();
-    expect(screen.getByText('Conversation gratuite • 4 questions incluses')).toBeTruthy();
-    expect(screen.getByTestId('coach-conversation-hero-card-title').props.children).toBe(
-      'Parler au coach',
+    expect(
+      screen.getByTestId('coach-conversation-hero-card-title').props.children,
+    ).toBe('Conversation Libre avec Noah');
+  });
+
+  it('injects the coach name from i18n into the title for premium_available', () => {
+    render(
+      <CoachConversationHeroCard
+        {...baseProps}
+        personaKey="playful_light"
+        variant="premium_available"
+      />,
     );
-    expect(screen.queryByText('Démarrer ma conversation')).toBeNull();
-    expect(surfaceStyle.flexDirection).toBe('row');
-    expect(surfaceStyle.borderRadius).toBe(BORDER_RADIUS.md);
-    expect(surfaceStyle.shadowOpacity).toBeLessThanOrEqual(0.04);
+
+    expect(
+      screen.getByTestId('coach-conversation-hero-card-title').props.children,
+    ).toBe('Conversation Libre avec Milo');
   });
 
   it.each([
     {
       variant: 'free_resume' as const,
       title: 'Conversation en cours',
-      subtitle: 'Continue là où tu t’es arrêté.',
       hint: '2 questions restantes',
-      meta: 'Conversation en cours • 2 questions restantes',
     },
     {
-      variant: 'premium_available' as const,
-      title: 'Parler au coach',
-      subtitle: 'Pose ta question, le coach personnalise sa réponse.',
-      hint: '6 messages restants aujourd’hui',
-      meta: 'Premium • 6 messages restants aujourd’hui',
+      variant: 'premium_resume' as const,
+      title: 'Conversation en cours',
+      hint: '5 messages restants',
     },
     {
       variant: 'free_exhausted' as const,
       title: 'Conversation gratuite utilisée',
-      subtitle: 'Passe premium pour continuer à écrire au coach.',
       hint: null,
-      meta: 'Limite gratuite atteinte',
     },
     {
       variant: 'premium_exhausted' as const,
       title: 'Limite quotidienne atteinte',
-      subtitle: 'Consulte ton historique en attendant le prochain reset.',
       hint: null,
-      meta: 'Limite quotidienne atteinte',
     },
-  ])('renders the $variant state with discrete metadata', (state) => {
+  ])(
+    'keeps the parent-provided title for $variant (no coach-name rephrasing)',
+    (state) => {
+      render(
+        <CoachConversationHeroCard
+          {...baseProps}
+          variant={state.variant}
+          title={state.title}
+          hint={state.hint}
+        />,
+      );
+
+      expect(
+        screen.getByTestId('coach-conversation-hero-card-title').props.children,
+      ).toBe(state.title);
+    },
+  );
+
+  it('builds an accessibility label combining heroTitle, subtitle, hint, and CTA', () => {
     render(
       <CoachConversationHeroCard
         {...baseProps}
-        variant={state.variant}
-        title={state.title}
-        subtitle={state.subtitle}
-        hint={state.hint}
+        hint="3 questions restantes"
+        variant="free_available"
       />,
     );
 
-    expect(screen.getAllByText(state.meta).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByTestId('coach-conversation-hero-card-title').props.children).toBe(
-      state.title,
+    const button = screen.getByTestId('coach-conversation-hero-card');
+    expect(button.props.accessibilityRole).toBe('button');
+    expect(button.props.accessibilityLabel).toContain(
+      'Conversation Libre avec Noah',
     );
-    expect(
-      screen.getByTestId('coach-conversation-hero-card-subtitle').props.children,
-    ).toBe(state.subtitle);
-    expect(screen.queryByTestId('coach-conversation-hero-card-hint')).toBeNull();
+    expect(button.props.accessibilityLabel).toContain('Pose ta question');
+    expect(button.props.accessibilityLabel).toContain('3 questions restantes');
+    expect(button.props.accessibilityLabel).toContain('Démarrer une conversation');
   });
 
-  it('keeps the row accessible and prevents presses while disabled', () => {
+  it('blocks presses when disabled', () => {
     const onPress = jest.fn();
-
     render(
       <CoachConversationHeroCard
         {...baseProps}
@@ -118,29 +146,51 @@ describe('CoachConversationHeroCard', () => {
     );
 
     const button = screen.getByTestId('coach-conversation-hero-card');
-
-    expect(button.props.accessibilityRole).toBe('button');
     expect(button.props.accessibilityState).toEqual({ disabled: true });
-    expect(button.props.accessibilityLabel).toContain('Parler au coach');
 
     fireEvent.press(button);
-
     expect(onPress).not.toHaveBeenCalled();
   });
 
-  it('keeps the same compact structure in dark mode', () => {
+  it('swaps the portrait for the fallback view when the image fails to load', () => {
+    render(
+      <CoachConversationHeroCard {...baseProps} variant="free_available" />,
+    );
+
+    const portrait = screen.getByTestId('coach-conversation-hero-card-portrait');
+    fireEvent(portrait, 'error');
+
+    expect(
+      screen.getByTestId('coach-conversation-hero-card-portrait-fallback'),
+    ).toBeTruthy();
+    expect(
+      screen.queryByTestId('coach-conversation-hero-card-portrait'),
+    ).toBeNull();
+  });
+
+  it('keeps the same structure in dark mode', () => {
     mockThemeState.colors = DARK_COLORS;
     mockThemeState.isDark = true;
 
-    render(<CoachConversationHeroCard {...baseProps} variant="premium_available" />);
-
-    const surfaceStyle = StyleSheet.flatten(
-      screen.getByTestId('coach-conversation-hero-card-surface').props.style,
+    render(
+      <CoachConversationHeroCard {...baseProps} variant="premium_available" />,
     );
 
-    expect(surfaceStyle.flexDirection).toBe('row');
-    expect(surfaceStyle.shadowOpacity).toBeLessThanOrEqual(0.04);
-    expect(screen.getByTestId('coach-conversation-hero-card-meta')).toBeTruthy();
-    expect(screen.getByTestId('coach-conversation-hero-card-action')).toBeTruthy();
+    expect(screen.getByTestId('coach-conversation-hero-card-gradient')).toBeTruthy();
+    expect(screen.getByTestId('coach-conversation-hero-card-cta')).toBeTruthy();
+    expect(screen.getByTestId('coach-conversation-hero-card-portrait')).toBeTruthy();
+
+    const cardStyle = getPressableStyle('coach-conversation-hero-card');
+    expect(cardStyle.borderRadius).toBe(BORDER_RADIUS.hero);
+    expect(cardStyle.overflow).toBe('hidden');
   });
 });
+
+function getPressableStyle(testID: string) {
+  const button = screen.getByTestId(testID);
+  return StyleSheet.flatten(
+    typeof button.props.style === 'function'
+      ? button.props.style({ pressed: false })
+      : button.props.style,
+  );
+}

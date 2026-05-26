@@ -1,6 +1,8 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import EmailVerificationScreen from '@/screens/EmailVerificationScreen';
+import { updatePreAuthOnboardingDraft } from '@/utils/preAuthOnboarding';
 
 // Mock dependencies
 jest.mock('lucide-react-native', () => ({
@@ -89,8 +91,9 @@ jest.mock('@/services/avatar', () => ({
 }));
 
 describe('EmailVerificationScreen', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
+    await AsyncStorage.clear();
     mockUseLocalSearchParams.mockReturnValue({
       email: 'test@example.com',
       userId: 'user-123',
@@ -184,5 +187,45 @@ describe('EmailVerificationScreen', () => {
       expect(mockSignOut).toHaveBeenCalled();
       expect(mockBack).toHaveBeenCalled();
     });
+  });
+
+  it('finalizes the matching email signup draft without asking for a username again', async () => {
+    await updatePreAuthOnboardingDraft({
+      username: 'draftuser',
+      createdUserId: 'user-123',
+      completionIntent: 'signup-email',
+      lastStep: 'verification',
+    });
+    render(<EmailVerificationScreen />);
+
+    fireEvent.changeText(screen.getByTestId('otp-0'), '123456');
+    fireEvent.press(screen.getByText('Verifier'));
+
+    await waitFor(() => {
+      expect(mockCompleteSignUp).toHaveBeenCalledWith(
+        'user-123',
+        'draftuser',
+        undefined,
+      );
+    });
+    expect(mockReplace).not.toHaveBeenCalledWith('/username-setup');
+  });
+
+  it('does not apply an email signup draft associated with another account', async () => {
+    await updatePreAuthOnboardingDraft({
+      username: 'draftuser',
+      createdUserId: 'another-user',
+      completionIntent: 'signup-email',
+      lastStep: 'verification',
+    });
+    render(<EmailVerificationScreen />);
+
+    fireEvent.changeText(screen.getByTestId('otp-0'), '123456');
+    fireEvent.press(screen.getByText('Verifier'));
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/username-setup');
+    });
+    expect(mockCompleteSignUp).not.toHaveBeenCalled();
   });
 });

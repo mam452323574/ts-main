@@ -1,6 +1,8 @@
 import {
+  buildInsufficientDataCoachResponseEntryValues,
   buildInvalidCoachResponseEntryValues,
   buildReadyCoachEntryValues,
+  COACH_INSUFFICIENT_DATA_ERROR_CODE,
   DEFAULT_COACH_DISCLAIMER,
   INVALID_COACH_RESPONSE_ERROR_CODE,
   resolveCoachPayload,
@@ -231,6 +233,136 @@ describe('coach payload helpers', () => {
         title_present: false,
         body_present: true,
       },
+    });
+  });
+
+  it('throws coach_insufficient_data when the provider signals an n8n templated fallback', () => {
+    const providerPayload = {
+      title: 'Conseil du jour',
+      body: 'Voici un cadre simple : identifie UNE intention claire pour cette semaine.',
+      insufficient_data: true,
+      debug: {
+        fallback_reason: 'generic_error',
+        language: 'fr',
+        prompt_type: 'nutrition_focus',
+        coach_route: 'nutrition_focus',
+        has_scan_intent: true,
+      },
+    };
+
+    expect(() => resolveCoachPayload(providerPayload)).toThrow(Phase2HttpError);
+    try {
+      resolveCoachPayload(providerPayload);
+    } catch (error) {
+      expect(error).toBeInstanceOf(Phase2HttpError);
+      expect((error as Phase2HttpError).code).toBe(
+        COACH_INSUFFICIENT_DATA_ERROR_CODE,
+      );
+      expect((error as Phase2HttpError).status).toBe(422);
+    }
+  });
+
+  it('reads insufficient_data BEFORE the title/body presence check', () => {
+    // Even with title+body present, insufficient_data === true must short-circuit.
+    // This is the production case: n8n always returns a (templated) body so the
+    // contract stays stable, but the flag tells us it is not from the LLM.
+    const providerPayload = {
+      title: 'Titre fallback',
+      body: 'Corps fallback générique',
+      insufficient_data: true,
+    };
+
+    expect(() => resolveCoachPayload(providerPayload)).toThrow(
+      'Coach webhook reported insufficient data',
+    );
+  });
+
+  it('does NOT throw when insufficient_data is absent or false', () => {
+    expect(() =>
+      resolveCoachPayload({
+        title: 'Real',
+        body: 'Real body',
+        insufficient_data: false,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      resolveCoachPayload({
+        title: 'Real',
+        body: 'Real body',
+      }),
+    ).not.toThrow();
+  });
+
+  it('builds an insufficient_data error update that the handler can refund on', () => {
+    const providerPayload = {
+      title: 'Conseil du jour',
+      body: 'Cadre générique fr.',
+      insufficient_data: true,
+      debug: {
+        fallback_reason: 'fallback',
+        language: 'fr',
+        prompt_type: 'nutrition_focus',
+        coach_route: 'nutrition_focus',
+        has_scan_intent: true,
+      },
+    };
+
+    const entryValues = buildInsufficientDataCoachResponseEntryValues({
+      payload: providerPayload,
+      usedFallback: false,
+      requestId: 'req-insufficient',
+    });
+
+    expect(entryValues).toEqual({
+      status: 'error',
+      error_code: COACH_INSUFFICIENT_DATA_ERROR_CODE,
+      response_payload_json: {
+        fallback: false,
+        source: 'coach_generation',
+        provider: 'n8n',
+        status: 'error',
+        error_code: COACH_INSUFFICIENT_DATA_ERROR_CODE,
+        request_id: 'req-insufficient',
+        wrapper_source: 'root',
+        fallback_reason: 'fallback',
+        language: 'fr',
+        prompt_type: 'nutrition_focus',
+        coach_route: 'nutrition_focus',
+        has_scan_intent: true,
+      },
+    });
+  });
+
+  it('lets explicit option fields override the provider debug block', () => {
+    const providerPayload = {
+      title: 't',
+      body: 'b',
+      insufficient_data: true,
+      debug: {
+        fallback_reason: 'fallback',
+        language: 'fr',
+        prompt_type: 'nutrition_focus',
+        has_scan_intent: false,
+      },
+    };
+
+    const entryValues = buildInsufficientDataCoachResponseEntryValues({
+      payload: providerPayload,
+      usedFallback: true,
+      requestId: 'req-override',
+      fallbackReason: 'generic_error',
+      language: 'en',
+      promptType: 'free_question',
+      coachRoute: 'general_fallback',
+      hasScanIntent: true,
+    });
+
+    expect(entryValues.response_payload_json).toMatchObject({
+      fallback_reason: 'generic_error',
+      language: 'en',
+      prompt_type: 'free_question',
+      coach_route: 'general_fallback',
+      has_scan_intent: true,
     });
   });
 });

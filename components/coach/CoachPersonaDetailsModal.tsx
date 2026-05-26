@@ -26,7 +26,10 @@ import {
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { CoachPersonaDefinition } from '@/shared/coachPersonas';
-import type { CoachPersonaVisual } from '@/shared/coachPersonaVisuals';
+import {
+  getCoachPersonaCrop,
+  type CoachPersonaVisual,
+} from '@/shared/coachPersonaVisuals';
 import { Squircle } from '@/components/Squircle';
 
 interface CoachPersonaDetailsModalProps {
@@ -176,6 +179,7 @@ export function CoachPersonaDetailsModal({
                       imageSource={visual.imageSource}
                       fallbackLabel={visual.fallbackLabel}
                       haloTint={visual.haloTint}
+                      imageCrop={getCoachPersonaCrop(visual, 'avatar')}
                       emphasis="featured"
                       size={84}
                       testID="coach-persona-details-avatar"
@@ -295,7 +299,7 @@ const createStyles = (colors: any, footerBottomPadding: number) =>
     },
     backdrop: {
       ...StyleSheet.absoluteFillObject,
-      backgroundColor: withAlpha(colors.primaryText, 0.18),
+      backgroundColor: 'transparent',
     },
     sheet: {
       borderTopLeftRadius: BORDER_RADIUS.xl + 10,

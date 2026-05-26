@@ -273,7 +273,7 @@ describe('SettingsScreen', () => {
     expect(testIds.indexOf('settings-top-chrome')).toBeLessThan(
       testIds.indexOf('settings-profile-header'),
     );
-    expect(topChromeStyle.backgroundColor).toBe('#000000');
+    expect(topChromeStyle.backgroundColor).toBe('#F2F2F7');
     expect(topChromeStyle.borderBottomWidth).toBe(0);
     expect(topChromeStyle.borderBottomColor).toBe('transparent');
     expect(screen.getByTestId('settings-quota-summary')).toBeTruthy();

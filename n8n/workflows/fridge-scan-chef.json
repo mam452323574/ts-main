@@ -33,14 +33,22 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ $json.response_payload }}",
+        "responseBody": "={{ $json.body }}",
         "options": {
           "responseCode": "={{ $json.normalized_ok ? 200 : 400 }}",
           "responseHeaders": {
             "entries": [
               {
                 "name": "Content-Type",
-                "value": "application/json"
+                "value": "application/json; charset=utf-8"
+              },
+              {
+                "name": "x-webhook-response-timestamp",
+                "value": "={{ $json.headers['x-webhook-response-timestamp'] }}"
+              },
+              {
+                "name": "x-webhook-response-signature",
+                "value": "={{ $json.headers['x-webhook-response-signature'] }}"
               }
             ]
           }
@@ -664,6 +672,66 @@
         1980,
         300
       ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const TOLERANCE_MS = 5 * 60 * 1000;\nconst SIGNATURE_PREFIX = 'sha256=';\n\nconst first = $input.first();\nconst headers = (first && first.json && first.json.headers) || (first && first.headers) || {};\nconst bodyObj = (first && first.json && first.json.body) || (first && first.body) || (first && first.json) || {};\nconst rawBody = JSON.stringify(bodyObj);\n\nconst timestamp = headers['x-webhook-timestamp'] || headers['X-Webhook-Timestamp'];\nconst signature = headers['x-webhook-signature'] || headers['X-Webhook-Signature'];\nconst secret = ($env.PHASE2_WEBHOOK_HMAC_SECRET || $env.COACH_WEBHOOK_HMAC_SECRET || '').trim();\n\nif (!secret) {\n  throw new Error('PHASE2_WEBHOOK_HMAC_SECRET missing on n8n side');\n}\nif (!timestamp || !signature) {\n  throw new Error('Webhook missing x-webhook-timestamp or x-webhook-signature');\n}\n\n// Anti-replay : timestamp dans une fenêtre de 5 min\nconst tsDate = new Date(String(timestamp));\nif (Number.isNaN(tsDate.getTime())) {\n  throw new Error('Invalid x-webhook-timestamp format');\n}\nconst drift = Math.abs(Date.now() - tsDate.getTime());\nif (drift > TOLERANCE_MS) {\n  throw new Error(`Webhook timestamp drift ${drift}ms exceeds tolerance`);\n}\n\n// Recalcul de la signature\nconst textEncoder = new TextEncoder();\nfunction arrayBufferToHex(buffer) {\n  return Array.from(new Uint8Array(buffer)).map((value) => value.toString(16).padStart(2, '0')).join('');\n}\n\nasync function verifyHmac(payload, secret, providedSig) {\n  let expectedHex;\n  try {\n    const crypto = require('crypto');\n    expectedHex = crypto.createHmac('sha256', secret).update(payload).digest('hex');\n  } catch (nodeError) {\n    const subtle = globalThis.crypto && globalThis.crypto.subtle;\n    if (!subtle) {\n      throw new Error('Neither Node crypto nor Web Crypto is available. ' + nodeError.message);\n    }\n    const signingKey = await subtle.importKey('raw', textEncoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);\n    const signatureBuffer = await subtle.sign('HMAC', signingKey, textEncoder.encode(payload));\n    expectedHex = arrayBufferToHex(signatureBuffer);\n  }\n\n  const expected = SIGNATURE_PREFIX + expectedHex;\n  \n  // Constant-time comparison\n  let mismatch = expected.length ^ providedSig.length;\n  const maxLength = Math.max(expected.length, providedSig.length);\n  for (let index = 0; index < maxLength; index += 1) {\n    mismatch |= (expected.charCodeAt(index) || 0) ^ (providedSig.charCodeAt(index) || 0);\n  }\n  if (mismatch !== 0) {\n    throw new Error('Webhook signature mismatch');\n  }\n}\n\nawait verifyHmac(String(timestamp) + '.' + rawBody, secret, String(signature));\n\nconst isSmoke = typeof bodyObj._smoke_test === 'string' && bodyObj._smoke_test.startsWith('check_signing_');\n\nreturn [{\n  json: {\n    ...$input.first().json,\n    _is_smoke_test: isSmoke\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        130,
+        -200
+      ],
+      "id": "d78d0589-2800-4d61-af4c-9476d9cc3dc0",
+      "name": "Verify Coach Webhook HMAC (fridge-scan)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "smoke-test-condition",
+              "leftValue": "={{ $json._is_smoke_test }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "adc92dd9-e03b-4bdd-8bfa-36e9b66e3b44",
+      "name": "Smoke Switch (fridge-scan)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        290,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ENFORCE = ($env.COACH_WEBHOOK_HMAC_ENFORCE || '').trim().toLowerCase() === 'true';\nconst SECRET = ($env.PHASE2_WEBHOOK_HMAC_SECRET || $env.COACH_WEBHOOK_HMAC_SECRET || '').trim();\n\nif (!SECRET) {\n  if (ENFORCE) {\n    throw new Error('sign_webhook_response_secret_missing');\n  }\n  console.warn('[sign-webhook-response] HMAC secret not configured (dual-mode, skipping signature)');\n  return $input.all();\n}\n\nconst originalJson = $input.first().json;\nconst bodyToSign = originalJson.response_payload || originalJson;\nconst rawBody = JSON.stringify(bodyToSign);\nconst timestamp = new Date().toISOString();\nconst payload = timestamp + '.' + rawBody;\n\nconst textEncoder = new TextEncoder();\nfunction arrayBufferToHex(buffer) {\n  return Array.from(new Uint8Array(buffer)).map((value) => value.toString(16).padStart(2, '0')).join('');\n}\n\nasync function signResponse(payload, secret) {\n  try {\n    const crypto = require('crypto');\n    return 'sha256=' + crypto.createHmac('sha256', secret).update(payload).digest('hex');\n  } catch (nodeError) {\n    const subtle = globalThis.crypto && globalThis.crypto.subtle;\n    if (!subtle) {\n      throw new Error('Neither Node crypto nor Web Crypto is available. ' + nodeError.message);\n    }\n    const signingKey = await subtle.importKey('raw', textEncoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);\n    const signatureBuffer = await subtle.sign('HMAC', signingKey, textEncoder.encode(payload));\n    return 'sha256=' + arrayBufferToHex(signatureBuffer);\n  }\n}\n\nconst sig = await signResponse(payload, SECRET);\n\nreturn [{\n  json: {\n    ...originalJson,\n    body: bodyToSign,\n    headers: {\n      'x-webhook-response-timestamp': timestamp,\n      'x-webhook-response-signature': sig,\n    }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        390,
+        -100
+      ],
+      "id": "ebf6d80f-9fab-4495-9a6e-bf6d0d8acf5d",
+      "name": "Sign Webhook Response (fridge-scan-chef)"
     }
   ],
   "connections": {
@@ -671,7 +739,7 @@
       "main": [
         [
           {
-            "node": "Normalize inbound fridge scan",
+            "node": "Verify Coach Webhook HMAC (fridge-scan)",
             "type": "main",
             "index": 0
           }
@@ -682,7 +750,7 @@
       "main": [
         [
           {
-            "node": "Respond to App",
+            "node": "Sign Webhook Response (fridge-scan-chef)",
             "type": "main",
             "index": 0
           }
@@ -910,6 +978,46 @@
         [
           {
             "node": "Complete fridge scan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Coach Webhook HMAC (fridge-scan)": {
+      "main": [
+        [
+          {
+            "node": "Smoke Switch (fridge-scan)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Smoke Switch (fridge-scan)": {
+      "main": [
+        [
+          {
+            "node": "Sign Webhook Response (fridge-scan-chef)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normalize inbound fridge scan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign Webhook Response (fridge-scan-chef)": {
+      "main": [
+        [
+          {
+            "node": "Respond to App",
             "type": "main",
             "index": 0
           }

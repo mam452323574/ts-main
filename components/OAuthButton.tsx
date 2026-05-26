@@ -12,7 +12,6 @@ import {
   BORDER_RADIUS,
   SIZES,
   SPACING,
-  mixColors,
   withAlpha,
 } from '@/constants/theme';
 import { Squircle } from '@/components/Squircle';
@@ -35,17 +34,12 @@ export function OAuthButton({
   const isDisabled = disabled || loading;
 
   const config = useMemo(() => {
-    const surfaceColor = colors.surfaceElevated ?? colors.cardBackground;
-
     if (provider === 'google') {
       return {
         label: 'Continuer avec Google',
-        backgroundColor: isDark
-          ? mixColors(surfaceColor, colors.primary, 0.08)
-          : '#FFFFFF',
-        borderColor: isDark
-          ? withAlpha(colors.primary, 0.24)
-          : withAlpha(colors.primaryText, 0.1),
+        backgroundColor: colors.cardBackground,
+        borderColor:
+          colors.borderSubtle ?? withAlpha(colors.primaryText, isDark ? 0.12 : 0.08),
         textColor: colors.primaryText,
         loaderColor: colors.primary,
       };
@@ -120,18 +114,14 @@ const createStyles = (colors: any, isDark: boolean) =>
   StyleSheet.create({
     button: {
       width: '100%',
-      minHeight: 54,
+      minHeight: 56,
       borderRadius: BORDER_RADIUS.pill,
       paddingVertical: SPACING.md,
       paddingHorizontal: SPACING.lg,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1,
-      shadowColor: isDark ? colors.primary : '#000000',
-      shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: isDark ? 0.14 : 0.06,
-      shadowRadius: 18,
-      elevation: 2, borderCurve: 'continuous',
+      borderCurve: 'continuous',
     },
     buttonPressed: {
       transform: [{ translateY: 1 }],

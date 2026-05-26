@@ -514,6 +514,10 @@ describe('SuperScanResultScreen', () => {
 
     fireEvent.press(rendered.getByTestId('super-scan-coach-cta-button'));
 
+    // After the post-scan mapping fix: free user + super scan with actionable
+    // risk priority → latest_scan top priority preset (premium would route to
+    // risk_watch). The legacy 'latest_scan_issue_resolution' prompt_type is
+    // preserved on the encoded scan_intent payload only.
     expect(mockPush).toHaveBeenCalledWith(
       expect.objectContaining({
         pathname: '/coach',
@@ -522,7 +526,8 @@ describe('SuperScanResultScreen', () => {
           autoSubmit: '1',
           scanId: 'scan-super-cta',
           scanType: 'super',
-          promptType: 'latest_scan_issue_resolution',
+          promptType: 'latest_scan',
+          questionKey: 'latest_scan__top_priority_today',
           fallbackPromptType: 'latest_scan',
           scanIntent: expect.any(String),
         }),
@@ -558,6 +563,8 @@ describe('SuperScanResultScreen', () => {
 
     fireEvent.press(rendered.getByTestId('super-scan-fat-coach-cta-button'));
 
+    // Premium user + stable super scan (fat distribution layout): mapped to
+    // trend_review__habits_to_continue (maintain experience, premium tier).
     expect(mockPush).toHaveBeenCalledWith(
       expect.objectContaining({
         pathname: '/coach',
@@ -566,7 +573,8 @@ describe('SuperScanResultScreen', () => {
           autoSubmit: '1',
           scanId: 'scan-fat-cta',
           scanType: 'super',
-          promptType: 'latest_scan_issue_resolution',
+          promptType: 'trend_review',
+          questionKey: 'trend_review__habits_to_continue',
           fallbackPromptType: 'latest_scan',
           scanIntent: expect.any(String),
         }),

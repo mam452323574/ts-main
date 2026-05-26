@@ -61,53 +61,33 @@ export interface OnboardingPalette {
 }
 
 export function buildAuthPalette(colors: ThemeColors, isDark: boolean): AuthPalette {
-  const elevatedSurface = colors.surfaceElevated ?? colors.cardBackground;
-  const background = isDark
-    ? mixColors(colors.background, colors.primary, 0.08)
-    : mixColors(colors.background, colors.gold, 0.06);
-  const accent = isDark
-    ? mixColors(colors.primary, colors.white, 0.08)
-    : mixColors(colors.primary, colors.white, 0.02);
+  const surfaceMuted = colors.surfaceMuted ?? colors.cardBackground;
+  const accent = colors.primary;
 
   return {
     accent,
-    accentSoft: withAlpha(accent, isDark ? 0.14 : 0.12),
-    accentSofter: isDark
-      ? mixColors(elevatedSurface, accent, 0.1)
-      : mixColors(colors.cardBackground, accent, 0.08),
+    accentSoft: withAlpha(accent, isDark ? 0.18 : 0.1),
+    accentSofter: surfaceMuted,
     accentRing: accent,
     accentText: accent,
-    surface: isDark
-      ? mixColors(elevatedSurface, colors.white, 0.02)
-      : mixColors(colors.cardBackground, colors.white, 0.12),
-    surfaceStrong: isDark
-      ? mixColors(elevatedSurface, colors.white, 0.05)
-      : mixColors(colors.cardBackground, colors.primaryText, 0.025),
-    surfaceGlass:
-      colors.surfaceGlass ??
-      withAlpha(isDark ? elevatedSurface : colors.cardBackground, isDark ? 0.88 : 0.92),
-    surfaceSubtle: mixColors(
-      isDark ? elevatedSurface : colors.cardBackground,
-      accent,
-      isDark ? 0.08 : 0.05,
-    ),
-    divider: isDark ? withAlpha(colors.white, 0.08) : withAlpha(accent, 0.16),
+    surface: colors.cardBackground,
+    surfaceStrong: mixColors(colors.cardBackground, accent, isDark ? 0.1 : 0.045),
+    surfaceGlass: colors.cardBackground,
+    surfaceSubtle: surfaceMuted,
+    divider: colors.borderSubtle ?? withAlpha(colors.primaryText, isDark ? 0.12 : 0.08),
     inverseText: colors.background,
-    background,
-    heroGlowPrimary: withAlpha(accent, isDark ? 0.22 : 0.14),
-    heroGlowSecondary: withAlpha(colors.gold, isDark ? 0.16 : 0.12),
-    heroBorder: withAlpha(accent, isDark ? 0.24 : 0.18),
-    secondaryActionFill: isDark
-      ? withAlpha(colors.white, 0.06)
-      : withAlpha(colors.primaryText, 0.03),
-    secondaryActionBorder: isDark
-      ? withAlpha(colors.white, 0.12)
-      : withAlpha(colors.primaryText, 0.08),
+    background: colors.background,
+    heroGlowPrimary: 'transparent',
+    heroGlowSecondary: 'transparent',
+    heroBorder: colors.borderSubtle ?? withAlpha(colors.primaryText, isDark ? 0.12 : 0.08),
+    secondaryActionFill: surfaceMuted,
+    secondaryActionBorder:
+      colors.borderSubtle ?? withAlpha(colors.primaryText, isDark ? 0.12 : 0.08),
     progressInactive: isDark
       ? withAlpha(colors.white, 0.14)
       : withAlpha(colors.primaryText, 0.1),
     progressActive: accent,
-    shadowColor: isDark ? accent : colors.primaryText,
+    shadowColor: 'transparent',
   };
 }
 

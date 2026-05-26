@@ -263,6 +263,48 @@ describe('CoachGuidanceCard', () => {
     expect(screen.getByText('Reduire')).toBeTruthy();
   });
 
+  it('uses a heart icon for the final encouragement note instead of sparkles', () => {
+    render(
+      <CoachGuidanceCard
+        variant="fresh"
+        eyebrow="Conseil"
+        statusLabel="Recent"
+        personaKey="gentle_supportive"
+        personaLabel="Personnalite du Coach"
+        personaValue="Noah"
+        personaAvatarFallbackLabel="NO"
+        personaAvatarHaloTint="#88A7FF"
+        title="Progression douce"
+        body="Fallback body."
+        content={{
+          title: 'Progression douce',
+          summary: 'Garde un rythme simple et regulier.',
+          context_notes: [],
+          priorities: [],
+          action_steps: [],
+          warnings: [],
+          encouragement: 'Un petit pas propre vaut mieux qu un grand elan flou.',
+          primary_metric_delta: null,
+          data_gaps: [],
+          confidence: 'high',
+        }}
+        disclaimerLabel="Rappel non diagnostique"
+        disclaimerPillLabel="Info, pas diagnostic"
+        disclaimer="Wellness guidance only. This is not a diagnosis or medical advice."
+        expandLabel="Lire la suite"
+        collapseLabel="Reduire"
+        continuationHintLabel="Contenu resume, touchez pour ouvrir"
+        defaultExpanded
+      />,
+    );
+
+    expect(screen.getByTestId('coach-section-encouragement')).toBeTruthy();
+    const encouragementIcon = screen.UNSAFE_getByType('Heart' as any);
+    expect(encouragementIcon.props.size).toBe(14);
+    expect(encouragementIcon.props.strokeWidth).toBe(2);
+    expect(screen.UNSAFE_queryByType('Sparkles' as any)).toBeNull();
+  });
+
   it('renders structured guidance expanded by default when requested and still lets the user collapse it', () => {
     render(
       <CoachGuidanceCard

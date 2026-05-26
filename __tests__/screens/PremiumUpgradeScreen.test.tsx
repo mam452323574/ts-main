@@ -4,7 +4,6 @@ import { Platform } from 'react-native';
 
 import PremiumUpgradeScreen from '@/screens/PremiumUpgradeScreen';
 import { i18n, loadLocalesForTests } from '@/i18n/translations';
-import { LIGHT_COLORS, getAndroidLightSurface } from '@/constants/theme';
 
 const mockBack = jest.fn();
 const mockDismiss = jest.fn();
@@ -224,22 +223,10 @@ describe('PremiumUpgradeScreen', () => {
     expect(screen.queryByText(/unlimited scans/i)).toBeNull();
   });
 
-  it('uses Android light shell styling on the highlighted annual package card', async () => {
+  it('keeps the selected Android package card flat with a restrained border highlight', async () => {
     Object.defineProperty(Platform, 'OS', {
       value: 'android',
       configurable: true,
-    });
-
-    const annualSurface = getAndroidLightSurface(LIGHT_COLORS, {
-      accentColor: LIGHT_COLORS.gold,
-      shadowColor: LIGHT_COLORS.gold,
-      backgroundAlpha: 0.07,
-      borderAlpha: 0.22,
-      overlayAlpha: 0.1,
-      shadowOpacity: 0.12,
-      shadowRadius: 18,
-      shadowOffsetY: 8,
-      elevation: 4,
     });
 
     const { getByTestId } = render(<PremiumUpgradeScreen />);
@@ -254,16 +241,14 @@ describe('PremiumUpgradeScreen', () => {
     expect(annualShellStyles).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          elevation: 4,
-          shadowColor: annualSurface.shadowStyle.shadowColor,
+          elevation: 0,
+          shadowOpacity: 0,
         }),
       ]),
     );
     expect(annualSurfaceStyles).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          backgroundColor: annualSurface.backgroundColor,
-          borderColor: annualSurface.borderColor,
           borderWidth: 1.5,
         }),
       ]),
@@ -334,6 +319,16 @@ describe('PremiumUpgradeScreen', () => {
         screen.getAllByText(String(i18n.t('premium.subscription_page.entry_offer_cta'))).length,
       ).toBeGreaterThan(0);
     });
+
+    const monthlySurfaceStyles = getStyles(screen.getByTestId('premium-card-monthly-surface').props.style);
+    const annualSurfaceStyles = getStyles(screen.getByTestId('premium-card-annual-surface').props.style);
+
+    expect(monthlySurfaceStyles).toEqual(
+      expect.arrayContaining([expect.objectContaining({ borderWidth: 1.5 })]),
+    );
+    expect(annualSurfaceStyles).toEqual(
+      expect.arrayContaining([expect.objectContaining({ borderWidth: 1 })]),
+    );
 
     fireEvent.press(screen.getByTestId('premium-card-monthly-cta'));
 

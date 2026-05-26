@@ -22,6 +22,7 @@ import {
   type ThemeColors,
   withAlpha,
 } from '@/constants/theme';
+import type { CoachImageCrop } from '@/shared/coachImageCrop';
 
 import type {
   CoachGenerationPromptType,
@@ -32,6 +33,14 @@ export interface CoachPromptVisual {
   icon: LucideIcon;
   accentColor: string;
   artworkSource: ImageSourcePropType;
+  /**
+   * Per-prompt cropping. Most prompt artworks have the subject centred but
+   * occupy only ~40–45% of the 768×768 source, so a small `imageScale` bump
+   * gives them more visual presence inside the artwork frame. A handful of
+   * prompts have a slightly off-centre subject (loupe, kettlebell) and use
+   * a small downscale or shifted position instead.
+   */
+  crop?: CoachImageCrop;
 }
 
 export interface CoachPromptPalette {
@@ -57,61 +66,76 @@ export const COACH_PROMPT_VISUALS: Record<CoachGenerationPromptType, CoachPrompt
     icon: MessageCircle,
     accentColor: '#88A978',
     artworkSource: require('../assets/images/coach/prompts/latest_scan.webp'),
+    crop: { imageScale: 1.1 },
   },
   latest_scan: {
     icon: ScanSearch,
     accentColor: '#7FA9D4',
     artworkSource: require('../assets/images/coach/prompts/latest_scan.webp'),
+    crop: { imageScale: 1.1 },
   },
   latest_scan_issue_resolution: {
     icon: ScanSearch,
     accentColor: '#7FA9D4',
     artworkSource: require('../assets/images/coach/prompts/latest_scan.webp'),
+    crop: { imageScale: 1.1 },
   },
   weekly_plan: {
     icon: CalendarDays,
     accentColor: '#C99A64',
     artworkSource: require('../assets/images/coach/prompts/weekly_plan.webp'),
+    crop: { imageScale: 1.1 },
   },
   recovery_plan: {
     icon: RefreshCw,
     accentColor: '#A99BCF',
     artworkSource: require('../assets/images/coach/prompts/recovery_plan.webp'),
+    crop: { imageScale: 1.1 },
   },
   nutrition_focus: {
     icon: Apple,
     accentColor: '#72AFA8',
     artworkSource: require('../assets/images/coach/prompts/nutrition_focus.webp'),
+    crop: { imageScale: 1.1 },
   },
   body_focus: {
     icon: Dumbbell,
     accentColor: '#8D9EC8',
     artworkSource: require('../assets/images/coach/prompts/body_focus.webp'),
+    // Sujet (haltère) placé en diagonale et décalé bas-droite dans l'asset :
+    //   un imageScale > 1 pousse une des extrémités hors-frame. On garde 1.0
+    //   pour conserver l'haltère entier après le crop `contentFit="cover"`.
+    crop: { imageScale: 1.0 },
   },
   face_focus: {
     icon: ScanFace,
     accentColor: '#D98B86',
     artworkSource: require('../assets/images/coach/prompts/face_focus.webp'),
+    crop: { imageScale: 1.1 },
   },
   hydration_focus: {
     icon: Droplets,
     accentColor: '#78AAC8',
     artworkSource: require('../assets/images/coach/prompts/hydration_focus.webp'),
+    crop: { imageScale: 1.15 },
   },
   sleep_coach: {
     icon: Moon,
     accentColor: '#8C98BD',
     artworkSource: require('../assets/images/coach/prompts/sleep_coach.webp'),
+    crop: { imageScale: 1.1 },
   },
   risk_watch: {
     icon: ShieldAlert,
     accentColor: '#C48667',
     artworkSource: require('../assets/images/coach/prompts/risk_watch.webp'),
+    crop: { imageScale: 0.95 },
   },
   trend_review: {
     icon: LineChart,
     accentColor: '#7FA9D4',
     artworkSource: require('../assets/images/coach/prompts/trend_review.webp'),
+    crop: { imageScale: 1.1 },
   },
 };
 

@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Check, Crown, Lock } from 'lucide-react-native';
+import { Check } from 'lucide-react-native';
 
 import { useTheme } from '@/contexts/ThemeContext';
 import {
@@ -15,9 +15,15 @@ import {
   SPACING,
   withAlpha,
 } from '@/constants/theme';
+import { CoachLockBadge } from '@/components/coach/CoachLockBadge';
 import { CoachPersonaAvatar } from '@/components/coach/CoachPersonaAvatar';
+import type { CoachImageCrop } from '@/shared/coachImageCrop';
 import type { CoachPersonaVisual } from '@/shared/coachPersonaVisuals';
 import { Squircle } from '@/components/Squircle';
+
+// Historical scale used by the portrait artwork — preserved as the fallback
+// when no per-asset `imageScale` is supplied.
+const PORTRAIT_DEFAULT_SCALE = 1.08;
 
 interface CoachPersonaCardProps {
   title: string;
@@ -31,6 +37,11 @@ interface CoachPersonaCardProps {
   disabled?: boolean;
   lockedBadgeLabel?: string;
   lockedHint?: string;
+  /**
+   * Per-asset crop override. When omitted the card keeps its historical
+   * centred crop and 1.08× scale — matching the previous behaviour.
+   */
+  imageCrop?: CoachImageCrop;
   onPress: () => void;
   testID?: string;
 }
@@ -47,6 +58,7 @@ export function CoachPersonaCard({
   disabled = false,
   lockedBadgeLabel,
   lockedHint,
+  imageCrop,
   onPress,
   testID,
 }: CoachPersonaCardProps) {
@@ -55,6 +67,8 @@ export function CoachPersonaCard({
   const isPortrait = variant === 'portrait';
   const [imageFailed, setImageFailed] = useState(false);
   const styles = createStyles(colors, isDark, isCompact, isPortrait);
+  const portraitImageScale = imageCrop?.imageScale ?? PORTRAIT_DEFAULT_SCALE;
+  const portraitContentPosition = imageCrop?.contentPosition;
   const cardSurface = getVisualMoodSurface(colors, isDark, {
     mood: 'obsidian',
     accentColor: avatarHaloTint,
@@ -108,7 +122,12 @@ export function CoachPersonaCard({
               <Image
                 source={avatarImageSource}
                 contentFit="cover"
-                style={[styles.portraitImage, locked && styles.portraitImageDimmed]}
+                contentPosition={portraitContentPosition}
+                style={[
+                  styles.portraitImage,
+                  { transform: [{ scale: portraitImageScale }] },
+                  locked && styles.portraitImageDimmed,
+                ]}
                 onError={() => setImageFailed(true)}
                 testID={testID ? `${testID}-portrait-image` : undefined}
               />
@@ -221,25 +240,11 @@ export function CoachPersonaCard({
             testID={testID ? `${testID}-lock-blur` : undefined}
           />
           <View style={styles.lockScrim} />
-          <View
+          <CoachLockBadge
+            label={lockedBadgeLabel}
             style={[styles.lockBadge, isPortrait && styles.lockBadgePortrait]}
-            testID={testID ? `${testID}-lock-badge` : undefined}
-          >
-            <Crown
-              color={colors.gold ?? '#FFD700'}
-              fill={colors.gold ?? '#FFD700'}
-              size={12}
-              testID={testID ? `${testID}-lock-crown` : undefined}
-            />
-            <Lock
-              color={colors.gold ?? '#FFD700'}
-              size={12}
-              testID={testID ? `${testID}-lock-icon` : undefined}
-            />
-            {lockedBadgeLabel ? (
-              <Text style={styles.lockBadgeText}>{lockedBadgeLabel}</Text>
-            ) : null}
-          </View>
+            testID={testID}
+          />
         </View>
       ) : null}
     </Pressable>
@@ -314,6 +319,11 @@ const createStyles = (
     },
     titlePortrait: {
       color: isDark ? colors.white : colors.primaryText,
+      textShadowColor: isDark
+        ? 'rgba(0,0,0,0.55)'
+        : 'rgba(0,0,0,0.12)',
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: isDark ? 3 : 2,
     },
     titleActive: {
       color: colors.primary,
@@ -356,7 +366,6 @@ const createStyles = (
     portraitImage: {
       width: '100%',
       height: '100%',
-      transform: [{ scale: 1.08 }],
     },
     portraitImageDimmed: {
       opacity: 0.76,
@@ -379,7 +388,7 @@ const createStyles = (
       left: 0,
       right: 0,
       bottom: 0,
-      height: 88,
+      height: 108,
     },
     lockOverlay: {
       ...StyleSheet.absoluteFillObject,
@@ -396,28 +405,8 @@ const createStyles = (
     },
     lockBadge: {
       alignSelf: 'flex-start',
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 5,
-      paddingHorizontal: SPACING.sm + 2,
-      paddingVertical: 5,
-      borderRadius: BORDER_RADIUS.full,
-      backgroundColor: mixColors(
-        colors.goldLight ?? '#FFF8E1',
-        colors.background,
-        isDark ? 0.68 : 0.12,
-      ),
-      borderWidth: 1,
-      borderColor: withAlpha(colors.gold ?? '#FFD700', 0.32), borderCurve: 'continuous',
     },
     lockBadgePortrait: {
       alignSelf: 'flex-end',
-    },
-    lockBadgeText: {
-      fontSize: 10,
-      fontWeight: FONT_WEIGHTS.bold,
-      color: colors.gold ?? '#FFD700',
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
     },
   });

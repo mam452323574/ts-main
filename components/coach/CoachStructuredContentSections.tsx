@@ -14,10 +14,10 @@ import {
   Compass,
   Eye,
   Flame,
+  Heart,
   Repeat,
   ScanLine,
   ShoppingBag,
-  Sparkles,
   Target,
   Utensils,
 } from 'lucide-react-native';
@@ -693,7 +693,7 @@ export function CoachStructuredContentSections({
           style={styles.encouragementRow}
           testID={`${testIDPrefix}-encouragement`}
         >
-          <Sparkles
+          <Heart
             color={iconColor}
             size={14}
             strokeWidth={2}

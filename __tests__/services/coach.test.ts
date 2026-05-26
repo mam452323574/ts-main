@@ -1,6 +1,7 @@
 import {
   buildCoachPayload,
   fetchCoachEntries,
+  fetchCoachEntryErrorSummary,
   fetchCoachHistoryPage,
   fetchCoachHistorySummary,
   fetchCoachScreenSnapshot,
@@ -10,6 +11,9 @@ import {
   getCoachEntryFailureDebugInfo,
   getCoachQuotaFromError,
   getCoachServiceErrorDebugInfo,
+  invalidateCoachProfileMemoryCache,
+  mergeCoachEntryFailureDebugInfo,
+  resolveCoachFailureKindFromDebugInfo,
   resolveCoachFailureKindFromEntry,
   resolveCoachFailureKindFromError,
   isCoachQuotaExhaustedError,
@@ -19,6 +23,13 @@ import {
 } from '@/services/coach';
 import { DEFAULT_COACH_PERSONA_KEY } from '@/shared/coachPersonas';
 import type { CoachGuidancePayload, CoachScanDigest } from '@/types';
+import { logExpectedFailure, logOperationalError } from '@/utils/observability';
+
+jest.mock('@/utils/observability', () => ({
+  logOperationalError: jest.fn(),
+  logExpectedFailure: jest.fn(),
+  logOperationalInfo: jest.fn(),
+}));
 
 const { supabase } = jest.requireMock('@/services/supabase') as {
   supabase: {
@@ -3233,6 +3244,469 @@ describe('coach service', () => {
       expect(sanitized.message).toBe('plain');
       expect(sanitized.providerFailureKind).toBeNull();
       expect(sanitized.providerNodeName).toBeNull();
+    });
+  });
+
+  describe('coach-sync-profile-memory skip-if-fresh cache', () => {
+    const SYNC_URL_FRAGMENT = '/functions/v1/coach-sync-profile-memory';
+    const recentScans = [
+      createFaceScanRow('scan-face-cache', '2026-05-19T08:00:00.000Z'),
+    ];
+
+    function mockSessionForUser(userId: string) {
+      supabase.auth.getSession.mockResolvedValue({
+        data: {
+          session: {
+            access_token: `token-${userId}`,
+            user: { id: userId },
+          },
+        },
+      });
+    }
+
+    function mockTwoGenerationsHappyPath() {
+      supabase.from.mockImplementation((table: string) => {
+        if (table === 'scans') {
+          return createScansSelectMock(recentScans);
+        }
+        return createLatestEntrySelectMock(null);
+      });
+
+      const generationResponseBody = JSON.stringify({
+        success: true,
+        cached: false,
+        entry_id: 'entry-cached-coach',
+        persona_key: 'gentle_supportive',
+        prompt_type: 'latest_scan',
+        status: 'ready',
+        title: 'Coach guidance',
+        body: 'Stay consistent.',
+        disclaimer:
+          'Wellness guidance only. This is not a diagnosis or medical advice.',
+        cta_label: null,
+        cta_route: null,
+        source: 'n8n',
+        response_payload_json: {},
+        quota: null,
+      });
+      const syncResponseBody = JSON.stringify({
+        success: true,
+        applied_count: 0,
+        profile_memory: {
+          detected_diet_signals: ['protein_focus'],
+          detected_strong_focus: 'nutrition',
+          suggested_goals: ['Hydration'],
+          suggested_persona_key: 'patient_calm',
+          last_updated_at: '2026-05-19T08:00:00.000Z',
+          update_count: 1,
+        },
+      });
+
+      global.fetch = jest.fn(async (url: string) => {
+        if (typeof url === 'string' && url.includes(SYNC_URL_FRAGMENT)) {
+          return { ok: true, text: async () => syncResponseBody } as any;
+        }
+        return { ok: true, text: async () => generationResponseBody } as any;
+      }) as typeof global.fetch;
+    }
+
+    beforeEach(() => {
+      invalidateCoachProfileMemoryCache();
+    });
+
+    afterEach(() => {
+      invalidateCoachProfileMemoryCache();
+    });
+
+    it('skips the Edge call when a fresh cached result exists for the same user', async () => {
+      mockSessionForUser('user-cache-hit');
+      mockTwoGenerationsHappyPath();
+
+      await generateCoachGuidance({
+        promptType: 'latest_scan',
+        personaKey: 'gentle_supportive',
+      });
+      await generateCoachGuidance({
+        promptType: 'latest_scan',
+        personaKey: 'gentle_supportive',
+      });
+
+      const syncCalls = (global.fetch as jest.Mock).mock.calls.filter(
+        ([url]) => typeof url === 'string' && url.includes(SYNC_URL_FRAGMENT),
+      );
+      expect(syncCalls).toHaveLength(1);
+    });
+
+    it('re-invokes the Edge after invalidateCoachProfileMemoryCache()', async () => {
+      mockSessionForUser('user-cache-invalidated');
+      mockTwoGenerationsHappyPath();
+
+      await generateCoachGuidance({
+        promptType: 'latest_scan',
+        personaKey: 'gentle_supportive',
+      });
+      invalidateCoachProfileMemoryCache();
+      await generateCoachGuidance({
+        promptType: 'latest_scan',
+        personaKey: 'gentle_supportive',
+      });
+
+      const syncCalls = (global.fetch as jest.Mock).mock.calls.filter(
+        ([url]) => typeof url === 'string' && url.includes(SYNC_URL_FRAGMENT),
+      );
+      expect(syncCalls).toHaveLength(2);
+    });
+
+    it('keeps a valid cache entry when a later Edge sync fails', async () => {
+      mockSessionForUser('user-cache-resilient');
+
+      supabase.from.mockImplementation((table: string) => {
+        if (table === 'scans') {
+          return createScansSelectMock(recentScans);
+        }
+        return createLatestEntrySelectMock(null);
+      });
+
+      const generationResponseBody = JSON.stringify({
+        success: true,
+        cached: false,
+        entry_id: 'entry-resilient',
+        persona_key: 'gentle_supportive',
+        prompt_type: 'latest_scan',
+        status: 'ready',
+        title: 'Coach guidance',
+        body: 'Stay consistent.',
+        disclaimer:
+          'Wellness guidance only. This is not a diagnosis or medical advice.',
+        cta_label: null,
+        cta_route: null,
+        source: 'n8n',
+        response_payload_json: {},
+        quota: null,
+      });
+      const syncOkBody = JSON.stringify({
+        success: true,
+        applied_count: 0,
+        profile_memory: null,
+      });
+
+      let syncInvocationCount = 0;
+      global.fetch = jest.fn(async (url: string) => {
+        if (typeof url === 'string' && url.includes(SYNC_URL_FRAGMENT)) {
+          syncInvocationCount += 1;
+          if (syncInvocationCount === 1) {
+            return { ok: true, text: async () => syncOkBody } as any;
+          }
+          return {
+            ok: false,
+            status: 429,
+            text: async () =>
+              JSON.stringify({
+                code: 'coach_profile_sync_rate_limit_exceeded',
+                error: 'Coach profile sync rate limit exceeded for window: minute',
+              }),
+          } as any;
+        }
+        return { ok: true, text: async () => generationResponseBody } as any;
+      }) as typeof global.fetch;
+
+      await generateCoachGuidance({
+        promptType: 'latest_scan',
+        personaKey: 'gentle_supportive',
+      });
+      invalidateCoachProfileMemoryCache();
+      // A second attempt right after invalidation hits the Edge — and the Edge
+      // returns 429. The cache must NOT be populated with a corrupted entry;
+      // a third attempt after a fresh invalidation should still reach the Edge.
+      await generateCoachGuidance({
+        promptType: 'latest_scan',
+        personaKey: 'gentle_supportive',
+      });
+      invalidateCoachProfileMemoryCache();
+      await generateCoachGuidance({
+        promptType: 'latest_scan',
+        personaKey: 'gentle_supportive',
+      });
+
+      // Three sync invocations total — confirms a failed Edge response does
+      // not leave a "successful" entry in the cache.
+      expect(syncInvocationCount).toBe(3);
+    });
+
+    it('logs a 429 sync rate-limit at WARN (not ERROR)', async () => {
+      mockSessionForUser('user-rate-limited');
+
+      supabase.from.mockImplementation((table: string) => {
+        if (table === 'scans') {
+          return createScansSelectMock(recentScans);
+        }
+        return createLatestEntrySelectMock(null);
+      });
+
+      const generationResponseBody = JSON.stringify({
+        success: true,
+        cached: false,
+        entry_id: 'entry-rate-limited',
+        persona_key: 'gentle_supportive',
+        prompt_type: 'latest_scan',
+        status: 'ready',
+        title: 'Coach guidance',
+        body: 'Stay consistent.',
+        disclaimer:
+          'Wellness guidance only. This is not a diagnosis or medical advice.',
+        cta_label: null,
+        cta_route: null,
+        source: 'n8n',
+        response_payload_json: {},
+        quota: null,
+      });
+
+      global.fetch = jest.fn(async (url: string) => {
+        if (typeof url === 'string' && url.includes(SYNC_URL_FRAGMENT)) {
+          return {
+            ok: false,
+            status: 429,
+            text: async () =>
+              JSON.stringify({
+                code: 'coach_profile_sync_rate_limit_exceeded',
+                error: 'Coach profile sync rate limit exceeded for window: day',
+              }),
+          } as any;
+        }
+        return { ok: true, text: async () => generationResponseBody } as any;
+      }) as typeof global.fetch;
+
+      // The 429 must NOT crash guidance generation — it's fire-and-forget.
+      await generateCoachGuidance({
+        promptType: 'latest_scan',
+        personaKey: 'gentle_supportive',
+      });
+
+      expect(logExpectedFailure).toHaveBeenCalledWith(
+        '[Coach] Failed to sync coach profile memory',
+        expect.anything(),
+      );
+      expect(logOperationalError).not.toHaveBeenCalledWith(
+        '[Coach] Failed to sync coach profile memory',
+        expect.anything(),
+      );
+    });
+
+    it('logs a non-rate-limit sync failure at ERROR', async () => {
+      mockSessionForUser('user-sync-500');
+
+      supabase.from.mockImplementation((table: string) => {
+        if (table === 'scans') {
+          return createScansSelectMock(recentScans);
+        }
+        return createLatestEntrySelectMock(null);
+      });
+
+      const generationResponseBody = JSON.stringify({
+        success: true,
+        cached: false,
+        entry_id: 'entry-sync-500',
+        persona_key: 'gentle_supportive',
+        prompt_type: 'latest_scan',
+        status: 'ready',
+        title: 'Coach guidance',
+        body: 'Stay consistent.',
+        disclaimer:
+          'Wellness guidance only. This is not a diagnosis or medical advice.',
+        cta_label: null,
+        cta_route: null,
+        source: 'n8n',
+        response_payload_json: {},
+        quota: null,
+      });
+
+      global.fetch = jest.fn(async (url: string) => {
+        if (typeof url === 'string' && url.includes(SYNC_URL_FRAGMENT)) {
+          return {
+            ok: false,
+            status: 500,
+            text: async () =>
+              JSON.stringify({
+                code: 'coach_profile_sync_internal_error',
+                error: 'Internal error',
+              }),
+          } as any;
+        }
+        return { ok: true, text: async () => generationResponseBody } as any;
+      }) as typeof global.fetch;
+
+      await generateCoachGuidance({
+        promptType: 'latest_scan',
+        personaKey: 'gentle_supportive',
+      });
+
+      expect(logOperationalError).toHaveBeenCalledWith(
+        '[Coach] Failed to sync coach profile memory',
+        expect.anything(),
+      );
+      expect(logExpectedFailure).not.toHaveBeenCalledWith(
+        '[Coach] Failed to sync coach profile memory',
+        expect.anything(),
+      );
+    });
+  });
+
+  describe('fetchCoachEntryErrorSummary', () => {
+    afterEach(() => {
+      supabase.rpc.mockReset();
+      // Restore the default jest.setup.js implementation so other suites are
+      // not affected.
+      supabase.rpc.mockResolvedValue({ data: null, error: null });
+    });
+
+    it('returns null when the RPC yields no row (entry not found or not owned)', async () => {
+      supabase.rpc.mockResolvedValueOnce({ data: [], error: null });
+      const result = await fetchCoachEntryErrorSummary('entry-missing');
+      expect(result).toBeNull();
+      expect(supabase.rpc).toHaveBeenCalledWith(
+        'get_coach_entry_error_summary',
+        { p_entry_id: 'entry-missing' },
+      );
+    });
+
+    it('parses webhook_status and provider_failure_kind from the RPC payload', async () => {
+      supabase.rpc.mockResolvedValueOnce({
+        data: [
+          {
+            id: 'entry-with-error',
+            status: 'error',
+            error_code: 'coach_webhook_unreachable',
+            webhook_status: 504,
+            provider_failure_kind: 'timeout',
+            source: 'coach_generation',
+            locale: 'fr',
+            created_at: '2026-05-20T10:00:00.000Z',
+            updated_at: '2026-05-20T10:00:01.000Z',
+          },
+        ],
+        error: null,
+      });
+
+      const result = await fetchCoachEntryErrorSummary('entry-with-error');
+
+      expect(result).toEqual({
+        id: 'entry-with-error',
+        status: 'error',
+        errorCode: 'coach_webhook_unreachable',
+        webhookStatus: 504,
+        providerFailureKind: 'timeout',
+        source: 'coach_generation',
+        locale: 'fr',
+        createdAt: '2026-05-20T10:00:00.000Z',
+        updatedAt: '2026-05-20T10:00:01.000Z',
+      });
+    });
+
+    it('wraps RPC errors in a CoachServiceError', async () => {
+      supabase.rpc.mockResolvedValueOnce({
+        data: null,
+        error: { code: '42883', message: 'function not found' },
+      });
+
+      await expect(
+        fetchCoachEntryErrorSummary('entry-x'),
+      ).rejects.toMatchObject({
+        code: 'coach_entry_error_summary_unavailable',
+        status: 502,
+      });
+    });
+  });
+
+  describe('mergeCoachEntryFailureDebugInfo', () => {
+    function buildBaseDebugInfo(overrides: Partial<any> = {}) {
+      return {
+        message: 'coach_entry_error',
+        code: null,
+        status: null,
+        requestId: null,
+        functionName: 'coach-generate-response',
+        details: null,
+        providerFailureKind: null,
+        providerFailureStage: null,
+        providerNodeType: null,
+        providerNodeName: null,
+        webhookStatus: null,
+        provider: null,
+        source: null,
+        fallbackUsed: null,
+        responseBodyPresent: null,
+        ...overrides,
+      };
+    }
+
+    it('returns the base unchanged when the summary is null', () => {
+      const base = buildBaseDebugInfo();
+      expect(mergeCoachEntryFailureDebugInfo(base, null)).toBe(base);
+    });
+
+    it('returns null when the base is null (no entry to merge into)', () => {
+      expect(mergeCoachEntryFailureDebugInfo(null, null)).toBeNull();
+    });
+
+    it('promotes the RPC error code and webhook status into the merged info', () => {
+      const base = buildBaseDebugInfo();
+      const merged = mergeCoachEntryFailureDebugInfo(base, {
+        id: 'entry-1',
+        status: 'error',
+        errorCode: 'coach_webhook_unreachable',
+        webhookStatus: 504,
+        providerFailureKind: 'timeout',
+        source: 'coach_generation',
+        locale: 'en',
+        createdAt: null,
+        updatedAt: null,
+      });
+
+      expect(merged).toMatchObject({
+        code: 'coach_webhook_unreachable',
+        message: 'coach_webhook_unreachable',
+        status: 504,
+        webhookStatus: 504,
+        providerFailureKind: 'timeout',
+        source: 'coach_generation',
+      });
+    });
+
+    it('flows through the failure-kind resolver to a real classification', () => {
+      const base = buildBaseDebugInfo();
+      const merged = mergeCoachEntryFailureDebugInfo(base, {
+        id: 'entry-1',
+        status: 'error',
+        errorCode: 'coach_webhook_not_configured',
+        webhookStatus: null,
+        providerFailureKind: null,
+        source: 'coach_generation',
+        locale: null,
+        createdAt: null,
+        updatedAt: null,
+      });
+
+      expect(resolveCoachFailureKindFromDebugInfo(merged)).toBe(
+        'provider_unavailable',
+      );
+    });
+
+    it('does not overwrite a meaningful base message with the error code', () => {
+      const base = buildBaseDebugInfo({ message: 'Coach upstream timeout' });
+      const merged = mergeCoachEntryFailureDebugInfo(base, {
+        id: 'entry-1',
+        status: 'error',
+        errorCode: 'coach_webhook_unreachable',
+        webhookStatus: null,
+        providerFailureKind: null,
+        source: null,
+        locale: null,
+        createdAt: null,
+        updatedAt: null,
+      });
+
+      expect(merged?.message).toBe('Coach upstream timeout');
+      expect(merged?.code).toBe('coach_webhook_unreachable');
     });
   });
 });

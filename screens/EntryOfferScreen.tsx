@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { Gift, Sparkles } from 'lucide-react-native';
+import { Gift } from 'lucide-react-native';
 
 import { AppScreen } from '@/components/AppScreen';
 import { Button } from '@/components/Button';
@@ -345,9 +345,6 @@ export default function EntryOfferScreen() {
       <View style={styles.hero}>
         <Squircle style={styles.iconWrap}>
           <Gift color={colors.gold} size={28} />
-          <Squircle style={styles.sparkleBadge}>
-            <Sparkles color={colors.background} size={14} />
-          </Squircle>
         </Squircle>
 
         <Text style={styles.eyebrow}>{t('entry_offer.eyebrow')}</Text>
@@ -356,12 +353,17 @@ export default function EntryOfferScreen() {
       </View>
 
       {loadingOffering ? (
-        <Surface variant="raised" style={styles.stateCard} testID="entry-offer-loading-state">
+        <Surface variant="flat" shadow={false} style={styles.stateCard} testID="entry-offer-loading-state">
           <ActivityIndicator color={colors.primary} />
         </Surface>
       ) : canDisplayOffer && resolvedOffering?.canShowPromo && resolvedOffering.selectedPackage ? (
         <>
-          <Surface variant="premium" accentColor={colors.gold} style={styles.wheelCard}>
+          <Surface
+            variant="flat"
+            shadow={false}
+            style={styles.wheelCard}
+            testID="entry-offer-wheel-card"
+          >
             <Text style={styles.sectionTitle}>{t('entry_offer.reveal_title')}</Text>
             <Text style={styles.sectionBody}>{t('entry_offer.reveal_body')}</Text>
 
@@ -396,8 +398,8 @@ export default function EntryOfferScreen() {
           </Surface>
 
           <Surface
-            variant="premium"
-            accentColor={colors.gold}
+            variant="flat"
+            shadow={false}
             style={styles.rewardCard}
             testID="entry-offer-reward-card"
           >
@@ -418,11 +420,13 @@ export default function EntryOfferScreen() {
               }}
               loading={claiming}
               disabled={!revealed || claiming}
+              variant="premium"
+              flat
             />
           </Surface>
         </>
       ) : (
-        <Surface variant="raised" style={styles.stateCard} testID="entry-offer-fallback-state">
+        <Surface variant="flat" shadow={false} style={styles.stateCard} testID="entry-offer-fallback-state">
           <Text style={styles.sectionTitle}>{t('entry_offer.unavailable_title')}</Text>
           <Text style={styles.sectionBody}>{t('entry_offer.unavailable_body')}</Text>
           {!hasActiveEntitlement ? (
@@ -478,19 +482,8 @@ const createStyles = (colors: any) =>
       backgroundColor: withAlpha(colors.gold, 0.14),
       position: 'relative',
       borderWidth: 1,
-      borderColor: withAlpha(colors.gold, 0.32),
-      ...SHADOWS.goldGlow, borderCurve: 'continuous',
-    },
-    sparkleBadge: {
-      position: 'absolute',
-      right: -2,
-      top: -2,
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.gold, borderCurve: 'continuous',
+      borderColor: withAlpha(colors.gold, 0.18),
+      ...SHADOWS.none, borderCurve: 'continuous',
     },
     eyebrow: {
       fontSize: SIZES.text12,
@@ -513,9 +506,15 @@ const createStyles = (colors: any) =>
     },
     wheelCard: {
       gap: SPACING.md,
+      backgroundColor: colors.cardBackground,
+      borderColor: withAlpha(colors.primaryText, 0.08),
+      ...SHADOWS.none,
     },
     rewardCard: {
       gap: SPACING.md,
+      backgroundColor: colors.cardBackground,
+      borderColor: withAlpha(colors.gold, 0.18),
+      ...SHADOWS.none,
     },
     rewardHeader: {
       flexDirection: 'row',
@@ -555,6 +554,9 @@ const createStyles = (colors: any) =>
       gap: SPACING.sm,
       alignItems: 'center',
       justifyContent: 'center',
+      backgroundColor: colors.cardBackground,
+      borderColor: withAlpha(colors.primaryText, 0.08),
+      ...SHADOWS.none,
     },
     sectionTitle: {
       fontSize: SIZES.text18,

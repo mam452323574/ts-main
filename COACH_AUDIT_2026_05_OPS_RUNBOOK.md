@@ -47,6 +47,50 @@ supabase migration list --linked | grep "20260520180"
 
 Les 7 migrations sont **idempotentes** (toutes commencent par `DROP CONSTRAINT IF EXISTS` ou `CREATE OR REPLACE`). Re-runnable sans danger.
 
+## Étape 2.5 — Pré-vol response signing n8n (S-01 inbound)
+
+But : confirmer que **TOUS** les workflows n8n appelés par les Edge Functions signent leur réponse AVANT de flipper `PHASE2_WEBHOOK_AUTH_MODE=*hmac*`. Sans ça, la vérification HMAC inbound activée par défaut au flip rejette chaque réponse avec HTTP 502 `webhook_response_unsigned` (incident 2026-05-19 sur `analyze-scan`, cf. [n8n/RESPONSE_SIGNING_REGISTRY.md](n8n/RESPONSE_SIGNING_REGISTRY.md)).
+
+### 2.5a — Couverture du registre (statique, repo)
+
+```bash
+sh scripts/list-webhook-callers.sh
+# exit 0 obligatoire. Si exit 1 → ajouter les lignes manquantes dans
+# n8n/RESPONSE_SIGNING_REGISTRY.md avant de continuer.
+```
+
+### 2.5b — Statut par workflow (manuel, registre)
+
+Ouvrir [n8n/RESPONSE_SIGNING_REGISTRY.md](n8n/RESPONSE_SIGNING_REGISTRY.md). Pour CHAQUE caller listé, vérifier que les colonnes **"Function node ajouté"** et **"Smoke test passé"** sont remplies (date + owner). Sinon : configurer le node de signing avec le template de [n8n/WEBHOOK_RESPONSE_SIGNING.md](n8n/WEBHOOK_RESPONSE_SIGNING.md) §"Workflow snippet n8n".
+
+### 2.5c — Smoke test inbound (live, n8n)
+
+```bash
+# Recuperer le secret HMAC partage (Supabase). Puis ping chaque URL n8n.
+PHASE2_WEBHOOK_HMAC_SECRET=$(tail -n 1 secrets/coach_webhook_hmac.txt) \
+  sh scripts/check-n8n-response-signing.sh \
+    https://n8n.example/webhook/scan-analyze \
+    https://n8n.example/webhook/social-report-content \
+    https://n8n.example/webhook/coach-generate \
+    https://n8n.example/webhook/coach-send-message \
+    https://n8n.example/webhook/fridge-scan
+# exit 0 obligatoire sur les 5 URLs (0 FAIL).
+```
+
+> Pré-requis n8n : chaque workflow doit idéalement avoir un IF-node "smoke shortcut" en tête détectant `payload._smoke_test==='check_signing_*'` et répondant `{ok:true,smoke:true}` sans déclencher le reste du workflow. Sans ça, le smoke peut écrire en DB / appeler l'LLM. Documenter le coût par workflow dans le registre.
+
+### 2.5d — Plan B si au moins un workflow n'est pas signé
+
+```bash
+# Activer le kill-switch global EN MEME TEMPS (ou AVANT) le flip outbound :
+supabase secrets set WEBHOOK_VERIFY_RESPONSE=false --project-ref <your-project-ref>
+# Puis ouvrir un ticket de tracking obligatoire : retirer ce flag dès que les
+# workflows manquants sont signés. Limite max recommandée : 72 h en mode
+# kill-switch (S-01 = surface MITM/DNS-rebind ré-ouverte).
+```
+
+**À ne PAS faire** : flipper outbound sans 2.5a/b/c green ET sans kill-switch posé. C'est exactement le scénario qui a produit l'incident `webhook_response_unsigned` du 2026-05-19 sur `analyze-scan` (cf. [n8n/RESPONSE_SIGNING_REGISTRY.md](n8n/RESPONSE_SIGNING_REGISTRY.md) §"Suivi des changements").
+
 ## Étape 3 — HMAC : déployer en dual-mode (Edge + n8n)
 
 ### 3a — Supabase Edge Function secrets
@@ -56,7 +100,13 @@ Les 7 migrations sont **idempotentes** (toutes commencent par `DROP CONSTRAINT I
 SECRET=$(tail -n 1 secrets/coach_webhook_hmac.txt)
 
 supabase secrets set PHASE2_WEBHOOK_HMAC_SECRET="$SECRET" --project-ref <your-project-ref>
-supabase secrets set PHASE2_WEBHOOK_AUTH_MODE=bearer+hmac --project-ref <your-project-ref>
+
+# Pre-flight : confirmer que le secret HMAC est bien remonté côté Supabase
+# avant de flipper le mode (évite la régression 2026-05-19, cf.
+# OPS_ACTIVATE_COACH_HMAC.md Étape 2).
+sh scripts/check-webhook-secrets.sh hmac <your-project-ref> || exit 1
+
+supabase secrets set PHASE2_WEBHOOK_AUTH_MODE=hmac --project-ref <your-project-ref>
 
 # Re-deploy les Edge Functions qui appellent les webhooks coach (pour qu'elles
 # voient les nouveaux secrets) :
@@ -165,7 +215,10 @@ psql "$DATABASE_URL" -c "
 
 - [ ] Étape 1 — Phase A SQL exécutée, tous les seuils OK.
 - [ ] Étape 2 — 7 migrations 2026-05-20-18:00 appliquées en prod.
-- [ ] Étape 3a — `PHASE2_WEBHOOK_AUTH_MODE=bearer+hmac` + `PHASE2_WEBHOOK_HMAC_SECRET` set dans Supabase.
+- [ ] Étape 2.5a — `sh scripts/list-webhook-callers.sh` exit 0 (tous les callers dans le registre).
+- [ ] Étape 2.5b — `n8n/RESPONSE_SIGNING_REGISTRY.md` : colonnes "Function node ajouté" + "Smoke test passé" remplies pour chaque caller.
+- [ ] Étape 2.5c — `sh scripts/check-n8n-response-signing.sh` exit 0 sur les 5 URLs (OU kill-switch `WEBHOOK_VERIFY_RESPONSE=false` posé avec ticket de retrait < 72 h).
+- [ ] Étape 3a — `PHASE2_WEBHOOK_HMAC_SECRET` set, pre-flight `sh scripts/check-webhook-secrets.sh hmac <ref>` exit 0, puis `PHASE2_WEBHOOK_AUTH_MODE=hmac` set dans Supabase.
 - [ ] Étape 3a — Edge Functions `coach-generate-response` + `coach-send-message` redéployées.
 - [ ] Étape 3b — `COACH_WEBHOOK_HMAC_SECRET` + `COACH_WEBHOOK_HMAC_ENFORCE=false` set dans n8n.
 - [ ] Étape 3c — 24 h d'observation, zéro `[coach-webhook-hmac]` warning.

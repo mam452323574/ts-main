@@ -16,6 +16,7 @@ import { getKeyboardAvoidingViewBehavior } from '@/utils/mobileLayout';
 interface AppScreenProps {
   children: ReactNode;
   scroll?: boolean;
+  scrollBounces?: boolean;
   keyboard?: boolean;
   topInset?: boolean;
   bottomInset?: boolean;
@@ -28,6 +29,7 @@ interface AppScreenProps {
 export function AppScreen({
   children,
   scroll = false,
+  scrollBounces = true,
   keyboard = false,
   topInset = true,
   bottomInset = true,
@@ -72,6 +74,9 @@ export function AppScreen({
       contentContainerStyle={scrollContentStyle}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
+      bounces={scrollBounces}
+      alwaysBounceVertical={scrollBounces}
+      overScrollMode={scrollBounces ? 'auto' : 'never'}
       contentInsetAdjustmentBehavior="never"
       automaticallyAdjustContentInsets={false}
       automaticallyAdjustKeyboardInsets={useScrollKeyboardInsetsOnIOS}

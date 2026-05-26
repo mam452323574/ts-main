@@ -1,5 +1,5 @@
 import React from 'react';
-import { Platform } from 'react-native';
+import { Platform, Text } from 'react-native';
 import { fireEvent, render } from '@testing-library/react-native';
 
 import { ContextualPaywall } from '@/components/ContextualPaywall';
@@ -87,8 +87,18 @@ describe('ContextualPaywall', () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('suppresses the decorative badge when badgeIcon is null', () => {
-    const { queryByTestId } = render(
+  it('does not render a decorative badge by default', () => {
+    const { queryByTestId, rerender } = render(
+      <ContextualPaywall
+        visible={true}
+        onClose={jest.fn()}
+        title="Premium"
+      />
+    );
+
+    expect(queryByTestId('contextual-paywall-badge')).toBeNull();
+
+    rerender(
       <ContextualPaywall
         visible={true}
         onClose={jest.fn()}
@@ -100,18 +110,32 @@ describe('ContextualPaywall', () => {
     expect(queryByTestId('contextual-paywall-badge')).toBeNull();
   });
 
-  it('uses separated Android light shell and surface styles', () => {
+  it('renders a badge only when one is explicitly provided', () => {
+    const { getByTestId, getByText } = render(
+      <ContextualPaywall
+        visible={true}
+        onClose={jest.fn()}
+        title="Premium"
+        badgeIcon={<Text>Explicit badge</Text>}
+      />
+    );
+
+    expect(getByTestId('contextual-paywall-badge')).toBeTruthy();
+    expect(getByText('Explicit badge')).toBeTruthy();
+  });
+
+  it('uses a restrained Android light shell and surface style', () => {
     Object.defineProperty(Platform, 'OS', { value: 'android', configurable: true });
     const expectedSurface = getAndroidLightSurface(LIGHT_COLORS, {
       accentColor: LIGHT_COLORS.primary,
       shadowColor: LIGHT_COLORS.gray,
       backgroundAlpha: 0.04,
-      borderAlpha: 0.12,
-      overlayAlpha: 0.08,
-      shadowOpacity: 0.12,
-      shadowRadius: 20,
-      shadowOffsetY: 10,
-      elevation: 8,
+      borderAlpha: 0.08,
+      overlayAlpha: 0.04,
+      shadowOpacity: 0.04,
+      shadowRadius: 10,
+      shadowOffsetY: 4,
+      elevation: 1,
     });
 
     const { getByTestId } = render(
@@ -124,7 +148,7 @@ describe('ContextualPaywall', () => {
     expect(shellStyles).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          elevation: 8,
+          elevation: 1,
           shadowColor: expectedSurface.shadowStyle.shadowColor,
         }),
       ])

@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { Sun, Moon, Crown, ChevronRight } from 'lucide-react-native';
+import { Sun, Moon, Crown, ChevronRight, AlertTriangle, CloudOff, HelpCircle } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useAuth } from '../contexts/AuthContext';
@@ -622,9 +622,34 @@ export default function HomeScreen() {
                           }
                         />
                       ) : (
-                        <Text style={styles.quotaStateText}>
-                          {t(quotaStateLabelKey ?? 'scan_limit.missing_payload')}
-                        </Text>
+                        <View
+                          style={[
+                            styles.quotaStateContainer,
+                            quotaState.status === 'query-error' && styles.quotaStateContainerError,
+                            quotaState.status === 'backend-unavailable' &&
+                              styles.quotaStateContainerWarning,
+                          ]}
+                          testID={`scan-limit-state-${quotaState.status}`}
+                        >
+                          {quotaState.status === 'query-error' ? (
+                            <AlertTriangle color={colors.error} size={12} strokeWidth={2} />
+                          ) : quotaState.status === 'backend-unavailable' ? (
+                            <CloudOff color={colors.warning} size={12} strokeWidth={2} />
+                          ) : quotaState.status === 'missing-payload' ? (
+                            <HelpCircle color={colors.gray} size={12} strokeWidth={2} />
+                          ) : null}
+                          <Text
+                            style={[
+                              styles.quotaStateText,
+                              quotaState.status === 'query-error' && styles.quotaStateTextError,
+                              quotaState.status === 'backend-unavailable' &&
+                                styles.quotaStateTextWarning,
+                            ]}
+                            numberOfLines={2}
+                          >
+                            {t(quotaStateLabelKey ?? 'scan_limit.missing_payload')}
+                          </Text>
+                        </View>
                       )}
                     </Squircle>
                   </Squircle>
@@ -896,12 +921,35 @@ const createStyles = (
       color: colors.primaryText,
       marginBottom: SPACING.md,
     },
+    quotaStateContainer: {
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 4,
+      paddingVertical: SPACING.sm,
+      width: '100%',
+      minWidth: 0,
+    },
+    // Couleurs douces (alpha bas) pour distinguer les états sans crier
+    // dans une UI déjà chargée. Le but : que l'utilisateur perçoive
+    // "ça ne va pas / patience" sans confondre avec un cooldown normal.
+    quotaStateContainerError: {
+      // pas de background — on signale via l'icône + couleur du texte
+    },
+    quotaStateContainerWarning: {
+      // idem
+    },
     quotaStateText: {
       fontSize: SIZES.text12,
-      lineHeight: 17,
+      lineHeight: 14,
       color: colors.gray,
       textAlign: 'center',
-      paddingVertical: SPACING.sm,
+    },
+    quotaStateTextError: {
+      color: colors.error,
+    },
+    quotaStateTextWarning: {
+      color: colors.warning,
     },
     superQuotaStateCard: {
       borderRadius: BORDER_RADIUS.xl,

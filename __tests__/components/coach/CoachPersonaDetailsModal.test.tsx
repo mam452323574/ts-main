@@ -1,4 +1,5 @@
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import { CoachPersonaDetailsModal } from '@/components/coach/CoachPersonaDetailsModal';
@@ -45,6 +46,29 @@ describe('CoachPersonaDetailsModal', () => {
     expect(screen.getByTestId('coach-persona-details-energy')).toBeTruthy();
     expect(screen.getByTestId('coach-persona-details-motivation')).toBeTruthy();
     expect(screen.getByTestId('coach-persona-details-best-for')).toBeTruthy();
+  });
+
+  it('keeps the page visible behind the coach detail sheet', () => {
+    render(
+      <CoachPersonaDetailsModal
+        visible
+        persona={getCoachPersona('strict_tough')}
+        visual={getCoachPersonaVisual('strict_tough')}
+        active={false}
+        locked={false}
+        onClose={jest.fn()}
+        onConfirm={jest.fn()}
+        onUnlock={jest.fn()}
+      />,
+    );
+
+    const backdropStyle = StyleSheet.flatten(
+      screen.getByTestId('coach-persona-details-backdrop').props.style,
+    );
+
+    expect(backdropStyle.backgroundColor).toBe('transparent');
+    expect(backdropStyle.backgroundColor).not.toBe('rgba(0, 0, 0, 0.48)');
+    expect(backdropStyle.backgroundColor).not.toBe('rgba(244, 245, 248, 0.18)');
   });
 
   it('uses the confirmation CTA for unlocked coaches', () => {

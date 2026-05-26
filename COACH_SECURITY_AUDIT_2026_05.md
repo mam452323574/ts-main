@@ -15,7 +15,7 @@ L'audit identifie **1 P0** (héritage C-04 — webhook n8n sans HMAC, étendu au
 
 ### Actions prioritaires (proposées, non implémentées dans cette passe)
 
-1. **P0 — C-04** : activer `PHASE2_WEBHOOK_AUTH_MODE=bearer+hmac` + `PHASE2_WEBHOOK_HMAC_SECRET` en prod **et** câbler la validation HMAC dans les deux workflows n8n (`coach.json` + `coach-conversation.json`).
+1. ~~**P0 — C-04**~~ : ✅ **Activé 2026-05-19** — HMAC bidirectionnel en prod, enforcement n8n actif, vérification réponse active par défaut.
 2. **P1 — N-A** : whitelist stricte du `payload.persona.style_guide` côté normalisateur n8n (fallback aux personas server-side connues si signature manquante).
 3. **P1 — N-B** : ajouter `timeout` (≈ 30 s) et `maxRetries` (2) sur les nœuds DeepSeek/LLM des deux workflows.
 4. **P1 — N-C** : rate limit + bornes explicites sur `coach-sync-profile-memory` (5/h par user, `LIMIT 50`, idempotence per-row).
@@ -30,7 +30,7 @@ L'audit identifie **1 P0** (héritage C-04 — webhook n8n sans HMAC, étendu au
 | **C-01** | P0 | ✅ Confirmé en place | Rate limit `coach-generate-response` ([handler.ts:85-111](supabase/functions/coach-generate-response/handler.ts:85)) | — |
 | **C-02** | P1 | ✅ Confirmé en place | `assertCoachInnerPayload` ([phase2Contracts.ts](supabase/functions/_shared/phase2Contracts.ts)) — whitelist du sous-payload | — |
 | **C-03** | P1 | ✅ Confirmé en place | `maxResponseBytes=32KB` sur webhook coach ([coachProvider.ts](supabase/functions/_shared/coachProvider.ts), [coachConversationProvider.ts](supabase/functions/_shared/coachConversationProvider.ts)) | — |
-| **C-04** | **P0** | ✅ **Code en place, ops terminés** | Webhook n8n sans validation HMAC explicite — étendu au workflow conversation | Nœud `Verify Coach Webhook HMAC` ajouté aux deux workflows + test ; checklist staged rollout dans [SUPABASE_SECURITY_CONFIG.md](SUPABASE_SECURITY_CONFIG.md). Activation prod = ops terminée. |
+| **C-04** | **P0** | ✅ **Activé 2026-05-19** | Webhook n8n sans validation HMAC explicite — étendu au workflow conversation | Nœuds `Verify Coach Webhook HMAC` en place, secrets vérifiés (SHA-256 match), `COACH_WEBHOOK_HMAC_ENFORCE=true`, vérification réponse active par défaut (`shouldVerifyResponseSignature` → `useHmac`). |
 | **C-05** | P2 | ✅ Corrigé | RPC `get_coach_history_page` + `coach-screen-snapshot` (`select('*')`) + `services/coach.ts` `fetchCoachEntries` / `fetchLatestReadyCoachEntry` exposent les colonnes internes | Backfill `20260520180300` + RPC v2 `20260520180400` + frontend bascule + `select` explicite snapshot + constante `COACH_ENTRY_PUBLIC_COLUMNS_SELECT` réutilisée dans les 2 reads frontend |
 | **C-06** | P2 | ✅ Corrigé | BLOCK policies en place sur les **nouvelles** tables conversation, mais **pas** sur `coach_entries` | Migration `20260520130000` ajoute BLOCK policies INSERT/UPDATE/DELETE + REVOKE redondant |
 | **C-07** | P2 | ⏳ Pendant | `user_profiles.coach_persona_key` modifiable sans audit ni CHECK | Reporté à une passe dédiée (trigger d'audit + CHECK enum) — risque très faible aujourd'hui |
@@ -247,7 +247,7 @@ function shouldDebugCoachService() {
 | C-01 | ✅ Corrigé | ✅ Confirmé | `enforceCoachGenerationRateLimit` ([handler.ts:85-111](supabase/functions/coach-generate-response/handler.ts:85)), constantes 5/30/120, migration [20260426190000](supabase/migrations/20260426190000_add_coach_generation_rate_limit.sql) en place. Le nouveau quota conversation est l'équivalent : `recordCoachConversationAttempt` 8/80/200 ([coachConversationQuota.ts:153-191](supabase/functions/_shared/coachConversationQuota.ts:153)). |
 | C-02 | ✅ Corrigé | ✅ Confirmé | `assertCoachInnerPayload` toujours présent dans `phase2Contracts.ts`. Le nouveau flux conversation a son propre `parseCoachSendMessageRequest` ([coachConversation.ts:134-157](supabase/functions/_shared/coachConversation.ts:134)) qui valide `conversation_id` (UUID regex), `content` (≤ 2000 chars, normalisation zero-width / multi-newlines), et `client_request_id` (regex `[A-Za-z0-9_:.-]+`, ≤ 80 chars). |
 | C-03 | ✅ Corrigé | ✅ Confirmé | `maxResponseBytes=32KB` côté presets ; côté conversation, même politique appliquée via `postCoachConversationWebhook` ([coachConversationProvider.ts](supabase/functions/_shared/coachConversationProvider.ts)). Code d'erreur dédié `COACH_CONVERSATION_RESPONSE_TOO_LARGE_CODE`, refundable. |
-| **C-04** | ✅ Config ops | ✅ **Corrigé** | Aucune validation HMAC visible dans les workflows n8n ([coach-conversation.json:9](n8n/workflows/coach-conversation.json:9) → `"options": {}`). À confirmer côté ops : variables `PHASE2_WEBHOOK_AUTH_MODE` + `PHASE2_WEBHOOK_HMAC_SECRET` activées en prod **et** validation effective côté n8n via un nœud JS de vérification de signature. **Aggrave N-A** (prompt injection). |
+| **C-04** | ✅ Config ops | ✅ **Activé 2026-05-19** | HMAC bidirectionnel vérifié et enforcement activé. Secrets Supabase/n8n concordants (SHA-256 match). `COACH_WEBHOOK_HMAC_ENFORCE=true`. Vérification réponse n8n→Supabase active par défaut via `shouldVerifyResponseSignature`. N-A désormais mitigé. |
 | **C-05** | ⏳ À durcir | ⏳ **Aggravé** | RPC `get_coach_history_page` retourne toujours `request_payload_json`, `response_payload_json`, `cache_key`, `input_hash`, `error_code` ([20260423150000:35-58](supabase/migrations/20260423150000_add_coach_entry_content_v2.sql:35)). **Aggravation découverte :** [coach-screen-snapshot/index.ts:96](supabase/functions/coach-screen-snapshot/index.ts:96) fait `select('*')` sur `coach_entries` → expose les mêmes colonnes via un second canal. |
 | **C-06** | ⏳ À durcir | ⚠️ **Partiel** | `coach_entries` n'a toujours que la SELECT policy ([20260406120000:339-344](supabase/migrations/20260406120000_phase2_backend_foundations.sql:339)). **Bonne nouvelle** : les 3 nouvelles tables `coach_conversations`, `coach_conversation_messages`, `coach_free_conversation_state` ont **toutes** des BLOCK policies INSERT/UPDATE/DELETE explicites ([20260524150000:90-110, 190-213, 253-276](supabase/migrations/20260524150000_create_coach_conversation_tables.sql:90)) + `REVOKE INSERT, UPDATE, DELETE ... FROM authenticated` ([:287-289](supabase/migrations/20260524150000_create_coach_conversation_tables.sql:287)). La leçon est appliquée — reste à rétroporter sur `coach_entries`. |
 | **C-07** | ⏳ À durcir | ⏳ Pendant | `user_profiles.coach_persona_key` reste modifiable côté client via supabase-js (GRANT UPDATE à [20260408150000](supabase/migrations/20260408150000_grant_user_profiles_coach_persona_key.sql)), sans CHECK SQL ni trigger d'audit. Atténuation côté conversation : `coach_conversations.persona_key` est gelé à la création avec un CHECK sur l'enum ([20260524150000:39-48](supabase/migrations/20260524150000_create_coach_conversation_tables.sql:39)) — design pertinent. |
@@ -322,7 +322,7 @@ function shouldDebugCoachService() {
 
 ### P0 (immédiat, ops)
 
-1. **C-04** — Activer `PHASE2_WEBHOOK_AUTH_MODE=bearer+hmac` + `PHASE2_WEBHOOK_HMAC_SECRET` en prod. Ajouter un nœud Code n8n en tête de chaque workflow qui recalcule `HMAC-SHA256(${x-webhook-timestamp}.${rawBody}, secret)` et rejette si signature ≠ ou timestamp > 5 min. Documenter dans [SUPABASE_SECURITY_CONFIG.md](SUPABASE_SECURITY_CONFIG.md). **Effort : 2 h ops + 1 h n8n.**
+1. **C-04** — Activer `PHASE2_WEBHOOK_AUTH_MODE=hmac` + `PHASE2_WEBHOOK_HMAC_SECRET` en prod. Ajouter un nœud Code n8n en tête de chaque workflow qui recalcule `HMAC-SHA256(${x-webhook-timestamp}.${rawBody}, secret)` et rejette si signature ≠ ou timestamp > 5 min. Documenter dans [SUPABASE_SECURITY_CONFIG.md](SUPABASE_SECURITY_CONFIG.md). **Effort : 2 h ops + 1 h n8n.**
 
 ### P1 (cette sprint)
 
@@ -396,4 +396,4 @@ Après application des correctifs P0/P1, scénarios à valider :
 
 ---
 
-**Audit complété 2026-05-19. Prochaine révision recommandée : après application des P0/P1 (C-04, N-A, N-B, N-C), ou au plus tard 2026-06-30.**
+**Audit complété 2026-05-19. Tous les P0/P1 appliqués (C-04 HMAC activé, N-A/N-B/N-C corrigés). Prochaine révision recommandée : au plus tard 2026-06-30 (P2 pendants : C-07).**

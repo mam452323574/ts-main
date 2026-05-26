@@ -84,11 +84,17 @@ export function PremiumTeaserCard({
             },
           ]}
         >
-          {isLocked ? <Lock color={colors.gold} size={12} /> : null}
+          {/*
+           * Quand le badge est verrouillé, icône et texte étaient tous deux
+           * en `colors.gold` sur fond or pâle → contraste ~1.15:1, illisible.
+           * On garde le fond doré (signature premium) mais on passe le
+           * foreground à `primaryText` pour rétablir un contraste correct.
+           */}
+          {isLocked ? <Lock color={colors.primaryText} size={12} /> : null}
           <Text
             {...RESULT_TEXT_PROPS}
             numberOfLines={1}
-            style={[styles.statusText, { color: isLocked ? colors.gold : colors.gray }]}
+            style={[styles.statusText, { color: isLocked ? colors.primaryText : colors.gray }]}
           >
             {label}
           </Text>

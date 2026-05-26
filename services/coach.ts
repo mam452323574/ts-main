@@ -39,7 +39,7 @@ import {
   isRenderableCoachEntry,
   type RenderableCoachEntry,
 } from '@/utils/coachHistory';
-import { logOperationalError } from '@/utils/observability';
+import { logExpectedFailure, logOperationalError } from '@/utils/observability';
 import {
   sanitizeUntrustedAiText,
   sanitizeUntrustedAiTextArray,
@@ -71,6 +71,8 @@ import type {
   CoachPreferredTimeOfDay,
   CoachPrimaryGoalKey,
   CoachQuestionKey,
+  CoachQuotaBucketKey,
+  CoachQuotaBucketStatus,
   CoachQuotaStatus,
   CoachRecommendations,
   CoachRecommendationTone,
@@ -456,6 +458,22 @@ export function resolveCoachFailureKindFromError(error: unknown): CoachFailureKi
   );
 }
 
+export function resolveCoachFailureKindFromDebugInfo(
+  debugInfo:
+    | Pick<
+        CoachEntryFailureDebugInfo,
+        'code' | 'status' | 'providerFailureKind'
+      >
+    | null
+    | undefined,
+): CoachFailureKind {
+  return resolveCoachFailureKindFromCode(
+    debugInfo?.code ?? null,
+    debugInfo?.status ?? null,
+    debugInfo?.providerFailureKind ?? null,
+  );
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -496,6 +514,37 @@ function readCoachAccountTier(value: unknown): CoachQuotaStatus['account_tier'] 
   return value === 'premium' || value === 'admin' ? value : 'free';
 }
 
+function parseCoachQuotaBucket(
+  value: unknown,
+  unlimited: boolean,
+  fallbackWindowSeconds: number,
+): CoachQuotaBucketStatus | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const limit = readNullableInteger(value.limit);
+  const used = readOptionalInteger(value.used_count);
+  const available = readNullableInteger(value.available);
+  const windowSeconds = readOptionalInteger(value.window_seconds);
+  if (
+    used === null ||
+    (!unlimited && (limit === null || available === null))
+  ) {
+    return null;
+  }
+  return {
+    limit: unlimited || limit === null ? null : Math.max(0, limit),
+    used_count: Math.max(0, used),
+    available:
+      unlimited || available === null ? null : Math.max(0, available),
+    next_recharge_at: readOptionalString(value.next_recharge_at),
+    window_seconds: Math.max(
+      1,
+      windowSeconds ?? fallbackWindowSeconds,
+    ),
+  };
+}
+
 export function parseCoachQuotaStatus(payload: unknown): CoachQuotaStatus | null {
   if (!isRecord(payload)) {
     return null;
@@ -517,15 +566,178 @@ export function parseCoachQuotaStatus(payload: unknown): CoachQuotaStatus | null
     return null;
   }
 
-  return {
-    account_tier: readCoachAccountTier(payload.account_tier),
+  const normalizedTopLevel = {
     limit: unlimited ? null : Math.max(0, limit ?? 0),
     used_count: Math.max(0, usedCount),
     available: unlimited ? null : Math.max(0, available ?? 0),
     next_recharge_at: readOptionalString(payload.next_recharge_at),
     unlimited,
     window_seconds: Math.max(1, windowSeconds),
+  };
+
+  // Buckets are emitted by the post-2026-05-26 RPC. Older payloads (during the
+  // rollout window) only carry the top-level pool — we synthesize a mirrored
+  // bucket map so downstream code can treat both shapes uniformly without
+  // having to special-case the legacy path.
+  const bucketsRecord = isRecord(payload.buckets) ? payload.buckets : null;
+  const generalBucket =
+    parseCoachQuotaBucket(
+      bucketsRecord?.general,
+      unlimited,
+      normalizedTopLevel.window_seconds,
+    ) ?? {
+      limit: normalizedTopLevel.limit,
+      used_count: normalizedTopLevel.used_count,
+      available: normalizedTopLevel.available,
+      next_recharge_at: normalizedTopLevel.next_recharge_at,
+      window_seconds: normalizedTopLevel.window_seconds,
+    };
+  const scanCtaBucket =
+    parseCoachQuotaBucket(
+      bucketsRecord?.scan_cta,
+      unlimited,
+      normalizedTopLevel.window_seconds,
+    ) ?? {
+      limit: normalizedTopLevel.limit,
+      used_count: 0,
+      // Without server-side buckets we cannot know the scan_cta state; assume
+      // a fresh window so we do not pre-block the user. The server stays
+      // authoritative — a 429 will surface as a structured error if blocked.
+      available: normalizedTopLevel.limit,
+      next_recharge_at: null,
+      window_seconds: normalizedTopLevel.window_seconds,
+    };
+
+  return {
+    account_tier: readCoachAccountTier(payload.account_tier),
+    ...normalizedTopLevel,
     as_of: asOf,
+    buckets: {
+      general: generalBucket,
+      scan_cta: scanCtaBucket,
+    },
+  };
+}
+
+// Maps the *origin* of a Coach request to its quota bucket. We never read
+// this from the user — it is purely derived from the request shape, mirroring
+// the server-side `coach_quota_bucket_for_source` SQL helper. A scan-CTA
+// request is one where the caller carries a populated `scan_intent` payload.
+export function coachQuotaSourceForRequest(input: {
+  hasScanIntent?: boolean | null | undefined;
+  promptType?: string | null | undefined;
+}): CoachQuotaBucketKey {
+  // promptType is purely informational here — it would be a fragile gate, so
+  // we never branch on it. Kept in the signature so callers can audit the
+  // decision in one place (and so we can add telemetry later without
+  // churning call sites).
+  return input.hasScanIntent === true ? 'scan_cta' : 'general';
+}
+
+// Returns the bucket sub-view for a given request source. Falls back to a
+// synthesised bucket mirroring the top-level pool when the server snapshot
+// predates the split — keeps the UI honest during rollout and against any
+// future schema surprise. Returns `null` when the quota itself is missing.
+export function selectCoachQuotaBucket(
+  quota: CoachQuotaStatus | null | undefined,
+  source: CoachQuotaBucketKey,
+): CoachQuotaBucketStatus | null {
+  if (!quota) {
+    return null;
+  }
+  if (quota.buckets && quota.buckets[source]) {
+    return quota.buckets[source];
+  }
+  // Conservative fallback: mirror top-level. For the scan_cta bucket on a
+  // legacy payload we cannot know the real state, so we expose the same view
+  // as general — the server stays authoritative on the 429.
+  return {
+    limit: quota.limit,
+    used_count: quota.used_count,
+    available: quota.available,
+    next_recharge_at: quota.next_recharge_at,
+    window_seconds: quota.window_seconds,
+  };
+}
+
+// Pulls the bucket key the server told us was exhausted from an error
+// payload. Returns null when the error is not a 429 or when the new
+// quota_bucket detail is not present (pre-rollout error shape).
+export function getCoachQuotaBucketKeyFromError(
+  error: unknown,
+): CoachQuotaBucketKey | null {
+  if (!(error instanceof CoachServiceError)) {
+    return null;
+  }
+  const details = error.details;
+  if (!isRecord(details)) {
+    return null;
+  }
+  if (details.quota_bucket === 'general' || details.quota_bucket === 'scan_cta') {
+    return details.quota_bucket;
+  }
+  // Defense in depth: derive from quota_source if quota_bucket is missing.
+  if (
+    details.quota_source === 'coach_scan_cta_generation' ||
+    details.quota_source === 'coach_scan_cta_cache'
+  ) {
+    return 'scan_cta';
+  }
+  if (
+    details.quota_source === 'coach_generation' ||
+    details.quota_source === 'coach_cache'
+  ) {
+    return 'general';
+  }
+  return null;
+}
+
+// Merges a quota payload that came back as part of a 429 (which is already
+// projected onto the consumed bucket by the server) into a previously-known
+// quota snapshot. Preserves the OTHER bucket so the UI does not flash an
+// outdated state for a flow that was not touched by this error.
+//
+// The top-level fields follow the server's projection (i.e. the consumed
+// bucket) so legacy consumers (and the alert "next request in X") keep
+// reading the right cooldown without needing to know about buckets.
+export function mergeCoachQuotaForBucket(
+  previous: CoachQuotaStatus | null | undefined,
+  fromError: CoachQuotaStatus,
+  consumedBucket: CoachQuotaBucketKey,
+): CoachQuotaStatus {
+  const consumedBucketStatus: CoachQuotaBucketStatus = {
+    limit: fromError.limit,
+    used_count: fromError.used_count,
+    available: fromError.available,
+    next_recharge_at: fromError.next_recharge_at,
+    window_seconds: fromError.window_seconds,
+  };
+
+  const otherBucketKey: CoachQuotaBucketKey =
+    consumedBucket === 'general' ? 'scan_cta' : 'general';
+
+  // Prefer the previous snapshot's view of the OTHER bucket — it is the most
+  // recent server-known state for that flow. Fall back to the error's view
+  // (which will have been synthesised by parseCoachQuotaStatus) if we have
+  // nothing else.
+  const otherBucketStatus: CoachQuotaBucketStatus =
+    previous?.buckets?.[otherBucketKey] ??
+    fromError.buckets?.[otherBucketKey] ?? {
+      limit: fromError.limit,
+      used_count: 0,
+      available: fromError.limit,
+      next_recharge_at: null,
+      window_seconds: fromError.window_seconds,
+    };
+
+  return {
+    ...fromError,
+    buckets: {
+      general:
+        consumedBucket === 'general' ? consumedBucketStatus : otherBucketStatus,
+      scan_cta:
+        consumedBucket === 'scan_cta' ? consumedBucketStatus : otherBucketStatus,
+    },
   };
 }
 
@@ -643,6 +855,98 @@ export function resolveCoachFailureKindFromEntry(
     debugInfo?.status,
     debugInfo?.providerFailureKind,
   );
+}
+
+// Counterpart of COACH_ENTRY_PUBLIC_COLUMNS_SELECT: the public table read
+// strips error_code / response_payload_json so the wire never carries n8n
+// topology. This RPC re-exposes a curated subset (error code + parsed webhook
+// status + provider_failure_kind) for the UI to render meaningful diagnostics
+// on `status === 'error'` entries owned by the caller. Backed by
+// supabase/migrations/20260605130000_add_get_coach_entry_error_summary.sql
+// (SECURITY DEFINER, filtered by auth.uid()).
+export interface CoachEntryErrorSummary {
+  id: string;
+  status: string;
+  errorCode: string | null;
+  webhookStatus: number | null;
+  providerFailureKind: string | null;
+  source: string | null;
+  locale: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export async function fetchCoachEntryErrorSummary(
+  entryId: string,
+): Promise<CoachEntryErrorSummary | null> {
+  const { data, error } = await supabase.rpc('get_coach_entry_error_summary', {
+    p_entry_id: entryId,
+  });
+
+  if (error) {
+    throw createCoachServiceError(
+      'Failed to fetch coach entry error summary',
+      {
+        code: 'coach_entry_error_summary_unavailable',
+        status: 502,
+        details: error,
+      },
+    );
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!isRecord(row)) {
+    return null;
+  }
+
+  const rowId = readOptionalString(row.id);
+  const rowStatus = readOptionalString(row.status);
+  if (!rowId || !rowStatus) {
+    return null;
+  }
+
+  return {
+    id: rowId,
+    status: rowStatus,
+    errorCode: readOptionalString(row.error_code),
+    webhookStatus: readOptionalNumber(row.webhook_status),
+    providerFailureKind: readOptionalString(row.provider_failure_kind),
+    source: readOptionalString(row.source),
+    locale: readOptionalString(row.locale),
+    createdAt: readOptionalString(row.created_at),
+    updatedAt: readOptionalString(row.updated_at),
+  };
+}
+
+// Merge the RPC payload into the base debug info derived from the public
+// columns. The RPC fields take precedence when present because the public
+// projection deliberately leaves `code` / `webhookStatus` / `providerFailureKind`
+// null. Other fields (provider, providerNodeName, providerNodeType) stay null
+// — they remain backend-only by design (cf. C-05 of COACH_SECURITY_AUDIT_2026_05).
+export function mergeCoachEntryFailureDebugInfo(
+  base: CoachEntryFailureDebugInfo | null,
+  summary: CoachEntryErrorSummary | null,
+): CoachEntryFailureDebugInfo | null {
+  if (!base) {
+    return base;
+  }
+  if (!summary) {
+    return base;
+  }
+
+  return {
+    ...base,
+    code: summary.errorCode ?? base.code,
+    message:
+      base.message && base.message !== 'coach_entry_error'
+        ? base.message
+        : (summary.errorCode ?? base.message),
+    status: summary.webhookStatus ?? base.status,
+    webhookStatus: summary.webhookStatus ?? base.webhookStatus,
+    providerFailureKind:
+      summary.providerFailureKind ?? base.providerFailureKind,
+    source: summary.source ?? base.source,
+  };
 }
 
 function normalizeCoachLocale(locale?: string | null) {
@@ -974,15 +1278,66 @@ async function invokeAuthedCoachFunction<TResponse>(
   });
 }
 
+// Skip-if-fresh cache for coach-sync-profile-memory.
+// The Edge Function enforces strict per-user rate limits (2/min, 10/h, 30/j —
+// cf. supabase/functions/coach-sync-profile-memory/index.ts:31-43). Every
+// generateCoachGuidance() call invokes syncCoachProfileMemory(), so back-to-back
+// regenerations saturate the limit and pollute logs with 429s even when the
+// inferred profile has not changed. Cache the result for 60s scoped by user,
+// and reset on signout/profile-update (see invalidateCoachProfileMemoryCache).
+const COACH_PROFILE_MEMORY_CACHE_TTL_MS = 60_000;
+let coachProfileMemoryCache: {
+  userId: string;
+  result: PersistedInferredPersona | null;
+  expiresAt: number;
+} | null = null;
+
+export function invalidateCoachProfileMemoryCache() {
+  coachProfileMemoryCache = null;
+}
+
+// 429 from coach-sync-profile-memory is intentional throttling (2/min, 10/h,
+// 30/day per user — see supabase/functions/coach-sync-profile-memory/index.ts).
+// The catch in generateCoachGuidance treats sync as fire-and-forget, so a
+// rate-limit hit must not surface as ERROR — it's an expected, non-fatal signal.
+function isCoachProfileSyncRateLimitError(error: unknown): boolean {
+  if (!(error instanceof CoachServiceError)) return false;
+  return (
+    error.status === 429 ||
+    error.code === 'coach_profile_sync_rate_limit_exceeded'
+  );
+}
+
 async function syncCoachProfileMemory(): Promise<PersistedInferredPersona | null> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData?.session?.user?.id ?? null;
+
+  if (userId) {
+    const now = Date.now();
+    const cached = coachProfileMemoryCache;
+    if (cached && cached.userId === userId && cached.expiresAt > now) {
+      return cached.result;
+    }
+  }
+
   const response = await invokeAuthedCoachFunction<CoachSyncProfileMemoryResponse>(
     COACH_SYNC_PROFILE_MEMORY_FUNCTION_NAME,
     {},
   );
 
-  return isRecord(response)
+  const result = isRecord(response)
     ? normalizePersistedInferredPersona(response.profile_memory ?? null)
     : null;
+
+  if (userId) {
+    coachProfileMemoryCache = {
+      userId,
+      result,
+      expiresAt: Date.now() + COACH_PROFILE_MEMORY_CACHE_TTL_MS,
+    };
+  }
+
+  return result;
 }
 
 const COACH_METRIC_SPECS: Record<ScanType, CoachMetricSpec[]> = {
@@ -5206,7 +5561,10 @@ export async function generateCoachGuidance(options: {
       const syncedCoachProfileMemory = await syncCoachProfileMemory();
       resolvedCoachProfileMemory = syncedCoachProfileMemory;
     } catch (error) {
-      logOperationalError('[Coach] Failed to sync coach profile memory', error);
+      const logFn = isCoachProfileSyncRateLimitError(error)
+        ? logExpectedFailure
+        : logOperationalError;
+      logFn('[Coach] Failed to sync coach profile memory', error);
     }
 
     const scans = await fetchCoachScansForGeneration(requestedSelectedScanId);

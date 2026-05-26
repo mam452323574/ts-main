@@ -9,6 +9,7 @@ import {
   SIZES,
   withAlpha,
 } from '@/constants/theme';
+import type { CoachImageCrop } from '@/shared/coachImageCrop';
 import type { CoachPersonaVisual } from '@/shared/coachPersonaVisuals';
 import { Squircle } from '@/components/Squircle';
 
@@ -19,6 +20,13 @@ interface CoachPersonaAvatarProps {
   size?: number;
   dimmed?: boolean;
   emphasis?: 'default' | 'featured' | 'subtle';
+  /**
+   * Per-asset crop override. The avatar applies the emphasis-derived scale
+   * regardless (so the "featured" look is preserved); `imageScale` from the
+   * crop config is multiplied on top, and `contentPosition` is forwarded
+   * directly to `expo-image`.
+   */
+  imageCrop?: CoachImageCrop;
   testID?: string;
 }
 
@@ -29,6 +37,7 @@ export function CoachPersonaAvatar({
   size = 52,
   dimmed = false,
   emphasis = 'default',
+  imageCrop,
   testID,
 }: CoachPersonaAvatarProps) {
   const { colors } = useTheme();
@@ -79,7 +88,8 @@ export function CoachPersonaAvatar({
       : resolvedEmphasis === 'subtle'
         ? 0.2
         : 0.26;
-  const imageScale = resolvedEmphasis === 'featured' ? 1.03 : 1;
+  const emphasisScale = resolvedEmphasis === 'featured' ? 1.03 : 1;
+  const effectiveImageScale = emphasisScale * (imageCrop?.imageScale ?? 1);
 
   return (
     <Squircle
@@ -125,13 +135,14 @@ export function CoachPersonaAvatar({
         {shouldRenderImage ? (
           <Image
             source={imageSource}
+            contentPosition={imageCrop?.contentPosition}
             style={[
               styles.image,
               {
                 width: size,
                 height: size,
                 borderRadius: size / 2,
-                transform: [{ scale: imageScale }],
+                transform: [{ scale: effectiveImageScale }],
               },
               dimmed && styles.imageDimmed,
             ]}

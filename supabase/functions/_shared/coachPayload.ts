@@ -12,6 +12,7 @@ import {
 export { DEFAULT_COACH_DISCLAIMER } from '../../../shared/coachCopy.ts';
 
 export const INVALID_COACH_RESPONSE_ERROR_CODE = 'invalid_coach_response';
+export const COACH_INSUFFICIENT_DATA_ERROR_CODE = 'coach_insufficient_data';
 
 export interface ResolvedCoachPayload {
   title: string;
@@ -56,6 +57,17 @@ interface BuildInvalidCoachResponseEntryValuesOptions {
   providerFailureStage?: string | null;
   providerNodeType?: string | null;
   providerNodeName?: string | null;
+}
+
+interface BuildInsufficientDataCoachResponseEntryValuesOptions {
+  payload: Record<string, unknown> | null;
+  usedFallback: boolean;
+  requestId?: string | null;
+  fallbackReason?: string | null;
+  language?: string | null;
+  promptType?: string | null;
+  coachRoute?: string | null;
+  hasScanIntent?: boolean | null;
 }
 
 type CoachPayloadWrapperSource = 'root' | 'data' | 'entry';
@@ -103,6 +115,17 @@ export function resolveCoachPayload(
       502,
       INVALID_COACH_RESPONSE_ERROR_CODE,
       'Coach webhook returned an invalid payload',
+    );
+  }
+
+  // n8n signals when it had to fall back to a generic/templated body because
+  // the LLM produced nothing usable. Treat that as a non-consuming failure so
+  // the caller can refund the quota instead of persisting a fabricated reply.
+  if (basePayload.insufficient_data === true) {
+    throw new Phase2HttpError(
+      422,
+      COACH_INSUFFICIENT_DATA_ERROR_CODE,
+      'Coach webhook reported insufficient data to produce a useful reply',
     );
   }
 
@@ -219,6 +242,61 @@ export function buildInvalidCoachResponseEntryValues(
       wrapper_source: payloadWrapperSource,
       title_present: Boolean(title),
       body_present: Boolean(body),
+    }),
+  };
+}
+
+export function buildInsufficientDataCoachResponseEntryValues(
+  options: BuildInsufficientDataCoachResponseEntryValuesOptions,
+) {
+  const { source: payloadWrapperSource, candidate: providerSummaryPayload } =
+    resolveCoachPayloadSource(options.payload);
+  const debugSource =
+    providerSummaryPayload && isRecord(providerSummaryPayload.debug)
+      ? (providerSummaryPayload.debug as Record<string, unknown>)
+      : null;
+  const fallbackReason =
+    options.fallbackReason ??
+    (debugSource && typeof debugSource.fallback_reason === 'string'
+      ? (debugSource.fallback_reason as string)
+      : null);
+  const language =
+    options.language ??
+    (debugSource && typeof debugSource.language === 'string'
+      ? (debugSource.language as string)
+      : null);
+  const promptType =
+    options.promptType ??
+    (debugSource && typeof debugSource.prompt_type === 'string'
+      ? (debugSource.prompt_type as string)
+      : null);
+  const coachRoute =
+    options.coachRoute ??
+    (debugSource && typeof debugSource.coach_route === 'string'
+      ? (debugSource.coach_route as string)
+      : null);
+  const hasScanIntent =
+    options.hasScanIntent ??
+    (debugSource && typeof debugSource.has_scan_intent === 'boolean'
+      ? (debugSource.has_scan_intent as boolean)
+      : null);
+
+  return {
+    status: 'error' as const,
+    error_code: COACH_INSUFFICIENT_DATA_ERROR_CODE,
+    response_payload_json: summarizeProviderPayload(providerSummaryPayload, {
+      fallback: options.usedFallback,
+      source: 'coach_generation',
+      provider: 'n8n',
+      status: 'error',
+      error_code: COACH_INSUFFICIENT_DATA_ERROR_CODE,
+      request_id: options.requestId ?? undefined,
+      wrapper_source: payloadWrapperSource,
+      fallback_reason: fallbackReason ?? undefined,
+      language: language ?? undefined,
+      prompt_type: promptType ?? undefined,
+      coach_route: coachRoute ?? undefined,
+      has_scan_intent: hasScanIntent ?? undefined,
     }),
   };
 }

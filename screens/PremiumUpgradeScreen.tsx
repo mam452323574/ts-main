@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback, type ComponentType } from 'react';
+import { useState, useEffect, useMemo, useCallback, type ComponentType } from 'react';
 import {
   View,
   Text,
@@ -7,20 +7,16 @@ import {
   ScrollView,
   ActivityIndicator,
   Platform,
-  Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
   ChartNoAxesCombined,
   ChefHat,
   Check,
   Crown,
   RefreshCw,
-  Sparkles,
-  Star,
   X,
   type LucideProps,
 } from 'lucide-react-native';
@@ -35,9 +31,6 @@ import {
   BORDER_RADIUS,
   FONT_WEIGHTS,
   SHADOWS,
-  getAndroidLightSurface,
-  getObsidianSurface,
-  getVisualMoodSurface,
   mixColors,
   withAlpha,
 } from '@/constants/theme';
@@ -234,11 +227,6 @@ export default function PremiumUpgradeScreen() {
   const runtime = getRuntimeCapabilities();
   const { showAlert, alertElement } = useCustomAlert();
   const isNativePurchasesAvailable = runtime.canUseNativePurchases;
-  const heroGradientColors = useMemo(
-    () => premiumHealth.premiumGradient,
-    [premiumHealth],
-  );
-
   const source = readRouteParam(params.source);
   const requestedOfferingId = readRouteParam(params.offeringId);
   const requestedPackageId = readRouteParam(params.packageId);
@@ -256,26 +244,6 @@ export default function PremiumUpgradeScreen() {
   const [promoOffering, setPromoOffering] = useState<Awaited<
     ReturnType<typeof resolveEntryOfferOffering>
   > | null>(null);
-
-  // Animations
-  const slideAnim = useRef(new Animated.Value(40)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        tension: 50,
-        friction: 8,
-        useNativeDriver: true,
-      }),
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 400,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [fadeAnim, slideAnim]);
 
   useEffect(() => {
     let isMounted = true;
@@ -760,7 +728,6 @@ export default function PremiumUpgradeScreen() {
   const renderPackageCard = (pack: PurchasesPackage) => {
     const isHighlighted = highlightedPackageId === pack.identifier;
     const isAnnual = pack.packageType === 'ANNUAL';
-    const shouldUseHighlightStyles = isHighlighted || isAnnual;
     const comparedPrice = isAnnual ? buildComparedPrice(monthlyPackage, pack, locale) : null;
     const badge =
       isHighlighted && activeEntryOfferPackage
@@ -790,13 +757,12 @@ export default function PremiumUpgradeScreen() {
         key={pack.identifier}
         style={[
           styles.cardShell,
-          shouldUseHighlightStyles ? styles.cardShellAnnual : styles.cardShellMonthly,
+          isHighlighted ? styles.cardShellSelected : styles.cardShellMonthly,
         ]}
         testID={`premium-card-${packageTestIdSuffix}-shell`}
       >
         {badge ? (
-          <View style={[styles.badge, { backgroundColor: colors.gold }]}>
-            <Star color={colors.background} size={12} fill={colors.background} />
+          <View style={styles.badge}>
             <Text style={styles.badgeText}>{badge}</Text>
           </View>
         ) : null}
@@ -804,7 +770,7 @@ export default function PremiumUpgradeScreen() {
         <Squircle
           style={[
             styles.cardSurface,
-            shouldUseHighlightStyles ? styles.cardSurfaceAnnual : styles.cardSurfaceMonthly,
+            isHighlighted ? styles.cardSurfaceSelected : styles.cardSurfaceMonthly,
           ]}
           testID={`premium-card-${packageTestIdSuffix}-surface`}
         >
@@ -812,7 +778,7 @@ export default function PremiumUpgradeScreen() {
             <Text style={[styles.cardTitle, { color: colors.primaryText }]}>
               {resolvePackageTitle(pack, t)}
             </Text>
-            <Text style={[styles.cardPrice, { color: shouldUseHighlightStyles ? colors.gold : colors.primary }]}>
+            <Text style={[styles.cardPrice, { color: isHighlighted ? colors.gold : colors.primaryText }]}>
               {pack.product.priceString}
             </Text>
             {packageSubtitle ? (
@@ -834,19 +800,17 @@ export default function PremiumUpgradeScreen() {
 
           <View style={styles.featuresList} testID="premium-card-features-list">
             {premiumFeatures.map((feature, index) =>
-              renderFeatureRow(feature, index, shouldUseHighlightStyles),
+              renderFeatureRow(feature, index, isHighlighted),
             )}
           </View>
 
           <TouchableOpacity
             style={[
               styles.ctaButton,
-              shouldUseHighlightStyles ? styles.ctaButtonAnnual : null,
               {
                 backgroundColor: colors.primaryText,
                 opacity: purchaseDisabled ? 0.7 : 1,
               },
-              SHADOWS.button,
             ]}
             onPress={() => {
               void handlePurchase(pack);
@@ -882,28 +846,12 @@ export default function PremiumUpgradeScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View
-          style={[
-            styles.content,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }],
-            },
-          ]}
-        >
+        <View style={styles.content}>
           {/* ─── Hero section ─── */}
           <Squircle style={styles.heroShell}>
-            <LinearGradient
-              colors={heroGradientColors}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.heroSection}
-            >
+            <View style={styles.heroSection}>
               <Squircle style={styles.heroCrownContainer}>
-                <Crown color={colors.gold} size={44} fill={withAlpha(colors.gold, 0.22)} />
-                <View style={styles.heroSparkle}>
-                  <Sparkles color={colors.gold} size={20} fill={colors.gold} />
-                </View>
+                <Crown color={colors.gold} size={26} />
               </Squircle>
               <Text style={[styles.heroTitle, { color: colors.primaryText }]}>
                 {t('premium.subscription_page.hero_title')}
@@ -913,18 +861,7 @@ export default function PremiumUpgradeScreen() {
                   activeEntryOfferPackage?.subheadline ??
                   t('premium.subscription_page.hero_subtitle')}
               </Text>
-
-              <View style={styles.heroBenefits}>
-                {premiumFeatures.slice(0, 3).map((feature, index) => (
-                  <Squircle key={`${feature.label}-${index}`} style={styles.heroBenefitChip}>
-                    <Check color={colors.gold} size={14} />
-                    <Text style={styles.heroBenefitText} numberOfLines={2}>
-                      {feature.label}
-                    </Text>
-                  </Squircle>
-                ))}
-              </View>
-            </LinearGradient>
+            </View>
           </Squircle>
 
           <Squircle style={styles.contextCard}>
@@ -1038,7 +975,7 @@ export default function PremiumUpgradeScreen() {
             )}
           </Squircle>
 
-        </Animated.View>
+        </View>
       </ScrollView>
     </AppScreen>
   );
@@ -1054,83 +991,6 @@ const createStyles = (
   isDark: boolean,
   premiumHealth: PremiumHealthPalette,
 ) => {
-  const isAndroidLight = Platform.OS === 'android' && !isDark;
-  const heroSurface = getVisualMoodSurface(colors, isDark, {
-    mood: 'softClinical',
-    accentColor: premiumHealth.premiumAccent,
-    intensity: 'hero',
-  });
-  const contextSurface = getVisualMoodSurface(colors, isDark, {
-    mood: 'softClinical',
-    accentColor: premiumHealth.trustAccent,
-    intensity: 'card',
-  });
-  const freeSurface = isAndroidLight
-    ? getAndroidLightSurface(colors, {
-        accentColor: colors.gray,
-        shadowColor: colors.gray,
-        backgroundAlpha: 0.05,
-        borderAlpha: 0.12,
-        overlayAlpha: 0.08,
-        shadowOpacity: 0.06,
-        shadowRadius: 14,
-        shadowOffsetY: 6,
-        elevation: 2,
-      })
-    : isDark
-      ? getObsidianSurface(colors, {
-          accentColor: colors.gray,
-          intensity: 'flat',
-          backgroundAlpha: 0.03,
-          borderAlpha: 0.1,
-          shadowOpacity: 0.08,
-        })
-    : null;
-  const monthlySurface = isAndroidLight
-    ? getAndroidLightSurface(colors, {
-        accentColor: colors.primary,
-        shadowColor: colors.primary,
-        backgroundAlpha: 0.05,
-        borderAlpha: 0.16,
-        overlayAlpha: 0.08,
-        shadowOpacity: 0.08,
-        shadowRadius: 16,
-        shadowOffsetY: 6,
-        elevation: 3,
-      })
-    : isDark
-      ? getObsidianSurface(colors, {
-          accentColor: premiumHealth.trustAccent,
-          intensity: 'raised',
-          backgroundAlpha: 0.05,
-          borderAlpha: 0.16,
-          shadowOpacity: 0.14,
-        })
-    : null;
-  const annualSurface = isAndroidLight
-    ? getAndroidLightSurface(colors, {
-        accentColor: colors.gold,
-        shadowColor: colors.gold,
-        backgroundAlpha: 0.07,
-        borderAlpha: 0.22,
-        overlayAlpha: 0.1,
-        shadowOpacity: 0.12,
-        shadowRadius: 18,
-        shadowOffsetY: 8,
-        elevation: 4,
-      })
-    : isDark
-      ? getObsidianSurface(colors, {
-          accentColor: premiumHealth.premiumAccent,
-          intensity: 'premium',
-          backgroundAlpha: 0.1,
-          borderAlpha: 0.34,
-          shadowOpacity: 0.22,
-          shadowRadius: 30,
-          shadowOffsetY: 14,
-        })
-    : null;
-
   return StyleSheet.create({
   container: {
     flex: 1,
@@ -1170,34 +1030,26 @@ const createStyles = (
     paddingBottom: SPACING.lg,
     borderRadius: BORDER_RADIUS.hero,
     borderWidth: 1,
-    borderColor: heroSurface.borderColor,
-    backgroundColor: heroSurface.backgroundColor,
-    gap: SPACING.md, borderCurve: 'continuous',
+    borderColor: premiumHealth.borderSubtle,
+    backgroundColor: premiumHealth.surfaceRaised,
+    gap: SPACING.sm, borderCurve: 'continuous',
   },
   heroShell: {
     marginHorizontal: SPACING.page,
     borderRadius: BORDER_RADIUS.hero,
-    ...(heroSurface.shadowColor ? heroSurface : SHADOWS.card), borderCurve: 'continuous',
+    ...SHADOWS.none, borderCurve: 'continuous',
   },
   heroCrownContainer: {
-    position: 'relative',
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: isDark
-      ? mixColors(colors.cardBackground, colors.gold, 0.1)
-      : mixColors(colors.cardBackground, colors.gold, 0.18),
+    backgroundColor: premiumHealth.premiumAccentSoft,
     borderWidth: 1,
-    borderColor: withAlpha(colors.gold, isDark ? 0.28 : 0.22),
-    marginBottom: SPACING.md,
-    ...(isDark ? annualSurface?.shadowStyle : SHADOWS.card), borderCurve: 'continuous',
-  },
-  heroSparkle: {
-    position: 'absolute',
-    top: -6,
-    right: -14,
+    borderColor: withAlpha(premiumHealth.premiumAccent, isDark ? 0.2 : 0.16),
+    marginBottom: SPACING.sm,
+    ...SHADOWS.none, borderCurve: 'continuous',
   },
   heroTitle: {
     fontSize: SIZES.xl,
@@ -1210,40 +1062,18 @@ const createStyles = (
     textAlign: 'center',
     lineHeight: 22,
   },
-  heroBenefits: {
-    width: '100%',
-    gap: SPACING.sm,
-  },
-  heroBenefitChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.xl,
-    backgroundColor: premiumHealth.chipBackground,
-    borderWidth: 1,
-    borderColor: premiumHealth.chipBorder, borderCurve: 'continuous',
-  },
-  heroBenefitText: {
-    flex: 1,
-    fontSize: SIZES.sm,
-    lineHeight: 18,
-    color: colors.primaryText,
-    fontWeight: FONT_WEIGHTS.medium,
-  },
   contextCard: {
     marginHorizontal: SPACING.page,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
     borderRadius: BORDER_RADIUS.xl,
     borderWidth: 1,
-    borderColor: contextSurface.borderColor,
+    borderColor: premiumHealth.borderSubtle,
     backgroundColor: premiumHealth.surfaceRaised,
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.md,
-    ...(contextSurface.shadowColor ? contextSurface : SHADOWS.none), borderCurve: 'continuous',
+    ...SHADOWS.none, borderCurve: 'continuous',
   },
   contextIconWrap: {
     width: 36,
@@ -1288,16 +1118,15 @@ const createStyles = (
     alignSelf: 'center', borderCurve: 'continuous',
   },
   cardShellFree: {
-    opacity: 0.85,
-    ...(freeSurface?.shadowStyle ?? SHADOWS.card),
+    opacity: 0.76,
+    ...SHADOWS.none,
   },
   cardShellMonthly: {
-    ...(monthlySurface?.shadowStyle ?? SHADOWS.card),
+    ...SHADOWS.none,
   },
-  cardShellAnnual: {
+  cardShellSelected: {
     position: 'relative',
-    transform: [{ scale: 1.01 }],
-    ...(annualSurface?.shadowStyle ?? SHADOWS.card),
+    ...SHADOWS.none,
   },
   cardSurface: {
     borderRadius: BORDER_RADIUS.hero,
@@ -1306,20 +1135,16 @@ const createStyles = (
     borderWidth: 1, borderCurve: 'continuous',
   },
   cardSurfaceFree: {
-    backgroundColor: freeSurface
-      ? freeSurface?.backgroundColor
-      : isDark
-        ? premiumHealth.surfaceBase
-        : premiumHealth.surfaceRaised,
-    borderColor: freeSurface?.borderColor ?? colors.lightGray,
+    backgroundColor: isDark ? premiumHealth.surfaceBase : premiumHealth.surfaceRaised,
+    borderColor: premiumHealth.borderSubtle,
   },
   cardSurfaceMonthly: {
-    backgroundColor: monthlySurface?.backgroundColor ?? colors.cardBackground,
-    borderColor: monthlySurface?.borderColor ?? withAlpha(colors.primary, 0.25),
+    backgroundColor: premiumHealth.surfaceRaised,
+    borderColor: premiumHealth.borderSubtle,
   },
-  cardSurfaceAnnual: {
-    backgroundColor: annualSurface?.backgroundColor ?? colors.cardBackground,
-    borderColor: annualSurface?.borderColor ?? colors.gold,
+  cardSurfaceSelected: {
+    backgroundColor: premiumHealth.surfaceRaised,
+    borderColor: withAlpha(premiumHealth.premiumAccent, isDark ? 0.34 : 0.25),
     borderWidth: 1.5,
   },
 
@@ -1335,13 +1160,18 @@ const createStyles = (
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.xs + 2,
     borderRadius: BORDER_RADIUS.full,
-    gap: SPACING.xs,
     zIndex: 10,
     borderWidth: 1,
-    borderColor: withAlpha(colors.white, 0.22), borderCurve: 'continuous',
+    borderColor: withAlpha(premiumHealth.premiumAccent, isDark ? 0.24 : 0.18),
+    backgroundColor: premiumHealth.premiumAccentSoft, borderCurve: 'continuous',
   },
   badgeText: {
-    color: colors.background,
+    // Auparavant `premiumAccent` (or) sur fond `premiumAccentSoft` (or à 6 %
+    // d'opacité en light → ~#FAF6EE) donnait un contraste ~3.5:1, sous le
+    // seuil WCAG AA pour 12 px bold. Même pattern que PremiumTeaserCard :
+    // garder le fond or signature et passer le texte à `primaryText` pour
+    // rétablir un contraste ≥14:1 dans les deux thèmes.
+    color: colors.primaryText,
     fontSize: SIZES.xs,
     fontWeight: FONT_WEIGHTS.bold,
     textTransform: 'uppercase',
@@ -1413,9 +1243,6 @@ const createStyles = (
     borderColor: premiumHealth.primaryActionBorder,
     backgroundColor: premiumHealth.primaryActionBackground, borderCurve: 'continuous',
   },
-  ctaButtonAnnual: {
-    paddingVertical: SPACING.md + 2,
-  },
   ctaButtonText: {
     color: premiumHealth.primaryActionText,
     fontSize: SIZES.sm,
@@ -1449,12 +1276,12 @@ const createStyles = (
     paddingVertical: SPACING.lg,
     borderRadius: BORDER_RADIUS.xl,
     borderWidth: 1,
-    borderColor: contextSurface.borderColor,
+    borderColor: premiumHealth.borderSubtle,
     backgroundColor: premiumHealth.surfaceRaised,
     marginHorizontal: SPACING.page,
     alignItems: 'center',
     gap: SPACING.md,
-    ...(contextSurface.shadowColor ? contextSurface : SHADOWS.none), borderCurve: 'continuous',
+    ...SHADOWS.none, borderCurve: 'continuous',
   },
   restoreButton: {
     flexDirection: 'row',
@@ -1513,7 +1340,7 @@ const createStyles = (
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: SPACING.xl,
-    ...(annualSurface?.shadowStyle ?? SHADOWS.card), borderCurve: 'continuous',
+    ...SHADOWS.none, borderCurve: 'continuous',
   },
   alreadyPremiumTitle: {
     fontSize: SIZES.xxxl,

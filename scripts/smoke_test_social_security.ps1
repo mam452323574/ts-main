@@ -4,13 +4,13 @@
 # A executer apres deploy sur staging, avant rollout prod.
 #
 # Tests inclus :
-#   1) S-02 — webhook URL avec host inconnu rejetee (host_not_allowed)
-#   2) S-02 — webhook URL pointant vers 127.0.0.1 rejetee (host_resolves_private)
-#   3) S-07 — admin-whoami refuse pour non-admin (403)
-#   4) S-07 — admin-whoami OK pour admin (200, is_admin=true)
-#   5) S-09 — moderate-user avec meme Idempotency-Key retourne 409 sur retry
-#   6) S-15 — adjust-post-reactions avec admin_like_adjustment=99999 rejete (400)
-#   7) S-10/S-11 — CORS retourne 'null' sans Origin, case-insensitive avec Origin
+#   1) S-02 -- webhook URL avec host inconnu rejetee (host_not_allowed)
+#   2) S-02 -- webhook URL pointant vers 127.0.0.1 rejetee (host_resolves_private)
+#   3) S-07 -- admin-whoami refuse pour non-admin (403)
+#   4) S-07 -- admin-whoami OK pour admin (200, is_admin=true)
+#   5) S-09 -- moderate-user avec meme Idempotency-Key retourne 409 sur retry
+#   6) S-15 -- adjust-post-reactions avec admin_like_adjustment=99999 rejete (400)
+#   7) S-10/S-11 -- CORS retourne 'null' sans Origin, case-insensitive avec Origin
 #
 # Tests SQL (a faire via Dashboard ou psql separe, non couverts par ce script) :
 #   - S-08 : verifier shouldAutoHideForReports n'a plus de parametre threshold
@@ -54,10 +54,10 @@ function Test-Case {
   Write-Host "[TEST] $Name" -ForegroundColor Cyan
   try {
     & $Block
-    Write-Host "  ✅ PASS" -ForegroundColor Green
+    Write-Host "  [PASS]" -ForegroundColor Green
     $Script:Pass++
   } catch {
-    Write-Host "  ❌ FAIL : $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "  [FAIL] : $($_.Exception.Message)" -ForegroundColor Red
     $Script:Fail++
   }
   Write-Host ''
@@ -107,7 +107,7 @@ function Invoke-EdgeFunction {
 }
 
 # =============================================================================
-# S-07 — admin-whoami
+# S-07 -- admin-whoami
 # =============================================================================
 
 Test-Case 'S-07 : admin-whoami retourne 200 pour admin' {
@@ -123,7 +123,7 @@ Test-Case 'S-07 : admin-whoami retourne 403 pour non-admin' {
 }
 
 # =============================================================================
-# S-09 — Idempotency replay
+# S-09 -- Idempotency replay
 # =============================================================================
 
 if ([string]::IsNullOrWhiteSpace($TargetUserId)) {
@@ -151,7 +151,7 @@ if ([string]::IsNullOrWhiteSpace($TargetUserId)) {
 }
 
 # =============================================================================
-# S-15 — Reaction adjustment bounds
+# S-15 -- Reaction adjustment bounds
 # =============================================================================
 
 if ([string]::IsNullOrWhiteSpace($TargetPostId)) {
@@ -175,7 +175,7 @@ if ([string]::IsNullOrWhiteSpace($TargetPostId)) {
 }
 
 # =============================================================================
-# S-10 / S-11 — CORS
+# S-10 / S-11 -- CORS
 # =============================================================================
 
 Test-Case 'S-10 : sans Origin, Allow-Origin = null (pas *)' {
@@ -200,11 +200,11 @@ Test-Case 'S-11 : Origin case-insensitive matching (necessite ALLOWED_ORIGINS co
 
 Write-Host ''
 Write-Host "==================================" -ForegroundColor Cyan
-Write-Host "  Smoke test social — resume" -ForegroundColor Cyan
+Write-Host "  Smoke test social -- resume" -ForegroundColor Cyan
 Write-Host "==================================" -ForegroundColor Cyan
-Write-Host "  ✅ Pass  : $Pass" -ForegroundColor Green
-Write-Host "  ❌ Fail  : $Fail" -ForegroundColor Red
-Write-Host "  ⚠️  Skip  : $Skip" -ForegroundColor Yellow
+Write-Host "  [PASS]  : $Pass" -ForegroundColor Green
+Write-Host "  [FAIL]  : $Fail" -ForegroundColor Red
+Write-Host "  [SKIP]  : $Skip" -ForegroundColor Yellow
 Write-Host ''
 
 if ($Fail -gt 0) {

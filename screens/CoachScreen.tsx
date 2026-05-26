@@ -24,6 +24,7 @@ import { ScreenState } from '@/components/ScreenState';
 import { CoachActionComposer } from '@/components/coach/CoachActionComposer';
 import { CoachConversationHeroCard } from '@/components/coach/CoachConversationHeroCard';
 import { CoachGuidanceCard } from '@/components/coach/CoachGuidanceCard';
+import { CoachPremiumUpsellInline } from '@/components/coach/chat/CoachPremiumUpsellInline';
 import { CoachPersonaDetailsModal } from '@/components/coach/CoachPersonaDetailsModal';
 import { CoachSettingsInline } from '@/components/coach/CoachSettingsInline';
 import { LoadingMiniGame } from '@/components/loading/LoadingMiniGame';
@@ -49,16 +50,23 @@ import { useSmoothLoadingProgress } from '@/hooks/useSmoothLoadingProgress';
 import { trackEvent } from '@/services/analytics';
 import {
   COACH_NO_USABLE_SCAN_ERROR_CODE,
+  coachQuotaSourceForRequest,
   getCoachEntryFailureDebugInfo,
+  getCoachQuotaBucketKeyFromError,
   getCoachQuotaFromError,
   getCoachServiceErrorDebugInfo,
   isCoachProviderUnavailableEntry,
   isCoachProviderUnavailableError,
   isCoachQuotaExhaustedError,
+  mergeCoachEntryFailureDebugInfo,
+  mergeCoachQuotaForBucket,
+  resolveCoachFailureKindFromDebugInfo,
   resolveCoachFailureKindFromEntry,
   resolveCoachFailureKindFromError,
+  selectCoachQuotaBucket,
   type CoachFailureKind,
 } from '@/services/coach';
+import { useCoachEntryErrorSummary } from '@/hooks/queries/useCoachEntryErrorSummary';
 import { markCoachSeen } from '@/services/growthExperience';
 import { getCoachPersonaVisual } from '@/shared/coachPersonaVisuals';
 import {
@@ -85,6 +93,8 @@ import {
 } from '@/shared/coachPromptTypes';
 import {
   decodeScanCoachIntentParam,
+  isScanCoachIntentDowngradedForFreeTier,
+  resolveScanCoachIntentPremiumPromptType,
   type ScanCoachIntent,
 } from '@/utils/scanCoachIntent';
 import { resolveCoachSubmitIntent } from '@/utils/coachSubmitIntent';
@@ -161,7 +171,7 @@ type CoachScreenProps = {
   variant?: 'stack' | 'tab';
 };
 
-type CoachScanResultContext = {
+type CoachScanResultContextBase = {
   source: 'scan_result';
   scanId: string | null;
   scanType: string | null;
@@ -172,7 +182,15 @@ type CoachScanResultContext = {
   autoSubmit: boolean;
 };
 
-type CoachScanResultRouteRequest = CoachScanResultContext & {
+type CoachScanResultContext = CoachScanResultContextBase & {
+  // Set when a free user is routed to a free preset that hides a more
+  // specialised premium experience (e.g. body posture → latest_scan vs.
+  // body_focus). Used to render a non-blocking premium upsell banner.
+  downgradedFromPremium: boolean;
+  premiumPromptType: CoachGenerationPromptType | null;
+};
+
+type CoachScanResultRouteRequest = CoachScanResultContextBase & {
   promptType: CoachPromptType;
   fallbackPromptType: CoachPromptType | null;
   questionKey: CoachQuestionKey | null;
@@ -799,14 +817,31 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
   const handleCoachQuotaRechargeElapsed = useCallback(() => {
     void refetchCoachQuota();
   }, [refetchCoachQuota]);
+  // The quota bucket consulted by this screen depends on whether the user
+  // arrived here from a scanner result (autoSubmit + scanIntent) or from a
+  // normal Coach preset. The two flows now hit independent buckets server
+  // side; we mirror that here so the gating + countdown reflects the bucket
+  // the user is actually about to consume. The user never sees the bucket
+  // name — they just see the right cooldown.
+  const activeCoachQuotaSource = useMemo(
+    () =>
+      coachQuotaSourceForRequest({
+        hasScanIntent: !!scanResultContext?.scanIntent,
+      }),
+    [scanResultContext?.scanIntent],
+  );
+  const activeCoachQuotaBucket = useMemo(
+    () => selectCoachQuotaBucket(coachQuota, activeCoachQuotaSource),
+    [coachQuota, activeCoachQuotaSource],
+  );
   const coachQuotaCountdownLabel = useCoachQuotaCountdown(
-    coachQuota?.next_recharge_at,
+    activeCoachQuotaBucket?.next_recharge_at ?? coachQuota?.next_recharge_at,
     handleCoachQuotaRechargeElapsed,
   );
   const isCoachQuotaExhausted =
     !!coachQuota &&
     !coachQuota.unlimited &&
-    (coachQuota.available ?? 0) <= 0;
+    (activeCoachQuotaBucket?.available ?? coachQuota.available ?? 0) <= 0;
   const isCoachQuotaUnknown = !coachQuota;
   const isCoachQuotaUnavailable = !!coachQuotaError && !coachQuota;
   const activePersonaLocked = useMemo(
@@ -960,22 +995,6 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
       })),
     [personaOptions],
   );
-  const selectedFirstPersonaOptionsWithVisuals = useMemo(() => {
-    const selectedPersona = personaOptionsWithVisuals.find(
-      (persona) => persona.key === activePersonaKey,
-    );
-
-    if (!selectedPersona) {
-      return personaOptionsWithVisuals;
-    }
-
-    return [
-      selectedPersona,
-      ...personaOptionsWithVisuals.filter(
-        (persona) => persona.key !== activePersonaKey,
-      ),
-    ];
-  }, [activePersonaKey, personaOptionsWithVisuals]);
   const alternativePersonaOptions = useMemo(
     () =>
       personaOptionsWithVisuals.filter(
@@ -1296,6 +1315,10 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
                 trackedCoachEntry?.status ??
                 (!trackedCoachEntry ? 'missing' : 'pending'),
             },
+            providerFailureKind: null,
+            providerFailureStage: null,
+            providerNodeType: null,
+            providerNodeName: null,
             webhookStatus: null,
             provider: 'n8n',
             source: 'coach_generation',
@@ -1305,19 +1328,47 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
         : null,
     [effectiveTrackedEntryId, isTrackedEntryStaleFailure, trackedCoachEntry],
   );
+  const trackedCoachEntryIsError = trackedCoachEntry?.status === 'error';
+  const trackedCoachEntryErrorSummaryQuery = useCoachEntryErrorSummary({
+    entryId: trackedCoachEntryIsError ? (trackedCoachEntry?.id ?? null) : null,
+  });
+  const trackedCoachEntryErrorSummary = trackedCoachEntryErrorSummaryQuery.data ?? null;
   const trackedEntryFailureDebugInfo = useMemo(
-    () =>
-      staleTrackedEntryFailureDebugInfo ??
-      getCoachEntryFailureDebugInfo(trackedCoachEntry),
-    [staleTrackedEntryFailureDebugInfo, trackedCoachEntry],
+    () => {
+      const base =
+        staleTrackedEntryFailureDebugInfo ??
+        getCoachEntryFailureDebugInfo(trackedCoachEntry);
+      if (isTrackedEntryStaleFailure) {
+        return base;
+      }
+      return mergeCoachEntryFailureDebugInfo(base, trackedCoachEntryErrorSummary);
+    },
+    [
+      isTrackedEntryStaleFailure,
+      staleTrackedEntryFailureDebugInfo,
+      trackedCoachEntry,
+      trackedCoachEntryErrorSummary,
+    ],
   );
-  const trackedEntryFailureKind = useMemo(
-    () =>
-      isTrackedEntryStaleFailure
-        ? 'provider_request_failed'
-        : resolveCoachFailureKindFromEntry(trackedCoachEntry),
-    [isTrackedEntryStaleFailure, trackedCoachEntry],
-  );
+  const trackedEntryFailureKind = useMemo<CoachFailureKind>(() => {
+    if (isTrackedEntryStaleFailure) {
+      return 'provider_request_failed';
+    }
+    const baseKind = resolveCoachFailureKindFromEntry(trackedCoachEntry);
+    if (baseKind !== 'generic' || !trackedEntryFailureDebugInfo) {
+      return baseKind;
+    }
+    // The public coach_entries projection omits error_code, so the entry-only
+    // classifier may fall through to 'generic'. The error-summary RPC fills
+    // that gap — re-run the resolution against the merged debug info so the
+    // UI surfaces the right failure kind (provider_unavailable,
+    // provider_request_failed, ...).
+    return resolveCoachFailureKindFromDebugInfo(trackedEntryFailureDebugInfo);
+  }, [
+    isTrackedEntryStaleFailure,
+    trackedCoachEntry,
+    trackedEntryFailureDebugInfo,
+  ]);
   const mutationFailureKind = useMemo(
     () => resolveCoachFailureKindFromError(coachGeneration.error),
     [coachGeneration.error],
@@ -1679,14 +1730,14 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
 
   const inlinePersonaOptions = useMemo(
     () =>
-      selectedFirstPersonaOptionsWithVisuals.map((persona) => ({
+      alternativePersonaOptions.map((persona) => ({
         key: persona.key,
         title: t(persona.titleTranslationKey),
         subtitle: t(persona.subtitleTranslationKey),
         visual: persona.visual,
         locked: persona.locked,
       })),
-    [selectedFirstPersonaOptionsWithVisuals, t],
+    [alternativePersonaOptions, t],
   );
 
   const handleEditSettings = useCallback(() => {
@@ -1767,6 +1818,41 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     const nextQuestionSelectionMode: CoachQuestionSelectionMode =
       resolvedFreeQuestionText ? 'free_text' : 'preset';
 
+    // Phase 0 observability: emit when the legacy "premium-locked" downgrade
+    // path triggers. With the new scanCoachIntent mapping, free users should
+    // already land on free presets — any remaining fire here indicates either
+    // a stale URL or a route we haven't migrated yet.
+    if (resolvedPromptType !== requestedPromptType) {
+      trackEvent('coach_scan_intent_downgrade', {
+        requested_prompt_type: requestedPromptType,
+        fallback_prompt_type_used: resolvedPromptType,
+        priority_metric: scanResultRouteRequest.priorityMetric,
+        account_tier: userProfile?.account_tier ?? 'unknown',
+      });
+    }
+    if (
+      scanResultRouteRequest.questionKey &&
+      resolvedQuestionKey === null
+    ) {
+      trackEvent('coach_scan_intent_question_key_mismatch', {
+        attempted_question_key: scanResultRouteRequest.questionKey,
+        resolved_prompt_type: resolvedPromptType,
+        account_tier: userProfile?.account_tier ?? 'unknown',
+      });
+    }
+
+    // Phase 2: detect the intrinsic free→premium downgrade in the mapping
+    // (e.g. body posture metric → latest_scan for free vs body_focus for
+    // premium). The banner is rendered below in the JSX.
+    const intent = scanResultRouteRequest.scanIntent;
+    const downgradedFromPremium = intent
+      ? isScanCoachIntentDowngradedForFreeTier(intent, userProfile?.account_tier)
+      : false;
+    const premiumPromptType =
+      downgradedFromPremium && intent
+        ? resolveScanCoachIntentPremiumPromptType(intent)
+        : null;
+
     appliedScanResultRouteSignatureRef.current =
       scanResultRouteRequest.signature;
     setQuestionSelectionMode(nextQuestionSelectionMode);
@@ -1786,6 +1872,8 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
       generationPromptType: resolvedGenerationPromptType,
       routeSignature: scanResultRouteRequest.signature,
       autoSubmit: scanResultRouteRequest.autoSubmit,
+      downgradedFromPremium,
+      premiumPromptType,
     });
     setTrackedEntryId(null);
     setDisplayMode('settings');
@@ -1794,6 +1882,8 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     locale,
     scanResultRouteRequest,
     setQuestionSelectionMode,
+    userProfile?.account_tier,
+    t,
   ]);
 
   // Garde-fou : si le mode courant est verrouillé pour le tier actuel
@@ -2044,6 +2134,9 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
       ? 'auto_from_scan_result'
       : 'manual';
     pendingAutoSubmitRef.current = false;
+    const shouldForceRefresh =
+      promptType !== FREE_QUESTION_PROMPT_TYPE &&
+      submissionTrigger === 'manual';
 
     if (activePersonaLocked) {
       trackEvent('coach_generation_locked_persona_blocked', {
@@ -2101,7 +2194,13 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
         prompt_type: visiblePromptType,
         persona_key: activePersonaKey,
         account_tier: coachQuota.account_tier,
-        next_recharge_at: coachQuota.next_recharge_at,
+        // Report the bucket-aware cooldown so analytics matches what the user
+        // actually sees in the alert. We intentionally do NOT add a
+        // bucket_name field to the user-facing copy — the cooldown speaks for
+        // itself.
+        next_recharge_at:
+          activeCoachQuotaBucket?.next_recharge_at ?? coachQuota.next_recharge_at,
+        quota_source: activeCoachQuotaSource,
       });
       showAlert(
         t('coach.quota.exhausted_title'),
@@ -2134,6 +2233,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
         promptType !== FREE_QUESTION_PROMPT_TYPE &&
         !!scanResultContext?.scanIntent,
       submission_trigger: submissionTrigger,
+      force_refresh: shouldForceRefresh,
     });
 
     try {
@@ -2147,6 +2247,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
         scanResultContext?.scanIntent
           ? { scanIntent: scanResultContext.scanIntent }
           : {}),
+        ...(shouldForceRefresh ? { forceRefresh: true } : {}),
       });
       const shouldTrackResponse =
         response.entry_id.length > 0 && !hasRenderableCoachContent(response);
@@ -2171,6 +2272,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
         fallback: response.fallback,
         status: response.status,
         submission_trigger: submissionTrigger,
+        force_refresh: shouldForceRefresh,
       });
     } catch (error) {
       if (shouldDebugCoachScreen()) {
@@ -2184,14 +2286,24 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
       }
 
       const quotaFromError = getCoachQuotaFromError(error);
+      const consumedBucketKey =
+        getCoachQuotaBucketKeyFromError(error) ?? activeCoachQuotaSource;
       if (quotaFromError) {
+        // Preserve the previously-known view of the OTHER bucket. Without
+        // this, a 429 on scan_cta would wipe the snapshot's `buckets.general`
+        // (because the error payload only carries the consumed bucket) and
+        // the next render would falsely "forget" the user has presets left.
         queryClient.setQueriesData(
           { queryKey: COACH_SCREEN_SNAPSHOT_QUERY_KEY },
           (previousSnapshot: any) =>
             previousSnapshot
               ? {
                   ...previousSnapshot,
-                  quota: quotaFromError,
+                  quota: mergeCoachQuotaForBucket(
+                    previousSnapshot.quota,
+                    quotaFromError,
+                    consumedBucketKey,
+                  ),
                 }
               : previousSnapshot,
         );
@@ -2474,7 +2586,10 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
           />
         )
       }
-      style={styles.scrollHeader}
+      style={[
+        styles.scrollHeader,
+        variant === 'tab' && { paddingTop: insets.top + SPACING.xl },
+      ]}
       testID="coach-screen-header"
     />
   );
@@ -2501,12 +2616,15 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
           scrollIndicatorInsets={{ bottom: coachScrollIndicatorBottomInset }}
           showsVerticalScrollIndicator={false}
         >
-          {screenHeaderElement}
+          {!showGenerationLoadingState ? screenHeaderElement : null}
 
           <View
             style={[
               styles.scrollBody,
-              showGenerationLoadingState && { flex: 1, paddingTop: SPACING.sm },
+              showGenerationLoadingState && {
+                flex: 1,
+                paddingTop: insets.top + SPACING.md,
+              },
             ]}
             testID="coach-scroll-body"
           >
@@ -2517,6 +2635,35 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
               ]}
               testID="coach-latest-guidance-section"
             >
+            {displayMode === 'settings' &&
+            !showLoadingState &&
+            !showQueryErrorState &&
+            !showProviderUnavailableState &&
+            !isGenerationAwaitingResult &&
+            scanResultContext?.downgradedFromPremium &&
+            scanResultContext.premiumPromptType ? (
+              <CoachPremiumUpsellInline
+                title={t('coach.scan_downgrade.title')}
+                body={t(
+                  `coach.scan_downgrade.body_${scanResultContext.premiumPromptType}`,
+                  {
+                    defaultValue: t('coach.scan_downgrade.body_default'),
+                  } as any,
+                )}
+                ctaLabel={t('coach.scan_downgrade.cta')}
+                onPress={() =>
+                  handleOpenPremiumUpgrade('post_scan_downgrade', {
+                    requested_prompt_type:
+                      scanResultContext?.premiumPromptType ?? null,
+                    priority_metric:
+                      scanResultContext?.priorityMetric ?? null,
+                    scan_type: scanResultContext?.scanType ?? null,
+                  })
+                }
+                testID="coach-scan-downgrade-banner"
+              />
+            ) : null}
+
             {displayMode === 'settings' &&
             !showLoadingState &&
             !showQueryErrorState &&
@@ -2564,7 +2711,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
                 promptSubtitle={promptSubtitleResolver}
                 promptCategoryLabel={promptCategoryTitleResolver}
                 accentColor={activePersonaVisual.haloTint}
-                personaSectionLabel={t('coach.options_sheet.persona_label')}
+                personaSectionLabel={t('coach.other_personas_label')}
                 modeSectionLabel={t('coach.options_sheet.mode_label')}
                 lockedBadgeLabel={t('coach.locked_badge')}
                 lockedHint={t('coach.locked_tap_hint')}
@@ -2996,7 +3143,7 @@ const createStyles = (
       textAlign: 'left',
     },
     generationLoadingShell: {
-      gap: SPACING.sm,
+      gap: SPACING.md,
       alignSelf: 'stretch',
     },
     generationLoadingCard: {

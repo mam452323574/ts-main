@@ -24,6 +24,7 @@ interface ButtonProps {
   tone?: ButtonTone;
   loading?: boolean;
   disabled?: boolean;
+  flat?: boolean;
   testID?: string;
   icon?: ReactNode;
   iconPosition?: 'left' | 'right';
@@ -37,6 +38,7 @@ export function Button({
   tone = 'primary',
   loading = false,
   disabled = false,
+  flat = false,
   testID,
   icon,
   iconPosition = 'left',
@@ -118,6 +120,7 @@ export function Button({
           variant === 'premium' && styles.premiumButton,
           variant === 'premium' && size === 'lg' && styles.premiumButtonLg,
           variant === 'ghost' && styles.ghostButton,
+          flat && styles.flatButton,
           (disabled || loading) && styles.disabledButton,
         ]}
       >
@@ -231,6 +234,13 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     backgroundColor: 'transparent',
     borderRadius: BORDER_RADIUS.pill,
     minHeight: 44, borderCurve: 'continuous',
+  },
+  flatButton: {
+    shadowColor: 'transparent',
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 0,
   },
   disabledButton: {
     opacity: 0.5,

@@ -1,21 +1,24 @@
 #!/usr/bin/env node
-// One-shot script to neutralize "not enough data" responses in the N8N coach
-// workflow.
+// OBSOLETE — do not re-run. The hydration fallback strings injected by this
+// script (defaultBody / genericError × 6 locales) were replaced by neutral
+// context-asking strings in the hotfix documented in
+// COACH_BUG_HYDRATATION_AUDIT_2026_05_20.md (R-1).
+// The `to:` values below have been updated to the new neutral strings so that,
+// if the script is ever re-run against an old export, it lays down the correct
+// (post-hotfix) values. Kept for historical traceability only.
 //
-// Rationale: the audit identified three problematic fallback paths that ship
-// the user an excuse instead of useful advice:
+// Original rationale (kept for context):
 //   - localizedCopy.defaultBody   "Je n'ai pas pu formuler un conseil…"
 //   - localizedCopy.genericError  "Un conseil personnalisé n'est pas disponible…"
 //   - parsed.body returned by the LLM when it slipped a refusal through
 //     ("pas assez de données", "je ne peux pas conseiller", …).
 //
-// This pass:
-//   - rewrites defaultBody / genericError in the 6 locales (FR/EN/DE/IT/ES/PT)
-//     with a non-apologetic, actionable, universal piece of advice ;
+// This pass (historical):
+//   - rewrites defaultBody / genericError in the 6 locales (FR/EN/DE/IT/ES/PT) ;
 //   - keeps noScanBody (legitimate "user has zero scan" path) untouched ;
 //   - injects a defensive sanitizer that strips the LLM body when it contains
-//     a banned refusal phrase, so the user sees the new useful fallback
-//     instead of the LLM's excuse.
+//     a banned refusal phrase, so the user sees the fallback instead of the
+//     LLM's excuse.
 //
 // Run from repo root: node tmp/apply-coach-fallback-cleanup.js
 // Idempotent: re-runs are no-ops (each replacement guards on the OLD substring).
@@ -58,72 +61,72 @@ const replacements = [
   {
     label: 'FR defaultBody',
     from: 'defaultBody: "Je n\'ai pas pu formuler un conseil personnalise fiable a partir des informations disponibles. Reessaie avec un scan recent pour obtenir un retour plus utile.",',
-    to: 'defaultBody: "Voici ta priorite du jour : un grand verre d eau au reveil, 5 minutes de marche apres le dejeuner, et un coucher avant minuit. Trois gestes simples qui font deja une vraie difference.",',
+    to: 'defaultBody: "Pour te donner un retour vraiment utile, j ai besoin d un peu plus de contexte. Reformule ta question en quelques mots ou relance un scan recent et je te reponds en detail.",',
   },
   {
     label: 'FR genericError',
     from: 'genericError: "Un conseil personnalise n\'est pas disponible pour le moment. Reessaie dans un instant.",',
-    to: 'genericError: "Ta priorite aujourd hui : bois un grand verre d eau au reveil, bouge 5 minutes apres le repas, et couche-toi un peu plus tot. Petits gestes, grand impact.",',
+    to: 'genericError: "Reformule ta demande en une ou deux phrases pour que je puisse y repondre precisement. Si tu veux un retour personnalise, un scan recent m aide a ajuster le conseil.",',
   },
 
   // EN
   {
     label: 'EN defaultBody',
     from: 'defaultBody: "I could not build a reliable personalized coaching summary from the available information. Try again with a recent scan for clearer guidance.",',
-    to: 'defaultBody: "Your priority today: a tall glass of water on waking, a 5-minute walk after lunch, and an earlier bedtime. Three simple actions that already make a real difference.",',
+    to: 'defaultBody: "To give you a truly useful answer, I need a bit more context. Rephrase your question in a few words, or run a recent scan and I will reply in detail.",',
   },
   {
     label: 'EN genericError',
     from: 'genericError: "A personalized coaching note is not available right now. Please try again shortly.",',
-    to: 'genericError: "Your priority today: drink a tall glass of water on waking, walk 5 minutes after a meal, and get to bed a little earlier. Small actions, big impact.",',
+    to: 'genericError: "Rephrase your request in one or two sentences so I can answer precisely. If you want a personalized note, a recent scan helps me fine-tune the advice.",',
   },
 
   // DE
   {
     label: 'DE defaultBody',
     from: 'defaultBody: "Ich konnte aus den verfuegbaren Informationen keine verlaessliche personalisierte Coach-Zusammenfassung erstellen. Versuche es mit einem aktuellen Scan noch einmal.",',
-    to: 'defaultBody: "Deine Tagespriorität: ein großes Glas Wasser nach dem Aufwachen, 5 Minuten Gehen nach dem Mittagessen und etwas früher schlafen. Drei einfache Gesten mit echter Wirkung.",',
+    to: 'defaultBody: "Damit ich dir wirklich nützlich antworten kann, brauche ich etwas mehr Kontext. Formuliere deine Frage in wenigen Worten neu oder starte einen aktuellen Scan, und ich antworte dir ausführlich.",',
   },
   {
     label: 'DE genericError',
     from: 'genericError: "Ein personalisierter Coach-Hinweis ist im Moment nicht verfuegbar. Bitte versuche es gleich noch einmal.",',
-    to: 'genericError: "Deine Priorität heute: morgens ein großes Glas Wasser, 5 Minuten Gehen nach einer Mahlzeit, etwas früher ins Bett. Kleine Gesten, großer Effekt.",',
+    to: 'genericError: "Formuliere deine Anfrage in ein bis zwei Sätzen neu, damit ich präzise antworten kann. Für eine persönliche Rückmeldung hilft mir ein aktueller Scan, den Hinweis genau abzustimmen.",',
   },
 
   // IT
   {
     label: 'IT defaultBody',
     from: 'defaultBody: "Non sono riuscito a creare un riepilogo coach personalizzato e affidabile dalle informazioni disponibili. Riprova con una scansione recente per avere indicazioni piu chiare.",',
-    to: 'defaultBody: "La tua priorità di oggi: un grande bicchiere d acqua appena sveglio, 5 minuti di camminata dopo pranzo e andare a letto un po\' prima. Tre gesti semplici che fanno davvero la differenza.",',
+    to: 'defaultBody: "Per darti una risposta davvero utile mi serve un po’ piu di contesto. Riformula la tua domanda in poche parole oppure avvia una scansione recente e ti rispondo nel dettaglio.",',
   },
   {
     label: 'IT genericError',
     from: 'genericError: "Un consiglio personalizzato non e disponibile in questo momento. Riprova tra poco.",',
-    to: 'genericError: "La tua priorità oggi: bevi un grande bicchiere d acqua appena sveglio, cammina 5 minuti dopo un pasto e dormi un po\' prima. Piccoli gesti, grande impatto.",',
+    to: 'genericError: "Riformula la tua richiesta in una o due frasi cosi posso risponderti con precisione. Per un riscontro personalizzato, una scansione recente mi aiuta a calibrare il consiglio.",',
   },
 
   // ES
   {
     label: 'ES defaultBody',
     from: 'defaultBody: "No pude crear un resumen personalizado y fiable a partir de la informacion disponible. Intentalo de nuevo con un escaneo reciente para obtener una orientacion mas clara.",',
-    to: 'defaultBody: "Tu prioridad de hoy: un vaso grande de agua al despertar, 5 minutos de caminata después del almuerzo, y acostarte un poco antes. Tres gestos simples que ya marcan la diferencia.",',
+    to: 'defaultBody: "Para darte una respuesta realmente útil necesito un poco más de contexto. Reformula tu pregunta en pocas palabras o lanza un escaneo reciente y te respondo en detalle.",',
   },
   {
     label: 'ES genericError',
     from: 'genericError: "Una orientacion personalizada no esta disponible en este momento. Intentalo de nuevo en breve.",',
-    to: 'genericError: "Tu prioridad hoy: bebe un vaso grande de agua al despertar, camina 5 minutos después de una comida, y acuéstate un poco antes. Pequeños gestos, gran impacto.",',
+    to: 'genericError: "Reformula tu petición en una o dos frases para que pueda responderte con precisión. Si quieres una respuesta personalizada, un escaneo reciente me ayuda a afinar el consejo.",',
   },
 
   // PT
   {
     label: 'PT defaultBody',
     from: 'defaultBody: "Nao consegui criar um resumo personalizado e fiavel a partir das informacoes disponiveis. Tenta novamente com um scan recente para obter uma orientacao mais clara.",',
-    to: 'defaultBody: "A tua prioridade hoje: um copo grande de água ao acordar, 5 minutos de caminhada depois do almoço, e ir para a cama um pouco mais cedo. Três gestos simples que já fazem a diferença.",',
+    to: 'defaultBody: "Para te dar uma resposta verdadeiramente útil preciso de um pouco mais de contexto. Reformula a tua pergunta em poucas palavras ou lança um scan recente e respondo-te em detalhe.",',
   },
   {
     label: 'PT genericError',
     from: 'genericError: "Uma orientacao personalizada nao esta disponivel neste momento. Tenta novamente daqui a pouco.",',
-    to: 'genericError: "A tua prioridade hoje: bebe um copo grande de água ao acordar, caminha 5 minutos depois de uma refeição, e deita-te um pouco mais cedo. Pequenos gestos, grande impacto.",',
+    to: 'genericError: "Reformula o teu pedido em uma ou duas frases para eu poder responder com precisão. Se queres uma resposta personalizada, um scan recente ajuda-me a afinar o conselho.",',
   },
 ];
 

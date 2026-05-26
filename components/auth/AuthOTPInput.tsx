@@ -7,7 +7,7 @@ import {
   View,
 } from 'react-native';
 
-import { BORDER_RADIUS, SHADOWS, SIZES, SPACING, withAlpha } from '@/constants/theme';
+import { BORDER_RADIUS, SIZES, SPACING, withAlpha } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuthPalette } from '@/components/auth/tokens';
 
@@ -129,11 +129,11 @@ const createStyles = (
     },
     cell: {
       width: 48,
-      height: 60,
-      borderRadius: BORDER_RADIUS.xl,
+      height: 56,
+      borderRadius: BORDER_RADIUS.lg,
       borderWidth: 1,
-      borderColor: 'transparent',
-      backgroundColor: palette.accentSofter,
+      borderColor: palette.secondaryActionBorder,
+      backgroundColor: palette.surface,
       textAlign: 'center',
       fontSize: SIZES.xl,
       fontWeight: '700',
@@ -141,8 +141,7 @@ const createStyles = (
     },
     cellFilled: {
       borderColor: palette.accentRing,
-      backgroundColor: palette.accentSoft,
-      ...SHADOWS.soft,
+      backgroundColor: palette.surfaceStrong,
     },
     cellError: {
       borderColor: withAlpha(colors.error, 0.5),

@@ -11,7 +11,7 @@ interface NextScanTimerProps {
   onTimerComplete?: () => void;
   textColor?: string;
   iconColor?: string;
-  mode?: 'default' | 'scannerCompact' | 'scannerChipCompact';
+  mode?: 'default' | 'scannerCompact' | 'scannerChipCompact' | 'homeCompact';
   serverClockOffsetMs?: number;
   padHours?: boolean;
 }
@@ -31,7 +31,8 @@ export function NextScanTimer({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const isScannerCompact = mode === 'scannerCompact';
   const isScannerChipCompact = mode === 'scannerChipCompact';
-  const isCompactMode = isScannerCompact || isScannerChipCompact;
+  const isHomeCompact = mode === 'homeCompact';
+  const isCompactMode = isScannerCompact || isScannerChipCompact || isHomeCompact;
   const [timeRemaining, setTimeRemaining] = useState('');
   const [isAvailable, setIsAvailable] = useState(false);
   const onTimerCompleteRef = useRef(onTimerComplete);
@@ -120,6 +121,7 @@ export function NextScanTimer({
           styles.container,
           isScannerCompact && styles.scannerCompactContainer,
           isScannerChipCompact && styles.scannerChipCompactContainer,
+          isHomeCompact && styles.homeCompactContainer,
         ]}
       >
         {!isCompactMode && <Clock color={colors.success} size={12} strokeWidth={2.5} />}
@@ -129,6 +131,7 @@ export function NextScanTimer({
             styles.availableText,
             isScannerCompact && styles.scannerCompactText,
             isScannerChipCompact && styles.scannerChipCompactText,
+            isHomeCompact && styles.homeCompactText,
           ]}
           numberOfLines={1}
         >
@@ -140,7 +143,7 @@ export function NextScanTimer({
 
   const timerText = isScannerChipCompact
     ? timeRemaining
-    : isScannerCompact
+    : isScannerCompact || isHomeCompact
       ? `${scanLabel ? `${scanLabel} ` : ''}${timeRemaining}`
       : `${scanLabel ? `${scanLabel} ` : ''}${t('common.in')} ${timeRemaining}`;
 
@@ -150,9 +153,10 @@ export function NextScanTimer({
         styles.container,
         isScannerCompact && styles.scannerCompactContainer,
         isScannerChipCompact && styles.scannerChipCompactContainer,
+        isHomeCompact && styles.homeCompactContainer,
       ]}
     >
-      {!isScannerCompact && (
+      {!isScannerCompact && !isHomeCompact && (
         <Clock
           color={iconColor || 'rgba(255, 255, 255, 0.7)'}
           size={isScannerChipCompact ? 9 : 12}
@@ -165,8 +169,10 @@ export function NextScanTimer({
           textColor ? { color: textColor } : undefined,
           isScannerCompact && styles.scannerCompactText,
           isScannerChipCompact && styles.scannerChipCompactText,
+          isHomeCompact && styles.homeCompactText,
         ]}
-        numberOfLines={1}
+        numberOfLines={isHomeCompact ? 2 : 1}
+        ellipsizeMode="tail"
       >
         {timerText}
       </Text>
@@ -226,6 +232,26 @@ const createStyles = (colors: any) => StyleSheet.create({
     textAlign: 'center',
     flexShrink: 1,
     minWidth: 0,
+  },
+  // homeCompact: layout vertical sur 2 lignes pour les mini-cards de la Home
+  // où l'espace horizontal est trop étroit pour "Nouveau scan dans 23h 59m"
+  // sur une seule ligne. Texte volontairement légèrement plus grand que
+  // scannerCompact pour rester lisible quand il wrap.
+  homeCompactContainer: {
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    marginTop: 0,
+    width: '100%',
+  },
+  homeCompactText: {
+    fontSize: SIZES.text10,
+    lineHeight: 12,
+    fontStyle: 'normal',
+    fontWeight: FONT_WEIGHTS.medium,
+    textAlign: 'center',
+    flexShrink: 1,
+    minWidth: 0,
+    width: '100%',
   },
   availableText: {
     color: colors.success,

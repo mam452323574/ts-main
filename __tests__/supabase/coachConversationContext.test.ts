@@ -10,11 +10,24 @@ interface ScanRow {
   analysis_result: unknown;
   analyzed_at: unknown;
   created_at: unknown;
+  scan_metrics?: unknown;
+}
+
+interface MaybeSettableMock {
+  data: unknown;
+  error: unknown;
 }
 
 interface MockClientOptions {
-  scans?: { data: unknown; error: unknown } | (() => { data: unknown; error: unknown });
-  userProfile?: { data: unknown; error: unknown } | (() => { data: unknown; error: unknown });
+  scans?: MaybeSettableMock | (() => MaybeSettableMock);
+  userProfile?: MaybeSettableMock | (() => MaybeSettableMock);
+  scanSummary?: MaybeSettableMock | (() => MaybeSettableMock);
+}
+
+function resolveMock(option: MockClientOptions[keyof MockClientOptions] | undefined): MaybeSettableMock {
+  if (typeof option === 'function') return option();
+  if (option) return option;
+  return { data: null, error: null };
 }
 
 function createMockClient(options: MockClientOptions = {}) {
@@ -25,17 +38,20 @@ function createMockClient(options: MockClientOptions = {}) {
   const scansSelect = jest.fn(() => ({ eq: scansEq }));
 
   scansLimit.mockImplementation(() => {
-    const result = typeof options.scans === 'function' ? options.scans() : options.scans;
-    return Promise.resolve(result ?? { data: [], error: null });
+    const result = resolveMock(options.scans);
+    return Promise.resolve(result);
   });
 
-  const profileMaybeSingle = jest.fn(() => {
-    const result =
-      typeof options.userProfile === 'function' ? options.userProfile() : options.userProfile;
-    return Promise.resolve(result ?? { data: null, error: null });
-  });
+  const profileMaybeSingle = jest.fn(() => Promise.resolve(resolveMock(options.userProfile)));
   const profileEq = jest.fn(() => ({ maybeSingle: profileMaybeSingle }));
   const profileSelect = jest.fn(() => ({ eq: profileEq }));
+
+  const rpc = jest.fn((name: string) => {
+    if (name === 'get_user_scan_summary') {
+      return Promise.resolve(resolveMock(options.scanSummary));
+    }
+    throw new Error(`Unexpected rpc in mock: ${name}`);
+  });
 
   const from = jest.fn((table: string) => {
     if (table === 'scans') return { select: scansSelect };
@@ -44,9 +60,10 @@ function createMockClient(options: MockClientOptions = {}) {
   });
 
   return {
-    client: { from },
+    client: { from, rpc },
     spies: {
       from,
+      rpc,
       scansSelect,
       scansEq,
       scansOrder1,
@@ -95,6 +112,15 @@ describe('buildRecentScanDigest', () => {
     });
   });
 
+  it('selects scan_metrics(*) alongside the scan columns', () => {
+    const { client, spies } = createMockClient({ scans: { data: [], error: null } });
+    return buildRecentScanDigest(client, 'user-1').then(() => {
+      expect(spies.scansSelect).toHaveBeenCalledWith(
+        expect.stringContaining('scan_metrics(*)'),
+      );
+    });
+  });
+
   it('falls back to created_at when analyzed_at is missing', async () => {
     const { client } = createMockClient({
       scans: {
@@ -109,7 +135,11 @@ describe('buildRecentScanDigest', () => {
     });
     const digest = await buildRecentScanDigest(client, 'user-1');
     expect(digest).toEqual([
-      { scan_type: 'body', captured_at: '2026-04-01T08:00:00.000Z' },
+      {
+        scan_id: 'scan-1',
+        scan_type: 'body',
+        captured_at: '2026-04-01T08:00:00.000Z',
+      },
     ]);
   });
 
@@ -160,8 +190,8 @@ describe('buildRecentScanDigest', () => {
     }
   });
 
-  it('truncates a long summary with an ellipsis suffix', async () => {
-    const longSummary = 'A'.repeat(500);
+  it('truncates a long summary with an ellipsis suffix (400 chars max)', async () => {
+    const longSummary = 'A'.repeat(800);
     const { client } = createMockClient({
       scans: {
         data: [makeScanRow({ analysis_result: { analysis_summary: longSummary } })],
@@ -170,7 +200,7 @@ describe('buildRecentScanDigest', () => {
     });
     const digest = await buildRecentScanDigest(client, 'user-1');
     expect(digest[0].summary).toBeDefined();
-    expect(digest[0].summary!.length).toBe(200);
+    expect(digest[0].summary!.length).toBe(400);
     expect(digest[0].summary!.endsWith('…')).toBe(true);
   });
 
@@ -185,14 +215,14 @@ describe('buildRecentScanDigest', () => {
     expect(digest[0].summary).toBe('Quick recap.');
   });
 
-  it('returns up to two findings, each clamped to 80 chars', async () => {
-    const long = 'F'.repeat(120);
+  it('returns up to four findings, each clamped to 160 chars', async () => {
+    const long = 'F'.repeat(200);
     const { client } = createMockClient({
       scans: {
         data: [
           makeScanRow({
             analysis_result: {
-              findings: [long, 'short finding', 'third', 'fourth'],
+              findings: [long, 'short finding', 'third finding', 'fourth finding', 'fifth finding'],
             },
           }),
         ],
@@ -200,8 +230,8 @@ describe('buildRecentScanDigest', () => {
       },
     });
     const digest = await buildRecentScanDigest(client, 'user-1');
-    expect(digest[0].top_findings).toHaveLength(2);
-    expect(digest[0].top_findings![0].length).toBe(80);
+    expect(digest[0].top_findings).toHaveLength(4);
+    expect(digest[0].top_findings![0].length).toBe(160);
     expect(digest[0].top_findings![0].endsWith('…')).toBe(true);
     expect(digest[0].top_findings![1]).toBe('short finding');
   });
@@ -235,11 +265,11 @@ describe('buildRecentScanDigest', () => {
     });
   });
 
-  it('produces a JSON payload of three rich entries under 1200 chars', async () => {
+  it('produces a JSON payload of three rich entries under 3 KB', async () => {
     const rows: ScanRow[] = ['s1', 's2', 's3'].map((id, idx) =>
       makeScanRow({
         id,
-        scan_type: idx === 0 ? 'body' : idx === 1 ? 'face' : 'fridge',
+        scan_type: idx === 0 ? 'body' : idx === 1 ? 'health' : 'nutrition',
         analysis_result: {
           overall_score: 80 - idx * 5,
           analysis_summary:
@@ -253,7 +283,7 @@ describe('buildRecentScanDigest', () => {
     );
     const { client } = createMockClient({ scans: { data: rows, error: null } });
     const digest = await buildRecentScanDigest(client, 'user-1');
-    expect(JSON.stringify(digest).length).toBeLessThan(1200);
+    expect(JSON.stringify(digest).length).toBeLessThan(3000);
   });
 });
 
@@ -284,6 +314,7 @@ describe('buildCoachUserContext', () => {
     const { client } = createMockClient({
       userProfile: { data: { inferred_persona: makeStoredPersona() }, error: null },
       scans: { data: [makeScanRow()], error: null },
+      scanSummary: { data: null, error: null },
     });
 
     const context = await buildCoachUserContext(client, 'user-1', 'req-1');
@@ -300,6 +331,7 @@ describe('buildCoachUserContext', () => {
     const { client } = createMockClient({
       userProfile: { data: null, error: null },
       scans: { data: [makeScanRow()], error: null },
+      scanSummary: { data: null, error: null },
     });
 
     const context = await buildCoachUserContext(client, 'user-1', 'req-2');
@@ -313,6 +345,7 @@ describe('buildCoachUserContext', () => {
     const { client } = createMockClient({
       userProfile: { data: { inferred_persona: {} }, error: null },
       scans: { data: [makeScanRow()], error: null },
+      scanSummary: { data: null, error: null },
     });
 
     const context = await buildCoachUserContext(client, 'user-1', 'req-3');
@@ -325,6 +358,7 @@ describe('buildCoachUserContext', () => {
     const { client } = createMockClient({
       userProfile: { data: { inferred_persona: makeStoredPersona() }, error: null },
       scans: { data: [], error: null },
+      scanSummary: { data: null, error: null },
     });
 
     const context = await buildCoachUserContext(client, 'user-1', 'req-4');
@@ -338,6 +372,7 @@ describe('buildCoachUserContext', () => {
     const { client } = createMockClient({
       userProfile: { data: null, error: null },
       scans: { data: [], error: null },
+      scanSummary: { data: null, error: null },
     });
 
     const context = await buildCoachUserContext(client, 'user-1', 'req-5');
@@ -350,6 +385,7 @@ describe('buildCoachUserContext', () => {
     const { client } = createMockClient({
       userProfile: { data: { inferred_persona: makeStoredPersona() }, error: null },
       scans: { data: null, error: { message: 'scans-down' } },
+      scanSummary: { data: null, error: null },
     });
 
     const context = await buildCoachUserContext(client, 'user-1', 'req-6');
@@ -357,20 +393,66 @@ describe('buildCoachUserContext', () => {
     expect(context).not.toBeNull();
     expect(context!.inferred_persona).toMatchObject({ detected_diet_signals: ['vegan'] });
     expect(context!.recent_scan_digest).toBeUndefined();
-    expect(logSpy).toHaveBeenCalledTimes(1);
-    expect(logSpy.mock.calls[0][0]).toContain('user_context fetch degraded');
+    expect(logSpy).toHaveBeenCalled();
+    const messages = logSpy.mock.calls.map((args) => args[0]);
+    expect(messages.some((m) => typeof m === 'string' && m.includes('user_context fetch degraded'))).toBe(true);
   });
 
-  it('returns null when both reads throw', async () => {
+  it('returns null when all three reads throw', async () => {
     const { client } = createMockClient({
       userProfile: { data: null, error: { message: 'profile-down' } },
       scans: { data: null, error: { message: 'scans-down' } },
+      scanSummary: { data: null, error: { message: 'summary-down' } },
     });
 
     const context = await buildCoachUserContext(client, 'user-1', 'req-7');
 
     expect(context).toBeNull();
-    expect(logSpy).toHaveBeenCalledTimes(2);
+    expect(logSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('includes scan_summary when the RPC returns a non-zero total', async () => {
+    const { client } = createMockClient({
+      userProfile: { data: null, error: null },
+      scans: { data: [makeScanRow()], error: null },
+      scanSummary: {
+        data: {
+          total: 12,
+          last_7d: 3,
+          last_30d: 8,
+          first_at: '2026-01-10T00:00:00.000Z',
+          last_at: '2026-05-18T10:00:00.000Z',
+          by_type: { body: 6, health: 4, nutrition: 2 },
+        },
+        error: null,
+      },
+    });
+
+    const context = await buildCoachUserContext(client, 'user-1', 'req-8');
+
+    expect(context).not.toBeNull();
+    expect(context!.scan_summary).toMatchObject({
+      total: 12,
+      last_7d: 3,
+      last_30d: 8,
+      by_type: { body: 6, health: 4, nutrition: 2 },
+    });
+  });
+
+  it('omits scan_summary when total is 0 (no scans)', async () => {
+    const { client } = createMockClient({
+      userProfile: { data: { inferred_persona: makeStoredPersona() }, error: null },
+      scans: { data: [], error: null },
+      scanSummary: {
+        data: { total: 0, last_7d: 0, last_30d: 0, first_at: null, last_at: null, by_type: {} },
+        error: null,
+      },
+    });
+
+    const context = await buildCoachUserContext(client, 'user-1', 'req-9');
+
+    expect(context).not.toBeNull();
+    expect(context!.scan_summary).toBeUndefined();
   });
 });
 

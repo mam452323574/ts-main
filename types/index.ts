@@ -1464,8 +1464,21 @@ export interface CoachEntry {
   generated_at?: string | null;
 }
 
+export type CoachQuotaBucketKey = 'general' | 'scan_cta';
+
+export interface CoachQuotaBucketStatus {
+  limit: number | null;
+  used_count: number;
+  available: number | null;
+  next_recharge_at: string | null;
+  window_seconds: number;
+}
+
 export interface CoachQuotaStatus {
   account_tier: AccountTier;
+  // Top-level fields mirror the `general` bucket for backward compatibility
+  // with payloads that predate the split-bucket migration (2026-05-26). New
+  // code reads `buckets.general` / `buckets.scan_cta` via selectCoachQuotaBucket.
   limit: number | null;
   used_count: number;
   available: number | null;
@@ -1473,6 +1486,14 @@ export interface CoachQuotaStatus {
   unlimited: boolean;
   window_seconds: number;
   as_of: string;
+  // Optional during the rollout window: clients that hit a pre-split RPC
+  // response still parse successfully (the front falls back to a synthesized
+  // bucket map mirroring the top-level pool). Post-migration, the server
+  // always emits this.
+  buckets?: {
+    general: CoachQuotaBucketStatus;
+    scan_cta: CoachQuotaBucketStatus;
+  };
 }
 
 export interface UserGrowthExperience {

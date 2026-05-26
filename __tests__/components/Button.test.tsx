@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react-native';
-import { ActivityIndicator } from 'react-native';
+import { ActivityIndicator, StyleSheet } from 'react-native';
 import { Button } from '@/components/Button';
 
 describe('Button', () => {
@@ -70,5 +70,20 @@ describe('Button', () => {
       <Button title="Outline" onPress={mockOnPress} variant="outline" />
     );
     expect(screen.getByText('Outline')).toBeTruthy();
+  });
+
+  it('can render a flat auth action without elevation', () => {
+    render(<Button title="Flat" onPress={mockOnPress} flat testID="flat-button" />);
+
+    const pressable = screen.getByTestId('flat-button');
+    const buttonSurface = pressable.children[0] as any;
+    expect(StyleSheet.flatten(buttonSurface.props.style)).toEqual(
+      expect.objectContaining({
+        shadowColor: 'transparent',
+        shadowOpacity: 0,
+        shadowRadius: 0,
+        elevation: 0,
+      }),
+    );
   });
 });

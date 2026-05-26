@@ -543,6 +543,12 @@ describe('ScanResultScreen', () => {
 
     fireEvent.press(rendered.getByTestId('scan-result-coach-cta-button'));
 
+    // After the post-scan mapping fix, a free user clicking on a body posture
+    // scan is routed to the free preset latest_scan__top_priority_today (with
+    // a downgrade banner shown by CoachScreen). Premium would route to
+    // body_focus__mobility_posture_priorities. The legacy
+    // 'latest_scan_issue_resolution' prompt type is no longer emitted as the
+    // outbound prompt_type — only kept on the encoded scan_intent payload.
     expect(mockPush).toHaveBeenCalledWith(
       expect.objectContaining({
         pathname: '/coach',
@@ -551,7 +557,8 @@ describe('ScanResultScreen', () => {
           autoSubmit: '1',
           scanId: 'scan-body-123',
           scanType: 'body',
-          promptType: 'latest_scan_issue_resolution',
+          promptType: 'latest_scan',
+          questionKey: 'latest_scan__top_priority_today',
           fallbackPromptType: 'latest_scan',
           priorityMetric: 'posture_score',
           scanIntent: expect.any(String),

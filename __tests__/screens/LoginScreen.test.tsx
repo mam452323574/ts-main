@@ -1,6 +1,11 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import LoginScreen from '@/screens/LoginScreen';
+import {
+  loadPreAuthOnboardingDraft,
+  updatePreAuthOnboardingDraft,
+} from '@/utils/preAuthOnboarding';
 
 // Mock dependencies
 jest.mock('lucide-react-native', () => ({
@@ -59,8 +64,9 @@ jest.mock('@/contexts/AuthContext', () => ({
 }));
 
 describe('LoginScreen', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
+    await AsyncStorage.clear();
     mockSignIn.mockResolvedValue({ nextStep: 'ready', userId: 'user-123' });
     mockSignInWithGoogle.mockResolvedValue(undefined);
     mockSendVerificationEmail.mockResolvedValue(undefined);
@@ -81,7 +87,7 @@ describe('LoginScreen', () => {
   it('displays login subtitle', () => {
     render(<LoginScreen />);
     
-    expect(screen.getByText('Connectez-vous à votre compte')).toBeTruthy();
+    expect(screen.getByText('Connectez-vous ou récupérez votre compte')).toBeTruthy();
   });
 
   it('displays email and password inputs', () => {
@@ -152,6 +158,27 @@ describe('LoginScreen', () => {
     await waitFor(() => {
       expect(mockSignInWithGoogle).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it('does not apply an abandoned signup intent during Google login', async () => {
+    await updatePreAuthOnboardingDraft({
+      username: 'draftuser',
+      completionIntent: 'signup-google',
+      lastStep: 'accountMethod',
+    });
+    render(<LoginScreen />);
+
+    fireEvent.press(screen.getByTestId('oauth-google-button'));
+
+    await waitFor(() => {
+      expect(mockSignInWithGoogle).toHaveBeenCalledTimes(1);
+    });
+    await expect(loadPreAuthOnboardingDraft()).resolves.toEqual(
+      expect.objectContaining({
+        username: 'draftuser',
+        completionIntent: null,
+      }),
+    );
   });
 
   it('keeps unverified users on verification when the resend fails', async () => {

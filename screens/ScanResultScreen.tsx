@@ -282,6 +282,7 @@ export default function ScanResultScreen() {
     const coachGenerationInput =
       buildCoachGenerationInputFromScanCoachIntent(coachIntent, {
         accountTier: userProfile?.account_tier,
+        locale,
       });
 
     router.push({

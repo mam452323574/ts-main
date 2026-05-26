@@ -378,7 +378,7 @@ describe('phase2 contracts', () => {
         scan_count_7d: 5,
         question_key: 'latest_scan__top_priority_today',
         question_text:
-          "A partir de mon dernier scan, quelle est la priorite n\u00b01 aujourd'hui ?",
+          "Quelle priorite n\u00b01 traiter aujourd'hui ?",
         question_hints: {
           intent_key: 'latest_scan_priority_today',
           time_scope: 'today',

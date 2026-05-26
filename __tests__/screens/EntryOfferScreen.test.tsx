@@ -13,6 +13,7 @@ const mockShowAlert = jest.fn();
 const mockShouldPresentEntryOffer = jest.fn<any, [any]>(() => true);
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
+const getStyles = (style: any) => (Array.isArray(style) ? style : [style]);
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
@@ -221,6 +222,13 @@ describe('EntryOfferScreen', () => {
     await waitFor(() => {
       expect(screen.getByTestId('entry-offer-wheel')).toBeTruthy();
     });
+
+    expect(getStyles(screen.getByTestId('entry-offer-wheel-card').props.style)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ elevation: 0, shadowOpacity: 0 })]),
+    );
+    expect(getStyles(screen.getByTestId('entry-offer-reward-card').props.style)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ elevation: 0, shadowOpacity: 0 })]),
+    );
 
     await waitFor(() => {
       expect(mockMarkEntryOfferShown).toHaveBeenCalledWith('entry-offer');

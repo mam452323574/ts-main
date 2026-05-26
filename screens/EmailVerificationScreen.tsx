@@ -18,7 +18,7 @@ import {
   AuthShell,
 } from '@/components/auth';
 import { Button } from '@/components/Button';
-import { BORDER_RADIUS, SIZES, SPACING, mixColors, withAlpha } from '@/constants/theme';
+import { BORDER_RADIUS, SIZES, SPACING, withAlpha } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useStartupDiagnostics } from '@/contexts/StartupDiagnosticsContext';
@@ -54,11 +54,11 @@ export default function EmailVerificationScreen() {
     signOut,
     completeSignUp,
   } = useAuth();
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const { t } = useLanguage();
   const { markStartup, settleStartup } = useStartupDiagnostics();
   const { showAlert, alertElement } = useCustomAlert();
-  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [code, setCode] = useState<string[]>(Array(CODE_LENGTH).fill(''));
   const [loading, setLoading] = useState(false);
@@ -199,7 +199,12 @@ export default function EmailVerificationScreen() {
         throw new Error(t('onboarding.error_session'));
       }
 
-      if (!draft.username) {
+      const canCompleteEmailDraft =
+        draft.completionIntent === 'signup-email' &&
+        draft.createdUserId === userId &&
+        Boolean(draft.username);
+
+      if (!canCompleteEmailDraft) {
         await refreshUserProfile();
         router.replace('/username-setup');
         return true;
@@ -363,7 +368,7 @@ export default function EmailVerificationScreen() {
       <AppScreen style={styles.successScreen}>
         <View style={styles.successContainer}>
           <Squircle style={styles.successIcon}>
-            <Check color={colors.white} size={48} />
+            <Check color={colors.success} size={32} />
           </Squircle>
           <Text style={styles.successTitle}>
             {t('auth.verification_sent_title')}
@@ -387,9 +392,11 @@ export default function EmailVerificationScreen() {
       onBack={handleCancelPrompt}
       backTestID="email-verification-back"
       showLanguage={false}
+      scroll
     >
       {alertElement}
       <AuthHero
+        variant="step"
         brand="HEALTH SCAN"
         align="center"
         title={t('auth.verify_title')}
@@ -439,12 +446,14 @@ export default function EmailVerificationScreen() {
             disabled={loading || finalizing}
             variant="primary"
             size="lg"
+            flat
           />
           <Button
             title={t('onboarding.avatar_upload_continue')}
             onPress={handleContinueWithoutAvatar}
             disabled={loading || finalizing}
             variant="ghost"
+            flat
             testID="verification-continue-without-avatar"
           />
         </View>
@@ -458,6 +467,7 @@ export default function EmailVerificationScreen() {
           }
           variant="primary"
           size="lg"
+          flat
         />
       )}
 
@@ -496,7 +506,7 @@ export default function EmailVerificationScreen() {
   );
 }
 
-const createStyles = (colors: any, isDark: boolean) =>
+const createStyles = (colors: any) =>
   StyleSheet.create({
     successScreen: {
       flex: 1,
@@ -508,7 +518,10 @@ const createStyles = (colors: any, isDark: boolean) =>
       borderRadius: 40,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: mixColors(colors.cardBackground, colors.primary, isDark ? 0.18 : 0.10), borderCurve: 'continuous',
+      backgroundColor: colors.primaryLight,
+      borderWidth: 1,
+      borderColor: withAlpha(colors.primary, 0.12),
+      borderCurve: 'continuous',
     },
     emailText: {
       fontSize: SIZES.md,
@@ -571,16 +584,17 @@ const createStyles = (colors: any, isDark: boolean) =>
       padding: SPACING.lg,
     },
     successIcon: {
-      width: 100,
-      height: 100,
-      borderRadius: 50,
-      backgroundColor: colors.success,
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: colors.successLight ?? withAlpha(colors.success, 0.12),
       justifyContent: 'center',
       alignItems: 'center',
-      marginBottom: SPACING.lg, borderCurve: 'continuous',
+      marginBottom: SPACING.lg,
+      borderCurve: 'continuous',
     },
     successTitle: {
-      fontSize: SIZES.xxl,
+      fontSize: SIZES.text28,
       fontWeight: '700',
       color: colors.primaryText,
       marginBottom: SPACING.sm,

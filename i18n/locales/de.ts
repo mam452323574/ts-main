@@ -665,6 +665,9 @@ export const DE_TRANSLATIONS = {
     disclaimer_default: 'Nur Wellness-Hinweise. Das ist weder eine Diagnose noch ein medizinischer Rat.',
     locked_badge: 'Premium',
     locked_tap_hint: 'Tippe, um diese Persoenlichkeit freizuschalten.',
+    conversation_hero: {
+      title_with_coach: 'Freies Gespraech mit {{coachName}}',
+    },
     free_persona_hint: 'Noah ist im kostenlosen Plan enthalten.',
     active_persona_label: 'Coach-Persoenlichkeit',
     selected_persona_label: 'Ausgewaehlter Coach',
@@ -703,6 +706,24 @@ export const DE_TRANSLATIONS = {
     first_scan_required_cta: 'Scan starten',
     no_scan_title: 'Starte mit einem Scan',
     no_scan_body: 'Starte mit einem Scan, um dein personalisiertes Coaching zu aktivieren.',
+    scan_downgrade: {
+      title: 'Eine tiefere Analyse ist verfugbar',
+      body_default:
+        'Fur eine detailliertere Analyse deines Scans bietet Premium gezieltes Coaching. Hier ist zunachst eine kostenlose Erstanalyse.',
+      body_body_focus:
+        'Fur einen detaillierten Korperplan (Haltung, Mobilitat, Erholung) ist Premium erforderlich. Hier ist eine kostenlose Analyse deines Scans.',
+      body_nutrition_focus:
+        'Fur einen gezielten Ernahrungsplan (Mahlzeiten, Alternativen, Einkaufe) ist Premium erforderlich. Hier ist eine kostenlose Analyse deines Scans.',
+      body_sleep_coach:
+        'Fur ein detailliertes Schlaf-/Erholungsprotokoll ist Premium erforderlich. Hier ist eine kostenlose Analyse deines Scans.',
+      body_risk_watch:
+        'Fur eine detaillierte Signaluberwachung ist Premium erforderlich. Hier ist eine kostenlose Analyse deines Scans.',
+      body_trend_review:
+        'Fur eine feingranulare Analyse deiner Entwicklung ist Premium erforderlich. Hier ist eine kostenlose Analyse deines Scans.',
+      body_weekly_plan:
+        'Fur einen kompletten Wochenplan (Hautpflege + Ernahrung + Training) ist Premium erforderlich. Hier ist eine kostenlose Analyse deines Scans.',
+      cta: 'Premium entdecken',
+    },
     history_title: 'Fruhere Guidance',
     view_history_cta: 'Verlauf ansehen',
     history_cta_count: '{{count}} fruehere Hinweise',
@@ -1384,7 +1405,7 @@ export const DE_TRANSLATIONS = {
   },
   auth: {
     login_title: 'Health Scan',
-    login_subtitle: 'Melden Sie sich an',
+    login_subtitle: 'Anmelden oder Konto wiederherstellen',
     email_placeholder: 'E-Mail',
     password_placeholder: 'Passwort',
     password_confirm: 'Passwort bestätigen',
@@ -1560,6 +1581,8 @@ export const DE_TRANSLATIONS = {
       chef: 'Chef',
       used: 'Verwendet',
       detected: 'Erkannt',
+      detected_preview: 'In deinem Kuhlschrank erkannt',
+      detected_preview_more: '+{{count}}',
       calories: 'Energie',
       protein: 'Protein',
       note: 'Notiz',
@@ -1721,7 +1744,9 @@ export const DE_TRANSLATIONS = {
     theme_step_subtitle: 'Wähle hell oder dunkel. Du kannst es später ändern.',
     intro_step_title: 'Dein erster Scan beginnt hier',
     intro_step_subtitle: 'Scanne, verstehe und verfolge dann, was sich verändert. Zuerst richten wir nur das Wesentliche ein.',
-    intro_step_note: 'Benutzername, Look, dann E-Mail bestätigen. Noch ein Schritt bis zu deinem ersten Scan.',
+    intro_step_note: 'Wähle Benutzername und Look und verknüpfe dein Profil dann mit Google oder E-Mail.',
+    intro_cta: 'Loslegen',
+    existing_account_cta: 'Ich habe bereits ein Konto / Konto wiederherstellen',
     profile_step_title: 'Richte dein Scan-Profil ein',
     profile_step_subtitle: 'Wähle deinen Namen, füge auf Wunsch ein Foto hinzu und behalte einen klaren Look.',
     username_step_title: 'Wie sollen wir dich nennen?',
@@ -1740,6 +1765,9 @@ export const DE_TRANSLATIONS = {
     avatar_upload_continue: 'Ohne Foto fortfahren',
     account_step_title: 'Erstelle dein Konto',
     account_step_subtitle: 'E-Mail, Passwort, dann ein Code vor deinem ersten Scan.',
+    account_method_title: 'Profil speichern',
+    account_method_subtitle: 'Wähle, wie du dein Profil mit deinem Konto verknüpfst.',
+    account_email_cta: 'Mit E-Mail registrieren',
     username_label: 'Benutzername *',
     username_placeholder: 'user123',
     profile_theme_title: 'Erscheinungsbild',
@@ -1762,6 +1790,12 @@ export const DE_TRANSLATIONS = {
     next_btn: 'Weiter',
     start_btn: 'Abenteuer starten',
     enter_app: 'App öffnen',
+    finalize_profile_title: 'Profil abschließen',
+    finalize_profile_subtitle: 'Bestätige deinen Benutzernamen, um deine Auswahl zu speichern.',
+    finalize_profile_btn: 'Profil abschließen',
+    final_title: 'Dein Profil ist bereit',
+    final_subtitle: 'Alles ist eingerichtet. Du kannst jetzt die App öffnen.',
+    profile_ready_label: 'Aktives Profil',
     slide_1_eyebrow: 'Scanner',
     slide_1_title: 'Scanne zuerst. Rate weniger.',
     slide_1_subtitle: 'Ein Foto für Mahlzeiten, Gesicht oder Körper. Health Scan macht daraus einen klaren Ausgangspunkt.',

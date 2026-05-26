@@ -5,7 +5,7 @@
 -- =============================================================================
 --
 -- Audit : SOCIAL_SECURITY_AUDIT.md (finding S-12).
--- Pre-requis : avoir deploye 20260524130000_social_report_threshold_shadow_logging.sql
+-- Pre-requis : avoir deploye 20260524131000_social_report_threshold_shadow_logging.sql
 -- depuis >= 7 jours et analyse social_report_threshold_shadow.
 --
 -- ⚠️ NE PAS APPLIQUER cette migration avant d'avoir verifie :

@@ -543,6 +543,37 @@ export function ChefResultCard({
             ))}
           </View>
         ) : null}
+
+        {/* Aperçu gratuit "faire croquer" — montre 1-2 ingrédients détectés
+            sans révéler la recette complète (qui reste premium). */}
+        {!isUnlocked && mealResult.ingredients_detected.length > 0 ? (
+          <View
+            style={styles.detectedPreview}
+            testID="chef-result-detected-preview"
+          >
+            <Text {...RESULT_TEXT_PROPS} style={styles.detectedPreviewLabel}>
+              {t('fridge_scan_result.labels.detected_preview')}
+            </Text>
+            <View style={styles.tagWrap}>
+              {mealResult.ingredients_detected.slice(0, 2).map((ingredient) => (
+                <View key={ingredient} style={styles.tag}>
+                  <Text {...RESULT_TEXT_PROPS} numberOfLines={1} style={styles.tagText}>
+                    {ingredient}
+                  </Text>
+                </View>
+              ))}
+              {mealResult.ingredients_detected.length > 2 ? (
+                <View style={styles.tag}>
+                  <Text {...RESULT_TEXT_PROPS} numberOfLines={1} style={styles.tagText}>
+                    {t('fridge_scan_result.labels.detected_preview_more', {
+                      count: mealResult.ingredients_detected.length - 2,
+                    })}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
+        ) : null}
       </View>
 
       {renderGatedSection(
@@ -918,6 +949,19 @@ const createStyles = (
     },
     subLabelSpacing: {
       marginTop: SPACING.xs,
+    },
+    detectedPreview: {
+      gap: SPACING.xs,
+      marginTop: SPACING.xs,
+    },
+    detectedPreviewLabel: {
+      color: withAlpha(colors.primaryText, 0.62),
+      fontSize: SIZES.text12,
+      lineHeight: 16,
+      fontWeight: FONT_WEIGHTS.bold,
+      textTransform: 'uppercase',
+      letterSpacing: 0.35,
+      includeFontPadding: false,
     },
     nutritionGrid: {
       flexDirection: 'row',

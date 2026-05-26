@@ -50,7 +50,7 @@ export function FeatureGate({
           <Lock color={colors.primary} size={48} />
         </Squircle>
         <Squircle style={styles.crownBadge}>
-          <Crown color={colors.background} size={20} fill={colors.background} />
+          <Crown color={colors.background} size={18} fill={colors.background} />
         </Squircle>
       </View>
 
@@ -115,17 +115,35 @@ const createStyles = (colors: any) => StyleSheet.create({
     ...SHADOWS.card, borderCurve: 'continuous',
   },
   crownBadge: {
+    // Polish (audit 2026-05): la couronne était positionnée à -10/-10 avec
+    // une taille de 48 et une bordure de 3px. Combinée à `SHADOWS.card`
+    // appliqué sur `iconBackground` (shadowRadius 24, shadowOpacity 0.2),
+    // ça donnait un halo gris-sombre rayonnant SOUS la couronne qui
+    // dépassait du conteneur → effet "aura sale".
+    // Correction :
+    // - Réduction de la taille (48 → 36) pour des proportions plus saines.
+    // - Réduction de l'offset (-10 → -4) pour ne pas trop déborder de
+    //   l'iconBackground tout en gardant un léger effet "badge épinglé".
+    // - Bordure 3 → 2 (l'épaisseur visuelle reste forte sur 36px).
+    // - Ombre légère INTENTIONNELLE en or pour détacher la pastille du
+    //   shadow gris du parent, au lieu de la laisser fondre dedans.
     position: 'absolute',
-    top: -10,
-    right: -10,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    top: -4,
+    right: -4,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: colors.gold,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: colors.background, borderCurve: 'continuous',
+    borderWidth: 2,
+    borderColor: colors.background,
+    shadowColor: colors.gold,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.32,
+    shadowRadius: 5,
+    elevation: 3,
+    borderCurve: 'continuous',
   },
   title: {
     fontSize: SIZES.lg,

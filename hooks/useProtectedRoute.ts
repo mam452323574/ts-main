@@ -18,6 +18,7 @@ import {
   isSpecialRoute,
 } from '@/constants/routes';
 import { hasPremiumAccess } from '@/utils/subscription';
+import { clearPreAuthOnboardingDraft } from '@/utils/preAuthOnboarding';
 
 const LOOP_DETECTION = {
   THRESHOLD: 5,
@@ -356,6 +357,7 @@ export function useProtectedRoute() {
 
     if (authState.isVerified && authState.hasUsername) {
       if (routeState.isRootEntry || routeState.isPublic) {
+        void clearPreAuthOnboardingDraft();
         safeRedirect('/(tabs)');
       }
     }
