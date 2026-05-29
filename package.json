@@ -1,7 +1,8 @@
 {
-  "name": "bolt-expo-starter",
+  "name": "selflens",
   "main": "expo-router/entry",
   "version": "1.0.0",
+  "description": "SelfLens — coach santé & bien-être personnel (Expo + Supabase)",
   "private": true,
   "scripts": {
     "dev": "npx expo start",

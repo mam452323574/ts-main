@@ -1029,10 +1029,7 @@ export class ApiService {
       }).sort((a, b) => new Date((a as any).date).getTime() - new Date((b as any).date).getTime());
     };
 
-    // Mapper les anciennes données
     // Mapper les anciennes données (legacy)
-    // const healthScoreHistory = ... (Removed, computed later)
-
     const calorieHistory = (healthScores || []).map((h: any) => ({
       date: h.date,
       consumed: h.calories_current,
