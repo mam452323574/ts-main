@@ -36,7 +36,13 @@ jest.mock('@/components/OAuthButton', () => ({
         disabled={disabled || loading}
         testID={`oauth-${provider}-button`}
       >
-        <Text>{loading ? 'Google loading' : 'Continuer avec Google'}</Text>
+        <Text>
+          {loading
+            ? 'Google loading'
+            : provider === 'apple'
+              ? 'Continuer avec Apple'
+              : 'Continuer avec Google'}
+        </Text>
       </TouchableOpacity>
     );
   },
@@ -53,12 +59,14 @@ jest.mock('expo-router', () => ({
 
 const mockSignIn = jest.fn();
 const mockSignInWithGoogle = jest.fn();
+const mockSignInWithOAuth = jest.fn();
 const mockSendVerificationEmail = jest.fn();
 
 jest.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
     signIn: mockSignIn,
     signInWithGoogle: mockSignInWithGoogle,
+    signInWithOAuth: mockSignInWithOAuth,
     sendVerificationEmail: mockSendVerificationEmail,
   }),
 }));
@@ -69,6 +77,7 @@ describe('LoginScreen', () => {
     await AsyncStorage.clear();
     mockSignIn.mockResolvedValue({ nextStep: 'ready', userId: 'user-123' });
     mockSignInWithGoogle.mockResolvedValue(undefined);
+    mockSignInWithOAuth.mockResolvedValue(undefined);
     mockSendVerificationEmail.mockResolvedValue(undefined);
   });
 
@@ -81,13 +90,13 @@ describe('LoginScreen', () => {
   it('displays app title', () => {
     render(<LoginScreen />);
     
-    expect(screen.getByText('Health Scan')).toBeTruthy();
+    expect(screen.getByText('SelfLens')).toBeTruthy();
   });
 
   it('displays login subtitle', () => {
     render(<LoginScreen />);
     
-    expect(screen.getByText('Connectez-vous ou récupérez votre compte')).toBeTruthy();
+    expect(screen.getByText('Connectez-vous à votre compte')).toBeTruthy();
   });
 
   it('displays email and password inputs', () => {
@@ -157,6 +166,22 @@ describe('LoginScreen', () => {
 
     await waitFor(() => {
       expect(mockSignInWithGoogle).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('displays the Apple sign-in button', () => {
+    render(<LoginScreen />);
+
+    expect(screen.getByTestId('oauth-apple-button')).toBeTruthy();
+  });
+
+  it('calls signInWithOAuth("apple") from the Apple button', async () => {
+    render(<LoginScreen />);
+
+    fireEvent.press(screen.getByTestId('oauth-apple-button'));
+
+    await waitFor(() => {
+      expect(mockSignInWithOAuth).toHaveBeenCalledWith('apple');
     });
   });
 

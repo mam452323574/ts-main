@@ -1271,13 +1271,17 @@ export async function handleCoachGenerateResponseRequest(req: Request) {
       expires_at: null,
     };
 
+    // Hotfix 2026-05-27 — the partial unique index introduced by
+    // 20260527120000_add_coach_history_soft_delete_columns makes the previous
+    // .upsert({ onConflict: 'user_id,cache_key' }) crash with 42P10
+    // (PostgREST cannot pass the WHERE deleted_at IS NULL predicate). The
+    // dedicated RPC encapsulates the matching ON CONFLICT ... WHERE clause.
     const { data: pendingEntry, error: pendingEntryError } = await supabase
-      .from('coach_entries')
-      .upsert(pendingValues, {
-        onConflict: 'user_id,cache_key',
-      })
-      .select('*')
-      .single();
+      .rpc('upsert_coach_pending_entry', {
+        p_user_id: user.id,
+        p_cache_key: writeCacheKey,
+        p_values: pendingValues,
+      });
 
     if (pendingEntryError || !pendingEntry) {
       const refundResult = await refundCoachQuotaEventWithRetry(supabase, {

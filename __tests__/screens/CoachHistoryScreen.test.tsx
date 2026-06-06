@@ -1,35 +1,76 @@
-﻿import React from 'react';
+import React from 'react';
 import { fireEvent, render } from '@testing-library/react-native';
 
 import CoachHistoryScreen from '@/screens/CoachHistoryScreen';
 
-const mockUseInfiniteCoachHistory = jest.fn();
+const mockUseInfiniteCoachUnifiedHistory = jest.fn();
+const mockUseInfiniteCoachConversations = jest.fn();
+const mockUseDeleteCoachEntry = jest.fn();
+const mockUseDeleteCoachConversation = jest.fn();
 const mockUseLocalSearchParams = jest.fn();
 const mockRouterPush = jest.fn();
 const mockRouterBack = jest.fn();
 const mockRouterDismiss = jest.fn();
 const mockRouterCanDismiss = jest.fn();
 
-function createCoachEntry(overrides: Record<string, unknown> = {}) {
+function createUnifiedEntryItem(overrides: Record<string, unknown> = {}) {
   return {
-    id: 'entry-older',
-    title: 'Saved coach guidance',
-    body: 'Keep your hydration steady and sleep on time.',
-    disclaimer:
-      'Wellness guidance only. This is not a diagnosis or medical advice.',
+    kind: 'entry' as const,
+    id: 'unified-entry-1',
+    user_id: 'user-1',
+    sort_at: '2026-04-09T08:00:00.000Z',
+    title: 'Unified guidance',
+    body: 'Unified body content.',
     persona_key: 'gentle_supportive',
+    locale: null,
+    status: 'ready',
+    created_at: '2026-04-09T08:00:00.000Z',
+    updated_at: '2026-04-09T08:00:00.000Z',
+    generated_at: '2026-04-09T08:00:00.000Z',
+    source: 'n8n',
+    prompt_type: null,
+    question_key: null,
+    question_text: null,
+    response_version: null,
+    content_json: null,
     cta_label: null,
     cta_route: null,
-    created_at: '2026-04-06T08:00:00.000Z',
-    generated_at: '2026-04-06T08:00:00.000Z',
-    source: 'n8n',
-    status: 'ready',
+    expires_at: null,
+    disclaimer: null,
+    deleted_at: null,
     ...overrides,
   };
 }
 
-let mockCoachHistoryState: {
-  data: Record<string, unknown>[];
+function createUnifiedConversationItem(overrides: Record<string, unknown> = {}) {
+  return {
+    kind: 'conversation' as const,
+    id: 'unified-conv-1',
+    user_id: 'user-1',
+    sort_at: '2026-04-10T08:00:00.000Z',
+    title: 'Recent chat with the coach',
+    persona_key: 'gentle_supportive',
+    locale: null,
+    status: 'active',
+    created_at: '2026-04-10T08:00:00.000Z',
+    updated_at: '2026-04-10T08:00:00.000Z',
+    message_count: 4,
+    user_message_count: 2,
+    account_tier_at_start: 'premium',
+    last_user_message_at: '2026-04-10T08:00:00.000Z',
+    last_assistant_message_at: '2026-04-10T08:00:00.000Z',
+    ended_at: null,
+    ended_reason: null,
+    archived_at: null,
+    hidden_at: null,
+    metadata: {},
+    conversation_status: 'active' as const,
+    ...overrides,
+  };
+}
+
+let mockCoachUnifiedHistoryState: {
+  data: Array<ReturnType<typeof createUnifiedEntryItem> | ReturnType<typeof createUnifiedConversationItem>>;
   error: Error | null;
   isFetching: boolean;
   isFetchingNextPage: boolean;
@@ -37,6 +78,9 @@ let mockCoachHistoryState: {
   fetchNextPage: jest.Mock;
   refetch: jest.Mock;
 };
+
+const mockDeleteEntryMutate = jest.fn();
+const mockDeleteConversationMutate = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
@@ -52,11 +96,21 @@ jest.mock('@/components/ModalHandle', () => ({
   ModalHandle: () => null,
 }));
 
-jest.mock('@/hooks/queries', () => ({
-  useInfiniteCoachHistory: (...args: unknown[]) => mockUseInfiniteCoachHistory(...args),
+jest.mock('@/hooks/queries/useInfiniteCoachUnifiedHistory', () => ({
+  useInfiniteCoachUnifiedHistory: (...args: unknown[]) =>
+    mockUseInfiniteCoachUnifiedHistory(...args),
+  COACH_UNIFIED_HISTORY_INFINITE_QUERY_KEY: ['coachUnifiedHistoryInfinite'],
 }));
-jest.mock('@/hooks/queries/useInfiniteCoachHistory', () => ({
-  useInfiniteCoachHistory: (...args: unknown[]) => mockUseInfiniteCoachHistory(...args),
+jest.mock('@/hooks/queries/useInfiniteCoachConversations', () => ({
+  useInfiniteCoachConversations: (...args: unknown[]) =>
+    mockUseInfiniteCoachConversations(...args),
+}));
+jest.mock('@/hooks/queries/useDeleteCoachEntry', () => ({
+  useDeleteCoachEntry: (...args: unknown[]) => mockUseDeleteCoachEntry(...args),
+}));
+jest.mock('@/hooks/queries/useDeleteCoachConversation', () => ({
+  useDeleteCoachConversation: (...args: unknown[]) =>
+    mockUseDeleteCoachConversation(...args),
 }));
 
 describe('CoachHistoryScreen', () => {
@@ -64,17 +118,10 @@ describe('CoachHistoryScreen', () => {
     jest.clearAllMocks();
     mockRouterCanDismiss.mockReturnValue(false);
     mockUseLocalSearchParams.mockReturnValue({
-      excludeEntryId: 'entry-active',
+      excludeEntryId: undefined,
     });
-    mockCoachHistoryState = {
-      data: [
-        createCoachEntry({
-          id: 'entry-active',
-          title: 'Active guidance',
-          body: 'This card should be excluded from history.',
-        }),
-        createCoachEntry(),
-      ],
+    mockCoachUnifiedHistoryState = {
+      data: [],
       error: null,
       isFetching: false,
       isFetchingNextPage: false,
@@ -82,410 +129,254 @@ describe('CoachHistoryScreen', () => {
       fetchNextPage: jest.fn(),
       refetch: jest.fn(),
     };
-    mockUseInfiniteCoachHistory.mockImplementation(
-      ({ excludeEntryId }: { excludeEntryId?: string | null }) => ({
-        items: mockCoachHistoryState.data.filter(
-          (entry) => entry.id !== (excludeEntryId ?? null),
-        ),
-        error: mockCoachHistoryState.error,
-        isFetching: mockCoachHistoryState.isFetching,
-        isFetchingNextPage: mockCoachHistoryState.isFetchingNextPage,
-        hasNextPage: mockCoachHistoryState.hasNextPage,
-        fetchNextPage: mockCoachHistoryState.fetchNextPage,
-        refetch: mockCoachHistoryState.refetch,
-      }),
-    );
-  });
-
-  it('renders the history list and excludes the active entry', () => {
-    const screen = render(<CoachHistoryScreen />);
-
-    expect(screen.getByTestId('coach-history-list')).toBeTruthy();
-    expect(screen.queryByTestId('coach-history-card-entry-active')).toBeNull();
-    expect(screen.getByTestId('coach-history-card-entry-older')).toBeTruthy();
-    expect(screen.getByTestId('coach-history-card-entry-older-date')).toBeTruthy();
-    expect(screen.getByTestId('coach-history-card-entry-older-expanded')).toBeTruthy();
-  });
-
-  it('hides a history CTA when the provider route is not supported', () => {
-    mockCoachHistoryState = {
-      ...mockCoachHistoryState,
-      data: [
-        createCoachEntry({
-          id: 'entry-invalid-cta',
-          title: 'Targeted guidance',
-          body: 'Open the next step to continue this plan.',
-          cta_label: 'Open plan',
-          cta_route: '/weekly-plan',
-        }),
-      ],
-    };
-
-    const screen = render(<CoachHistoryScreen />);
-
-    expect(screen.getByTestId('coach-history-card-entry-invalid-cta-expanded')).toBeTruthy();
-    expect(screen.queryByText('Open plan')).toBeNull();
-    expect(mockRouterPush).not.toHaveBeenCalled();
-  });
-
-  it('expands a history card and routes its CTA only when the destination is supported', () => {
-    mockCoachHistoryState = {
-      ...mockCoachHistoryState,
-      data: [
-        createCoachEntry({
-          id: 'entry-cta',
-          title: 'Targeted guidance',
-          body: 'Open the next step to continue this plan.',
-          cta_label: 'Open plan',
-          cta_route: '/coach/history',
-        }),
-      ],
-    };
-
-    const screen = render(<CoachHistoryScreen />);
-
-    expect(screen.getByTestId('coach-history-card-entry-cta-expanded')).toBeTruthy();
-
-    expect(screen.queryByText('Open plan')).toBeNull();
-
-    fireEvent.press(screen.getByText("Voir l'historique"));
-
-    expect(mockRouterPush).toHaveBeenCalledWith('/coach-history');
-  });
-
-  it('renders saved Coach v2 nutrition sections in expanded history cards', () => {
-    mockCoachHistoryState = {
-      ...mockCoachHistoryState,
-      data: [
-        createCoachEntry({
-          id: 'entry-nutrition',
-          title: 'Ton fuel du jour',
-          body: 'Fallback body.',
-          content: {
-            title: 'Ton fuel du jour',
-            summary: 'Un bowl simple pour tenir sans stress.',
-            context_notes: [],
-            priorities: [],
-            action_steps: ['Prepare ton bowl demain midi.'],
-            warnings: [],
-            encouragement: null,
-            primary_metric_delta: null,
-            data_gaps: [],
-            confidence: 'high',
-            meal_template: {
-              name: 'Bowl Boost Proteines',
-              when: 'midi',
-              prep_min: 12,
-              ingredients: [{ item: 'Poulet', portion: '150 g' }],
-              why: null,
-            },
-            quick_recipe: {
-              name: 'Bowl express',
-              total_min: null,
-              steps: ['Cuire le quinoa.', 'Dresser le bol.'],
-              tags: [],
-            },
-            habit_tracker: [
-              {
-                label: 'Bowl proteine midi',
-                target_days: 6,
-                window: 'midi',
-              },
-            ],
-          },
-        }),
-      ],
-    };
-
-    const screen = render(<CoachHistoryScreen />);
-
-    expect(screen.getByTestId('coach-section-meal_template')).toBeTruthy();
-    expect(screen.getByText('Prochain repas')).toBeTruthy();
-    expect(screen.getByText(/Bowl Boost Proteines/)).toBeTruthy();
-    expect(screen.getByTestId('coach-section-quick_recipe')).toBeTruthy();
-    expect(screen.getByText('Recette flash')).toBeTruthy();
-    expect(screen.getByTestId('coach-section-habit_tracker')).toBeTruthy();
-    expect(screen.getByText('Bowl proteine midi · 6j/7 · midi')).toBeTruthy();
-    expect(screen.queryByText(/\[missing/)).toBeNull();
-    expect(screen.queryByText('meal_template')).toBeNull();
-    expect(screen.queryByText('null')).toBeNull();
-  });
-
-  it('renders saved weekly schedule sections when history entries include enriched structured content', () => {
-    mockCoachHistoryState = {
-      ...mockCoachHistoryState,
-      data: [
-        createCoachEntry({
-          id: 'entry-weekly',
-          title: 'Cadre tranquille',
-          body: [
-            'Prenons un moment. Voici un cadre tranquille pour la semaine.',
-            'Agenda de la semaine :',
-            'Lundi 08:00 - Respiration 4-6 + etirements doux (10 min)',
-          ].join('\n'),
-          content: {
-            title: 'Cadre tranquille',
-            summary: 'Prenons un moment. Voici un cadre tranquille pour la semaine.',
-            context_notes: [],
-            priorities: [],
-            action_steps: ['Respire 4-6 chaque matin.'],
-            warnings: [],
-            encouragement: null,
-            primary_metric_delta: null,
-            data_gaps: [],
-            confidence: 'high',
-            daily_schedule: [
-              {
-                day: 'Lundi',
-                slots: [
-                  {
-                    time: '08:00',
-                    duration_min: 10,
-                    action: 'Respiration 4-6 + etirements doux (10 min)',
-                    tag: null,
-                  },
-                ],
-              },
-            ],
-          },
-        }),
-      ],
-    };
-
-    const screen = render(<CoachHistoryScreen />);
-
-    expect(screen.getByTestId('coach-section-daily_schedule')).toBeTruthy();
-    expect(screen.getByText('Lundi')).toBeTruthy();
-    expect(screen.getByText(/08:00/)).toBeTruthy();
-  });
-
-  it('opens only the newest history card by default and does not reopen it after a manual close', () => {
-    mockCoachHistoryState = {
-      ...mockCoachHistoryState,
-      data: [
-        createCoachEntry({
-          id: 'entry-newest',
-          title: 'Newest guidance',
-          generated_at: '2026-04-09T08:00:00.000Z',
-        }),
-        createCoachEntry({
-          id: 'entry-older',
-          title: 'Older guidance',
-          generated_at: '2026-04-07T08:00:00.000Z',
-        }),
-      ],
-    };
-
-    const screen = render(<CoachHistoryScreen />);
-
-    expect(screen.getByTestId('coach-history-card-entry-newest-expanded')).toBeTruthy();
-    expect(screen.queryByTestId('coach-history-card-entry-older-expanded')).toBeNull();
-
-    fireEvent.press(screen.getByTestId('coach-history-card-entry-newest-toggle'));
-
-    expect(screen.queryByTestId('coach-history-card-entry-newest-expanded')).toBeNull();
-
-    mockCoachHistoryState = {
-      ...mockCoachHistoryState,
-      isFetching: true,
-    };
-    screen.rerender(<CoachHistoryScreen />);
-
-    expect(screen.queryByTestId('coach-history-card-entry-newest-expanded')).toBeNull();
-  });
-
-  it('keeps the persisted persona on history cards and falls back to a neutral coach when it is missing', () => {
-    mockCoachHistoryState = {
-      ...mockCoachHistoryState,
-      data: [
-        createCoachEntry({
-          id: 'entry-strict',
-          persona_key: 'strict_tough',
-          title: 'Strict guidance',
-        }),
-        createCoachEntry({
-          id: 'entry-neutral',
-          persona_key: 'gentle_supportive',
-          has_valid_persona: false,
-          title: 'Legacy guidance',
-        }),
-      ],
-    };
-
-    const screen = render(<CoachHistoryScreen />);
-
-    expect(screen.getByText('Axel')).toBeTruthy();
-    expect(screen.getByText('Coach')).toBeTruthy();
-    expect(screen.queryAllByText('Noah')).toHaveLength(0);
-  });
-
-  it('shows a loading state while entries are fetching for the first load', () => {
-    mockCoachHistoryState = {
-      data: [],
+    mockUseInfiniteCoachUnifiedHistory.mockImplementation(() => ({
+      items: mockCoachUnifiedHistoryState.data,
+      error: mockCoachUnifiedHistoryState.error,
+      isFetching: mockCoachUnifiedHistoryState.isFetching,
+      isFetchingNextPage: mockCoachUnifiedHistoryState.isFetchingNextPage,
+      hasNextPage: mockCoachUnifiedHistoryState.hasNextPage,
+      fetchNextPage: mockCoachUnifiedHistoryState.fetchNextPage,
+      refetch: mockCoachUnifiedHistoryState.refetch,
+    }));
+    // Default mock for the per-persona conversations hook used by the new
+    // filtered mode. Tests that exercise the filtered mode override this in
+    // their own scope.
+    mockUseInfiniteCoachConversations.mockImplementation(() => ({
+      items: [],
       error: null,
-      isFetching: true,
-      isFetchingNextPage: false,
-      hasNextPage: false,
-      fetchNextPage: jest.fn(),
-      refetch: jest.fn(),
-    };
-
-    const screen = render(<CoachHistoryScreen />);
-
-    expect(screen.getByTestId('coach-history-loading-state')).toBeTruthy();
-  });
-
-  it('renders an empty state when there is no saved history after filtering the active entry', () => {
-    mockCoachHistoryState = {
-      ...mockCoachHistoryState,
-      data: [
-        createCoachEntry({
-          id: 'entry-active',
-          title: 'Active guidance',
-        }),
-      ],
-    };
-
-    const screen = render(<CoachHistoryScreen />);
-
-    expect(screen.getByTestId('coach-history-empty-state')).toBeTruthy();
-  });
-
-  it('routes the empty-state CTA back to Coach when no modal can dismiss', () => {
-    mockCoachHistoryState = {
-      ...mockCoachHistoryState,
-      data: [
-        createCoachEntry({
-          id: 'entry-active',
-          title: 'Active guidance',
-        }),
-      ],
-    };
-
-    const screen = render(<CoachHistoryScreen />);
-
-    fireEvent.press(screen.getByText('Nouveau conseil'));
-
-    expect(mockRouterCanDismiss).toHaveBeenCalled();
-    expect(mockRouterPush).toHaveBeenCalledWith('/coach');
-    expect(mockRouterDismiss).not.toHaveBeenCalled();
-  });
-
-  it('dismisses the empty-state CTA when presented as a modal', () => {
-    mockRouterCanDismiss.mockReturnValue(true);
-    mockCoachHistoryState = {
-      ...mockCoachHistoryState,
-      data: [],
-    };
-
-    const screen = render(<CoachHistoryScreen />);
-
-    fireEvent.press(screen.getByText('Nouveau conseil'));
-
-    expect(mockRouterDismiss).toHaveBeenCalled();
-    expect(mockRouterPush).not.toHaveBeenCalledWith('/coach');
-  });
-
-  it('refreshes the history list through pull-to-refresh', () => {
-    const refetch = jest.fn();
-    mockCoachHistoryState = {
-      ...mockCoachHistoryState,
-      data: [createCoachEntry()],
-      isFetching: true,
-      refetch,
-    };
-
-    const screen = render(<CoachHistoryScreen />);
-    const list = screen.getByTestId('coach-history-list');
-
-    expect(list.props.refreshing).toBe(true);
-
-    fireEvent(list, 'refresh');
-
-    expect(refetch).toHaveBeenCalledTimes(1);
-  });
-
-  it('marks only entries generated within the last 24 hours as recent', () => {
-    const now = new Date('2026-04-28T10:00:00.000Z').getTime();
-    const dateNowSpy = jest.spyOn(Date, 'now').mockReturnValue(now);
-    mockCoachHistoryState = {
-      ...mockCoachHistoryState,
-      data: [
-        createCoachEntry({
-          id: 'entry-recent',
-          generated_at: '2026-04-28T09:00:00.000Z',
-        }),
-        createCoachEntry({
-          id: 'entry-old',
-          generated_at: '2026-04-26T09:00:00.000Z',
-        }),
-      ],
-    };
-
-    try {
-      const screen = render(<CoachHistoryScreen />);
-
-      expect(
-        screen.getByTestId('coach-history-card-entry-recent-recent-badge'),
-      ).toBeTruthy();
-      expect(
-        screen.queryByTestId('coach-history-card-entry-old-recent-badge'),
-      ).toBeNull();
-    } finally {
-      dateNowSpy.mockRestore();
-    }
-  });
-
-  it('shows a stable pagination error and retries only after an explicit user action', () => {
-    const refetch = jest.fn();
-    mockCoachHistoryState = {
-      data: [],
-      error: new Error(
-        'Coach history pagination function "get_coach_history_page_v2" is unavailable.',
-      ),
       isFetching: false,
       isFetchingNextPage: false,
       hasNextPage: false,
       fetchNextPage: jest.fn(),
+      refetch: jest.fn(),
+    }));
+    mockUseDeleteCoachEntry.mockReturnValue({
+      mutate: (...args: unknown[]) => mockDeleteEntryMutate(...args),
+      isPending: false,
+    });
+    mockUseDeleteCoachConversation.mockReturnValue({
+      mutate: (...args: unknown[]) => mockDeleteConversationMutate(...args),
+      isPending: false,
+    });
+  });
+
+  it('renders the unified feed directly with no tab selector', () => {
+    mockCoachUnifiedHistoryState = {
+      ...mockCoachUnifiedHistoryState,
+      data: [createUnifiedEntryItem()],
+    };
+
+    const screen = render(<CoachHistoryScreen />);
+
+    expect(screen.getByTestId('coach-history-unified-list')).toBeTruthy();
+    expect(screen.queryByTestId('coach-history-tab-selector')).toBeNull();
+    expect(screen.queryByTestId('coach-history-tab-all')).toBeNull();
+    expect(screen.queryByTestId('coach-history-tab-requests')).toBeNull();
+    expect(screen.queryByTestId('coach-history-tab-conversations')).toBeNull();
+  });
+
+  it('keeps the global mixed history when a legacy persona_key parameter is present', () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      persona_key: 'patient_calm',
+    });
+    mockCoachUnifiedHistoryState = {
+      ...mockCoachUnifiedHistoryState,
+      data: [createUnifiedConversationItem({ id: 'legacy-param-conversation' })],
+    };
+
+    const screen = render(<CoachHistoryScreen />);
+
+    expect(screen.getByTestId('coach-history-unified-list')).toBeTruthy();
+    expect(
+      screen.getByTestId('coach-history-unified-conversation-legacy-param-conversation'),
+    ).toBeTruthy();
+    expect(mockUseInfiniteCoachConversations).not.toHaveBeenCalled();
+  });
+
+  it('renders entries and conversations interleaved in the unified feed', () => {
+    mockCoachUnifiedHistoryState = {
+      ...mockCoachUnifiedHistoryState,
+      data: [
+        createUnifiedConversationItem({ id: 'conv-A', title: 'Today’s chat' }),
+        createUnifiedEntryItem({ id: 'entry-B', title: 'Yesterday’s advice' }),
+      ],
+    };
+
+    const screen = render(<CoachHistoryScreen />);
+
+    expect(screen.getByTestId('coach-history-unified-entry-entry-B')).toBeTruthy();
+    expect(
+      screen.getByTestId('coach-history-unified-conversation-conv-A'),
+    ).toBeTruthy();
+  });
+
+  it('excludes the active entry id from the unified feed', () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      excludeEntryId: 'entry-A',
+    });
+    mockCoachUnifiedHistoryState = {
+      ...mockCoachUnifiedHistoryState,
+      data: [
+        createUnifiedEntryItem({ id: 'entry-A', title: 'Active advice' }),
+        createUnifiedEntryItem({ id: 'entry-B', title: 'Visible advice' }),
+      ],
+    };
+
+    const screen = render(<CoachHistoryScreen />);
+
+    expect(screen.queryByTestId('coach-history-unified-entry-entry-A')).toBeNull();
+    expect(screen.getByTestId('coach-history-unified-entry-entry-B')).toBeTruthy();
+  });
+
+  it('shows a single empty state when no items exist', () => {
+    const screen = render(<CoachHistoryScreen />);
+
+    expect(screen.getByTestId('coach-history-unified-empty-state')).toBeTruthy();
+  });
+
+  it('shows a single error state with retry when the unified fetch fails', () => {
+    const refetch = jest.fn();
+    mockCoachUnifiedHistoryState = {
+      ...mockCoachUnifiedHistoryState,
+      error: new Error('Network down'),
       refetch,
     };
 
     const screen = render(<CoachHistoryScreen />);
 
-    expect(screen.getByTestId('coach-history-error-state')).toBeTruthy();
-    expect(refetch).not.toHaveBeenCalled();
-
+    expect(screen.getByTestId('coach-history-unified-error-state')).toBeTruthy();
     fireEvent.press(screen.getByText(/retry|essayer/i));
-
     expect(refetch).toHaveBeenCalled();
   });
 
-  it('uses the header back action to leave the screen', () => {
-    const screen = render(<CoachHistoryScreen />);
-
-    fireEvent.press(screen.getByTestId('coach-history-back-button'));
-
-    expect(mockRouterCanDismiss).toHaveBeenCalled();
-    expect(mockRouterBack).toHaveBeenCalled();
-    expect(mockRouterDismiss).not.toHaveBeenCalled();
-  });
-
-  it('dismisses the modal when the router can dismiss', () => {
-    mockRouterCanDismiss.mockReturnValue(true);
+  it('shows a loading state on first load', () => {
+    mockCoachUnifiedHistoryState = {
+      ...mockCoachUnifiedHistoryState,
+      isFetching: true,
+    };
 
     const screen = render(<CoachHistoryScreen />);
 
-    fireEvent.press(screen.getByTestId('coach-history-back-button'));
-
-    expect(mockRouterDismiss).toHaveBeenCalled();
-    expect(mockRouterBack).not.toHaveBeenCalled();
+    expect(screen.getByTestId('coach-history-unified-loading-state')).toBeTruthy();
   });
 
-  it('shows the saved coach question instead of the generic mode title when available', () => {
-    mockCoachHistoryState = {
-      ...mockCoachHistoryState,
+  it('refreshes via pull-to-refresh', () => {
+    const refetch = jest.fn();
+    mockCoachUnifiedHistoryState = {
+      ...mockCoachUnifiedHistoryState,
+      data: [createUnifiedEntryItem()],
+      isFetching: true,
+      refetch,
+    };
+
+    const screen = render(<CoachHistoryScreen />);
+    const list = screen.getByTestId('coach-history-unified-list');
+
+    expect(list.props.refreshing).toBe(true);
+    fireEvent(list, 'refresh');
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('auto-expands the newest entry on first render', () => {
+    mockCoachUnifiedHistoryState = {
+      ...mockCoachUnifiedHistoryState,
       data: [
-        createCoachEntry({
+        createUnifiedEntryItem({ id: 'entry-newest', title: 'Newest guidance' }),
+        createUnifiedEntryItem({ id: 'entry-older', title: 'Older guidance' }),
+      ],
+    };
+
+    const screen = render(<CoachHistoryScreen />);
+
+    expect(
+      screen.getByTestId('coach-history-unified-entry-entry-newest-expanded'),
+    ).toBeTruthy();
+    expect(
+      screen.queryByTestId('coach-history-unified-entry-entry-older-expanded'),
+    ).toBeNull();
+  });
+
+  it('fires the delete-entry mutation after confirmation', () => {
+    const AlertModule = jest.requireActual('react-native').Alert;
+    const alertSpy = jest.spyOn(AlertModule, 'alert');
+    mockCoachUnifiedHistoryState = {
+      ...mockCoachUnifiedHistoryState,
+      data: [createUnifiedEntryItem({ id: 'entry-todelete' })],
+    };
+
+    const screen = render(<CoachHistoryScreen />);
+
+    fireEvent.press(
+      screen.getByTestId('coach-history-unified-entry-entry-todelete-delete'),
+    );
+
+    const buttons = alertSpy.mock.calls[0]?.[2];
+    const confirmButton = (
+      buttons as Array<{ text: string; onPress?: () => void }> | undefined
+    )?.find((button) => button.text === 'Supprimer');
+    confirmButton?.onPress?.();
+
+    expect(mockDeleteEntryMutate).toHaveBeenCalledWith(
+      { entryId: 'entry-todelete' },
+      expect.any(Object),
+    );
+
+    alertSpy.mockRestore();
+  });
+
+  it('fires the delete-conversation mutation after confirmation', () => {
+    const AlertModule = jest.requireActual('react-native').Alert;
+    const alertSpy = jest.spyOn(AlertModule, 'alert');
+    mockCoachUnifiedHistoryState = {
+      ...mockCoachUnifiedHistoryState,
+      data: [createUnifiedConversationItem({ id: 'conv-todelete' })],
+    };
+
+    const screen = render(<CoachHistoryScreen />);
+
+    fireEvent.press(
+      screen.getByTestId('coach-history-unified-conversation-conv-todelete-delete'),
+    );
+
+    const buttons = alertSpy.mock.calls[0]?.[2];
+    const confirmButton = (
+      buttons as Array<{ text: string; onPress?: () => void }> | undefined
+    )?.find((button) => button.text === 'Supprimer');
+    confirmButton?.onPress?.();
+
+    expect(mockDeleteConversationMutate).toHaveBeenCalledWith(
+      { conversationId: 'conv-todelete' },
+      expect.any(Object),
+    );
+
+    alertSpy.mockRestore();
+  });
+
+  it('does not crash when the auto-expanded entry is removed from the feed', () => {
+    mockCoachUnifiedHistoryState = {
+      ...mockCoachUnifiedHistoryState,
+      data: [createUnifiedEntryItem({ id: 'entry-todelete' })],
+    };
+
+    const screen = render(<CoachHistoryScreen />);
+    expect(
+      screen.getByTestId('coach-history-unified-entry-entry-todelete-expanded'),
+    ).toBeTruthy();
+
+    mockCoachUnifiedHistoryState = {
+      ...mockCoachUnifiedHistoryState,
+      data: [],
+    };
+    screen.rerender(<CoachHistoryScreen />);
+
+    expect(screen.getByTestId('coach-history-unified-empty-state')).toBeTruthy();
+  });
+
+  it('displays the saved question_text on an entry when present', () => {
+    mockCoachUnifiedHistoryState = {
+      ...mockCoachUnifiedHistoryState,
+      data: [
+        createUnifiedEntryItem({
           id: 'entry-question',
           prompt_type: 'latest_scan',
           question_text:
@@ -499,5 +390,118 @@ describe('CoachHistoryScreen', () => {
     expect(
       screen.getByText('Sur quoi je dois me concentrer avant ma seance ce soir ?'),
     ).toBeTruthy();
+  });
+
+  it('marks only entries generated within the last 24 hours as recent', () => {
+    const now = new Date('2026-04-28T10:00:00.000Z').getTime();
+    const dateNowSpy = jest.spyOn(Date, 'now').mockReturnValue(now);
+    mockCoachUnifiedHistoryState = {
+      ...mockCoachUnifiedHistoryState,
+      data: [
+        createUnifiedEntryItem({
+          id: 'entry-recent',
+          generated_at: '2026-04-28T09:00:00.000Z',
+        }),
+        createUnifiedEntryItem({
+          id: 'entry-old',
+          generated_at: '2026-04-26T09:00:00.000Z',
+        }),
+      ],
+    };
+
+    try {
+      const screen = render(<CoachHistoryScreen />);
+
+      expect(
+        screen.getByTestId(
+          'coach-history-unified-entry-entry-recent-recent-badge',
+        ),
+      ).toBeTruthy();
+      expect(
+        screen.queryByTestId(
+          'coach-history-unified-entry-entry-old-recent-badge',
+        ),
+      ).toBeNull();
+    } finally {
+      dateNowSpy.mockRestore();
+    }
+  });
+
+  it('routes the empty-state CTA back to /coach when no modal can dismiss', () => {
+    const screen = render(<CoachHistoryScreen />);
+
+    fireEvent.press(screen.getByText('Nouveau conseil'));
+
+    expect(mockRouterCanDismiss).toHaveBeenCalled();
+    expect(mockRouterPush).toHaveBeenCalledWith('/coach');
+    expect(mockRouterDismiss).not.toHaveBeenCalled();
+  });
+
+  it('dismisses the modal when the empty-state CTA is pressed inside a modal', () => {
+    mockRouterCanDismiss.mockReturnValue(true);
+
+    const screen = render(<CoachHistoryScreen />);
+
+    fireEvent.press(screen.getByText('Nouveau conseil'));
+
+    expect(mockRouterDismiss).toHaveBeenCalled();
+    expect(mockRouterPush).not.toHaveBeenCalledWith('/coach');
+  });
+
+  it('uses the header back action to leave the screen', () => {
+    const screen = render(<CoachHistoryScreen />);
+
+    fireEvent.press(screen.getByTestId('coach-history-back-button'));
+
+    expect(mockRouterCanDismiss).toHaveBeenCalled();
+    expect(mockRouterBack).toHaveBeenCalled();
+    expect(mockRouterDismiss).not.toHaveBeenCalled();
+  });
+
+  it('navigates to /coach/chat when a conversation card is tapped', () => {
+    mockCoachUnifiedHistoryState = {
+      ...mockCoachUnifiedHistoryState,
+      data: [createUnifiedConversationItem({ id: 'conv-open' })],
+    };
+
+    const screen = render(<CoachHistoryScreen />);
+
+    fireEvent.press(screen.getByTestId('coach-history-unified-conversation-conv-open'));
+
+    expect(mockRouterPush).toHaveBeenCalledWith({
+      pathname: '/coach/chat',
+      params: { id: 'conv-open' },
+    });
+  });
+
+  it('does not surface system status labels (ended / quota_reached / archived)', () => {
+    mockCoachUnifiedHistoryState = {
+      ...mockCoachUnifiedHistoryState,
+      data: [
+        createUnifiedConversationItem({
+          id: 'conv-ended',
+          status: 'ended',
+          conversation_status: 'ended' as any,
+        }),
+        createUnifiedConversationItem({
+          id: 'conv-archived',
+          status: 'archived',
+          conversation_status: 'archived' as any,
+        }),
+        createUnifiedConversationItem({
+          id: 'conv-quota',
+          status: 'quota_reached',
+          conversation_status: 'quota_reached' as any,
+          account_tier_at_start: 'free',
+        }),
+      ],
+    };
+
+    const screen = render(<CoachHistoryScreen />);
+
+    expect(screen.queryByText('Terminée')).toBeNull();
+    expect(screen.queryByText('Archivée')).toBeNull();
+    expect(screen.queryByText('Complète')).toBeNull();
+    expect(screen.queryByText('Conversation gratuite consommée')).toBeNull();
   });
 });

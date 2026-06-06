@@ -53,8 +53,14 @@ const COACH_PERSONA_VISUALS: Record<CoachPersonaKey, CoachPersonaVisual> = {
     fallbackLabel: 'LE',
     haloTint: '#76A9C8',
     teaserPriority: 2,
+    // Le scale 0.95 reste utile pour les petits avatars circulaires où la
+    // queue-de-cheval déborde latéralement. La carte portrait ("autres coachs")
+    // doit en revanche remplir le frame comme les autres personas : elle utilise
+    // donc son propre `cardCrop`, tandis que la hero reste calée en bas sans
+    // scale custom.
     crop: { contentPosition: 'top', imageScale: 0.95 },
-    heroCrop: { contentPosition: 'bottom', imageScale: 0.95 },
+    cardCrop: { contentPosition: 'top', imageScale: 1.08 },
+    heroCrop: { contentPosition: 'bottom' },
   },
   patient_calm: {
     imageSource: require('../assets/images/coach/patient_calm.webp'),

@@ -363,7 +363,7 @@ describe('shareStory payload builder', () => {
           },
         ],
         accentColor: '#000000',
-        footerBrand: 'HEALTH SCAN',
+        footerBrand: 'SELFLENS',
         footerCta: 'Track your progress',
       }),
     ).toEqual(
@@ -397,7 +397,7 @@ describe('shareStory payload builder', () => {
         },
       ],
       accentColor: '#000000',
-      footerBrand: 'HEALTH SCAN',
+      footerBrand: 'SELFLENS',
       footerCta: '',
     };
 

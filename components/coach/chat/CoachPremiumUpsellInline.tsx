@@ -8,6 +8,7 @@ import {
   FONT_WEIGHTS,
   SIZES,
   SPACING,
+  getThemeTokens,
   withAlpha,
 } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -27,8 +28,14 @@ function CoachPremiumUpsellInlineComponent({
   onPress,
   testID = 'coach-premium-upsell-inline',
 }: CoachPremiumUpsellInlineProps) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const { colors, isDark } = useTheme();
+  const premiumForeground = isDark
+    ? colors.gold
+    : getThemeTokens(false).premium.foreground;
+  const styles = useMemo(
+    () => createStyles(colors, premiumForeground),
+    [colors, premiumForeground],
+  );
 
   return (
     <Pressable
@@ -39,7 +46,12 @@ function CoachPremiumUpsellInlineComponent({
     >
       <Squircle style={styles.card}>
         <View style={styles.iconShell}>
-          <Crown color={colors.gold} size={18} strokeWidth={2.2} />
+          <Crown
+            color={premiumForeground}
+            size={18}
+            strokeWidth={2.2}
+            testID={`${testID}-icon`}
+          />
         </View>
         <View style={styles.copy}>
           <Text style={styles.title}>{title}</Text>
@@ -47,14 +59,19 @@ function CoachPremiumUpsellInlineComponent({
         </View>
         <View style={styles.ctaRow}>
           <Text style={styles.ctaLabel}>{ctaLabel}</Text>
-          <ArrowRight color={colors.gold} size={16} strokeWidth={2.4} />
+          <ArrowRight
+            color={premiumForeground}
+            size={16}
+            strokeWidth={2.4}
+            testID={`${testID}-arrow`}
+          />
         </View>
       </Squircle>
     </Pressable>
   );
 }
 
-const createStyles = (colors: any) =>
+const createStyles = (colors: any, premiumForeground: string) =>
   StyleSheet.create({
     pressable: {
       paddingHorizontal: SPACING.page,
@@ -102,7 +119,7 @@ const createStyles = (colors: any) =>
     ctaLabel: {
       fontSize: SIZES.text14,
       fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.gold,
+      color: premiumForeground,
     },
   });
 

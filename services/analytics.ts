@@ -39,6 +39,8 @@ export type AnalyticsEventName =
   | 'coach_prompt_submitted'
   | 'coach_response_received'
   | 'coach_generation_failed'
+  | 'coach_conversation_new_topic_pressed'
+  | 'coach_conversation_view_all_pressed'
   | 'entry_offer_shown'
   | 'entry_offer_spin'
   | 'entry_offer_result'
@@ -48,7 +50,13 @@ export type AnalyticsEventName =
   | 'entry_offer_purchase_completed'
   | 'subscription_purchase_failed'
   | 'subscription_restore_failed'
-  | 'subscription_entitlement_sync_failed';
+  | 'subscription_entitlement_sync_failed'
+  | 'ad_optin_shown'
+  | 'ad_optin_accepted'
+  | 'ad_optin_declined'
+  | 'ad_rewarded_earned'
+  | 'ad_unavailable'
+  | 'ad_failed';
 
 export type AnalyticsProperties = SafeObservabilityProperties;
 

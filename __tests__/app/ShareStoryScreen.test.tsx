@@ -218,7 +218,7 @@ describe('ShareStoryScreen', () => {
     expect(getByTestId('share-story-share-button')).toBeTruthy();
     expect(queryByTestId('share-story-loader')).toBeNull();
     expect(getByText('83')).toBeTruthy();
-    expect(getByText('HEALTH SCAN')).toBeTruthy();
+    expect(getByText('SELFLENS')).toBeTruthy();
     expect(getByText('27 ans')).toBeTruthy();
     expect(queryByText('Apercu 9:16 pret a partager.')).toBeNull();
     expect(queryByText('Scan reality. Stop guessing.')).toBeNull();
@@ -329,7 +329,7 @@ describe('ShareStoryScreen', () => {
       const { getByTestId, getByText } = render(<ShareStoryScreen />);
 
       expect(getByTestId('share-story-card')).toBeTruthy();
-      expect(getByText('HEALTH SCAN')).toBeTruthy();
+      expect(getByText('SELFLENS')).toBeTruthy();
       expect(getByTestId('share-story-share-button')).toBeTruthy();
     },
   );
@@ -371,7 +371,7 @@ describe('ShareStoryScreen', () => {
       );
       expect(screen.getByTestId('share-story-share-button')).toBeTruthy();
       expect(screen.getByTestId('share-story-capture-frame')).toBeTruthy();
-      expect(screen.getByText('HEALTH SCAN')).toBeTruthy();
+      expect(screen.getByText('SELFLENS')).toBeTruthy();
     },
   );
 

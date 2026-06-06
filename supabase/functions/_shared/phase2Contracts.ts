@@ -858,7 +858,7 @@ function normalizeSharePayloadSnapshot(value: unknown) {
         value.footerBrand,
         'share_payload_snapshot.footerBrand',
         SHARE_PAYLOAD_TEXT_MAX_LENGTH,
-      ) ?? 'HEALTH SCAN',
+      ) ?? 'SELFLENS',
     footerCta:
       clampShareString(
         value.footerCta,

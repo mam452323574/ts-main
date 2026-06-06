@@ -1,11 +1,12 @@
 import { useMemo } from 'react';
 import {
+  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { ChevronDown, ChevronUp } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react-native';
 
 import { Button } from '@/components/Button';
 import {
@@ -48,6 +49,8 @@ interface CoachHistoryCardProps {
   onCtaPress?: (() => void) | null;
   expanded: boolean;
   onToggle: () => void;
+  onDelete?: (() => void) | null;
+  deleteA11yLabel?: string;
   testID?: string;
 }
 
@@ -91,6 +94,8 @@ export function CoachHistoryCard({
   onCtaPress,
   expanded,
   onToggle,
+  onDelete,
+  deleteA11yLabel,
   testID = 'coach-history-card',
 }: CoachHistoryCardProps) {
   const { colors, isDark } = useTheme();
@@ -167,6 +172,31 @@ export function CoachHistoryCard({
                   {recentLabel}
                 </Text>
               </View>
+            ) : null}
+            {onDelete ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={deleteA11yLabel ?? 'Supprimer'}
+                onPress={(event) => {
+                  // Defensive optional-chain: native presses always carry an
+                  // event, but RNTL's fireEvent.press() invokes the handler
+                  // with no arguments, which used to throw on
+                  // `event.stopPropagation()` and break the delete-mutation
+                  // test. Keeping the call lets the production behaviour
+                  // (stopping the bubble to the card's outer Pressable) stay
+                  // intact while making the handler safe in tests too.
+                  event?.stopPropagation?.();
+                  onDelete();
+                }}
+                hitSlop={8}
+                style={({ pressed }) => [
+                  styles.deleteButton,
+                  pressed ? styles.deleteButtonPressed : null,
+                ]}
+                testID={`${testID}-delete`}
+              >
+                <Trash2 color={paper.inkMuted} size={14} strokeWidth={2.2} />
+              </Pressable>
             ) : null}
             <Squircle style={styles.chevronWrap}>
               {expanded ? (
@@ -350,6 +380,17 @@ const createStyles = (
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: paper.raised, borderCurve: 'continuous',
+    },
+    deleteButton: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: paper.raised,
+    },
+    deleteButtonPressed: {
+      opacity: 0.6,
     },
     summary: {
       gap: SPACING.sm + 2,

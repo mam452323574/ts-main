@@ -1,6 +1,6 @@
 # Audit Sécurité — XSS / Injection HTML
 
-**Projet :** HealthScan / TSE
+**Projet :** SelfLens / TSE
 **Date :** 2026-04-25
 **Périmètre :** App mobile React Native/Expo + sous-projet `website/` + Edge Functions Supabase
 **Auditeur :** Audit statique automatisé
@@ -366,7 +366,7 @@ export function normalizeSocialText(value: string) {
 - [ ] Test manuel : insérer en BDD `social_posts.image_url = 'javascript:alert(1)'` puis ouvrir le feed → placeholder, pas de crash.
 - [ ] Test manuel : avatar `data:image/svg+xml;...` → rejeté.
 - [ ] Test Edge Function : `curl -I` sur n'importe quelle Edge Function → headers `X-Content-Type-Options`, `X-Frame-Options`, CSP, HSTS, Referrer-Policy présents.
-- [ ] Test deep link malformé : `healthscan://share-story?payload=<JSON cassé>` → l'écran rejette gracefully.
+- [ ] Test deep link malformé : `selflens://share-story?payload=<JSON cassé>` → l'écran rejette gracefully.
 - [ ] Email de vérification reçu → texte intact, code numérique, pas d'injection HTML visible dans le source de l'email.
 
 ### 7.2 Liens vers documentation interne

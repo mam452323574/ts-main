@@ -4,7 +4,7 @@
  */
 
 // Routes invite uniquement
-export const PUBLIC_ROUTES = ['login', 'signup'] as const;
+export const PUBLIC_ROUTES = ['welcome', 'login', 'signup'] as const;
 
 // Routes accessibles quel que soit l'etat d'authentification
 export const SHARED_ROUTES = ['privacy-policy'] as const;
@@ -51,8 +51,9 @@ export const ADMIN_ROUTES = ['admin-social-moderation'] as const;
 // userProfile.account_tier === 'premium' (ou 'admin'). Voir P2-D dans
 // FRONTEND_SECURITY_AUDIT.md (défense en profondeur + UX cohérente,
 // le RLS / Edge Functions Supabase reste autoritaire).
+// Les routes Coach portent aussi des usages gratuits; les actions premium
+// restent protegees directement dans les ecrans concernes.
 export const PREMIUM_ROUTES = [
-  'coach',
   'coach-history',
   'super-scan-result',
   'recipes',
@@ -65,6 +66,7 @@ export const SPECIAL_ROUTES = ['premium-upgrade'] as const;
 
 // Configuration des écrans avec leurs options de présentation
 export const SCREEN_OPTIONS = {
+  'coach/conversations': { presentation: 'modal' as const },
   'entry-offer': { presentation: 'modal' as const },
   'social-compose': { presentation: 'modal' as const },
   'social-post': { presentation: 'card' as const },

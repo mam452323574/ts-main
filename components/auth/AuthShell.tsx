@@ -7,7 +7,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, type LucideIcon } from 'lucide-react-native';
 
 import { AppScreen } from '@/components/AppScreen';
 import { LanguageSelector } from '@/components/LanguageSelector';
@@ -22,6 +22,7 @@ interface AuthShellProps {
   children: ReactNode;
   showBack?: boolean;
   onBack?: () => void;
+  backIcon?: LucideIcon;
   showLanguage?: boolean;
   scroll?: boolean;
   contentStyle?: StyleProp<ViewStyle>;
@@ -33,6 +34,7 @@ export function AuthShell({
   children,
   showBack = false,
   onBack,
+  backIcon: BackIcon = ArrowLeft,
   showLanguage = true,
   scroll = false,
   contentStyle,
@@ -63,7 +65,7 @@ export function AuthShell({
             testID={backTestID}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <ArrowLeft color={colors.primaryText} size={22} />
+            <BackIcon color={colors.primaryText} size={22} />
           </TouchableOpacity>
         ) : null}
         {showLanguage ? (

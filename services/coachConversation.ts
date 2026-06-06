@@ -3,12 +3,12 @@ import {
   getConfiguredSupabaseProjectLabel,
   invokeAuthedEdgeFunction,
 } from './edgeFunctions';
-import { getSupabaseFunctionUrl } from './runtimeConfig';
 
 import { CoachServiceError } from './coach';
 import type { CoachPersonaKey } from '@/shared/coachPersonas';
 import type {
   CoachConversation,
+  CoachConversationInboxItem,
   CoachConversationListPage,
   CoachConversationMessage,
   CoachConversationQuotaStatus,
@@ -19,7 +19,44 @@ const COACH_SEND_MESSAGE_FN = 'coach-send-message';
 const COACH_END_CONVERSATION_FN = 'coach-end-conversation';
 const COACH_ARCHIVE_CONVERSATION_FN = 'coach-archive-conversation';
 const COACH_CONVERSATION_QUOTA_STATUS_FN = 'coach-conversation-quota-status';
-const COACH_CONVERSATIONS_LIST_FN = 'coach-conversations-list';
+
+export const COACH_CONVERSATION_QUOTA_EXHAUSTED_ERROR_CODE =
+  'coach_conversation_quota_exhausted';
+export const COACH_CONVERSATION_FREE_LIMIT_REACHED_ERROR_CODE =
+  'coach_free_conversation_message_limit_reached';
+export const COACH_CONVERSATION_FREE_ALREADY_USED_ERROR_CODE =
+  'coach_free_conversation_already_used';
+
+const COACH_CONVERSATION_QUOTA_ERROR_CODES = new Set<string>([
+  COACH_CONVERSATION_QUOTA_EXHAUSTED_ERROR_CODE,
+  COACH_CONVERSATION_FREE_LIMIT_REACHED_ERROR_CODE,
+  COACH_CONVERSATION_FREE_ALREADY_USED_ERROR_CODE,
+]);
+
+export function isCoachConversationQuotaExhaustedError(error: unknown): boolean {
+  return (
+    error instanceof CoachServiceError &&
+    typeof error.code === 'string' &&
+    COACH_CONVERSATION_QUOTA_ERROR_CODES.has(error.code)
+  );
+}
+
+export function getCoachConversationQuotaFromError(
+  error: unknown,
+): CoachConversationQuotaStatus | null {
+  if (!(error instanceof CoachServiceError)) return null;
+  const details = error.details;
+  if (!isRecord(details)) return null;
+  // The Edge Function packs the latest quota snapshot into the error details
+  // so the client can refresh its UI without an extra round trip.
+  const quota =
+    (details.quota as CoachConversationQuotaStatus | undefined) ??
+    (isRecord(details.payload)
+      ? (details.payload.quota as CoachConversationQuotaStatus | undefined)
+      : undefined);
+  if (!quota || typeof quota !== 'object') return null;
+  return quota;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -27,6 +64,67 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function readOptionalString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value : null;
+}
+
+function readNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function normalizeCoachConversationInboxItem(
+  row: unknown,
+): CoachConversationInboxItem | null {
+  if (!isRecord(row)) return null;
+
+  const id = readOptionalString(row.id);
+  const userId = readOptionalString(row.user_id);
+  const createdAt = readOptionalString(row.created_at);
+  const updatedAt = readOptionalString(row.updated_at);
+  const personaKey = readOptionalString(row.persona_key) as CoachPersonaKey | null;
+  const status =
+    readOptionalString(row.status) as CoachConversationInboxItem['status'] | null;
+
+  if (!id || !userId || !createdAt || !updatedAt || !personaKey || !status) {
+    return null;
+  }
+
+  return {
+    id,
+    user_id: userId,
+    created_at: createdAt,
+    updated_at: updatedAt,
+    title: readOptionalString(row.title),
+    persona_key: personaKey,
+    locale: readOptionalString(row.locale),
+    status,
+    message_count: Math.max(0, Math.trunc(readNumber(row.message_count) ?? 0)),
+    user_message_count: Math.max(
+      0,
+      Math.trunc(readNumber(row.user_message_count) ?? 0),
+    ),
+    account_tier_at_start:
+      (readOptionalString(
+        row.account_tier_at_start,
+      ) as CoachConversationInboxItem['account_tier_at_start']) ?? null,
+    last_user_message_at: readOptionalString(row.last_user_message_at),
+    last_assistant_message_at: readOptionalString(row.last_assistant_message_at),
+    ended_at: readOptionalString(row.ended_at),
+    ended_reason:
+      (readOptionalString(
+        row.ended_reason,
+      ) as CoachConversationInboxItem['ended_reason']) ?? null,
+    archived_at: readOptionalString(row.archived_at),
+    metadata: isRecord(row.metadata) ? row.metadata : {},
+    first_user_message_preview: readOptionalString(row.first_user_message_preview),
+    last_message_preview: readOptionalString(row.last_message_preview),
+    last_message_at: readOptionalString(row.last_message_at),
+  };
 }
 
 function createCoachConversationError(
@@ -131,33 +229,56 @@ export interface FetchCoachConversationsPageInput {
   limit?: number;
   cursor?: { updated_at: string; id: string } | null;
   include_archived?: boolean;
+  persona_key?: CoachPersonaKey | null;
 }
 
 export async function fetchCoachConversationsPage(
   input: FetchCoachConversationsPageInput = {},
 ): Promise<CoachConversationListPage> {
-  const response = await invokeCoachConversationFunction<{
-    success: boolean;
-    items: CoachConversation[];
-    has_more: boolean;
-    next_cursor: { updated_at: string; id: string } | null;
-  }>(COACH_CONVERSATIONS_LIST_FN, {
-    limit: input.limit ?? 20,
-    cursor: input.cursor ?? null,
-    include_archived: input.include_archived ?? false,
+  const limit = Math.max(1, Math.min(50, input.limit ?? 20));
+  const { data, error } = await supabase.rpc('get_coach_conversations_page', {
+    p_limit: limit + 1,
+    p_cursor_updated_at: input.cursor?.updated_at ?? null,
+    p_cursor_id: input.cursor?.id ?? null,
+    p_include_archived: input.include_archived ?? false,
+    p_include_hidden: false,
+    p_persona_key: input.persona_key ?? null,
   });
 
-  if (!isRecord(response) || !Array.isArray(response.items)) {
+  if (error) {
     throw createCoachConversationError(
-      'Coach conversations list returned an invalid payload',
-      { code: 'coach_conversations_list_invalid', status: 502 },
+      `Coach conversations page failed on Supabase project "${getConfiguredSupabaseProjectLabel()}".`,
+      {
+        code: 'coach_conversations_list_failed',
+        status: 502,
+        details: error,
+      },
+    );
+  }
+
+  const rows = Array.isArray(data)
+    ? data
+        .map((row) => normalizeCoachConversationInboxItem(row))
+        .filter((row): row is CoachConversationInboxItem => row !== null)
+    : [];
+  const hasMore = rows.length > limit;
+  const items = hasMore ? rows.slice(0, limit) : rows;
+  const last = items[items.length - 1];
+  const nextCursor = hasMore && last
+    ? { updated_at: last.updated_at, id: last.id }
+    : null;
+
+  if (!Array.isArray(data) && data !== null) {
+    throw createCoachConversationError(
+      'Coach conversations page returned an invalid payload',
+      { code: 'coach_conversations_list_invalid', status: 502, details: data },
     );
   }
 
   return {
-    items: response.items as CoachConversation[],
-    has_more: response.has_more === true,
-    next_cursor: (response.next_cursor as CoachConversationListPage['next_cursor']) ?? null,
+    items,
+    has_more: hasMore,
+    next_cursor: nextCursor,
   };
 }
 

@@ -28,9 +28,16 @@ import {
   AuthenticatedStorageSessionError,
   uploadAuthenticatedStorageObject,
 } from '@/services/authenticatedStorage';
-import { getRuntimeConfig, getSupabaseFunctionUrl } from './runtimeConfig';
+import { tryGetRuntimeConfig, getSupabaseFunctionUrl } from './runtimeConfig';
 
-const SUPABASE_URL = getRuntimeConfig().supabaseUrl;
+// Lecture NON-throwing au niveau module : si la config est indisponible on
+// retombe sur '' (les flux qui construisent des URLs storage ne sont pas
+// atteignables tant que `StartupConfigGate` bloque le démarrage). Évite un
+// throw à l'import qui crasherait le lancement (cf. rejet App Store 1.0.0(6)).
+const runtimeConfigResult = tryGetRuntimeConfig();
+const SUPABASE_URL = runtimeConfigResult.ok
+  ? runtimeConfigResult.config.supabaseUrl
+  : '';
 const GAMIFICATION_ASSET_BUCKET_NAME = 'gamification-assets';
 
 // Types d'erreurs pour une meilleure gestion

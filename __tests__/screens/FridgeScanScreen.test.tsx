@@ -57,6 +57,10 @@ let mockTheme = {
   colors: { ...mockLightThemeColors },
   isDark: false,
 };
+let mockAuthState = {
+  userProfile: { account_tier: 'premium' },
+  loading: false,
+};
 
 function createFridgeScanApiError(options: {
   message: string;
@@ -174,8 +178,9 @@ const translations: Record<string, string> = {
   'fridge_scan.chef_selector_eyebrow': 'Your cooking style',
   'fridge_scan.chef_selector_title': 'Which chef will it be?',
   'fridge_scan.feedback_cta': 'Retake',
-  'fridge_scan.feedback_primary_cta': 'Ask the chef',
-  'fridge_scan.feedback_secondary_cta': 'Retake',
+  'fridge_scan.feedback_primary_cta': 'Ask',
+  'fridge_scan.feedback_secondary_cta': 'Retake photo',
+  'fridge_scan.feedback_home_cta': 'Back home',
   'fridge_scan.feedback_camera_badge': 'Camera capture',
   'fridge_scan.feedback_gallery_badge': 'Gallery import',
   'fridge_scan.mode_labels.diet': 'Diet Chef',
@@ -236,10 +241,7 @@ jest.mock('@/contexts/LanguageContext', () => ({
 }));
 
 jest.mock('@/contexts/AuthContext', () => ({
-  useAuth: () => ({
-    userProfile: { account_tier: 'premium' },
-    loading: false,
-  }),
+  useAuth: () => mockAuthState,
 }));
 
 jest.mock('@/services/fridgeScan', () => ({
@@ -252,6 +254,18 @@ jest.mock('@/hooks/useCustomAlert', () => ({
     showAlert: mockShowAlert,
     alertElement: null,
   }),
+}));
+
+jest.mock('@/components/ContextualPaywall', () => ({
+  ContextualPaywall: ({ visible }: any) => {
+    if (!visible) {
+      return null;
+    }
+
+    const ReactLocal = require('react');
+    const { View } = require('react-native');
+    return ReactLocal.createElement(View, { testID: 'fridge-scan-paywall-visible' });
+  },
 }));
 
 jest.mock('@/components/Button', () => ({
@@ -320,6 +334,10 @@ describe('FridgeScanScreen', () => {
       colors: { ...mockLightThemeColors },
       isDark: false,
     };
+    mockAuthState = {
+      userProfile: { account_tier: 'premium' },
+      loading: false,
+    };
     Object.defineProperty(Platform, 'OS', {
       value: originalPlatform,
       configurable: true,
@@ -378,7 +396,7 @@ describe('FridgeScanScreen', () => {
 
   async function submitReview() {
     await act(async () => {
-      fireEvent.press(screen.getByText('Ask the chef'));
+      fireEvent.press(screen.getByText('Ask'));
       await Promise.resolve();
     });
   }
@@ -511,7 +529,9 @@ describe('FridgeScanScreen', () => {
     expect(screen.getByText('Balance, nutrition, and healthy meals.')).toBeTruthy();
     expect(screen.getByText('Protein, performance, and recovery.')).toBeTruthy();
     expect(screen.getByText('Flavor, comfort, and smart balance.')).toBeTruthy();
-    expect(screen.getByText('Ask the chef')).toBeTruthy();
+    expect(screen.getByText('Retake photo')).toBeTruthy();
+    expect(screen.getByText('Ask')).toBeTruthy();
+    expect(screen.queryByText('Back home')).toBeNull();
     expect(screen.getByTestId('fridge-scan-retake-action')).toBeTruthy();
     expect(screen.getByText('Camera capture')).toBeTruthy();
     expect(mockPush).not.toHaveBeenCalledWith(
@@ -621,7 +641,7 @@ describe('FridgeScanScreen', () => {
     });
 
     await act(async () => {
-      fireEvent.press(screen.getByText('Ask the chef'));
+      fireEvent.press(screen.getByText('Ask'));
       await Promise.resolve();
     });
 
@@ -650,7 +670,7 @@ describe('FridgeScanScreen', () => {
     });
 
     await act(async () => {
-      fireEvent.press(screen.getByText('Ask the chef'));
+      fireEvent.press(screen.getByText('Ask'));
       await Promise.resolve();
     });
 
@@ -679,7 +699,7 @@ describe('FridgeScanScreen', () => {
     });
 
     await act(async () => {
-      fireEvent.press(screen.getByText('Ask the chef'));
+      fireEvent.press(screen.getByText('Ask'));
       await Promise.resolve();
     });
 
@@ -703,7 +723,7 @@ describe('FridgeScanScreen', () => {
     });
 
     await act(async () => {
-      fireEvent.press(screen.getByText('Ask the chef'));
+      fireEvent.press(screen.getByText('Ask'));
       await Promise.resolve();
     });
 
@@ -735,7 +755,7 @@ describe('FridgeScanScreen', () => {
     expect(screen.getByTestId('fridge-scan-feedback-card')).toBeTruthy();
 
     await act(async () => {
-      fireEvent.press(screen.getByText('Retake'));
+      fireEvent.press(screen.getByText('Retake photo'));
       await Promise.resolve();
     });
 
@@ -743,6 +763,92 @@ describe('FridgeScanScreen', () => {
     expect(screen.getByTestId('fridge-scan-camera-view')).toBeTruthy();
     expect(mockPush).not.toHaveBeenCalled();
     expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('keeps the retake action available for an admin captured review', async () => {
+    mockAuthState = {
+      userProfile: { account_tier: 'admin' },
+      loading: false,
+    };
+
+    render(<FridgeScanScreen />);
+
+    await captureToReview();
+
+    expect(screen.getByText('Retake photo')).toBeTruthy();
+    expect(screen.getByText('Ask')).toBeTruthy();
+    expect(screen.queryByText('Back home')).toBeNull();
+    expect(screen.getByTestId('fridge-scan-retake-action')).toBeTruthy();
+  });
+
+  it('shows home instead of retake for a free captured review and routes explicitly home', async () => {
+    mockAuthState = {
+      userProfile: { account_tier: 'free' },
+      loading: false,
+    };
+
+    render(<FridgeScanScreen />);
+
+    await captureToReview();
+
+    expect(screen.getByText('Back home')).toBeTruthy();
+    expect(screen.getByText('Ask')).toBeTruthy();
+    expect(screen.queryByText('Retake photo')).toBeNull();
+    expect(screen.getByTestId('fridge-scan-home-action')).toBeTruthy();
+
+    fireEvent.press(screen.getByText('Back home'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(tabs)');
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('keeps the paywall gate when a free user asks from the captured review', async () => {
+    mockAuthState = {
+      userProfile: { account_tier: 'free' },
+      loading: false,
+    };
+
+    render(<FridgeScanScreen />);
+
+    await captureToReview();
+    await submitReview();
+
+    expect(screen.getByTestId('fridge-scan-paywall-visible')).toBeTruthy();
+    expect(mockSubmitFridgeScanCapture).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('uses the free review actions for a gallery import', async () => {
+    mockAuthState = {
+      userProfile: { account_tier: 'free' },
+      loading: false,
+    };
+
+    render(<FridgeScanScreen />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('fridge-scan-gallery-button'));
+      await Promise.resolve();
+    });
+
+    expect(screen.getByText('Back home')).toBeTruthy();
+    expect(screen.getByText('Ask')).toBeTruthy();
+    expect(screen.queryByText('Retake photo')).toBeNull();
+  });
+
+  it('does not show entitlement-dependent review actions while the profile is loading', async () => {
+    mockAuthState = {
+      userProfile: { account_tier: 'premium' },
+      loading: true,
+    };
+
+    render(<FridgeScanScreen />);
+
+    await captureToReview();
+
+    expect(screen.queryByText('Back home')).toBeNull();
+    expect(screen.queryByText('Retake photo')).toBeNull();
+    expect(screen.queryByText('Ask')).toBeNull();
   });
 
   it('derives compact Android overlay spacing from safe areas in camera and review modes', async () => {
@@ -852,7 +958,7 @@ describe('FridgeScanScreen', () => {
       });
 
       await act(async () => {
-        fireEvent.press(screen.getByText('Ask the chef'));
+        fireEvent.press(screen.getByText('Ask'));
         await Promise.resolve();
       });
 

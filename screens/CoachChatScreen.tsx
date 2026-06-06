@@ -23,7 +23,7 @@ import {
   resolveCoachQuotaBannerKind,
 } from '@/components/coach/chat/CoachQuotaBanner';
 import { CoachConversationStarter } from '@/components/coach/chat/CoachConversationStarter';
-import { CoachPremiumUpsellInline } from '@/components/coach/chat/CoachPremiumUpsellInline';
+import { pickRandomStarterSuggestions } from '@/shared/coachChatStarterSuggestions';
 import {
   BORDER_RADIUS,
   FONT_WEIGHTS,
@@ -44,17 +44,28 @@ import { useChatAutoScroll } from '@/hooks/useChatAutoScroll';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { useVoiceDictation } from '@/hooks/useVoiceDictation';
 import {
+  COACH_CONVERSATION_FREE_USER_LIMIT,
   COACH_CONVERSATION_USER_MESSAGE_MAX_LENGTH,
   canSendMessageInCoachConversation,
+  getCoachConversationFreeNextRechargeAt,
+  getCoachConversationFreeRemainingMessages,
+  isCoachConversationFreeQuotaExhausted,
   type CoachConversationMessage,
   type CoachConversationQuotaStatus,
 } from '@/shared/coachConversation';
 import { CoachServiceError } from '@/services/coach';
-import { generateCoachConversationClientRequestId } from '@/services/coachConversation';
+import {
+  generateCoachConversationClientRequestId,
+  getCoachConversationQuotaFromError,
+  isCoachConversationQuotaExhaustedError,
+} from '@/services/coachConversation';
+import { getCoachConversationQuotaQueryKey } from '@/hooks/queries/coachConversationQueryKeys';
+import { useQueryClient } from '@tanstack/react-query';
 import type { CoachPersonaKey } from '@/shared/coachPersonas';
+import { getCoachPersona, isCoachPersonaKey } from '@/shared/coachPersonas';
 import { getCoachPersonaVisual } from '@/shared/coachPersonaVisuals';
 import { resolveCoachPersonaKeyFromProfile } from '@/utils/coachPersona';
-import { getCoachPersona } from '@/shared/coachPersonas';
+import { formatCoachConversationQuotaDuration } from '@/utils/coachConversationFormatting';
 
 // V1 hardcoded French copy. Locale-aware overrides will come during the
 // i18n pass in step 10. The Edge Function still localises welcome messages
@@ -73,16 +84,24 @@ const COPY = {
     quotaPremiumWarning: 'Plus que {available} message(s) aujourd’hui',
     quotaPremiumExhausted: 'Limite quotidienne atteinte',
     quotaPremiumExhaustedBody: 'Reviens demain pour continuer ta conversation.',
-    quotaFreeTitle: 'Conversation gratuite',
-    quotaFreeActive: '{remaining} message(s) restant(s)',
-    quotaFreeWarning: 'Dernière question gratuite',
-    quotaFreeExhausted: 'Conversation gratuite épuisée',
-    quotaFreeExhaustedBody: 'Passe premium pour continuer à discuter avec le coach.',
+    quotaFreeCounter: 'Messages gratuits : {remaining}/{limit}',
+    quotaFreeWarning: 'Dernier message',
+    quotaFreeExhaustedBody:
+      'Tu peux attendre la prochaine recharge ou passer premium pour continuer.',
+    quotaFreeExhaustedCountdown: 'Recharge gratuite dans {duration}',
+    // Used when the server does not provide a recharge timestamp (or while the
+    // refetch triggered by an overdue timestamp is in flight). Voluntarily
+    // vague — saying "imminente" was misleading when the recharge never came.
+    quotaFreeExhaustedFallback: 'Recharge gratuite à venir',
     perConversationReached: 'Cette conversation est complète. Démarre-en une nouvelle pour continuer.',
     composerPlaceholder: 'Écris à ton coach…',
     composerSendLabel: 'Envoyer',
     micA11yLabel: 'Enregistrer un message vocal',
-    micUnavailable: 'Dictée non disponible sur ce support',
+    micUnavailable: 'Dictée vocale indisponible ici — appuie pour en savoir plus',
+    micUnavailableTitle: 'Dictée vocale indisponible',
+    micUnavailableBody:
+      "La dictée vocale ne fonctionne pas dans Expo Go. Installe un build de développement de l'app pour l'utiliser sur ton téléphone. Sur ordinateur, ouvre l'app dans Chrome ou Edge.",
+    micPermissionDenied: 'Accès au micro refusé. Autorise le micro dans les réglages pour pouvoir dicter.',
     voiceOverlayCancelHint: 'Glisse pour annuler',
     voiceOverlaySendLabel: 'Envoyer le vocal',
     voiceOverlayTimerA11yLabel: (seconds: number) =>
@@ -90,10 +109,6 @@ const COPY = {
     starterTitle: 'Pose ta première question',
     starterSubtitle:
       'Ton coach va analyser tes scans et te répondre comme s’il était à tes côtés. Choisis une idée ou écris ta question.',
-    suggestion_sleep: 'Comment améliorer mon sommeil cette semaine ?',
-    suggestion_routine: 'Aide-moi à organiser ma journée pour me sentir mieux.',
-    suggestion_nutrition: 'Donne-moi 3 idées simples pour bien manger ce midi.',
-    suggestion_motivation: "J'ai du mal à m'y mettre, comment tu m’aiderais ?",
     errorTitle: 'Le coach n’a pas pu répondre',
     errorBody: 'Vérifie ta connexion ou réessaie dans un instant.',
     errorRetry: 'Réessayer',
@@ -105,9 +120,9 @@ const COPY = {
     conversationArchived: 'Conversation archivée',
     quotaReachedTitle: 'Cette conversation est terminée',
     quotaReachedBody: 'Démarre une nouvelle conversation pour continuer.',
-    upsellTitle: 'Continue avec premium',
+    upsellTitle: 'Continuer avec premium',
     upsellBody:
-      'Tu as épuisé ta conversation gratuite. Passe premium pour discuter sans limite avec ton coach.',
+      'Continue maintenant et profite de plus de messages avec ton coach.',
     upsellCtaLong: 'Découvrir les avantages premium',
     notFoundTitle: 'Conversation introuvable',
     notFoundBody: 'Cette conversation a été supprimée ou tu n’y as pas accès.',
@@ -116,7 +131,11 @@ const COPY = {
   },
 };
 
-const SUGGESTIONS = ['suggestion_sleep', 'suggestion_routine', 'suggestion_nutrition', 'suggestion_motivation'] as const;
+// Number of starter suggestions displayed while a conversation is still empty.
+// Picked deterministically from `COACH_CHAT_STARTER_SUGGESTIONS_FR` using the
+// conversation id as seed — same thread always re-renders the same quartet,
+// a brand-new "Nouvelle conv" lands on a fresh roll.
+const STARTER_SUGGESTION_COUNT = 4;
 
 function formatQuotaCopy(template: string, replacements: Record<string, string | number>) {
   let output = template;
@@ -126,9 +145,22 @@ function formatQuotaCopy(template: string, replacements: Record<string, string |
   return output;
 }
 
+function formatRechargeCountdownLabel(
+  nextRechargeAt: string | null | undefined,
+  nowMs: number,
+) {
+  if (!nextRechargeAt) return null;
+  const targetMs = Date.parse(nextRechargeAt);
+  if (!Number.isFinite(targetMs)) return null;
+  const remaining = targetMs - nowMs;
+  if (remaining <= 0) return null;
+  return formatCoachConversationQuotaDuration(remaining);
+}
+
 function resolveQuotaBannerInputs(
   quota: CoachConversationQuotaStatus | null | undefined,
   copy: typeof COPY['fr'],
+  nowMs: number,
 ) {
   const kind = resolveCoachQuotaBannerKind(quota);
   if (!kind || !quota) return null;
@@ -161,28 +193,45 @@ function resolveQuotaBannerInputs(
       cta: null,
     };
   }
+  // Prefer the server-side limit so the counter stays consistent with backend
+  // enforcement when the value drifts (rollouts, A/B). Falls back to the
+  // shared client constant only when the payload doesn't carry one.
+  const freeMessageLimit =
+    quota.free_message_limit ?? COACH_CONVERSATION_FREE_USER_LIMIT;
+  const freeCounter = formatQuotaCopy(copy.quotaFreeCounter, {
+    remaining: getCoachConversationFreeRemainingMessages(quota),
+    limit: freeMessageLimit,
+  });
   if (kind === 'free_active') {
     return {
       kind,
-      title: copy.quotaFreeTitle,
-      body: formatQuotaCopy(copy.quotaFreeActive, {
-        remaining: quota.free_remaining_messages ?? 0,
-      }),
+      title: freeCounter,
+      body: null,
       cta: null,
     };
   }
   if (kind === 'free_warning') {
     return {
       kind,
-      title: copy.quotaFreeTitle,
+      title: freeCounter,
       body: copy.quotaFreeWarning,
       cta: null,
     };
   }
+  const rechargeCountdown = formatRechargeCountdownLabel(
+    getCoachConversationFreeNextRechargeAt(quota),
+    nowMs,
+  );
   return {
     kind,
-    title: copy.quotaFreeExhausted,
-    body: copy.quotaFreeExhaustedBody,
+    title: freeCounter,
+    body: rechargeCountdown
+      ? formatQuotaCopy(copy.quotaFreeExhaustedCountdown, {
+          duration: rechargeCountdown,
+        })
+      : copy.quotaFreeExhaustedFallback,
+    // The free-exhausted banner doubles as the premium CTA so we never render
+    // a second standalone upsell card next to it (see CoachChatScreen JSX).
     cta: copy.upsellCta,
   };
 }
@@ -243,20 +292,37 @@ export default function CoachChatScreen() {
     scrollToBottom,
   } = useChatAutoScroll<MessageListItem>({ reduceMotion });
 
-  const params = useLocalSearchParams<{ id?: string | string[] }>();
+  const params = useLocalSearchParams<{
+    id?: string | string[];
+    persona_key?: string | string[];
+    new?: string | string[];
+  }>();
   const conversationIdParam = useMemo(() => {
     if (!params.id) return null;
     return Array.isArray(params.id) ? params.id[0] ?? null : params.id;
   }, [params.id]);
+  const personaKeyFromParam = useMemo<CoachPersonaKey | null>(() => {
+    const raw = Array.isArray(params.persona_key) ? params.persona_key[0] : params.persona_key;
+    return isCoachPersonaKey(raw) ? raw : null;
+  }, [params.persona_key]);
+  // Legacy links may pass ?new=1. Keep accepting them while the inbox now
+  // creates a thread first and opens this screen with its conversation id.
+  const forceNew = useMemo(() => {
+    const raw = Array.isArray(params.new) ? params.new[0] : params.new;
+    return raw === '1' || raw === 'true';
+  }, [params.new]);
+
+  const queryClient = useQueryClient();
 
   const [activeConversationId, setActiveConversationId] = useState<string | null>(
-    conversationIdParam,
+    forceNew ? null : conversationIdParam,
   );
   const [composerValue, setComposerValue] = useState('');
   const [streamingDraft, setStreamingDraft] = useState<DraftMessage | null>(null);
   const [streamingError, setStreamingError] = useState<string | null>(null);
   const [outboxUserMessages, setOutboxUserMessages] = useState<OutboxUserMessage[]>([]);
   const pendingClientRequestIdRef = useRef<string | null>(null);
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
 
   // Typewriter dedup state — see plan: a message animates only if its id and
   // its trimmed content are both absent from these sets. We seed them with
@@ -268,22 +334,23 @@ export default function CoachChatScreen() {
   const initialMarkDoneRef = useRef(false);
 
   useEffect(() => {
+    if (forceNew) {
+      // A legacy "new=1" flag still wins over a stale id. Reset the dedup
+      // state so the next start_coach_conversation lands cleanly.
+      setActiveConversationId(null);
+      initialMarkDoneRef.current = false;
+      seenMessageIdsRef.current.clear();
+      seenContentsRef.current.clear();
+      return;
+    }
     if (conversationIdParam) {
       setActiveConversationId(conversationIdParam);
     }
-  }, [conversationIdParam]);
+  }, [conversationIdParam, forceNew]);
 
   const personaKeyFromProfile = useMemo(
     () => resolveCoachPersonaKeyFromProfile(userProfile),
     [userProfile],
-  );
-  const personaDefinition = useMemo(
-    () => getCoachPersona(personaKeyFromProfile as CoachPersonaKey),
-    [personaKeyFromProfile],
-  );
-  const personaVisual = useMemo(
-    () => getCoachPersonaVisual(personaKeyFromProfile as CoachPersonaKey),
-    [personaKeyFromProfile],
   );
 
   const quotaQuery = useCoachConversationQuota();
@@ -303,7 +370,20 @@ export default function CoachChatScreen() {
   });
 
   const conversation = conversationQuery.data ?? null;
-  const personaKey = (conversation?.persona_key as CoachPersonaKey | undefined) ?? personaKeyFromProfile;
+  // For an existing conversation, conversation.persona_key is authoritative.
+  // For a fresh thread (no activeConversationId), honour an explicit
+  // persona_key query param so the "Nouveau sujet" CTA can pin the coach.
+  // Otherwise fall back to the user's profile preference.
+  const personaKey = (conversation?.persona_key as CoachPersonaKey | undefined)
+    ?? (activeConversationId ? personaKeyFromProfile : (personaKeyFromParam ?? personaKeyFromProfile));
+  const personaDefinition = useMemo(
+    () => getCoachPersona(personaKey as CoachPersonaKey),
+    [personaKey],
+  );
+  const personaVisual = useMemo(
+    () => getCoachPersonaVisual(personaKey as CoachPersonaKey),
+    [personaKey],
+  );
   const quota = quotaQuery.data;
 
   const messages = useMemo(() => {
@@ -360,7 +440,9 @@ export default function CoachChatScreen() {
   const canSend = useMemo(() => {
     if (!conversation && !activeConversationId) {
       if (!quota) return true;
-      if (quota.tier === 'free' && quota.free_used) return false;
+      if (quota.tier === 'free' && isCoachConversationFreeQuotaExhausted(quota)) {
+        return false;
+      }
       if (quota.tier === 'premium' && (quota.premium_today_available ?? 0) <= 0) return false;
       return true;
     }
@@ -368,9 +450,50 @@ export default function CoachChatScreen() {
     return canSendMessageInCoachConversation(conversation, quota);
   }, [conversation, quota, activeConversationId]);
 
+  const isFreeQuotaExhausted = useMemo(
+    () => !!quota && quota.tier === 'free' && isCoachConversationFreeQuotaExhausted(quota),
+    [quota],
+  );
+
+  const freeNextRechargeAt = useMemo(
+    () => (quota ? getCoachConversationFreeNextRechargeAt(quota) : null),
+    [quota],
+  );
+
+  // Tick the local clock every 30s while the user is in the exhausted state,
+  // so the recharge countdown stays in sync without forcing a refetch. The
+  // useCoachConversationQuota query already schedules a refetch at the next
+  // recharge timestamp — this is purely a UI ticker.
+  useEffect(() => {
+    if (!isFreeQuotaExhausted || !freeNextRechargeAt) {
+      return undefined;
+    }
+    setNowMs(Date.now());
+    const intervalId = setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => clearInterval(intervalId);
+  }, [isFreeQuotaExhausted, freeNextRechargeAt]);
+
+  // Defensive refetch when the next-recharge timestamp is already in the past:
+  // the TanStack `refetchInterval` in useCoachConversationQuota normally fires
+  // around that moment, but a stale render (screen mount, app resume, clock
+  // drift) can otherwise leave the user stuck on the "à venir" fallback
+  // indefinitely. Invalidating the cached query forces a fresh server quota.
+  const isFreeRechargeOverdue = useMemo(() => {
+    if (!isFreeQuotaExhausted || !freeNextRechargeAt) return false;
+    const targetMs = Date.parse(freeNextRechargeAt);
+    return Number.isFinite(targetMs) && targetMs <= nowMs;
+  }, [isFreeQuotaExhausted, freeNextRechargeAt, nowMs]);
+
+  useEffect(() => {
+    if (!isFreeRechargeOverdue || !user?.id) return;
+    void queryClient.invalidateQueries({
+      queryKey: getCoachConversationQuotaQueryKey(user.id),
+    });
+  }, [isFreeRechargeOverdue, queryClient, user?.id]);
+
   const quotaBannerInputs = useMemo(
-    () => resolveQuotaBannerInputs(quota, copy),
-    [quota, copy],
+    () => resolveQuotaBannerInputs(quota, copy, nowMs),
+    [quota, copy, nowMs],
   );
 
   const isBusy = sendMutation.isPending || startMutation.isPending;
@@ -446,22 +569,55 @@ export default function CoachChatScreen() {
           prev.filter((m) => m.clientRequestId !== clientRequestId),
         );
       } catch (error) {
-        const message =
-          error instanceof CoachServiceError ? error.message : copy.errorBody;
+        // Server quota errors carry the latest quota snapshot in details so we
+        // can refresh the UI without an extra round trip. Surface a clear
+        // message when the quota is exhausted, and drop the optimistic copy
+        // since the server did NOT persist the message (no double consumption
+        // on retry — the unique client_request_id guard would short-circuit
+        // anyway, but we also remove it locally).
+        const quotaFromError = getCoachConversationQuotaFromError(error);
+        if (quotaFromError && user?.id) {
+          queryClient.setQueryData(
+            getCoachConversationQuotaQueryKey(user.id),
+            quotaFromError,
+          );
+        }
+        const isQuotaError = isCoachConversationQuotaExhaustedError(error);
+        const message = isQuotaError
+          ? copy.quotaFreeExhaustedBody
+          : error instanceof CoachServiceError
+            ? error.message
+            : copy.errorBody;
         setStreamingError(message);
         setStreamingDraft(null);
-        setOutboxUserMessages((prev) =>
-          prev.map((m) =>
-            m.clientRequestId === clientRequestId
-              ? { ...m, uiStatus: 'failed' }
-              : m,
-          ),
-        );
+        if (isQuotaError) {
+          // Drop the optimistic user bubble so the chat doesn't keep a
+          // "pending" message that will never be sent.
+          setOutboxUserMessages((prev) =>
+            prev.filter((m) => m.clientRequestId !== clientRequestId),
+          );
+        } else {
+          setOutboxUserMessages((prev) =>
+            prev.map((m) =>
+              m.clientRequestId === clientRequestId
+                ? { ...m, uiStatus: 'failed' }
+                : m,
+            ),
+          );
+        }
       } finally {
         pendingClientRequestIdRef.current = null;
       }
     },
-    [startMutation, sendMutation, personaKey, user?.id, copy.errorBody],
+    [
+      startMutation,
+      sendMutation,
+      personaKey,
+      user?.id,
+      copy.errorBody,
+      copy.quotaFreeExhaustedBody,
+      queryClient,
+    ],
   );
 
   const handleSend = useCallback(async () => {
@@ -510,13 +666,30 @@ export default function CoachChatScreen() {
   );
 
   const handlePressMic = useCallback(() => {
-    if (!voiceDictation.isSupported) return;
+    if (!voiceDictation.isSupported) {
+      // The mic looks disabled but stays tappable so we can explain *why*
+      // instead of the tap silently doing nothing (e.g. inside Expo Go, where
+      // the native speech module is not bundled).
+      Alert.alert(copy.micUnavailableTitle, copy.micUnavailableBody);
+      return;
+    }
     if (voiceDictation.isListening) {
       void voiceDictation.stop();
     } else {
       void voiceDictation.start();
     }
-  }, [voiceDictation]);
+  }, [voiceDictation, copy.micUnavailableTitle, copy.micUnavailableBody]);
+
+  // Surface the few voice errors that the user can actually act on (mic
+  // permission denied). Transient ones (no-speech, aborted) stay silent.
+  const micErrorLabel = useMemo(() => {
+    const err = voiceDictation.error;
+    if (!err || !voiceDictation.isSupported) return null;
+    if (err.includes('not-allowed') || err.includes('service-not-allowed')) {
+      return copy.micPermissionDenied;
+    }
+    return null;
+  }, [voiceDictation.error, voiceDictation.isSupported, copy.micPermissionDenied]);
 
   const handleCancelVoice = useCallback(() => {
     void voiceDictation.stop();
@@ -555,8 +728,20 @@ export default function CoachChatScreen() {
     );
   }, [activeConversationId, archiveMutation, router, copy]);
 
+  // Single back step: the chat is now a regular page under /coach/chat, so
+  // router.back() returns to whichever screen pushed us (the inbox in the
+  // canonical flow). We keep router.dismiss() as a defensive fallback for
+  // deep-links / single-screen stacks where back has nowhere to go.
   const handleClose = useCallback(() => {
-    if (router.canDismiss()) {
+    const canGoBack =
+      typeof router.canGoBack === 'function' ? router.canGoBack() : false;
+    if (canGoBack) {
+      router.back();
+      return;
+    }
+    const canDismiss =
+      typeof router.canDismiss === 'function' ? router.canDismiss() : false;
+    if (canDismiss) {
       router.dismiss();
       return;
     }
@@ -567,10 +752,35 @@ export default function CoachChatScreen() {
   // we must also hide it as soon as an optimistic outbox message exists —
   // otherwise the user's bubble stays invisible until startMutation resolves
   // and activeConversationId flips, which defeats the optimistic-render goal.
+  //
+  // We also surface the starter on a freshly-created conversation (id present
+  // but no real turn yet) so the "Nouvelle conv" CTA in the inbox lands the
+  // user on the suggestion grid rather than an empty chat. The
+  // `dataUpdatedAt > 0` gate prevents a flash on an *existing* conversation
+  // that's still loading its history.
+  const messagesResolved =
+    !activeConversationId || messagesQuery.dataUpdatedAt > 0;
+  // The backend seeds an auto-generated `system` welcome message on creation,
+  // so "no messages" is never true for a fresh thread. Gate on the absence of
+  // a real conversational turn (user/assistant) instead — the welcome alone
+  // must not suppress the suggestions.
+  const hasConversationalTurns = messages.some(
+    (m) => m.role === 'user' || m.role === 'assistant',
+  );
   const showStarter =
-    !activeConversationId &&
-    messages.length === 0 &&
+    messagesResolved &&
+    !hasConversationalTurns &&
     outboxUserMessages.length === 0;
+
+  // 4 deterministic-per-conversation suggestions sampled from the FR pool
+  // (~250 entries). Same conv → same picks across re-renders ; new conv → new
+  // roll. We seed with the active conversation id, falling back to a stable
+  // sentinel so the legacy `?new=1` path still gets a consistent quartet
+  // until the first message lands.
+  const starterSuggestions = useMemo(() => {
+    const seed = activeConversationId ?? 'coach-chat-fresh-thread';
+    return pickRandomStarterSuggestions(STARTER_SUGGESTION_COUNT, { seed });
+  }, [activeConversationId]);
   const hasStreamingContent = Boolean(streamingDraft?.content?.trim());
   const showTypingIndicator = sendMutation.isPending && !hasStreamingContent;
 
@@ -726,6 +936,10 @@ export default function CoachChatScreen() {
           testID="coach-chat-screen-header"
         />
 
+        {/* Single unified card: when the free quota is exhausted, the banner
+            carries the counter + countdown AND the premium CTA. The standalone
+            CoachPremiumUpsellInline is intentionally not rendered here so the
+            user never sees two stacked quota/upsell pop-ups at once. */}
         {quotaBannerInputs ? (
           <CoachQuotaBanner
             kind={quotaBannerInputs.kind}
@@ -734,16 +948,6 @@ export default function CoachChatScreen() {
             ctaLabel={quotaBannerInputs.cta}
             onPress={quotaBannerInputs.cta ? () => router.push('/premium-upgrade' as any) : null}
             testID="coach-chat-quota-banner"
-          />
-        ) : null}
-
-        {quota?.tier === 'free' && quota.free_used ? (
-          <CoachPremiumUpsellInline
-            title={copy.upsellTitle}
-            body={copy.upsellBody}
-            ctaLabel={copy.upsellCtaLong}
-            onPress={() => router.push('/premium-upgrade' as any)}
-            testID="coach-chat-upsell-inline"
           />
         ) : null}
 
@@ -777,7 +981,10 @@ export default function CoachChatScreen() {
               personaKey={personaKey as CoachPersonaKey}
               title={copy.starterTitle}
               subtitle={copy.starterSubtitle}
-              suggestions={SUGGESTIONS.map((id) => ({ id, label: copy[id] }))}
+              suggestions={starterSuggestions.map((label, index) => ({
+                id: `starter-${index}`,
+                label,
+              }))}
               onSelectSuggestion={(suggestion) => setComposerValue(suggestion.label)}
               testID="coach-chat-starter"
             />
@@ -834,6 +1041,7 @@ export default function CoachChatScreen() {
             micEnabled={voiceDictation.isSupported}
             isListening={voiceDictation.isListening}
             micUnavailableLabel={voiceDictation.isSupported ? null : copy.micUnavailable}
+            errorLabel={micErrorLabel}
             micA11yLabel={copy.micA11yLabel}
             onPressMic={handlePressMic}
             renderRecordingOverlay={() => (

@@ -157,6 +157,10 @@ jest.mock('@/components/ErrorBoundary', () => ({
   ErrorBoundary: ({ children }: { children: React.ReactNode }) => children,
 }));
 
+jest.mock('@/components/StartupConfigGate', () => ({
+  StartupConfigGate: ({ children }: { children: React.ReactNode }) => children,
+}));
+
 jest.mock('@/contexts/StartupDiagnosticsContext', () => ({
   StartupDiagnosticsProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
@@ -526,6 +530,12 @@ describe('RootLayout', () => {
     const coachHistoryScreenProps = stackScreenCalls.find(
       ([props]) => props.name === 'coach-history'
     )?.[0];
+    const coachConversationsScreenProps = stackScreenCalls.find(
+      ([props]) => props.name === 'coach/conversations'
+    )?.[0];
+    const coachChatScreenProps = stackScreenCalls.find(
+      ([props]) => props.name === 'coach/chat'
+    )?.[0];
     const adminSocialModerationScreenProps = stackScreenCalls.find(
       ([props]) => props.name === 'admin-social-moderation'
     )?.[0];
@@ -560,6 +570,8 @@ describe('RootLayout', () => {
     expect(coachScreenProps).toBeDefined();
     expect(analyticsScreenProps).toBeDefined();
     expect(coachHistoryScreenProps).toBeDefined();
+    expect(coachConversationsScreenProps).toBeDefined();
+    expect(coachChatScreenProps).toBeDefined();
     expect(adminSocialModerationScreenProps).toBeDefined();
     expect(fridgeScanScreenProps).toBeDefined();
     expect(scanPreviewScreenProps).toBeDefined();
@@ -589,6 +601,25 @@ describe('RootLayout', () => {
     expect(coachHistoryScreenProps?.options).toEqual(
       expect.objectContaining({
         presentation: 'modal',
+        contentStyle: expect.objectContaining({
+          backgroundColor: LIGHT_COLORS.background,
+        }),
+      })
+    );
+    // /coach/conversations is now a full-screen page (DM-style inbox) so it
+    // intentionally has no `presentation: 'modal'` option anymore.
+    expect(coachConversationsScreenProps?.options).toEqual(
+      expect.objectContaining({
+        contentStyle: expect.objectContaining({
+          backgroundColor: LIGHT_COLORS.background,
+        }),
+      })
+    );
+    expect(coachConversationsScreenProps?.options).not.toEqual(
+      expect.objectContaining({ presentation: 'modal' }),
+    );
+    expect(coachChatScreenProps?.options).toEqual(
+      expect.objectContaining({
         contentStyle: expect.objectContaining({
           backgroundColor: LIGHT_COLORS.background,
         }),

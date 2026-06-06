@@ -39,13 +39,13 @@ import { ScanType } from '@/types';
 import { SCAN_PREVIEW_MIN_LOADING_MS, SCAN_TYPE_LABELS } from '@/constants/scan';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAdsGate } from '@/contexts/AdsContext';
 import {
   SIZES,
   SPACING,
   BORDER_RADIUS,
   FONTS,
   FONT_WEIGHTS,
-  withAlpha,
 } from '@/constants/theme';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { primeCoachScansCache } from '@/utils/coachScanQueries';
@@ -426,6 +426,7 @@ export default function ScanPreviewScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
   const { t, locale } = useLanguage();
+  const { presentRewardedAdGate } = useAdsGate();
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const queryClient = useQueryClient();
@@ -476,11 +477,9 @@ export default function ScanPreviewScreen() {
         loadingMetrics,
         previewTheme,
         captureTheme,
-        colors,
       ),
     [
       captureTheme,
-      colors,
       insets,
       isCompactVerticalLayout,
       isTightVerticalLayout,
@@ -732,6 +731,13 @@ export default function ScanPreviewScreen() {
 
   async function handleConfirm() {
     if (loading) {
+      return;
+    }
+
+    // Pub récompensée avant le scan (utilisateurs gratuits uniquement ; no-op
+    // immédiat pour premium/admin). Un refus annule sans réserver de crédit.
+    const adOutcome = await presentRewardedAdGate('scan');
+    if (adOutcome === 'skipped') {
       return;
     }
 
@@ -1164,7 +1170,6 @@ const createStyles = (
   loadingMetrics: ScanPreviewLoadingDensityMetrics,
   previewTheme: ReturnType<typeof resolveScanPreviewVisualTheme>,
   captureTheme: ReturnType<typeof resolveScanCaptureVisualTheme>,
-  colors: any,
 ) => {
   const safeBottomInset = getMinimumBottomInsetPadding(insets.bottom, SPACING.sm);
   const imageBottomReserve =
@@ -1212,8 +1217,8 @@ const createStyles = (
       borderRadius: 30,
       overflow: 'hidden',
       borderWidth: 1,
-      borderColor: withAlpha(colors.white, 0.08),
-      backgroundColor: withAlpha(colors.white, 0.04),
+      borderColor: previewTheme.loadingTrustLineBorder,
+      backgroundColor: previewTheme.loadingTrustLineBackground,
       shadowColor: previewTheme.loadingHeroShadowColor,
       shadowOffset: { width: 0, height: 20 },
       shadowOpacity: 0.24,
@@ -1265,7 +1270,7 @@ const createStyles = (
       shadowRadius: 22,
       elevation: 8,
       borderTopWidth: 1,
-      borderColor: withAlpha(colors.white, 0.08), borderCurve: 'continuous',
+      borderColor: previewTheme.loadingTrustLineBorder, borderCurve: 'continuous',
     },
     buttonsContent: {
       paddingHorizontal: isCompactVerticalLayout ? SPACING.lg : SPACING.xl,
@@ -1280,7 +1285,7 @@ const createStyles = (
       borderRadius: BORDER_RADIUS.card,
       borderWidth: 1,
       borderColor: previewTheme.loadingTrustLineBorder,
-      backgroundColor: withAlpha(colors.white, 0.03),
+      backgroundColor: previewTheme.loadingTrustLineBackground,
       marginBottom: SPACING.xl,
       gap: SPACING.xs, borderCurve: 'continuous',
     },
@@ -1366,7 +1371,7 @@ const createStyles = (
     secondaryButton: {
       backgroundColor: previewTheme.secondaryButtonBackground,
       borderWidth: 1,
-      borderColor: withAlpha(colors.white, 0.08),
+      borderColor: previewTheme.loadingTrustLineBorder,
     },
     secondaryButtonText: {
       color: previewTheme.secondaryButtonText,

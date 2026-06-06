@@ -22,13 +22,20 @@ import { AppScreen } from '@/components/AppScreen';
 import { HeaderIconButton, ScreenHeader } from '@/components/ScreenHeader';
 import { ScreenState } from '@/components/ScreenState';
 import { CoachActionComposer } from '@/components/coach/CoachActionComposer';
-import { CoachConversationHeroCard } from '@/components/coach/CoachConversationHeroCard';
+import {
+  CoachConversationHeroCard,
+  type CoachConversationHeroVariant,
+} from '@/components/coach/CoachConversationHeroCard';
 import { CoachGuidanceCard } from '@/components/coach/CoachGuidanceCard';
 import { CoachPremiumUpsellInline } from '@/components/coach/chat/CoachPremiumUpsellInline';
 import { CoachPersonaDetailsModal } from '@/components/coach/CoachPersonaDetailsModal';
 import { CoachSettingsInline } from '@/components/coach/CoachSettingsInline';
 import { LoadingMiniGame } from '@/components/loading/LoadingMiniGame';
 import { useCoachConversationQuota } from '@/hooks/queries/useCoachConversationQuota';
+import {
+  getCoachConversationPersonaState,
+  isCoachConversationFreeQuotaExhausted,
+} from '@/shared/coachConversation';
 import {
   BORDER_RADIUS,
   FONT_WEIGHTS,
@@ -40,6 +47,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useAdsGate } from '@/contexts/AdsContext';
 import { useCoachGeneration } from '@/hooks/queries/useCoachGeneration';
 import {
   COACH_SCREEN_SNAPSHOT_QUERY_KEY,
@@ -126,6 +134,7 @@ import {
 } from '@/utils/coachLocalization';
 import { resolveCoachCtaRoute } from '@/utils/coachRoutes';
 import { getMainTabBarMetrics } from '@/utils/mainTabBarMetrics';
+import { formatCoachConversationQuotaDuration } from '@/utils/coachConversationFormatting';
 import { Squircle } from '@/components/Squircle';
 
 const PROMPT_TYPES: readonly CoachPromptType[] = COACH_PROMPT_TYPES;
@@ -470,16 +479,6 @@ function resolveCoachErrorBodyTranslationKey(failureKind: CoachFailureKind) {
   }
 }
 
-function formatCoachQuotaDuration(remainingMs: number) {
-  const totalMinutes = Number.isFinite(remainingMs)
-    ? Math.max(0, Math.ceil(remainingMs / 60_000))
-    : 0;
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-
-  return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
-}
-
 function formatCoachQuotaRemainingFromIso(nextRechargeAt: string | null | undefined) {
   if (!nextRechargeAt) {
     return null;
@@ -487,18 +486,29 @@ function formatCoachQuotaRemainingFromIso(nextRechargeAt: string | null | undefi
 
   const targetMs = Date.parse(nextRechargeAt);
   return Number.isFinite(targetMs)
-    ? formatCoachQuotaDuration(targetMs - Date.now())
+    ? formatCoachConversationQuotaDuration(targetMs - Date.now())
     : null;
 }
 
 function formatCoachConversationQuestionHint(count: number | null | undefined) {
   const safeCount = Math.max(0, count ?? 0);
-  return `${safeCount} question${safeCount > 1 ? 's' : ''} restante${safeCount > 1 ? 's' : ''}`;
+  return `${safeCount} message${safeCount > 1 ? 's' : ''} restant${safeCount > 1 ? 's' : ''}`;
 }
 
 function formatCoachConversationMessageHint(count: number | null | undefined) {
   const safeCount = Math.max(0, count ?? 0);
   return `${safeCount} message${safeCount > 1 ? 's' : ''} restant${safeCount > 1 ? 's' : ''} aujourd’hui`;
+}
+
+function formatCoachConversationRechargeHint(
+  nextRechargeAt: string | null | undefined,
+) {
+  if (!nextRechargeAt) return null;
+  const targetMs = Date.parse(nextRechargeAt);
+  if (!Number.isFinite(targetMs)) return null;
+  const remainingMs = targetMs - Date.now();
+  if (remainingMs <= 0) return 'Recharge imminente';
+  return `Prochain message dans ${formatCoachConversationQuotaDuration(remainingMs)}`;
 }
 
 function useCoachQuotaCountdown(
@@ -548,7 +558,7 @@ function useCoachQuotaCountdown(
     return null;
   }
 
-  return formatCoachQuotaDuration(targetMs - nowMs);
+  return formatCoachConversationQuotaDuration(targetMs - nowMs);
 }
 
 export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}) {
@@ -556,6 +566,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
   const routeParams = useLocalSearchParams();
   const queryClient = useQueryClient();
   const { user, userProfile, updateCoachPersona } = useAuth();
+  const { presentRewardedAdGate } = useAdsGate();
   const { colors, isDark } = useTheme();
   const { locale, t } = useLanguage();
   const { alertElement, showAlert } = useCustomAlert();
@@ -863,93 +874,90 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     if (!quota) {
       return null;
     }
-    if (quota.tier === 'admin') {
-      return {
-        variant: 'premium_available' as const,
-        title: 'Parler au coach',
-        subtitle: 'Pose tes questions librement, sans limite.',
-        ctaLabel: 'Ouvrir la conversation',
-        hint: null as string | null,
-        target: '/coach/chat' as const,
-        targetParams: null as null | Record<string, string>,
-        disabled: false,
-      };
-    }
-    if (quota.tier === 'free') {
-      if (quota.free_used) {
-        return {
-          variant: 'free_exhausted' as const,
-          title: 'Conversation gratuite utilisée',
-          subtitle: 'Passe premium pour continuer à écrire au coach.',
-          ctaLabel: 'Passer premium',
-          hint: null,
-          target: '/premium-upgrade' as const,
-          targetParams: null,
-          disabled: false,
-        };
+
+    const { lastConversation } =
+      getCoachConversationPersonaState(quota, activePersonaKey);
+
+    const isAdmin = quota.tier === 'admin';
+    const isFreeExhausted =
+      quota.tier === 'free' && isCoachConversationFreeQuotaExhausted(quota);
+    const isPremiumExhausted =
+      quota.tier === 'premium' && (quota.premium_today_available ?? 0) <= 0;
+    const isExhausted = !isAdmin && (isFreeExhausted || isPremiumExhausted);
+
+    // Hint stays under the CTA. The CTA label itself remains stable.
+    let hint: string | null = null;
+    if (!isAdmin) {
+      if (quota.tier === 'free') {
+        hint = isFreeExhausted
+          ? formatCoachConversationRechargeHint(
+              quota.free_next_recharge_at ?? quota.next_recharge_at,
+            )
+          : formatCoachConversationQuestionHint(
+              Math.max(0, quota.free_remaining_messages ?? 0),
+            );
+      } else {
+        hint = isPremiumExhausted
+          ? formatCoachConversationRechargeHint(quota.next_recharge_at)
+          : formatCoachConversationMessageHint(
+              Math.max(0, quota.premium_today_available ?? 0),
+            );
       }
-      if (quota.free_conversation_id) {
-        return {
-          variant: 'free_resume' as const,
-          title: 'Conversation en cours',
-          subtitle: 'Continue là où tu t’es arrêté.',
-          ctaLabel: 'Continuer',
-          hint: formatCoachConversationQuestionHint(quota.free_remaining_messages),
-          target: '/coach/chat' as const,
-          targetParams: { id: quota.free_conversation_id },
-          disabled: false,
-        };
-      }
-      return {
-        variant: 'free_available' as const,
-        title: 'Parler au coach',
-        subtitle: 'Pose ta question et reçois une réponse personnalisée.',
-        ctaLabel: 'Démarrer une conversation',
-        hint: null,
-        target: '/coach/chat' as const,
-        targetParams: null,
-        disabled: false,
-      };
     }
-    const available = quota.premium_today_available ?? 0;
-    if (available <= 0) {
-      return {
-        variant: 'premium_exhausted' as const,
-        title: 'Limite quotidienne atteinte',
-        subtitle: 'Consulte ton historique en attendant le prochain reset.',
-        ctaLabel: 'Voir l’historique',
-        hint: null,
-        target: '/coach-history' as const,
-        targetParams: null,
-        disabled: false,
-      };
+
+    // The hero always enters the Coach messaging inbox (global, no persona
+    // filter) so the user can see conversations across every coach at once.
+    const ctaLabel = t('coach.conversation_hero.cta_default');
+
+    // Subtitle: pick up the most recent conversation context when available.
+    let subtitle: string;
+    if (lastConversation) {
+      const dateLabel = formatCoachTimestamp(
+        lastConversation.last_user_message_at ?? lastConversation.updated_at,
+        locale,
+      );
+      subtitle = dateLabel
+        ? `Reprendre — ${dateLabel}`
+        : 'Reprends la conversation';
+    } else if (isExhausted) {
+      subtitle =
+        'Reviens à la prochaine recharge pour poser une nouvelle question.';
+    } else {
+      subtitle = 'Pose ta question et reçois une réponse personnalisée.';
     }
+
+    const variant: CoachConversationHeroVariant = isExhausted
+      ? quota.tier === 'free'
+        ? 'free_exhausted'
+        : 'premium_exhausted'
+      : lastConversation
+        ? quota.tier === 'free'
+          ? 'free_resume'
+          : 'premium_resume'
+        : quota.tier === 'free'
+          ? 'free_available'
+          : 'premium_available';
+
     return {
-      variant: 'premium_available' as const,
-      title: 'Parler au coach',
-      subtitle: 'Pose ta question, le coach personnalise sa réponse.',
-      ctaLabel: 'Démarrer une conversation',
-      hint: formatCoachConversationMessageHint(available),
-      target: '/coach/chat' as const,
-      targetParams: null,
+      variant,
+      // null → CoachConversationHeroCard composes "Parler à <coachName>".
+      title: null as string | null,
+      subtitle,
+      ctaLabel,
+      hint,
       disabled: false,
     };
-  }, [coachConversationQuotaQuery.data]);
+  }, [coachConversationQuotaQuery.data, activePersonaKey, locale, t]);
 
+  // Opens the global messaging inbox (all coaches). The inbox screen now reads
+  // a persona_key URL param only when an explicit filter is requested; not
+  // passing it here means the user lands on a true DM-style inbox with every
+  // conversation they have, regardless of which coach persona is active.
   const handleHeroPress = useCallback(() => {
-    if (!coachConversationHero) {
-      router.push('/coach/chat' as any);
-      return;
-    }
-    if (coachConversationHero.targetParams) {
-      router.push({
-        pathname: coachConversationHero.target,
-        params: coachConversationHero.targetParams,
-      } as any);
-      return;
-    }
-    router.push(coachConversationHero.target as any);
-  }, [coachConversationHero, router]);
+    router.push({
+      pathname: '/coach/conversations',
+    } as any);
+  }, [router]);
 
   const tabBarMetrics = useMemo(() => getMainTabBarMetrics(insets.bottom), [insets.bottom]);
   const coachChrome = useMemo(
@@ -1746,14 +1754,6 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     setDisplayMode('settings');
   }, [coachGeneration]);
 
-  const handleReturnHome = useCallback(() => {
-    if (router.canDismiss()) {
-      router.dismissAll();
-    } else {
-      router.replace('/(tabs)' as any);
-    }
-  }, [router]);
-
   const handleActionBarLayout = useCallback(
     ({ nativeEvent: { layout } }: LayoutChangeEvent) => {
       const nextHeight = Math.max(Math.round(layout.height), 0);
@@ -2216,6 +2216,14 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
       return;
     }
 
+    // Pub récompensée avant la génération coach (gratuits uniquement ; no-op
+    // immédiat pour premium/admin). Un refus n'entame pas le quota et laisse la
+    // vue inchangée. NB : le chat coach (CoachChatScreen) n'est pas concerné.
+    const adOutcome = await presentRewardedAdGate('coach');
+    if (adOutcome === 'skipped') {
+      return;
+    }
+
     setSubmittingPromptType(visiblePromptType);
     setTrackedEntryId(null);
     setDisplayMode('result');
@@ -2477,7 +2485,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     : shouldRoutePrimaryToScanner
       ? t('coach.action_bar.cta_scan')
       : isScanResultPopupResult
-        ? t('common.home_back')
+        ? t('coach.action_bar.back_to_scan_results')
         : isResultDisplay
           ? t('coach.action_bar.primary')
           : t('coach.action_bar.cta_request');
@@ -2505,7 +2513,7 @@ export default function CoachScreen({ variant = 'stack' }: CoachScreenProps = {}
     }
 
     if (isScanResultPopupResult) {
-      handleReturnHome();
+      handleClose();
       return;
     }
 

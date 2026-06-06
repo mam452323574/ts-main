@@ -1,4 +1,4 @@
-package com.healthscan.app
+package com.selflens.app
 
 import android.app.Application
 import android.content.res.Configuration

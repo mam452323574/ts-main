@@ -12,6 +12,7 @@ export interface RuntimeCapabilities {
   canUseNativePurchases: boolean;
   canUseLocalNotifications: boolean;
   canRegisterForPushNotifications: boolean;
+  canUseAds: boolean;
 }
 
 const runtimeDecisionLogHistory = new Set<string>();
@@ -31,6 +32,9 @@ export function getRuntimeCapabilities(): RuntimeCapabilities {
     // local scheduling disabled there while allowing other native runtimes.
     canUseLocalNotifications,
     canRegisterForPushNotifications: !isWeb && !isExpoGo,
+    // AdMob est un SDK natif : indisponible sur le web et en Expo Go (nécessite
+    // un dev/EAS build). On garde la même règle que les achats natifs.
+    canUseAds: !isWeb && !isExpoGo,
   };
 }
 

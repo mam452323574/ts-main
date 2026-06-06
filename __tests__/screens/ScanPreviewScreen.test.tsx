@@ -274,7 +274,7 @@ describe('ScanPreviewScreen', () => {
     expect(screen.getByText('Annuler')).toBeTruthy();
   });
 
-  it('keeps the preview dark-first even when the app theme is light', async () => {
+  it('uses a light action panel tint and readable text when the app theme is light', async () => {
     mockCreateScanWithAnalysis.mockImplementation(() => new Promise(() => {}));
 
     render(<ScanPreviewScreen />);
@@ -285,9 +285,9 @@ describe('ScanPreviewScreen', () => {
       screen.getByText('Annuler').props.style,
     );
 
-    expect(actionPanel.props.tint).toBe('dark');
-    expect(actionPanelStyle.backgroundColor).not.toBe('rgba(20, 20, 22, 0.4)');
-    expect(cancelTextStyle.color).not.toBe('#1C1C1E');
+    expect(actionPanel.props.tint).toBe('light');
+    expect(actionPanelStyle.backgroundColor).not.toBe('rgba(11, 19, 27, 0.94)');
+    expect(cancelTextStyle.color).toBe('#1C1C1E');
 
     fireEvent.press(screen.getByTestId('confirm-button'));
 
@@ -302,9 +302,9 @@ describe('ScanPreviewScreen', () => {
       screen.getByTestId('scan-preview-progress-card').props.style,
     );
 
-    expect(loadingOverlayStyle.backgroundColor).not.toBe('rgba(0, 0, 0, 0.85)');
+    expect(loadingOverlayStyle.backgroundColor).not.toBe('rgba(2, 7, 12, 0.94)');
     expect(progressCardStyle.backgroundColor).not.toBe(
-      'rgba(28, 28, 30, 0.98)',
+      'rgba(12, 20, 28, 0.96)',
     );
   });
 

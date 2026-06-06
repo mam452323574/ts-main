@@ -60,6 +60,7 @@ const createStyles = (
     },
     visual: {
       width: '100%',
+      alignItems: align === 'center' ? 'center' : 'flex-start',
       marginBottom: variant === 'step' ? 0 : SPACING.xs,
     },
     brandPill: {

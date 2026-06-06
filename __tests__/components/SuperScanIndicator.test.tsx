@@ -1,13 +1,33 @@
 import React from 'react';
-import { Platform } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import { render } from '@testing-library/react-native';
 import { SuperScanIndicator } from '@/components/SuperScanIndicator';
-import { LIGHT_COLORS, getAndroidLightSurface, mixColors } from '@/constants/theme';
+import {
+  DARK_COLORS,
+  LIGHT_COLORS,
+  getAndroidLightSurface,
+  getThemeTokens,
+  mixColors,
+} from '@/constants/theme';
+
+const mockThemeState = {
+  colors: LIGHT_COLORS,
+  isDark: false,
+};
+
+jest.mock('@/contexts/ThemeContext', () => ({
+  useTheme: () => mockThemeState,
+}));
 
 const getStyles = (style: any) => (Array.isArray(style) ? style : [style]);
 
 describe('SuperScanIndicator', () => {
   const originalPlatform = Platform.OS;
+
+  beforeEach(() => {
+    mockThemeState.colors = LIGHT_COLORS;
+    mockThemeState.isDark = false;
+  });
 
   afterEach(() => {
     Object.defineProperty(Platform, 'OS', { value: originalPlatform, configurable: true });
@@ -88,7 +108,7 @@ describe('SuperScanIndicator', () => {
       mixColors(LIGHT_COLORS.warning, LIGHT_COLORS.gold, 0.68),
     ];
 
-    const { UNSAFE_getAllByType, getByTestId } = render(
+    const { UNSAFE_getAllByType, UNSAFE_getByType, getByTestId, getByText } = render(
       <SuperScanIndicator
         isPremium={true}
         eligibility={{
@@ -122,5 +142,31 @@ describe('SuperScanIndicator', () => {
         }),
       ])
     );
+    expect(StyleSheet.flatten(getByText('1/1').props.style).color).toBe(
+      getThemeTokens(false).premium.foreground,
+    );
+    expect(UNSAFE_getByType('Zap' as any).props.color).toBe(
+      getThemeTokens(false).premium.foreground,
+    );
+  });
+
+  it('keeps the existing gold premium foreground in dark mode', () => {
+    mockThemeState.colors = DARK_COLORS;
+    mockThemeState.isDark = true;
+
+    const { UNSAFE_getByType, getByText } = render(
+      <SuperScanIndicator
+        isPremium
+        eligibility={{
+          success: true,
+          allowed: true,
+          message: 'available',
+          remaining: 1,
+        }}
+      />,
+    );
+
+    expect(StyleSheet.flatten(getByText('1/1').props.style).color).toBe(DARK_COLORS.gold);
+    expect(UNSAFE_getByType('Zap' as any).props.color).toBe(DARK_COLORS.gold);
   });
 });

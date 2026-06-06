@@ -31,7 +31,9 @@ export function ResultSheetTopChrome({
   const isSettingsVariant = variant === 'settings';
   const isFlushVariant = isResultVariant || isSettingsVariant;
   const defaultContainerBackgroundColor = isResultVariant
-    ? (isDark && colors.background === '#000000' ? colors.background : '#000000')
+    ? isDark
+      ? colors.background
+      : colors.cardBackground ?? colors.background
     : isSettingsVariant
       ? colors.background
       : isDark

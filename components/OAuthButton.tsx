@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import {
   BORDER_RADIUS,
   SIZES,
@@ -30,13 +31,14 @@ export function OAuthButton({
   disabled = false,
 }: OAuthButtonProps) {
   const { colors, isDark } = useTheme();
+  const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const isDisabled = disabled || loading;
 
   const config = useMemo(() => {
     if (provider === 'google') {
       return {
-        label: 'Continuer avec Google',
+        label: t('auth.oauth_google'),
         backgroundColor: colors.cardBackground,
         borderColor:
           colors.borderSubtle ?? withAlpha(colors.primaryText, isDark ? 0.12 : 0.08),
@@ -46,7 +48,7 @@ export function OAuthButton({
     }
 
     return {
-      label: 'Continuer avec Apple',
+      label: t('auth.oauth_apple'),
       backgroundColor: isDark ? '#F7F7F7' : '#111111',
       borderColor: isDark
         ? withAlpha(colors.white, 0.26)
@@ -54,7 +56,7 @@ export function OAuthButton({
       textColor: isDark ? '#111111' : '#FFFFFF',
       loaderColor: isDark ? '#111111' : '#FFFFFF',
     };
-  }, [colors, isDark, provider]);
+  }, [colors, isDark, provider, t]);
 
   return (
     <Pressable

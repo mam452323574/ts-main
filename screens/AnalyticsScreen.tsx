@@ -929,7 +929,12 @@ export default function AnalyticsScreen() {
               label: t(periodOption.labelKey),
               premium: periodOption.premium && !isPremium,
               icon: periodOption.premium && !isPremium ? (
-                <Crown size={12} fill={colors.gold} />
+                <Crown
+                  testID={`analytics-period-crown-${periodOption.value}`}
+                  size={12}
+                  color={colors.gold}
+                  fill={colors.gold}
+                />
               ) : undefined,
               accessibilityLabel: t(periodOption.labelKey),
               accessibilityHint:

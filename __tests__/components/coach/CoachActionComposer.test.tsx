@@ -113,7 +113,13 @@ describe('CoachActionComposer', () => {
           : screen.getByTestId('coach-action-primary').props.style,
       );
 
-      expect(hasStrongSurfaceOpacity(composerStyle.backgroundColor, 0.94)).toBe(true);
+      // Dark keeps its tight density (>= 0.94); light intentionally relaxed
+      // to ~0.88 (iOS) / ~0.92 (Android) per the 2026-05-27 audit so the
+      // composer reads as a softer glassy panel rather than a hard white
+      // block under the CTA. The action button background remains a solid
+      // hex in both themes, so its check is platform-agnostic.
+      const minComposerAlpha = themeName === 'dark' ? 0.94 : 0.85;
+      expect(hasStrongSurfaceOpacity(composerStyle.backgroundColor, minComposerAlpha)).toBe(true);
       expect(hasStrongSurfaceOpacity(actionButtonStyle.backgroundColor, 0.94)).toBe(true);
       expect(composerStyle.shadowColor).toBe('transparent');
       expect(composerStyle.shadowOpacity).toBe(0);
@@ -148,6 +154,38 @@ describe('CoachActionComposer', () => {
     expect(screen.getByText('Demander')).toBeTruthy();
     expect(screen.queryByText(/·/)).toBeNull();
     expect(screen.queryByText('Disponible')).toBeNull();
+  });
+
+  it('keeps a long scan-results return label readable inside the sticky action', () => {
+    const visual = getCoachPersonaVisual('patient_calm');
+    const longLabel = 'Zurück zu den Scanner-Ergebnissen';
+
+    render(
+      <CoachActionComposer
+        personaTitle="Mira"
+        promptTitle="Plan"
+        actionLabel={longLabel}
+        actionA11yLabel={longLabel}
+        personaVisual={visual}
+        onPress={jest.fn()}
+        actionTestID="coach-action-primary"
+      />,
+    );
+
+    const actionButton = screen.getByTestId('coach-action-primary');
+    const actionButtonStyle = StyleSheet.flatten(
+      typeof actionButton.props.style === 'function'
+        ? actionButton.props.style({ pressed: false })
+        : actionButton.props.style,
+    );
+    const actionLabel = screen.getByText(longLabel);
+    const actionLabelStyle = StyleSheet.flatten(actionLabel.props.style);
+
+    expect(actionButtonStyle.maxWidth).toBe('72%');
+    expect(actionLabel.props.numberOfLines).toBe(2);
+    expect(actionLabel.props.adjustsFontSizeToFit).toBe(true);
+    expect(actionLabelStyle.color).toBe(screen.getByTestId('coach-action-icon').props.color);
+    expect(getContrast(actionLabelStyle.color, actionButtonStyle.backgroundColor)).toBeGreaterThanOrEqual(4.5);
   });
 });
 

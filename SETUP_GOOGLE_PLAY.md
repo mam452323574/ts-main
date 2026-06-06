@@ -1,6 +1,6 @@
 # Google Play Subscription Setup
 
-`Health Scan` uses the store plus RevenueCat as the active subscription path.
+`SelfLens` uses the store plus RevenueCat as the active subscription path.
 
 ## Canonical Flow
 

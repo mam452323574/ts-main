@@ -59,6 +59,7 @@ const HISTORY_LOAD_LIMIT = 60;
 const REFUNDABLE_ERROR_CODES = new Set([
   COACH_CONVERSATION_WEBHOOK_FAILED_CODE,
   COACH_CONVERSATION_WEBHOOK_UNREACHABLE_CODE,
+  COACH_CONVERSATION_RESPONSE_INVALID_CODE,
   COACH_CONVERSATION_RESPONSE_TOO_LARGE_CODE,
 ]);
 const MAX_ASSISTANT_CONTENT_LENGTH = 8000;
@@ -387,41 +388,64 @@ export async function runCoachSendMessageHandler(req: Request): Promise<Response
     const reservation = await reserveCoachConversationMessageSlot(supabase, {
       userId: user.id,
       conversationId: conversation.id,
+      clientRequestId: parsed.client_request_id,
     });
     if (!reservation.allowed) {
       throw mapCoachConversationReservationToHttpError(reservation);
     }
 
-    const userMessage = await insertUserMessage(supabase, {
-      conversationId: conversation.id,
-      userId: user.id,
-      content: parsed.content,
-      clientRequestId: parsed.client_request_id,
-    });
+    let userMessage: Awaited<ReturnType<typeof insertUserMessage>>;
+    try {
+      userMessage = await insertUserMessage(supabase, {
+        conversationId: conversation.id,
+        userId: user.id,
+        content: parsed.content,
+        clientRequestId: parsed.client_request_id,
+      });
+    } catch (messageInsertError) {
+      await refundCoachConversationQuotaEvent(supabase, {
+        usageEventId: reservation.usage_event_id,
+        userId: user.id,
+        reason: 'coach_conversation_user_message_failed',
+      });
+      throw messageInsertError;
+    }
 
-    await attachCoachConversationQuotaEvent(supabase, {
-      usageEventId: reservation.usage_event_id,
-      userId: user.id,
-      messageId: userMessage.id,
-    });
+    let slidingWindow!: ReturnType<typeof buildSlidingWindowMessages>;
+    let userContext!: Awaited<ReturnType<typeof getCachedOrFreshUserContext>>;
+    let assistantMessage!: Awaited<ReturnType<typeof insertAssistantPendingMessage>>;
+    try {
+      await attachCoachConversationQuotaEvent(supabase, {
+        usageEventId: reservation.usage_event_id,
+        userId: user.id,
+        messageId: userMessage.id,
+      });
 
-    const history = await loadConversationHistory(supabase, conversation.id, user.id);
-    // Drop the just-inserted user message from history because we feed it as
-    // the new user text.
-    const historyWithoutLatest = history.filter((message) => message.id !== userMessage.id);
-    const slidingWindow = buildSlidingWindowMessages(historyWithoutLatest, parsed.content);
+      const history = await loadConversationHistory(supabase, conversation.id, user.id);
+      // Drop the just-inserted user message from history because we feed it as
+      // the new user text.
+      const historyWithoutLatest = history.filter((message) => message.id !== userMessage.id);
+      slidingWindow = buildSlidingWindowMessages(historyWithoutLatest, parsed.content);
 
-    const userContext = await getCachedOrFreshUserContext(
-      supabase,
-      user.id,
-      conversation.id,
-      requestId,
-    );
+      userContext = await getCachedOrFreshUserContext(
+        supabase,
+        user.id,
+        conversation.id,
+        requestId,
+      );
 
-    const assistantMessage = await insertAssistantPendingMessage(supabase, {
-      conversationId: conversation.id,
-      userId: user.id,
-    });
+      assistantMessage = await insertAssistantPendingMessage(supabase, {
+        conversationId: conversation.id,
+        userId: user.id,
+      });
+    } catch (generationSetupError) {
+      await refundCoachConversationQuotaEvent(supabase, {
+        usageEventId: reservation.usage_event_id,
+        userId: user.id,
+        reason: 'coach_conversation_generation_setup_failed',
+      });
+      throw generationSetupError;
+    }
 
     const generationStartedAt = Date.now();
 

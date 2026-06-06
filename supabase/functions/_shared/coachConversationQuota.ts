@@ -13,6 +13,8 @@ export const COACH_CONVERSATION_FREE_ALREADY_USED_ERROR_CODE =
   'coach_free_conversation_already_used';
 export const COACH_CONVERSATION_FREE_LIMIT_REACHED_ERROR_CODE =
   'coach_free_conversation_message_limit_reached';
+export const COACH_CONVERSATION_REQUEST_IN_PROGRESS_ERROR_CODE =
+  'coach_conversation_request_in_progress';
 export const COACH_CONVERSATION_MESSAGE_LIMIT_ERROR_CODE =
   'coach_conversation_message_limit_reached';
 export const COACH_CONVERSATION_NOT_FOUND_ERROR_CODE =
@@ -22,6 +24,12 @@ export const COACH_CONVERSATION_RATE_LIMIT_ERROR_CODE =
   'coach_conversation_rate_limit_exceeded';
 export const COACH_CONVERSATION_QUOTA_UNAVAILABLE_ERROR_CODE =
   'coach_conversation_quota_unavailable';
+
+export interface CoachConversationPersonaLastSnapshot {
+  id: string;
+  updated_at: string;
+  last_user_message_at: string | null;
+}
 
 export interface CoachConversationQuotaStatus {
   tier: CoachAccountTier;
@@ -35,9 +43,18 @@ export interface CoachConversationQuotaStatus {
   per_conversation_limit: number;
   free_used: boolean;
   free_message_limit: number | null;
+  free_used_count: number | null;
   free_remaining_messages: number | null;
+  free_next_recharge_at: string | null;
+  free_window_seconds: number | null;
   free_conversation_id: string | null;
+  quota_exceeded: boolean;
   as_of: string;
+  last_conversation_by_persona: Record<
+    string,
+    CoachConversationPersonaLastSnapshot | null
+  >;
+  conversation_count_by_persona: Record<string, number>;
 }
 
 export interface CoachConversationReservationResult {
@@ -57,6 +74,41 @@ export interface CoachConversationStartResult {
 
 function normalizeAccountTier(value: unknown): CoachAccountTier {
   return value === 'premium' || value === 'admin' ? value : 'free';
+}
+
+function readPersonaLastMap(
+  value: unknown,
+): Record<string, CoachConversationPersonaLastSnapshot | null> {
+  if (!isRecord(value)) return {};
+  const out: Record<string, CoachConversationPersonaLastSnapshot | null> = {};
+  for (const [key, raw] of Object.entries(value)) {
+    if (raw === null) {
+      out[key] = null;
+      continue;
+    }
+    if (!isRecord(raw)) continue;
+    const id = readOptionalString(raw.id);
+    const updatedAt = readOptionalString(raw.updated_at);
+    if (!id || !updatedAt) continue;
+    out[key] = {
+      id,
+      updated_at: updatedAt,
+      last_user_message_at: readOptionalString(raw.last_user_message_at),
+    };
+  }
+  return out;
+}
+
+function readPersonaCountsMap(value: unknown): Record<string, number> {
+  if (!isRecord(value)) return {};
+  const out: Record<string, number> = {};
+  for (const [key, raw] of Object.entries(value)) {
+    const n = readOptionalNumber(raw);
+    if (n !== null) {
+      out[key] = Math.max(0, Math.trunc(n));
+    }
+  }
+  return out;
 }
 
 export function normalizeCoachConversationQuotaStatus(
@@ -113,6 +165,10 @@ export function normalizeCoachConversationQuotaStatus(
       value.free_message_limit === null || value.free_message_limit === undefined
         ? null
         : Math.max(0, Math.trunc(readOptionalNumber(value.free_message_limit) ?? 0)),
+    free_used_count:
+      value.free_used_count === null || value.free_used_count === undefined
+        ? null
+        : Math.max(0, Math.trunc(readOptionalNumber(value.free_used_count) ?? 0)),
     free_remaining_messages:
       value.free_remaining_messages === null ||
       value.free_remaining_messages === undefined
@@ -121,8 +177,20 @@ export function normalizeCoachConversationQuotaStatus(
             0,
             Math.trunc(readOptionalNumber(value.free_remaining_messages) ?? 0),
           ),
+    free_next_recharge_at: readOptionalString(value.free_next_recharge_at),
+    free_window_seconds:
+      value.free_window_seconds === null || value.free_window_seconds === undefined
+        ? null
+        : Math.max(1, Math.trunc(readOptionalNumber(value.free_window_seconds) ?? 1)),
     free_conversation_id: readOptionalString(value.free_conversation_id),
+    quota_exceeded: readOptionalBoolean(value.quota_exceeded) === true,
     as_of: asOf,
+    last_conversation_by_persona: readPersonaLastMap(
+      value.last_conversation_by_persona,
+    ),
+    conversation_count_by_persona: readPersonaCountsMap(
+      value.conversation_count_by_persona,
+    ),
   };
 }
 
@@ -230,6 +298,7 @@ export async function reserveCoachConversationMessageSlot(
   options: {
     userId: string;
     conversationId: string;
+    clientRequestId?: string | null;
   },
 ): Promise<CoachConversationReservationResult> {
   const { data, error } = await client.rpc(
@@ -237,6 +306,7 @@ export async function reserveCoachConversationMessageSlot(
     {
       p_user_id: options.userId,
       p_conversation_id: options.conversationId,
+      p_client_request_id: options.clientRequestId ?? null,
     },
   );
 
@@ -366,7 +436,10 @@ export function mapCoachConversationReservationToHttpError(
     quota_premium_today_limit: result.quota.premium_today_limit,
     quota_per_conversation_limit: result.quota.per_conversation_limit,
     quota_free_used: result.quota.free_used,
+    quota_free_used_count: result.quota.free_used_count,
     quota_free_remaining_messages: result.quota.free_remaining_messages,
+    quota_free_next_recharge_at: result.quota.free_next_recharge_at,
+    quota_free_window_seconds: result.quota.free_window_seconds,
     quota_next_recharge_at: result.quota.next_recharge_at,
   } satisfies Record<string, unknown>;
 
@@ -379,6 +452,8 @@ export function mapCoachConversationReservationToHttpError(
       return new Phase2HttpError(403, code, 'Free Coach conversation already used', details);
     case COACH_CONVERSATION_FREE_LIMIT_REACHED_ERROR_CODE:
       return new Phase2HttpError(403, code, 'Free Coach conversation message limit reached', details);
+    case COACH_CONVERSATION_REQUEST_IN_PROGRESS_ERROR_CODE:
+      return new Phase2HttpError(409, code, 'Coach conversation request is already in progress', details);
     case COACH_CONVERSATION_MESSAGE_LIMIT_ERROR_CODE:
       return new Phase2HttpError(403, code, 'Per-conversation message limit reached', details);
     default:

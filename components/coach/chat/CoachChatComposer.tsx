@@ -33,6 +33,7 @@ export interface CoachChatComposerProps {
   micEnabled?: boolean;
   isListening?: boolean;
   micUnavailableLabel?: string | null;
+  errorLabel?: string | null;
   micA11yLabel?: string;
   onPressMic?: () => void;
   renderRecordingOverlay?: () => ReactNode;
@@ -53,6 +54,7 @@ function CoachChatComposerComponent({
   micEnabled = false,
   isListening = false,
   micUnavailableLabel = null,
+  errorLabel = null,
   micA11yLabel,
   onPressMic,
   renderRecordingOverlay,
@@ -79,8 +81,11 @@ function CoachChatComposerComponent({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={micA11yLabel ?? 'Microphone'}
-          accessibilityState={{ disabled: !micEnabled || disabled, selected: isListening }}
-          disabled={!micEnabled || disabled || busy}
+          // When the mic is unavailable we keep the button tappable (it still
+          // looks disabled via MicOff + micButtonDisabled) so the consumer can
+          // explain *why* on press instead of the tap silently doing nothing.
+          accessibilityState={{ disabled: disabled || busy, selected: isListening }}
+          disabled={disabled || busy}
           onPress={onPressMic}
           style={({ pressed }) => [
             styles.micButton,
@@ -141,7 +146,11 @@ function CoachChatComposerComponent({
         </Pressable>
       </View>
       <View style={styles.footerRow}>
-        {micUnavailableLabel && !micEnabled ? (
+        {errorLabel ? (
+          <Text style={[styles.footerText, styles.footerError]} testID={`${testID}-mic-error`}>
+            {errorLabel}
+          </Text>
+        ) : micUnavailableLabel && !micEnabled ? (
           <Text style={styles.footerText} testID={`${testID}-mic-unavailable`}>
             {micUnavailableLabel}
           </Text>
@@ -231,6 +240,9 @@ const createStyles = (colors: any) =>
       flex: 1,
       fontSize: SIZES.text12,
       color: withAlpha(colors.primaryText, 0.45),
+    },
+    footerError: {
+      color: colors.error,
     },
     counter: {
       fontSize: SIZES.text12,

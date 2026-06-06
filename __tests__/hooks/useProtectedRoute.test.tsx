@@ -48,9 +48,11 @@ jest.mock('@/constants/routes', () => ({
   isAdminRoute: jest.fn(
     (segment: string) => segment === 'admin-social-moderation'
   ),
+  // Aligned with the real PREMIUM_ROUTES in constants/routes.ts. The `coach`
+  // segment is intentionally NOT in this list: free accounts must reach
+  // `/coach` and `/coach/chat` for Noah; per-action paywalls live in-screen.
   isPremiumRoute: jest.fn((segment: string) =>
     [
-      'coach',
       'coach-history',
       'super-scan-result',
       'recipes',

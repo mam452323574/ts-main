@@ -8,6 +8,9 @@ export type ResultCatalogNamespace =
   | 'qualitative_levels.ingredient_quality'
   | 'qualitative_levels.glycemic_index'
   | 'qualitative_levels.severity'
+  | 'qualitative_levels.skin_clarity_signal'
+  | 'qualitative_levels.skin_evenness_signal'
+  | 'qualitative_levels.under_eye_freshness_signal'
   | 'scan.nutrition.vitamins'
   | 'scan.super.summaries'
   | 'scan.super.disclaimers'
@@ -381,6 +384,21 @@ export const SEVERITY_CONTRACT = createContract(
   SEVERITY_ALIASES
 );
 
+export const SKIN_CLARITY_SIGNAL_CONTRACT = createContract(
+  'qualitative_levels.skin_clarity_signal',
+  ['unknown', 'low', 'moderate', 'high'] as const
+);
+
+export const SKIN_EVENNESS_SIGNAL_CONTRACT = createContract(
+  'qualitative_levels.skin_evenness_signal',
+  ['unknown', 'low', 'moderate', 'high'] as const
+);
+
+export const UNDER_EYE_FRESHNESS_SIGNAL_CONTRACT = createContract(
+  'qualitative_levels.under_eye_freshness_signal',
+  ['unknown', 'low', 'moderate', 'high'] as const
+);
+
 export const VERDICT_CONTRACT = createContract(
   'verdicts',
   [
@@ -473,6 +491,9 @@ export const RESULT_CATALOG_CONTRACTS = [
   INGREDIENT_QUALITY_CONTRACT,
   GLYCEMIC_INDEX_CONTRACT,
   SEVERITY_CONTRACT,
+  SKIN_CLARITY_SIGNAL_CONTRACT,
+  SKIN_EVENNESS_SIGNAL_CONTRACT,
+  UNDER_EYE_FRESHNESS_SIGNAL_CONTRACT,
   NUTRITION_VITAMIN_CONTRACT,
   SUPER_SUMMARY_CONTRACT,
   SUPER_DISCLAIMER_CONTRACT,

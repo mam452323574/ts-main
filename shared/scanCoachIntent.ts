@@ -9,6 +9,11 @@ import {
   resolveCoachQuestionText,
   type CoachQuestionKey,
 } from '@/shared/coachQuestions';
+import {
+  selectCoachQuestionFromLibrary,
+  type CoachQuestionLibraryScanType,
+  type CoachQuestionLibraryTimeOfDay,
+} from '@/shared/coachQuestionsLibrary';
 import { trackEvent } from '@/services/analytics';
 
 export type ScanCoachIntentSeverity = 'low' | 'medium' | 'high';
@@ -43,7 +48,36 @@ type ScanCoachIntentOptions = {
   locale?: string | null;
   scanId?: string | null;
   scanType?: string | null;
+  /**
+   * Heure de la journée (optionnel) — utilisée par la bibliothèque de
+   * questions coach pour booster les entrées dont le `preferredTimeOfDay`
+   * correspond. Sans impact sur le routage n8n.
+   */
+  timeOfDay?: CoachQuestionLibraryTimeOfDay | null;
+  /**
+   * IDs des dernières questions coach déjà affichées pour ce user/métrique
+   * (anti-répétition). La sélection privilégie une question absente de la
+   * liste, mais retombe sur l'historique si tout est filtré. Le caller a la
+   * charge de persister cette liste — la bibliothèque reste pure.
+   */
+  recentlyUsedQuestionIds?: readonly string[] | null;
 };
+
+const LIBRARY_SCAN_TYPES: ReadonlySet<CoachQuestionLibraryScanType> = new Set([
+  'face',
+  'body',
+  'nutrition',
+  'fridge',
+  'super',
+]);
+
+function asLibraryScanType(
+  value: string,
+): CoachQuestionLibraryScanType | null {
+  return LIBRARY_SCAN_TYPES.has(value as CoachQuestionLibraryScanType)
+    ? (value as CoachQuestionLibraryScanType)
+    : null;
+}
 
 type MetricScanType = 'face' | 'body' | 'nutrition';
 
@@ -191,11 +225,13 @@ function pickDeterministicIndex(
 /**
  * Résout le texte de la question affichée dans la carte coach post-scan.
  *
- * Pipeline :
- *  1. Sélection déterministe d'une variante de preset (rotation `scanId+key`).
- *  2. Récupération de la traduction via `resolveCoachQuestionText(presetKey, locale)`.
- *  3. Fallback sur `fallback` (texte hardcoded de la `MetricDefinition`) si la
- *     traduction est vide / introuvable.
+ * Pipeline (2026-05-27, rewiring sur `coachQuestionsLibrary`) :
+ *  1. Tentative `selectCoachQuestionFromLibrary(scanType, metricKey, severity)`
+ *     → renvoie l'entrée la plus spécifique disponible (fallback metric=`*`).
+ *     Anti-répétition optionnelle via `recentlyUsedQuestionIds`.
+ *  2. Fallback : sélection déterministe parmi les `variants` historiques de la
+ *     `MetricDefinition` (rotation `scanId+key`) puis `resolveCoachQuestionText`.
+ *  3. Dernier recours : `fallback` (texte hardcoded de la `MetricDefinition`).
  *
  * Le routing n8n (`presetQuestionKeyFree` / `presetQuestionKeyPremium`) n'est
  * pas affecté : il reste pris en charge par `resolvePresetKeyForScanIntent`.
@@ -203,10 +239,32 @@ function pickDeterministicIndex(
 function resolveDisplayQuestionText(options: {
   variants: readonly CoachQuestionKey[];
   scanId: string | null | undefined;
+  scanType?: string | null;
   metricKey: string;
+  severity?: ScanCoachIntentSeverity | null;
   locale?: string | null;
+  timeOfDay?: CoachQuestionLibraryTimeOfDay | null;
+  recentlyUsedIds?: readonly string[] | null;
   fallback: string;
 }): string {
+  const libraryScanType = options.scanType
+    ? asLibraryScanType(options.scanType)
+    : null;
+  if (libraryScanType) {
+    const selection = selectCoachQuestionFromLibrary({
+      scanType: libraryScanType,
+      metricKey: options.metricKey,
+      severity: options.severity ?? null,
+      locale: options.locale,
+      scanId: options.scanId,
+      timeOfDay: options.timeOfDay,
+      recentlyUsedIds: options.recentlyUsedIds ?? undefined,
+    });
+    if (selection && selection.questionText.trim().length > 0) {
+      return selection.questionText;
+    }
+  }
+
   if (options.variants.length === 0) {
     return options.fallback;
   }
@@ -1116,6 +1174,10 @@ function buildFallback(
   scanId: string | null,
   scanType: string,
   locale?: string | null,
+  context: {
+    timeOfDay?: CoachQuestionLibraryTimeOfDay | null;
+    recentlyUsedIds?: readonly string[] | null;
+  } = {},
 ): ScanCoachIntent {
   return {
     ...(scanId ? { scan_id: scanId } : {}),
@@ -1131,8 +1193,15 @@ function buildFallback(
     question_text: resolveDisplayQuestionText({
       variants: POSITIVE_PRESET_VARIANTS,
       scanId,
-      metricKey: 'positive_scan',
+      // En fallback positif on n'a pas de métrique prioritaire identifiée :
+      //   on cible le wildcard `*` du scanType courant pour profiter quand
+      //   même de la bibliothèque (si elle a une entrée pour ce scanType).
+      scanType,
+      metricKey: '*',
+      severity: null,
       locale,
+      timeOfDay: context.timeOfDay,
+      recentlyUsedIds: context.recentlyUsedIds,
       fallback: POSITIVE_QUESTION_TEXT,
     }),
     fallback_prompt_type: FALLBACK_PROMPT_TYPE,
@@ -1148,15 +1217,23 @@ export function scanCoachIntent(
   const scanType = resolveScanType(analysisResult, options);
   const scanId = resolveScanId(analysisResult, options);
   const locale = options.locale ?? null;
+  const timeOfDay = options.timeOfDay ?? null;
+  const recentlyUsedIds = options.recentlyUsedQuestionIds ?? null;
   if (!payload || !hasReliableEnoughData(payload)) {
-    return buildFallback(scanId, scanType, locale);
+    return buildFallback(scanId, scanType, locale, {
+      timeOfDay,
+      recentlyUsedIds,
+    });
   }
 
   if (scanType === 'super') {
     const superSignal = resolveSuperScanSignal(payload);
 
     if (!superSignal) {
-      return buildFallback(scanId, scanType, locale);
+      return buildFallback(scanId, scanType, locale, {
+        timeOfDay,
+        recentlyUsedIds,
+      });
     }
 
     return {
@@ -1173,8 +1250,12 @@ export function scanCoachIntent(
       question_text: resolveDisplayQuestionText({
         variants: SUPER_PRESET_VARIANTS,
         scanId,
+        scanType,
         metricKey: SUPER_PRIORITY_METRIC,
+        severity: superSignal.severity,
         locale,
+        timeOfDay,
+        recentlyUsedIds,
         fallback: superSignal.questionText,
       }),
       fallback_prompt_type: FALLBACK_PROMPT_TYPE,
@@ -1184,7 +1265,10 @@ export function scanCoachIntent(
 
   const [prioritySignal] = findSignals(payload, scanType);
   if (!prioritySignal) {
-    return buildFallback(scanId, scanType, locale);
+    return buildFallback(scanId, scanType, locale, {
+      timeOfDay,
+      recentlyUsedIds,
+    });
   }
 
   const { definition, severity } = prioritySignal;
@@ -1208,8 +1292,12 @@ export function scanCoachIntent(
     question_text: resolveDisplayQuestionText({
       variants: displayVariants,
       scanId,
+      scanType,
       metricKey: definition.key,
+      severity,
       locale,
+      timeOfDay,
+      recentlyUsedIds,
       fallback: definition.questionText,
     }),
     fallback_prompt_type: FALLBACK_PROMPT_TYPE,

@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { captureRef } from 'react-native-view-shot';
-import { AtSign, Camera, Globe2, Hash, ImagePlus } from 'lucide-react-native';
+import { Camera, ImagePlus } from 'lucide-react-native';
 
 import { AppScreen } from '@/components/AppScreen';
 import { OptimizedImage } from '@/components/OptimizedImage';
@@ -150,7 +150,6 @@ export default function SocialComposerScreen() {
   const showAlertRef = useRef(showAlert);
   const translateRef = useRef(t);
   const scrollViewRef = useRef<ScrollView | null>(null);
-  const captionInputRef = useRef<TextInput | null>(null);
   const captionScrollFrameRef = useRef<number | null>(null);
   const legacyScanId = getSingleParam(params.scanId) ?? null;
   const routeDraftId = getSingleParam(params.draftId) ?? null;
@@ -317,21 +316,6 @@ export default function SocialComposerScreen() {
     cancelScheduledCaptionScroll();
     setIsCaptionFocused(false);
   }, [cancelScheduledCaptionScroll]);
-
-  const insertCaptionToken = useCallback(
-    (token: '#' | '@') => {
-      setCaption((currentCaption) => {
-        const separator =
-          currentCaption.length === 0 || currentCaption.endsWith(' ') ? '' : ' ';
-        return `${currentCaption}${separator}${token}`;
-      });
-      scheduleCaptionScrollIntoView();
-      requestAnimationFrame(() => {
-        captionInputRef.current?.focus();
-      });
-    },
-    [scheduleCaptionScrollIntoView],
-  );
 
   const handleCaptionSectionLayout = useCallback(
     ({ nativeEvent: { layout } }: LayoutChangeEvent) => {
@@ -681,7 +665,6 @@ export default function SocialComposerScreen() {
               </Text>
             </View>
             <TextInput
-              ref={captionInputRef}
               multiline
               maxLength={SOCIAL_POST_MAX_LENGTH}
               placeholder={t('social.composer.caption_placeholder')}
@@ -693,32 +676,6 @@ export default function SocialComposerScreen() {
               onFocus={handleCaptionFocus}
               testID="social-compose-caption-input"
             />
-            <View style={styles.quickToolsRow}>
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel={t('social.composer.hashtags')}
-                onPress={() => insertCaptionToken('#')}
-                style={styles.quickToolButton}
-                testID="social-compose-hashtag-button"
-              >
-                <Hash color={colors.primaryText} size={17} />
-                <Text style={styles.quickToolLabel}>
-                  {t('social.composer.hashtags')}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel={t('social.composer.mention')}
-                onPress={() => insertCaptionToken('@')}
-                style={styles.quickToolButton}
-                testID="social-compose-mention-button"
-              >
-                <AtSign color={colors.primaryText} size={17} />
-                <Text style={styles.quickToolLabel}>
-                  {t('social.composer.mention')}
-                </Text>
-              </TouchableOpacity>
-            </View>
           </View>
 
           {!isCaptionEditing ? (
@@ -737,19 +694,6 @@ export default function SocialComposerScreen() {
                   />
                 ))}
               </View>
-              <Squircle style={styles.visibilityRow} testID="social-compose-visibility-row">
-                <Squircle style={styles.visibilityIcon}>
-                  <Globe2 color={colors.primaryText} size={18} />
-                </Squircle>
-                <View style={styles.visibilityCopy}>
-                  <Text style={styles.visibilityTitle}>
-                    {t('social.composer.visibility_title')}
-                  </Text>
-                  <Text style={styles.visibilityBody}>
-                    {t('social.composer.visibility_body')}
-                  </Text>
-                </View>
-              </Squircle>
             </View>
           ) : null}
         </ScrollView>
@@ -885,28 +829,6 @@ const createStyles = (colors: any) =>
       textAlignVertical: 'top',
       lineHeight: 22, borderCurve: 'continuous',
     },
-    quickToolsRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: SPACING.sm,
-    },
-    quickToolButton: {
-      minHeight: 40,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: SPACING.xs,
-      paddingHorizontal: SPACING.md,
-      borderRadius: BORDER_RADIUS.full,
-      backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.06),
-      borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08), borderCurve: 'continuous',
-    },
-    quickToolLabel: {
-      fontSize: SIZES.text14,
-      fontWeight: FONT_WEIGHTS.semiBold,
-      color: colors.primaryText,
-    },
     helperText: {
       fontSize: SIZES.text12,
       color: colors.textMuted ?? colors.gray,
@@ -918,40 +840,6 @@ const createStyles = (colors: any) =>
       backgroundColor: colors.cardBackground,
       borderWidth: 1,
       borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.06), borderCurve: 'continuous',
-    },
-    visibilityRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: SPACING.md,
-      paddingHorizontal: SPACING.md,
-      paddingVertical: SPACING.md,
-      borderRadius: BORDER_RADIUS.lg,
-      backgroundColor: colors.surfaceMuted ?? withAlpha(colors.primaryText, 0.05),
-      borderWidth: 1,
-      borderColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08), borderCurve: 'continuous',
-    },
-    visibilityIcon: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.cardBackground, borderCurve: 'continuous',
-    },
-    visibilityCopy: {
-      flex: 1,
-      minWidth: 0,
-      gap: 2,
-    },
-    visibilityTitle: {
-      fontSize: SIZES.text14,
-      fontWeight: FONT_WEIGHTS.bold,
-      color: colors.primaryText,
-    },
-    visibilityBody: {
-      fontSize: SIZES.text12,
-      lineHeight: 17,
-      color: colors.textMuted ?? colors.gray,
     },
     heroHeaderBlock: {
       gap: SPACING.xs,

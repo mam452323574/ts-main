@@ -206,7 +206,7 @@ export function resolveScanPreviewVisualTheme(
 
 export function resolveScanCaptureVisualTheme(
   colors: ThemeColors,
-  _isDark: boolean,
+  isDark: boolean,
 ): ScanCaptureVisualTheme {
   const premium = buildPremiumHealthPalette(colors, true);
   const textPrimary = '#F6FBFF';
@@ -228,9 +228,9 @@ export function resolveScanCaptureVisualTheme(
     instructionCardBorder: withAlpha(colors.white, 0.1),
     instructionTitle: textPrimary,
     instructionBody: textSecondary,
-    secondaryButtonBackground: withAlpha(colors.white, 0.04),
+    secondaryButtonBackground: isDark ? withAlpha(colors.white, 0.04) : colors.white,
     secondaryButtonBorder: withAlpha(colors.white, 0.08),
-    secondaryButtonText: textPrimary,
+    secondaryButtonText: isDark ? textPrimary : colors.primaryText,
     primaryButtonBackground: premium.primaryActionBackground,
     primaryButtonBorder: premium.primaryActionBorder,
     primaryButtonText: premium.primaryActionText,

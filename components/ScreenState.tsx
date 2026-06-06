@@ -33,6 +33,8 @@ interface ScreenStateProps {
   icon?: ReactNode;
   actionLabel?: string;
   onAction?: () => void;
+  actionLoading?: boolean;
+  actionDisabled?: boolean;
   secondaryActionLabel?: string;
   onSecondaryAction?: () => void;
   surfaceVariant?: SurfaceVariant;
@@ -53,6 +55,8 @@ export function ScreenState({
   icon,
   actionLabel,
   onAction,
+  actionLoading = false,
+  actionDisabled = false,
   secondaryActionLabel,
   onSecondaryAction,
   surfaceVariant,
@@ -148,7 +152,13 @@ export function ScreenState({
 
         {actionLabel && onAction ? (
           <View style={styles.action}>
-            <Button title={actionLabel} onPress={onAction} testID={actionTestID} />
+            <Button
+              title={actionLabel}
+              onPress={onAction}
+              loading={actionLoading}
+              disabled={actionDisabled}
+              testID={actionTestID}
+            />
           </View>
         ) : null}
         {secondaryActionLabel && onSecondaryAction ? (

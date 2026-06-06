@@ -20,7 +20,6 @@ export function useCoachConversation(options: UseCoachConversationOptions) {
     queryFn: () => fetchCoachConversation(conversationId!),
     enabled: !!user?.id && !!conversationId,
     staleTime: 10_000,
-    placeholderData: (previousData) => previousData,
     retry: shouldRetryCoachReadQuery,
   });
 }

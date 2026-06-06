@@ -67,8 +67,11 @@ export const IT_RESULT_TRANSLATIONS = {
       photogenic: 'Fotogenia',
       skin_quality: 'Qualità della pelle',
       skin_clarity: 'Purezza pelle',
+      skin_clarity_signal: 'Pelle nitida',
       skin_evenness: 'Tono uniforme',
+      skin_evenness_signal: 'Incarnato uniforme',
       under_eye_shadow: 'Occhiaie',
+      under_eye_freshness_signal: 'Sguardo riposato',
       pore_visibility: 'Pori',
       complexion_redness: 'Rossori',
       sleep_quality: 'Sonno',
@@ -293,6 +296,24 @@ export const IT_RESULT_TRANSLATIONS = {
       high: 'Alta',
       unknown: 'Sconosciuta',
     },
+    skin_clarity_signal: {
+      low: 'Da sostenere',
+      moderate: 'In progresso',
+      high: 'Molto nitida',
+      unknown: 'Non disponibile',
+    },
+    skin_evenness_signal: {
+      low: 'Da armonizzare',
+      moderate: 'Equilibrato',
+      high: 'Molto uniforme',
+      unknown: 'Non disponibile',
+    },
+    under_eye_freshness_signal: {
+      low: 'Molto fresco',
+      moderate: 'Riposato',
+      high: 'Da rinfrescare',
+      unknown: 'Non disponibile',
+    },
   },
   share_story: {
     header: {
@@ -315,7 +336,7 @@ export const IT_RESULT_TRANSLATIONS = {
       risk: 'Rischio',
     },
     dialog: {
-      title: 'Condividi il visual di Health Scan',
+      title: 'Condividi il visual di SelfLens',
     },
     unavailable: {
       title: 'Condivisione non disponibile',

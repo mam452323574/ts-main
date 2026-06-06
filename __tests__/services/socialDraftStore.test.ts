@@ -31,7 +31,7 @@ describe('socialDraftStore', () => {
           heroImageUri: 'file:///meal.jpg',
           metrics: [],
           accentColor: '#FF9500',
-          footerBrand: 'HEALTH SCAN',
+          footerBrand: 'SELFLENS',
           footerCta: '',
         },
       },
@@ -61,7 +61,7 @@ describe('socialDraftStore', () => {
         heroImageUri: 'file:///meal.jpg',
         metrics: [],
         accentColor: '#FF9500',
-        footerBrand: 'HEALTH SCAN',
+        footerBrand: 'SELFLENS',
         footerCta: '',
       },
     });

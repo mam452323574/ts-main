@@ -22,6 +22,12 @@ interface ScreenHeaderProps {
   onClose?: () => void;
   left?: ReactNode;
   right?: ReactNode;
+  /**
+   * When true, the right slot keeps its 40 px minimum but is allowed to grow
+   * to fit a wider action (e.g. a labelled CTA). Defaults to false so the
+   * historical fixed-width icon button keeps the title perfectly centred.
+   */
+  rightSlotGrow?: boolean;
   topInset?: boolean;
   centered?: boolean;
   backTestID?: string;
@@ -39,6 +45,7 @@ export function ScreenHeader({
   onClose,
   left,
   right,
+  rightSlotGrow = false,
   topInset = true,
   centered = false,
   backTestID,
@@ -122,7 +129,9 @@ export function ScreenHeader({
         ) : null}
       </View>
       {resolvedRight || !isInline ? (
-        <View style={styles.sideSlot}>{resolvedRight}</View>
+        <View style={[styles.sideSlot, rightSlotGrow ? styles.sideSlotGrow : null]}>
+          {resolvedRight}
+        </View>
       ) : null}
     </View>
   );
@@ -132,16 +141,25 @@ interface HeaderIconButtonProps {
   accessibilityLabel: string;
   icon: ReactNode;
   onPress: () => void;
+  disabled?: boolean;
   testID?: string;
 }
 
-export function HeaderIconButton({ accessibilityLabel, icon, onPress, testID }: HeaderIconButtonProps) {
+export function HeaderIconButton({
+  accessibilityLabel,
+  icon,
+  onPress,
+  disabled = false,
+  testID,
+}: HeaderIconButtonProps) {
   const { colors, isDark } = useTheme();
 
   return (
     <TouchableOpacity
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       onPress={onPress}
       testID={testID}
       style={[
@@ -154,6 +172,7 @@ export function HeaderIconButton({ accessibilityLabel, icon, onPress, testID }: 
             ? withAlpha(colors.white ?? colors.primaryText, 0.08)
             : withAlpha(colors.primaryText, 0.065),
         },
+        disabled ? styles.iconButtonDisabled : null,
       ]}
       hitSlop={8}
     >
@@ -184,6 +203,11 @@ const styles = StyleSheet.create({
     minHeight: 40,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  sideSlotGrow: {
+    width: 'auto',
+    minWidth: 40,
+    alignItems: 'flex-end',
   },
   copy: {
     flex: 1,
@@ -217,5 +241,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1, borderCurve: 'continuous',
+  },
+  iconButtonDisabled: {
+    opacity: 0.45,
   },
 });

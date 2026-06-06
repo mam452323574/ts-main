@@ -2,6 +2,7 @@ export { AuthShell } from './AuthShell';
 export { AuthHero } from './AuthHero';
 export { AuthInput } from './AuthInput';
 export type { AuthInputStatus } from './AuthInput';
+export { UsernameField } from './UsernameField';
 export { AuthSelectCard } from './AuthSelectCard';
 export { AuthStepDots } from './AuthStepDots';
 export { AuthOTPInput } from './AuthOTPInput';

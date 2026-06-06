@@ -84,7 +84,11 @@ describe('coach service', () => {
     };
   }
 
-  function createCoachEntriesSelectMock(data: unknown, error: unknown = null) {
+  function createCoachEntriesSelectMock(
+    data: unknown,
+    error: unknown = null,
+    onIs: jest.Mock = jest.fn(),
+  ) {
     const queryResult = {
       data,
       error,
@@ -95,6 +99,10 @@ describe('coach service', () => {
       limit: jest.fn().mockResolvedValue(queryResult),
     };
     queryChain.order = jest.fn(() => queryChain);
+    queryChain.is = jest.fn((field: string, value: unknown) => {
+      onIs(field, value);
+      return queryChain;
+    });
 
     return {
       select: jest.fn(() => queryChain),
@@ -2857,6 +2865,33 @@ describe('coach service', () => {
         has_valid_persona: false,
       }),
     ]);
+  });
+
+  it('hides soft-deleted entries from the public Coach surface (F-01)', async () => {
+    const isCalls = jest.fn();
+    supabase.from.mockReturnValue(
+      createCoachEntriesSelectMock([], null, isCalls),
+    );
+
+    await expect(fetchCoachEntries()).resolves.toEqual([]);
+
+    expect(isCalls).toHaveBeenCalledWith('deleted_at', null);
+  });
+
+  it('hides soft-deleted entries from the latest ready guidance lookup (F-01)', async () => {
+    const isCalls = jest.fn();
+    supabase.from.mockImplementation((table: string) => {
+      if (table !== 'coach_entries') {
+        throw new Error(`Unexpected table ${table}`);
+      }
+      return createLatestEntrySelectMock(null, jest.fn(), null, isCalls);
+    });
+
+    await expect(
+      fetchLatestReadyCoachEntry({ locale: 'fr' }),
+    ).resolves.toBeNull();
+
+    expect(isCalls).toHaveBeenCalledWith('deleted_at', null);
   });
 
   it('extracts detailed tracked-entry failure metadata from stored coach response payloads', () => {

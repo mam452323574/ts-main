@@ -158,7 +158,7 @@ export function NextScanTimer({
     >
       {!isScannerCompact && !isHomeCompact && (
         <Clock
-          color={iconColor || 'rgba(255, 255, 255, 0.7)'}
+          color={iconColor ?? colors.textMuted ?? colors.gray}
           size={isScannerChipCompact ? 9 : 12}
           strokeWidth={2.5}
         />
@@ -196,7 +196,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   text: {
     fontSize: SIZES.text10,
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: colors.textMuted ?? colors.gray,
     fontWeight: FONT_WEIGHTS.medium,
     fontStyle: 'italic',
     flexShrink: 1,

@@ -1,26 +1,33 @@
-// B-02 backend audit — En production, ne faire confiance qu'à `cf-connecting-ip`
-// (Supabase Edge tourne derrière Cloudflare). Sinon un attaquant peut forger
-// `X-Forwarded-For` ou `X-Real-IP` pour contourner les rate limits par IP.
-
-function isProductionEnvironment() {
-  const environment =
-    Deno.env.get('SUPABASE_ENV') || Deno.env.get('APP_ENV') || '';
-  return environment.trim().toLowerCase() === 'production';
-}
+// B-02 backend audit — historiquement, derrière Cloudflare on ne faisait
+// confiance qu'à `cf-connecting-ip`. Depuis la migration self-hosted (derrière
+// Caddy/Kong, sans Cloudflare), ce header n'existe plus : on retombe sur les
+// headers de proxy `X-Forwarded-For` / `X-Real-IP` posés par Caddy.
+//
+// IMPORTANT : le fallback DOIT être une `inet` valide. L'ancien fallback
+// littéral "unknown" cassait tous les RPC typés `inet` (ex. check_ip_signup_allowed
+// → 22P02 "invalid input syntax for type inet" → signup en 503).
+//
+// Compromis sécurité : X-Forwarded-For est falsifiable côté client. Le rate
+// limit par IP reste une défense en profondeur (les contrôles email jetable +
+// vérification email restent prioritaires). Pour durcir : configurer Caddy/Kong
+// pour écraser X-Forwarded-For avec l'IP réelle.
 
 export function resolveTrustedClientIp(req: Request): string {
-  const cloudflareIp = req.headers.get('cf-connecting-ip');
+  const cloudflareIp = req.headers.get('cf-connecting-ip')?.trim();
   if (cloudflareIp) {
     return cloudflareIp;
   }
 
-  if (isProductionEnvironment()) {
-    return 'unknown';
+  const forwardedFor = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+  if (forwardedFor) {
+    return forwardedFor;
   }
 
-  return (
-    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    req.headers.get('x-real-ip') ||
-    'unknown'
-  );
+  const realIp = req.headers.get('x-real-ip')?.trim();
+  if (realIp) {
+    return realIp;
+  }
+
+  // Fallback = inet valide (jamais "unknown") pour ne pas casser les RPC inet.
+  return '0.0.0.0';
 }

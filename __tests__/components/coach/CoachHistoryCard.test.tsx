@@ -26,9 +26,13 @@ jest.mock('@/contexts/ThemeContext', () => ({
 function CoachHistoryCardHarness({
   onCtaPress = jest.fn(),
   recentLabel = null,
+  onDelete = null,
+  onToggleSpy,
 }: {
   onCtaPress?: jest.Mock;
   recentLabel?: string | null;
+  onDelete?: jest.Mock | null;
+  onToggleSpy?: jest.Mock;
 }) {
   const [expanded, setExpanded] = React.useState(false);
 
@@ -47,7 +51,11 @@ function CoachHistoryCardHarness({
       ctaLabel="Open plan"
       onCtaPress={onCtaPress}
       expanded={expanded}
-      onToggle={() => setExpanded((current) => !current)}
+      onToggle={() => {
+        onToggleSpy?.();
+        setExpanded((current) => !current);
+      }}
+      onDelete={onDelete ?? undefined}
       testID="coach-history-card"
     />
   );
@@ -96,5 +104,58 @@ describe('CoachHistoryCard', () => {
     fireEvent.press(screen.getByText('Open plan'));
 
     expect(onCtaPress).toHaveBeenCalledTimes(1);
+  });
+
+  describe('delete button', () => {
+    it('invokes onDelete when the delete button is pressed', () => {
+      const onDelete = jest.fn();
+      const screen = render(<CoachHistoryCardHarness onDelete={onDelete} />);
+
+      fireEvent.press(screen.getByTestId('coach-history-card-delete'));
+
+      expect(onDelete).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not throw when fireEvent.press calls the handler without a synthetic event', () => {
+      // Regression guard for the original bug: the handler used to call
+      // `event.stopPropagation()` directly, which threw under RNTL because
+      // fireEvent.press() does not supply an event argument. The optional
+      // chain in `CoachHistoryCard.tsx` keeps the handler safe.
+      const onDelete = jest.fn();
+      const screen = render(<CoachHistoryCardHarness onDelete={onDelete} />);
+
+      expect(() =>
+        fireEvent.press(screen.getByTestId('coach-history-card-delete')),
+      ).not.toThrow();
+      expect(onDelete).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not toggle the card when the delete button is pressed', () => {
+      const onToggleSpy = jest.fn();
+      const onDelete = jest.fn();
+      const screen = render(
+        <CoachHistoryCardHarness
+          onDelete={onDelete}
+          onToggleSpy={onToggleSpy}
+        />,
+      );
+
+      fireEvent.press(screen.getByTestId('coach-history-card-delete'));
+
+      expect(onToggleSpy).not.toHaveBeenCalled();
+      // The expanded section should stay collapsed too — extra safety net in
+      // case a future refactor wires the toggle onto a different surface.
+      expect(
+        screen.queryByTestId('coach-history-card-expanded'),
+      ).toBeNull();
+    });
+
+    it('omits the delete button when no onDelete handler is provided', () => {
+      const screen = render(<CoachHistoryCardHarness />);
+
+      expect(
+        screen.queryByTestId('coach-history-card-delete'),
+      ).toBeNull();
+    });
   });
 });

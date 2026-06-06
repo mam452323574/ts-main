@@ -12,6 +12,7 @@ import {
   FONT_WEIGHTS,
   SIZES,
   SPACING,
+  getCoachPaperSurface,
   getCoachOnMediaTokens,
   getVisualMoodSurface,
   mixColors,
@@ -37,7 +38,7 @@ export type CoachConversationHeroVariant =
 interface CoachConversationHeroCardProps {
   personaKey: CoachPersonaKey;
   variant: CoachConversationHeroVariant;
-  title: string;
+  title: string | null;
   subtitle: string;
   ctaLabel: string;
   hint?: string | null;
@@ -100,13 +101,28 @@ function CoachConversationHeroCardComponent({
   );
 
   const coachName = t(persona.titleTranslationKey);
-  const showWithCoachName =
-    variant === 'free_available' || variant === 'premium_available';
-  const heroTitle = showWithCoachName
-    ? t('coach.conversation_hero.title_with_coach', { coachName })
-    : title;
+  // When the parent passes title=null the card composes its own headline so
+  // it stays in lock-step with the persona currently displayed in the slot.
+  // The parent keeps the option to dictate a specific title (e.g. "Limite
+  // quotidienne atteinte") by passing a non-empty string.
+  const hasExplicitTitle =
+    typeof title === 'string' && title.trim().length > 0;
+  const heroTitle = hasExplicitTitle
+    ? title
+    : t('coach.conversation_hero.title_with_coach', { coachName });
 
-  const accessibilityLabel = [heroTitle, subtitle, hint, ctaLabel]
+  // B-1 (audit 2026-05-27): respect the parent-provided ctaLabel/subtitle so
+  // the limited / exhausted / resume variants no longer surface the misleading
+  // "Parler au coach" CTA. The fallback preserves the historical wording when
+  // a caller forgets to pass a label.
+  const resolvedCtaLabel =
+    typeof ctaLabel === 'string' && ctaLabel.trim().length > 0
+      ? ctaLabel
+      : 'Parler au coach';
+  const hasSubtitle =
+    typeof subtitle === 'string' && subtitle.trim().length > 0;
+
+  const accessibilityLabel = [heroTitle, subtitle, hint, resolvedCtaLabel]
     .filter(
       (value): value is string =>
         typeof value === 'string' && value.trim().length > 0,
@@ -202,6 +218,15 @@ function CoachConversationHeroCardComponent({
           >
             {heroTitle}
           </Text>
+          {hasSubtitle ? (
+            <Text
+              numberOfLines={2}
+              style={styles.subtitle}
+              testID={`${testID}-subtitle`}
+            >
+              {subtitle}
+            </Text>
+          ) : null}
           <View style={styles.ctaButton} testID={`${testID}-cta`}>
             <MessageCircle
               color={tone.ctaText}
@@ -209,8 +234,12 @@ function CoachConversationHeroCardComponent({
               strokeWidth={2.2}
               testID={`${testID}-cta-icon`}
             />
-            <Text numberOfLines={1} style={styles.ctaLabel}>
-              Parler au coach
+            <Text
+              numberOfLines={1}
+              style={styles.ctaLabel}
+              testID={`${testID}-cta-label`}
+            >
+              {resolvedCtaLabel}
             </Text>
           </View>
         </View>
@@ -245,6 +274,31 @@ function CoachConversationHeroCardComponent({
 }
 
 function buildTone(colors: any, isDark: boolean, accent: string) {
+  if (!isDark) {
+    const paper = getCoachPaperSurface(false);
+
+    return {
+      gradientTop: mixColors(paper.canvas, accent, 0.035),
+      gradientMid: mixColors(paper.raised, accent, 0.07),
+      gradientBottom: mixColors(paper.canvas, accent, 0.11),
+      ctaBg: mixColors(paper.canvas, accent, 0.08),
+      ctaBorder: withAlpha(accent, 0.24),
+      ctaText: paper.ink,
+      ctaTextShadow: 'transparent',
+      titleColor: paper.ink,
+      subtitleColor: paper.inkMuted,
+      shadowColor: accent,
+      cardBorder: withAlpha(accent, 0.2),
+      selectedPillBg: mixColors(paper.canvas, accent, 0.1),
+      selectedPillBorder: withAlpha(accent, 0.28),
+      selectedPillLabel: paper.inkMuted,
+      selectedPillNameColor: paper.ink,
+      selectedPillGlow: withAlpha(accent, 0.35),
+      selectedPillHalo: 'transparent',
+      selectedPillLabelShadow: 'transparent',
+    };
+  }
+
   const gradientTop = GRADIENT_ANCHOR;
   const gradientMid = mixColors(gradientTop, accent, 0.25);
   const gradientBottom = mixColors(gradientTop, accent, 0.5);
@@ -254,21 +308,22 @@ function buildTone(colors: any, isDark: boolean, accent: string) {
     gradientTop,
     gradientMid,
     gradientBottom,
-    ctaBg: mixColors(accent, GRADIENT_ANCHOR, isDark ? 0.42 : 0.3),
-    ctaBorder: withAlpha(colors.white, isDark ? 0.34 : 0.28),
+    ctaBg: mixColors(accent, GRADIENT_ANCHOR, 0.42),
+    ctaBorder: withAlpha(colors.white, 0.34),
     ctaText: onMedia.textPrimary,
     ctaTextShadow: onMedia.textShadowColor,
     titleColor: withAlpha(colors.white, 0.96),
+    subtitleColor: withAlpha(colors.white, 0.78),
     shadowColor: accent,
-    cardBorder: withAlpha(colors.white, isDark ? 0.22 : 0.16),
+    cardBorder: withAlpha(colors.white, 0.22),
     // Pill background stays tinted with GRADIENT_ANCHOR (the card's own
     // palette) rather than pure black — keeps the look cohesive with the
     // hero gradient while remaining opaque enough for contrast.
-    selectedPillBg: withAlpha(GRADIENT_ANCHOR, isDark ? 0.78 : 0.7),
-    selectedPillBorder: withAlpha(accent, isDark ? 0.45 : 0.4),
+    selectedPillBg: withAlpha(GRADIENT_ANCHOR, 0.78),
+    selectedPillBorder: withAlpha(accent, 0.45),
     selectedPillLabel: onMedia.textSecondary,
     selectedPillNameColor: onMedia.textPrimary,
-    selectedPillGlow: withAlpha(accent, isDark ? 0.85 : 0.55),
+    selectedPillGlow: withAlpha(accent, 0.85),
     selectedPillHalo: onMedia.textShadowColor,
     selectedPillLabelShadow: onMedia.textShadowColor,
   };
@@ -346,6 +401,12 @@ const createStyles = (
       lineHeight: 23,
       fontWeight: FONT_WEIGHTS.bold,
       color: tone.titleColor,
+    },
+    subtitle: {
+      fontSize: SIZES.text12,
+      lineHeight: 16,
+      fontWeight: FONT_WEIGHTS.regular,
+      color: tone.subtitleColor,
     },
     ctaButton: {
       marginTop: 4,

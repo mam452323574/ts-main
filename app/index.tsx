@@ -52,9 +52,9 @@ export default function Index() {
     );
   }
 
-  // Utilisateur non connecté → Login
+  // Utilisateur non connecté → écran d'accueil (choix connexion / création)
   if (!user) {
-    return <Redirect href="/login" />;
+    return <Redirect href={'/welcome' as any} />;
   }
 
   // Utilisateur connecté mais email non vérifié

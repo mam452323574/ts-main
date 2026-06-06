@@ -195,7 +195,7 @@ describe('SocialComposerScreen', () => {
           heroImageUri: 'file:///meal.jpg',
           metrics: [],
           accentColor: '#FF9500',
-          footerBrand: 'HEALTH SCAN',
+          footerBrand: 'SELFLENS',
           footerCta: 'Track your progress',
         },
       },
@@ -293,7 +293,7 @@ describe('SocialComposerScreen', () => {
         heroImageUri: 'file:///meal.jpg',
         metrics: [],
         accentColor: '#FF9500',
-        footerBrand: 'HEALTH SCAN',
+        footerBrand: 'SELFLENS',
         footerCta: 'Track your progress',
       }),
       scanId: 'scan-legacy',
@@ -384,7 +384,7 @@ describe('SocialComposerScreen', () => {
     expect(screen.getByTestId('social-compose-asset-card')).toBeTruthy();
   });
 
-  it('inserts hashtag and mention tokens into the caption composer', async () => {
+  it('publishes manually entered text without the removed quick actions or visibility callout', async () => {
     mockGetSocialComposerDraft.mockResolvedValueOnce(null);
     mockParams.mockReturnValue({
       defaultCategory: 'food',
@@ -392,19 +392,35 @@ describe('SocialComposerScreen', () => {
 
     const screen = await renderScreen();
 
+    expect(screen.queryByTestId('social-compose-hashtag-button')).toBeNull();
+    expect(screen.queryByTestId('social-compose-mention-button')).toBeNull();
+    expect(screen.queryByTestId('social-compose-visibility-row')).toBeNull();
+    expect(screen.queryByText('social.composer.visibility_title')).toBeNull();
+    expect(screen.queryByText('social.composer.visibility_body')).toBeNull();
+
+    fireEvent.changeText(
+      screen.getByTestId('social-compose-caption-input'),
+      'Manual #progress @alice',
+    );
+
+    expect(screen.getByTestId('social-compose-caption-input').props.value).toBe(
+      'Manual #progress @alice',
+    );
+
     await act(async () => {
-      fireEvent.press(screen.getByTestId('social-compose-hashtag-button'));
-      await Promise.resolve();
+      fireEvent.press(screen.getByTestId('social-compose-submit'));
     });
 
-    expect(screen.getByTestId('social-compose-caption-input').props.value).toBe('#');
-
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('social-compose-mention-button'));
-      await Promise.resolve();
+    await waitFor(() => {
+      expect(mockMutateAsync).toHaveBeenCalledWith({
+        category: 'food',
+        contentText: 'Manual #progress @alice',
+        scanId: null,
+        sharePayload: null,
+        assetSourceUri: null,
+      });
+      expect(mockBack).toHaveBeenCalled();
     });
-
-    expect(screen.getByTestId('social-compose-caption-input').props.value).toBe('# @');
   });
 
   it('registers keyboard listeners and restores the category when the keyboard closes', async () => {

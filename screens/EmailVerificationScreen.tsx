@@ -388,16 +388,13 @@ export default function EmailVerificationScreen() {
 
   return (
     <AuthShell
-      showBack
-      onBack={handleCancelPrompt}
-      backTestID="email-verification-back"
       showLanguage={false}
       scroll
     >
       {alertElement}
       <AuthHero
         variant="step"
-        brand="HEALTH SCAN"
+        brand="SELFLENS"
         align="center"
         title={t('auth.verify_title')}
         subtitle={t('auth.verify_subtitle')}
@@ -502,6 +499,15 @@ export default function EmailVerificationScreen() {
           </>
         )}
       </Pressable>
+
+      <Pressable
+        onPress={handleCancelPrompt}
+        accessibilityRole="button"
+        testID="email-verification-cancel"
+        style={({ pressed }) => [styles.cancelLink, pressed && styles.resendPressed]}
+      >
+        <Text style={styles.cancelText}>{t('auth.cancel_verification_link')}</Text>
+      </Pressable>
     </AuthShell>
   );
 }
@@ -576,6 +582,17 @@ const createStyles = (colors: any) =>
     },
     resendTextDisabled: {
       color: colors.gray,
+    },
+    cancelLink: {
+      alignItems: 'center',
+      paddingVertical: SPACING.sm,
+      borderRadius: BORDER_RADIUS.pill,
+      borderCurve: 'continuous',
+    },
+    cancelText: {
+      fontSize: SIZES.sm,
+      color: colors.gray,
+      fontWeight: '500',
     },
     successContainer: {
       flex: 1,

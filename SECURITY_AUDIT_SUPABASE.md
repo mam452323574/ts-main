@@ -1,4 +1,4 @@
-# Audit cybersécurité Supabase - Health Scan
+# Audit cybersécurité Supabase - SelfLens
 
 Date: 2026-04-25  
 Périmètre: backend Supabase uniquement, incluant Edge Functions, SQL/RLS/RPC, Storage, webhooks, secrets serveur, rate limits, logs et configuration dashboard.

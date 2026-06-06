@@ -17,6 +17,7 @@ recipe-artifacts/
 *.p12
 *.key
 *.mobileprovision
+credentials.json
 .metro-health-check*
 npm-debug.*
 yarn-debug.*
@@ -74,3 +75,14 @@ deploy_functions.ps1
 
 # n8n workflow definitions (server-side)
 n8n/
+
+# === Gros caches qui gonflaient l'upload à 1.9GB et cassaient l'extraction tar (2026-05-29) ===
+# Caches/artefacts de build natif Android — EAS les régénère, jamais à uploader
+.git/
+tmp/
+.gradle/
+android/.gradle/
+android/.cxx/
+android/.kotlin/
+android/app/.gradle/
+android/app/.cxx/

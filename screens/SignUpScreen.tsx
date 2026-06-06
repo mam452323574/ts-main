@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -15,16 +16,14 @@ import {
   ImagePlus,
   Lock,
   Mail,
-  UserRound,
 } from 'lucide-react-native';
 
 import {
   AuthHero,
   AuthInput,
-  AuthSelectCard,
   AuthShell,
   AuthStepDots,
-  AuthThemeVisual,
+  UsernameField,
 } from '@/components/auth';
 import { AvatarCropModal, type AvatarCropAsset } from '@/components/AvatarCropModal';
 import { Button } from '@/components/Button';
@@ -45,6 +44,7 @@ import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { createPreparedAvatarLocalUri } from '@/services/avatar';
 import { SignUpCredentialsSchema } from '@/utils/authSchemas';
 import type { AvatarCropSelection } from '@/utils/avatarCrop';
+import { isOAuthCancellationError } from '@/utils/oauthErrors';
 import {
   loadPreAuthOnboardingDraft,
   updatePreAuthOnboardingDraft,
@@ -57,10 +57,8 @@ import {
 } from '@/utils/username';
 
 const SIGNUP_STEPS: PreAuthOnboardingStep[] = [
-  'intro',
   'username',
   'avatar',
-  'appearance',
   'accountMethod',
   'emailCredentials',
 ];
@@ -74,6 +72,7 @@ export default function SignUpScreen() {
   const {
     signUp,
     signInWithGoogle,
+    signInWithOAuth,
     sendVerificationEmail,
     isDisposableEmail,
   } = useAuth();
@@ -85,7 +84,7 @@ export default function SignUpScreen() {
   const initialTheme: ThemeType =
     activeTheme === 'light' || activeTheme === 'dark' ? activeTheme : 'dark';
   const [hydrating, setHydrating] = useState(true);
-  const [step, setStep] = useState<PreAuthOnboardingStep>('intro');
+  const [step, setStep] = useState<PreAuthOnboardingStep>('username');
   const [selectedTheme, setSelectedTheme] = useState<ThemeType>(initialTheme);
   const [username, setUsername] = useState('');
   const [avatarLocalUri, setAvatarLocalUri] = useState<string | null>(null);
@@ -99,6 +98,7 @@ export default function SignUpScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const usernameValidation = useMemo(
@@ -127,7 +127,11 @@ export default function SignUpScreen() {
       setStep(
         draft.lastStep === 'verification'
           ? 'emailCredentials'
-          : draft.lastStep,
+          : draft.lastStep === 'intro'
+            ? 'username'
+            : draft.lastStep === 'appearance'
+              ? 'accountMethod'
+              : draft.lastStep,
       );
       setHydrating(false);
     };
@@ -192,12 +196,12 @@ export default function SignUpScreen() {
   };
 
   const handleBack = () => {
-    if (step === 'intro') {
+    if (step === 'username') {
       router.back();
       return;
     }
 
-    const previousStep = SIGNUP_STEPS[currentStepIndex - 1] ?? 'intro';
+    const previousStep = SIGNUP_STEPS[currentStepIndex - 1] ?? 'username';
     void persistStep(previousStep);
   };
 
@@ -322,20 +326,11 @@ export default function SignUpScreen() {
     setAvatarCropAsset(null);
     setAvatarSkipped(true);
     setError(null);
-    setStep('appearance');
+    setStep('accountMethod');
     await updatePreAuthOnboardingDraft({
       avatarLocalUri: null,
       avatarSkipped: true,
-      lastStep: 'appearance',
-    });
-  };
-
-  const handleThemeSelect = async (nextTheme: ThemeType) => {
-    setSelectedTheme(nextTheme);
-    setTheme(nextTheme);
-    await updatePreAuthOnboardingDraft({
-      selectedTheme: nextTheme,
-      lastStep: 'appearance',
+      lastStep: 'accountMethod',
     });
   };
 
@@ -505,13 +500,56 @@ export default function SignUpScreen() {
         completionIntent: null,
         createdUserId: null,
       });
-      setError(
-        oauthError instanceof Error
-          ? oauthError.message
-          : t('auth.errors.oauth_login', { provider: 'google' }),
-      );
+      // Annulation volontaire (l'utilisateur a fermé l'onglet Google) : on ne
+      // montre pas de bandeau d'erreur, on reste juste sur l'étape en cours.
+      if (!isOAuthCancellationError(oauthError)) {
+        setError(
+          oauthError instanceof Error
+            ? oauthError.message
+            : t('auth.errors.oauth_login', { provider: 'google' }),
+        );
+      }
     } finally {
       setGoogleLoading(false);
+    }
+  };
+
+  const handleAppleSignUp = async () => {
+    if (loading || appleLoading || googleLoading) {
+      return;
+    }
+
+    cancelPendingDraftSave();
+    try {
+      setAppleLoading(true);
+      setError(null);
+      await updatePreAuthOnboardingDraft({
+        selectedTheme,
+        username,
+        avatarLocalUri,
+        avatarSkipped,
+        email,
+        createdUserId: null,
+        completionIntent: 'signup-apple',
+        lastStep: 'accountMethod',
+      });
+      await signInWithOAuth('apple');
+    } catch (oauthError) {
+      await updatePreAuthOnboardingDraft({
+        completionIntent: null,
+        createdUserId: null,
+      });
+      // Annulation volontaire (l'utilisateur a fermé l'onglet Apple) : on ne
+      // montre pas de bandeau d'erreur, on reste juste sur l'étape en cours.
+      if (!isOAuthCancellationError(oauthError)) {
+        setError(
+          oauthError instanceof Error
+            ? oauthError.message
+            : t('auth.errors.oauth_login', { provider: 'apple' }),
+        );
+      }
+    } finally {
+      setAppleLoading(false);
     }
   };
 
@@ -522,37 +560,6 @@ export default function SignUpScreen() {
       </Squircle>
     ) : null;
 
-  const renderIntro = () => (
-    <View style={styles.simplePage}>
-      <View style={styles.introBody}>
-        <AuthHero
-          variant="intro"
-          brand="HEALTH SCAN"
-          title={t('onboarding.intro_step_title')}
-          subtitle={t('onboarding.intro_step_subtitle')}
-        />
-      </View>
-      <View style={styles.footer}>
-        <Text style={styles.supportText}>{t('onboarding.intro_step_note')}</Text>
-        <Button
-          title={t('onboarding.intro_cta')}
-          onPress={() => void persistStep('username')}
-          variant="primary"
-          size="lg"
-          flat
-          testID="signup-start"
-        />
-        <Pressable
-          onPress={() => router.push('/login')}
-          accessibilityRole="button"
-          style={styles.linkButton}
-        >
-          <Text style={styles.linkText}>{t('onboarding.existing_account_cta')}</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-
   const renderUsername = () => (
     <View style={styles.simplePage}>
       <View style={styles.body}>
@@ -561,14 +568,9 @@ export default function SignUpScreen() {
           title={t('onboarding.username_step_title')}
           subtitle={t('onboarding.username_step_subtitle')}
         />
-        <AuthInput
-          label={t('onboarding.username_label')}
-          icon={UserRound}
-          placeholder={t('onboarding.username_placeholder')}
+        <UsernameField
           value={username}
           onChangeText={handleUsernameChange}
-          autoCapitalize="none"
-          autoComplete="off"
           testID="signup-username-input"
           status={
             username.length > 0 && !usernameValidation.valid
@@ -587,13 +589,15 @@ export default function SignUpScreen() {
         />
         {renderError()}
       </View>
-      <Button
-        title={t('common.next')}
-        onPress={handleUsernameContinue}
-        variant="primary"
-        size="lg"
-        flat
-      />
+      <View style={styles.footer}>
+        <Button
+          title={t('common.next')}
+          onPress={handleUsernameContinue}
+          variant="primary"
+          size="lg"
+          flat
+        />
+      </View>
     </View>
   );
 
@@ -641,7 +645,7 @@ export default function SignUpScreen() {
       <View style={styles.footer}>
         <Button
           title={t('common.next')}
-          onPress={() => void persistStep('appearance')}
+          onPress={() => void persistStep('accountMethod')}
           disabled={!avatarLocalUri}
           variant="primary"
           size="lg"
@@ -659,43 +663,6 @@ export default function SignUpScreen() {
     </View>
   );
 
-  const renderAppearance = () => (
-    <View style={styles.simplePage}>
-      <View style={styles.body}>
-        <AuthHero
-          variant="step"
-          title={t('onboarding.profile_theme_title')}
-          subtitle={t('onboarding.profile_theme_subtitle')}
-        />
-        <View style={styles.themeChoices}>
-          <AuthSelectCard
-            selected={selectedTheme === 'light'}
-            onPress={() => void handleThemeSelect('light')}
-            title={t('onboarding.theme.light')}
-            subtitle={t('onboarding.theme.light_desc')}
-            testID="signup-theme-light"
-            visual={<AuthThemeVisual theme="light" size={42} />}
-          />
-          <AuthSelectCard
-            selected={selectedTheme === 'dark'}
-            onPress={() => void handleThemeSelect('dark')}
-            title={t('onboarding.theme.dark')}
-            subtitle={t('onboarding.theme.dark_desc')}
-            testID="signup-theme-dark"
-            visual={<AuthThemeVisual theme="dark" size={42} />}
-          />
-        </View>
-      </View>
-      <Button
-        title={t('common.next')}
-        onPress={() => void persistStep('accountMethod')}
-        variant="primary"
-        size="lg"
-        flat
-      />
-    </View>
-  );
-
   const renderAccountMethod = () => (
     <View style={styles.simplePage}>
       <View style={styles.body}>
@@ -708,8 +675,16 @@ export default function SignUpScreen() {
           provider="google"
           onPress={handleGoogleSignUp}
           loading={googleLoading}
-          disabled={googleLoading || loading}
+          disabled={googleLoading || appleLoading || loading}
         />
+        {Platform.OS === 'ios' ? (
+          <OAuthButton
+            provider="apple"
+            onPress={handleAppleSignUp}
+            loading={appleLoading}
+            disabled={googleLoading || appleLoading || loading}
+          />
+        ) : null}
         {renderError()}
       </View>
       <View style={styles.footer}>
@@ -774,32 +749,31 @@ export default function SignUpScreen() {
         </View>
         {renderError()}
       </View>
-      <Button
-        title={t('auth.signup_btn')}
-        onPress={handleSignUp}
-        loading={loading}
-        disabled={loading || googleLoading}
-        variant="primary"
-        size="lg"
-        flat
-      />
+      <View style={styles.footer}>
+        <Button
+          title={t('auth.signup_btn')}
+          onPress={handleSignUp}
+          loading={loading}
+          disabled={loading || googleLoading}
+          variant="primary"
+          size="lg"
+          flat
+        />
+      </View>
     </View>
   );
 
   const renderStep = () => {
     switch (step) {
-      case 'username':
-        return renderUsername();
       case 'avatar':
         return renderAvatar();
-      case 'appearance':
-        return renderAppearance();
       case 'accountMethod':
         return renderAccountMethod();
       case 'emailCredentials':
         return renderEmailCredentials();
+      case 'username':
       default:
-        return renderIntro();
+        return renderUsername();
     }
   };
 
@@ -815,10 +789,10 @@ export default function SignUpScreen() {
 
   return (
     <AuthShell
-      showBack={step !== 'intro'}
+      showBack
       onBack={handleBack}
       backTestID="signup-back-button"
-      showLanguage={step === 'intro'}
+      showLanguage={false}
       scroll={usesKeyboardLayout}
     >
       {alertElement}
@@ -829,13 +803,11 @@ export default function SignUpScreen() {
         onCancel={() => setAvatarCropAsset(null)}
         onConfirm={(selection) => void handleAvatarCropConfirm(selection)}
       />
-      {step !== 'intro' ? (
-        <AuthStepDots
-          total={SIGNUP_STEPS.length - 1}
-          current={currentStepIndex - 1}
-          style={styles.stepDots}
-        />
-      ) : null}
+      <AuthStepDots
+        total={SIGNUP_STEPS.length}
+        current={currentStepIndex}
+        style={styles.stepDots}
+      />
       {renderStep()}
     </AuthShell>
   );
@@ -859,19 +831,8 @@ const createStyles = (colors: any) =>
     body: {
       gap: SPACING.lg,
     },
-    introBody: {
-      flex: 1,
-      justifyContent: 'center',
-      paddingBottom: SPACING.xl,
-    },
     footer: {
       gap: SPACING.md,
-    },
-    supportText: {
-      fontSize: SIZES.sm,
-      lineHeight: 20,
-      color: colors.gray,
-      textAlign: 'center',
     },
     linkButton: {
       minHeight: 42,
@@ -920,9 +881,6 @@ const createStyles = (colors: any) =>
       fontWeight: '600',
       textAlign: 'center',
       flexShrink: 1,
-    },
-    themeChoices: {
-      gap: SPACING.sm,
     },
     errorContainer: {
       backgroundColor: withAlpha(colors.error, 0.1),

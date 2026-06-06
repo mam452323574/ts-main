@@ -67,8 +67,11 @@ export const EN_RESULT_TRANSLATIONS = {
       photogenic: 'Photogenic',
       skin_quality: 'Skin quality',
       skin_clarity: 'Skin clarity',
+      skin_clarity_signal: 'Clear skin',
       skin_evenness: 'Even tone',
+      skin_evenness_signal: 'Even tone',
       under_eye_shadow: 'Dark circles',
+      under_eye_freshness_signal: 'Rested eyes',
       pore_visibility: 'Pores',
       complexion_redness: 'Redness',
       sleep_quality: 'Sleep',
@@ -293,6 +296,24 @@ export const EN_RESULT_TRANSLATIONS = {
       high: 'High',
       unknown: 'Unknown',
     },
+    skin_clarity_signal: {
+      low: 'Needs support',
+      moderate: 'Improving',
+      high: 'Very clear',
+      unknown: 'Unavailable',
+    },
+    skin_evenness_signal: {
+      low: 'To balance',
+      moderate: 'Balanced',
+      high: 'Very even',
+      unknown: 'Unavailable',
+    },
+    under_eye_freshness_signal: {
+      low: 'Very fresh',
+      moderate: 'Rested',
+      high: 'Needs refreshing',
+      unknown: 'Unavailable',
+    },
   },
   share_story: {
     header: {
@@ -315,7 +336,7 @@ export const EN_RESULT_TRANSLATIONS = {
       risk: 'Risk',
     },
     dialog: {
-      title: 'Share your Health Scan visual',
+      title: 'Share your SelfLens visual',
     },
     unavailable: {
       title: 'Sharing unavailable',

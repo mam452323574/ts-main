@@ -135,7 +135,7 @@ export default function PostSignupOnboardingScreen() {
           </Squircle>
           <AuthHero
             variant="status"
-            brand="HEALTH SCAN"
+            brand="SELFLENS"
             title={t('onboarding.final_title')}
             subtitle={t('onboarding.final_subtitle')}
           />

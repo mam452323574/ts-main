@@ -4,6 +4,10 @@ import {
   type CoachConversationStatus,
 } from '@/shared/coachConversation';
 
+const MINUTE_MS = 60_000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+
 export interface CoachConversationStatusLabels {
   active: string;
   ended: string;
@@ -53,6 +57,23 @@ export function formatCoachConversationCounter(
     return labels.freePerConversation(used, freeLimit);
   }
   return labels.perConversation(used, premiumLimit);
+}
+
+export function formatCoachConversationQuotaDuration(remainingMs: number): string {
+  const safeRemainingMs = Number.isFinite(remainingMs)
+    ? Math.max(0, remainingMs)
+    : 0;
+
+  if (safeRemainingMs >= DAY_MS) {
+    const days = Math.ceil(safeRemainingMs / DAY_MS);
+    return `${days} jour${days > 1 ? 's' : ''}`;
+  }
+
+  if (safeRemainingMs >= HOUR_MS) {
+    return `${Math.ceil(safeRemainingMs / HOUR_MS)}h`;
+  }
+
+  return `${Math.ceil(safeRemainingMs / MINUTE_MS)}min`;
 }
 
 export function buildCoachConversationDisplayTitle(

@@ -43,6 +43,18 @@ verify_jwt = true
 [functions.coach-archive-conversation]
 verify_jwt = true
 
+[functions.coach-delete-entry]
+verify_jwt = true
+
+[functions.coach-restore-entry]
+verify_jwt = true
+
+[functions.coach-delete-conversation]
+verify_jwt = true
+
+[functions.coach-restore-conversation]
+verify_jwt = true
+
 [functions.coach-conversation-quota-status]
 verify_jwt = true
 

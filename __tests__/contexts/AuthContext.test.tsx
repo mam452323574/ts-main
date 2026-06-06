@@ -13,6 +13,7 @@ const mockLoadPurchasesModule = jest.fn();
 const mockMarkStartup = jest.fn();
 const mockTrackFailureEvent = jest.fn();
 const mockLogOperationalError = jest.fn();
+const mockLogExpectedFailure = jest.fn();
 const mockCreateOAuthState = jest.fn(() => 'oauth-state-1');
 
 jest.mock('@/utils/runtimeCapabilities', () => ({
@@ -24,6 +25,13 @@ jest.mock('@/utils/runtimeCapabilities', () => ({
 
 jest.mock('@/services/runtimeConfig', () => ({
   getRuntimeConfig: () => mockGetRuntimeConfig(),
+  tryGetRuntimeConfig: () => {
+    try {
+      return { ok: true, config: mockGetRuntimeConfig() };
+    } catch (error) {
+      return { ok: false, error };
+    }
+  },
   getSupabaseFunctionUrl: (functionName: string) =>
     mockGetSupabaseFunctionUrl(functionName),
 }));
@@ -50,6 +58,7 @@ jest.mock('@/utils/oauthState', () => ({
 
 jest.mock('@/utils/observability', () => ({
   logOperationalError: (...args: unknown[]) => mockLogOperationalError(...args),
+  logExpectedFailure: (...args: unknown[]) => mockLogExpectedFailure(...args),
   sanitizeObservabilityProperties: (properties?: Record<string, unknown>) =>
     properties,
 }));
@@ -605,7 +614,8 @@ describe('AuthProvider RevenueCat startup behavior', () => {
       requestId: 'req-limit-1',
     });
 
-    expect(mockLogOperationalError).toHaveBeenCalledWith(
+    // Le throttle 429 est une condition attendue : log en WARN, pas en ERROR.
+    expect(mockLogExpectedFailure).toHaveBeenCalledWith(
       '[SignUp] secure-signup rate limited',
       null,
       {
@@ -613,6 +623,11 @@ describe('AuthProvider RevenueCat startup behavior', () => {
         code: 'signup_rate_limited',
         request_id: 'req-limit-1',
       },
+    );
+    expect(mockLogOperationalError).not.toHaveBeenCalledWith(
+      '[SignUp] secure-signup rate limited',
+      expect.anything(),
+      expect.anything(),
     );
   });
 
@@ -1141,6 +1156,13 @@ describe('AuthProvider RevenueCat startup behavior', () => {
     );
 
     expect(supabase.auth.exchangeCodeForSession).not.toHaveBeenCalled();
+    // Une annulation volontaire ne doit pas être remontée en erreur
+    // opérationnelle (sinon stack trace rouge bruyante pour un geste normal).
+    expect(mockLogOperationalError).not.toHaveBeenCalledWith(
+      '[OAuth] OAuth flow failed',
+      expect.anything(),
+      expect.anything(),
+    );
   });
 
   it('does not log OAuth callback codes or tokens during debug logging', async () => {

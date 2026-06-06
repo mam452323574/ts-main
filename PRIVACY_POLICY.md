@@ -1,13 +1,13 @@
-# Health Scan Privacy Policy
+# SelfLens Privacy Policy
 
-Public URL target: `https://healthscan.cloud/privacy-policy`
+Public URL target: `https://privacy.selflens.org/privacy-policy/`
 
 ## FR
 
 **Derniere mise a jour : 26 avril 2026**
 
 ### 1. Responsable et portee
-Health Scan fournit des fonctionnalites de scan photo et de suivi sante. Cette politique couvre l application mobile, la page publique de politique de confidentialite et les services techniques relies a votre compte.
+SelfLens fournit des fonctionnalites de scan photo et de suivi sante. Cette politique couvre l application mobile, la page publique de politique de confidentialite et les services techniques relies a votre compte.
 
 ### 2. Donnees collectees
 Nous collectons uniquement les categories de donnees necessaires au service :
@@ -19,7 +19,7 @@ Nous collectons uniquement les categories de donnees necessaires au service :
 ### 3. Camera et photos
 La camera est utilisee pour capturer des photos que vous choisissez de soumettre a un scan. Les photos peuvent aussi etre choisies depuis la galerie via le selecteur de photos.
 
-Les images sont televersees de maniere securisee vers notre backend, stockees dans l infrastructure Supabase utilisee par Health Scan, puis transmises a notre infrastructure d analyse accessible via `n8n.basedjew.com` pour produire les resultats affiches dans l application.
+Les images sont televersees de maniere securisee vers notre backend, stockees dans l infrastructure Supabase utilisee par SelfLens, puis transmises a notre infrastructure d analyse accessible via `n8n.basedjew.com` pour produire les resultats affiches dans l application.
 
 ### 4. Finalites du traitement
 Nous utilisons vos donnees pour :
@@ -56,7 +56,7 @@ Vous pouvez supprimer un scan individuel depuis votre historique dans l applicat
 Pour demander la suppression complete de votre compte et de toutes les donnees associees, ecrivez a `privacy@healthscan.cloud` depuis l adresse associee a votre compte. Les scans, resultats et images sont alors purges sous 30 jours.
 
 ### 9. Mineurs et mises a jour
-Health Scan n est pas destine aux personnes de moins de 16 ans.
+SelfLens n est pas destine aux personnes de moins de 16 ans.
 
 Nous pouvons mettre a jour cette politique pour refleter des evolutions legales, techniques ou produit. La date de mise a jour la plus recente est indiquee en haut de cette page.
 
@@ -69,7 +69,7 @@ Nous pouvons mettre a jour cette politique pour refleter des evolutions legales,
 **Last updated: April 26, 2026**
 
 ### 1. Controller and scope
-Health Scan provides photo scan and health tracking features. This policy applies to the mobile app, the public privacy policy page, and the technical services connected to your account.
+SelfLens provides photo scan and health tracking features. This policy applies to the mobile app, the public privacy policy page, and the technical services connected to your account.
 
 ### 2. Data we collect
 We only collect categories of data that are necessary to operate the service:
@@ -81,7 +81,7 @@ We only collect categories of data that are necessary to operate the service:
 ### 3. Camera and photo use
 The camera is used to capture photos that you choose to submit for a scan. Photos may also be selected from the gallery when you use the system photo picker.
 
-Images are uploaded securely to our backend, stored in the Supabase infrastructure used by Health Scan, and then sent to our analysis infrastructure reachable via `n8n.basedjew.com` to produce the results shown in the app.
+Images are uploaded securely to our backend, stored in the Supabase infrastructure used by SelfLens, and then sent to our analysis infrastructure reachable via `n8n.basedjew.com` to produce the results shown in the app.
 
 ### 4. Why we process data
 We use your data to:
@@ -118,7 +118,7 @@ You can delete an individual scan from your history inside the app. Deletion imm
 To request full account deletion and removal of all associated data, email `privacy@healthscan.cloud` from the address linked to your account. Scans, results, and images are then purged within 30 days.
 
 ### 9. Children and updates
-Health Scan is not intended for people under 16 years old.
+SelfLens is not intended for people under 16 years old.
 
 We may update this policy to reflect legal, technical, or product changes. The latest revision date appears at the top of this page.
 

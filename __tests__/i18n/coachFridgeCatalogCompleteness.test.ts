@@ -84,6 +84,11 @@ describe('Coach and fridge scan translation catalog completeness', () => {
     duration: '6 hours',
     unit: 'hours',
     persona: 'Coach',
+    // `coach.conversation_hero.title_with_coach` interpole `{{coachName}}`
+    // dans les 6 locales. Sans ce param, i18n-js renvoie un placeholder
+    // `[missing "{{coachName}}" value]` qui declenche le filet
+    // `expect(...).not.toContain('[missing')` ci-dessous.
+    coachName: 'Noah',
   };
 
   beforeAll(async () => {
@@ -119,6 +124,19 @@ describe('Coach and fridge scan translation catalog completeness', () => {
       }
     },
   );
+
+  it.each([
+    ['fr', 'Retour aux résultats du scanner'],
+    ['en', 'Back to scan results'],
+    ['es', 'Volver a los resultados del escáner'],
+    ['de', 'Zurück zu den Scanner-Ergebnissen'],
+    ['it', 'Torna ai risultati dello scanner'],
+    ['pt', 'Voltar aos resultados do scanner'],
+  ] as const)('localizes the scanner result return action for %s', (locale, expected) => {
+    i18n.locale = locale;
+
+    expect(i18n.t('coach.action_bar.back_to_scan_results')).toBe(expected);
+  });
 
   it.each(locales)(
     'keeps the visible Chef rebrand copy clean for %s',

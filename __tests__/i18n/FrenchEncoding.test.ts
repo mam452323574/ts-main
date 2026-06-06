@@ -26,7 +26,7 @@ describe('French locale encoding', () => {
       'Modération sociale',
     );
     expect(FR_TRANSLATIONS.coach.title).toBe('Ton coach');
-    expect(FR_TRANSLATIONS.coach.history_title).toBe('Conseils précédents');
+    expect(FR_TRANSLATIONS.coach.history_title).toBe('Historique');
   });
 
   it('normalizes straight and curly apostrophes consistently', () => {

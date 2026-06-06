@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Health Scan",
+    "name": "SelfLens",
     "slug": "health-scan",
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
-    "scheme": "healthscan",
+    "scheme": "selflens",
     "userInterfaceStyle": "automatic",
     "jsEngine": "hermes",
     "newArchEnabled": true,
@@ -16,7 +16,8 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.healthscan.app",
+      "bundleIdentifier": "org.selflens.app",
+      "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       },
@@ -31,7 +32,7 @@
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#1E3A2B"
       },
-      "package": "com.healthscan.app",
+      "package": "com.selflens.app",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_MEDIA_IMAGES",
@@ -71,23 +72,25 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Health Scan a besoin d'acceder a votre camera pour capturer des photos destinees a l'analyse sante."
+          "cameraPermission": "SelfLens a besoin d'acceder a votre camera pour capturer des photos destinees a l'analyse sante."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Health Scan a besoin d'acceder a vos photos pour choisir une photo de profil.",
-          "cameraPermission": "Health Scan a besoin d'acceder a votre camera pour capturer des photos destinees a l'analyse sante.",
-          "microphonePermission": "Health Scan a besoin d'acceder a votre micro pour la dictee vocale dans la conversation avec ton coach."
+          "photosPermission": "SelfLens a besoin d'acceder a vos photos pour choisir une photo de profil.",
+          "cameraPermission": "SelfLens a besoin d'acceder a votre camera pour capturer des photos destinees a l'analyse sante.",
+          "microphonePermission": "SelfLens a besoin d'acceder a votre micro pour la dictee vocale dans la conversation avec ton coach."
         }
       ],
       [
         "expo-speech-recognition",
         {
-          "microphonePermission": "Health Scan a besoin d'acceder a votre micro pour la dictee vocale dans la conversation avec ton coach.",
-          "speechRecognitionPermission": "Health Scan utilise la reconnaissance vocale pour transcrire ce que tu dis dans la conversation avec ton coach.",
-          "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox"]
+          "microphonePermission": "SelfLens a besoin d'acceder a votre micro pour la dictee vocale dans la conversation avec ton coach.",
+          "speechRecognitionPermission": "SelfLens utilise la reconnaissance vocale pour transcrire ce que tu dis dans la conversation avec ton coach.",
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox"
+          ]
         }
       ],
       [
@@ -99,7 +102,22 @@
           "mode": "production"
         }
       ],
-      "expo-localization"
+      "expo-localization",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-7622840244305747~9488642668",
+          "iosAppId": "ca-app-pub-7622840244305747~8095669949",
+          "delayAppMeasurementInit": true,
+          "userTrackingUsageDescription": "SelfLens utilise cet identifiant publicitaire pour vous proposer des publicites plus pertinentes. Vous pouvez refuser sans perdre aucune fonctionnalite."
+        }
+      ],
+      [
+        "expo-tracking-transparency",
+        {
+          "userTrackingPermission": "SelfLens utilise cet identifiant publicitaire pour vous proposer des publicites plus pertinentes. Vous pouvez refuser sans perdre aucune fonctionnalite."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
@@ -108,11 +126,17 @@
       "router": {},
       "eas": {
         "projectId": "5c05cea9-b48e-4c50-aba8-bdb9855c9cd1"
-      }
+      },
+      "EXPO_PUBLIC_SUPABASE_URL": "https://supabase.basedjew.com",
+      "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzgwMDcwOTA1LCJleHAiOjIwOTU0MzA5MDV9.DNcht8AWIXe3Uqgz3P3PmINu2JeYEfqt1jM8TxHa2Yk",
+      "EXPO_PUBLIC_REVENUECAT_IOS_API_KEY": "appl_quwALTkmmGXdVTOTTvfVeQCoMJW",
+      "EXPO_PUBLIC_ADMOB_ANDROID_REWARDED": "ca-app-pub-7622840244305747/7987858730",
+      "EXPO_PUBLIC_ADMOB_IOS_REWARDED": "ca-app-pub-7622840244305747/1422450383"
     },
     "owner": "malo6002",
     "updates": {
-      "url": "https://u.expo.dev/5c05cea9-b48e-4c50-aba8-bdb9855c9cd1"
+      "url": "https://u.expo.dev/5c05cea9-b48e-4c50-aba8-bdb9855c9cd1",
+      "fallbackToCacheTimeout": 0
     }
   }
 }

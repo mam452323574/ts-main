@@ -91,7 +91,7 @@ describe('phase2 contracts', () => {
         accentColor: '#000000',
         accentColorSecondary: undefined,
         headline: undefined,
-        footerBrand: 'HEALTH SCAN',
+        footerBrand: 'SELFLENS',
         footerCta: 'Track your progress',
         statusBadgeLabel: undefined,
         statusTone: undefined,

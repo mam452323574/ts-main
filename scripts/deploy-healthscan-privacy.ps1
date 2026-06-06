@@ -29,5 +29,4 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host ""
 Write-Host "Deployment complete."
 Write-Host "Verify these URLs next:"
-Write-Host "  https://healthscan.cloud/privacy-policy"
-Write-Host "  https://www.healthscan.cloud/privacy-policy"
+Write-Host "  https://privacy.selflens.org/privacy-policy/"

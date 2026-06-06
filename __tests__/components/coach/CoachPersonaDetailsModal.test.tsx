@@ -110,7 +110,7 @@ describe('CoachPersonaDetailsModal', () => {
 
     expect(screen.getByTestId('coach-persona-details-locked-callout')).toBeTruthy();
     expect(
-      screen.getByText('Disponible avec Health Scan Premium'),
+      screen.getByText('Disponible avec SelfLens Premium'),
     ).toBeTruthy();
     expect(screen.getByText('Débloquer ce coach')).toBeTruthy();
     expect(screen.getByText('Plus tard')).toBeTruthy();

@@ -13,6 +13,7 @@ import {
   BORDER_RADIUS,
   SHADOWS,
   getAndroidLightSurface,
+  getThemeTokens,
   mixColors,
   withAlpha,
 } from '@/constants/theme';
@@ -42,7 +43,13 @@ function parseTimestampMs(value: number | string | undefined): number | undefine
 export function SuperScanIndicator({ isPremium, eligibility, onLockedPress }: SuperScanIndicatorProps) {
   const { colors, isDark } = useTheme();
   const { t } = useLanguage();
-  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const premiumForeground = isDark
+    ? colors.gold
+    : getThemeTokens(false).premium.foreground;
+  const styles = useMemo(
+    () => createStyles(colors, isDark, premiumForeground),
+    [colors, isDark, premiumForeground],
+  );
 
   const resolvedLimit = Math.max(eligibility?.limit ?? 1, 1);
   const resolvedRemaining = Math.max(
@@ -122,7 +129,7 @@ export function SuperScanIndicator({ isPremium, eligibility, onLockedPress }: Su
               </Text>
               {!isPremium && (
                 <Squircle style={styles.premiumBadge}>
-                  <Crown color={colors.gold} size={10} fill={colors.gold} />
+                  <Crown color={premiumForeground} size={10} fill={premiumForeground} />
                   <Text style={styles.premiumBadgeText}>{t('components.feature_list.premium')}</Text>
                 </Squircle>
               )}
@@ -143,7 +150,7 @@ export function SuperScanIndicator({ isPremium, eligibility, onLockedPress }: Su
               </Squircle>
             ) : hasRemainingScans ? (
               <Squircle style={styles.availableBadge}>
-                <Zap color={colors.gold} size={14} fill={colors.gold} />
+                <Zap color={premiumForeground} size={14} fill={premiumForeground} />
                 <Text style={styles.availableText}>{`${resolvedRemaining}/${resolvedLimit}`}</Text>
               </Squircle>
             ) : showRechargeTimer ? null : (
@@ -190,7 +197,7 @@ export function SuperScanIndicator({ isPremium, eligibility, onLockedPress }: Su
   );
 }
 
-const createStyles = (colors: any, isDark: boolean) => {
+const createStyles = (colors: any, isDark: boolean, premiumForeground: string) => {
   const isAndroidLight = Platform.OS === 'android' && !isDark;
   const premiumSurface = isAndroidLight
     ? getAndroidLightSurface(colors, {
@@ -363,7 +370,7 @@ const createStyles = (colors: any, isDark: boolean) => {
     premiumBadgeText: {
       fontSize: SIZES.text10,
       fontWeight: FONT_WEIGHTS.bold,
-      color: colors.gold,
+      color: premiumForeground,
     },
     statusContainer: {
       marginLeft: SPACING.sm,
@@ -391,7 +398,7 @@ const createStyles = (colors: any, isDark: boolean) => {
     availableText: {
       fontSize: SIZES.text10,
       fontWeight: FONT_WEIGHTS.bold,
-      color: colors.gold,
+      color: premiumForeground,
     },
     usedBadge: {
       minWidth: 36,
@@ -426,7 +433,7 @@ const createStyles = (colors: any, isDark: boolean) => {
     },
     progressLabel: {
       fontSize: SIZES.text10,
-      color: colors.gold,
+      color: premiumForeground,
       marginTop: SPACING.xs,
       textAlign: 'center',
       fontWeight: FONT_WEIGHTS.medium,

@@ -1,4 +1,13 @@
 export const FR_TRANSLATIONS = {
+  ads: {
+    optin: {
+      title: 'Débloquez votre résultat',
+      body: 'Regardez une courte vidéo (~30 s) pour débloquer votre résultat gratuitement.',
+      watch: 'Regarder la vidéo',
+      go_premium: 'Passer Premium (sans pub)',
+      later: 'Plus tard',
+    },
+  },
   common: {
     back: 'Retour',
     retry: 'Réessayer',
@@ -190,7 +199,7 @@ export const FR_TRANSLATIONS = {
             'La photo est envoyée dans un flux sécurisé avant le traitement.',
         },
         analysis: {
-          headline: 'Analyse Health Scan',
+          headline: 'Analyse SelfLens',
           subtext:
             'Les signaux visibles sont transformés en une lecture claire et exploitable.',
         },
@@ -310,7 +319,7 @@ export const FR_TRANSLATIONS = {
       risk: 'Risque',
     },
     dialog: {
-      title: 'Partager le visuel Health Scan',
+      title: 'Partager le visuel SelfLens',
     },
     unavailable: {
       title: 'Partage indisponible',
@@ -364,7 +373,7 @@ export const FR_TRANSLATIONS = {
       "Le service Supabase et le hook React Query renvoient pour l'instant un état vide et sûr.",
     feed_title: 'Feed communauté',
     feed_subtitle:
-      'Partagez vos progrès, vos repas et vos transformations dans le feed public Health Scan.',
+      'Partagez vos progrès, vos repas et vos transformations dans le feed public SelfLens.',
     actions: {
       compose: 'Créer un post',
       share: 'Partager',
@@ -522,13 +531,8 @@ export const FR_TRANSLATIONS = {
       placeholder_title: 'Commencez par une photo',
       placeholder_body:
         'Choisissez une photo ou réutilisez votre carte résultat.',
-      hashtags: 'Hashtags',
-      mention: 'Mention',
-      visibility_title: 'Tout le monde pourra voir ce post',
-      visibility_body: 'Il devient public après validation de la modération.',
       submit: 'Publier le post',
       submitting: 'Publication...',
-      helper: "Les posts restent cachés jusqu'à validation par la modération.",
       error_title: 'Publication impossible',
       error_submit: "Votre post n'a pas pu être publié pour le moment.",
       error_asset: "L'image n'a pas pu être préparée pour l'envoi.",
@@ -718,6 +722,8 @@ export const FR_TRANSLATIONS = {
     locked_tap_hint: 'Touchez pour débloquer cette personnalité.',
     conversation_hero: {
       title_with_coach: 'Conversation Libre avec {{coachName}}',
+      new_topic_cta: 'Nouveau sujet',
+      cta_default: 'Parler au coach',
     },
     free_persona_hint: "Noah est inclus dans l'offre gratuite.",
     active_persona_label: 'Personnalité du Coach',
@@ -735,7 +741,7 @@ export const FR_TRANSLATIONS = {
     persona_current_cta: 'Garder ce coach',
     persona_choose_cta: 'Choisir ce coach',
     persona_unlock_cta: 'Débloquer ce coach',
-    persona_locked_title: 'Disponible avec Health Scan Premium',
+    persona_locked_title: 'Disponible avec SelfLens Premium',
     persona_locked_body:
       'Aperçu de cette personnalité, à débloquer quand vous voulez coacher avec elle.',
     persona_unknown_title: 'Coach',
@@ -783,17 +789,54 @@ export const FR_TRANSLATIONS = {
         'Pour un plan hebdo skincare + nutrition + sport, Premium est requis. Voici une lecture gratuite de ton scan.',
       cta: 'Découvrir Premium',
     },
-    history_title: 'Conseils précédents',
+    history_title: 'Historique',
+    conversations_inbox: {
+      title_fallback: 'Conversations',
+      title_global: 'Messages',
+      new_conversation: 'Nouvelle conversation',
+      new_conversation_short: 'Nouvelle conv',
+      new_a11y: 'Nouvelle conversation avec {{coachName}}',
+      new_global_a11y: 'Démarrer une nouvelle conversation',
+      empty_title: 'Commence une conversation avec {{coachName}}',
+      empty_body: 'Tes sujets avec ce coach apparaîtront ici.',
+      empty_global_title: 'Aucune conversation pour l’instant',
+      empty_global_body: 'Démarre une discussion avec ton coach pour la retrouver ici.',
+      start_conversation_cta: 'Démarrer une conversation',
+      untitled: 'Nouvelle conversation',
+      no_preview: '…',
+      status_ended: 'Terminée',
+      status_full: 'Complète',
+      status_archived: 'Archivée',
+      load_more: 'Afficher plus',
+      loading_more: 'Chargement...',
+      error_title: 'Impossible de charger les conversations',
+      create_error_title: 'Conversation impossible',
+      invalid_title: 'Coach introuvable',
+      invalid_body: "Cette liste de conversations n'est pas disponible.",
+    },
     view_history_cta: "Voir l'historique",
     history_cta_count: '{{count}} conseil(s) précédents',
     history_cta_latest: 'Dernier conseil {{date}}',
     history_load_more: 'Afficher 10 de plus',
     history_loading_more: 'Chargement...',
-    history_screen_body:
-      "Retrouvez vos anciens conseils sans alourdir l'écran principal.",
     history_empty_title: 'Aucun conseil pour le moment',
     history_empty_body:
       'Demandez un nouveau conseil : les réponses terminées apparaîtront ici automatiquement.',
+    history_status_active: 'En cours',
+    history_conversations_with: 'Conversations avec {{coachName}}',
+    history_start_new_topic: 'Nouveau sujet',
+    history_empty_filtered_title: 'Aucune conversation avec ce coach',
+    history_empty_filtered_cta: 'Parler au coach',
+    history_view_all_for_persona: 'Voir les {{count}} conversations',
+    history_delete_action: 'Supprimer',
+    history_delete_confirm_title: 'Supprimer de l’historique ?',
+    history_delete_confirm_body_entry:
+      'Ce conseil ne sera plus visible dans ton historique.',
+    history_delete_confirm_body_conversation:
+      'Cette conversation ne sera plus visible dans ton historique.',
+    history_delete_confirm_cancel: 'Annuler',
+    history_delete_confirm_confirm: 'Supprimer',
+    history_delete_error_title: 'Suppression impossible',
     no_active_guidance_title: 'Pas encore de conseil actif',
     no_active_guidance_body:
       'Choisissez un type de guidance ci-dessous pour générer une nouvelle réponse avec cette personnalité.',
@@ -1048,6 +1091,7 @@ export const FR_TRANSLATIONS = {
     },
     action_bar: {
       primary: 'Nouveau conseil',
+      back_to_scan_results: 'Retour aux résultats du scanner',
       cta_request: 'Demander',
       cta_scan: 'Scanner',
       cta_generating: 'Génération…',
@@ -1187,7 +1231,7 @@ export const FR_TRANSLATIONS = {
     last_updated: 'Dernière mise à jour : 9 février 2026',
     intro_title: '1. Introduction',
     intro_content:
-      'Bienvenue sur Health Scan. Nous nous engageons à protéger votre vie privée et vos données personnelles. Cette politique explique comment nous collectons, utilisons et protégeons vos informations conformément au Règlement Général sur la Protection des Données (RGPD) et aux lois applicables.',
+      'Bienvenue sur SelfLens. Nous nous engageons à protéger votre vie privée et vos données personnelles. Cette politique explique comment nous collectons, utilisons et protégeons vos informations conformément au Règlement Général sur la Protection des Données (RGPD) et aux lois applicables.',
     data_title: '2. Données Collectées',
     data_content: 'Nous collectons les catégories de données suivantes :',
     data_account:
@@ -1200,7 +1244,7 @@ export const FR_TRANSLATIONS = {
       "Données d'utilisation : historique des scans, préférences, statistiques d'utilisation",
     camera_title: '3. Utilisation de la Caméra',
     camera_content:
-      "Health Scan utilise la caméra de votre appareil exclusivement pour capturer des images à analyser (visage, corps, alimentation). Les photos sont traitées par notre infrastructure d'analyse pour générer des analyses de santé. Les images sont transmises de manière sécurisée via HTTPS et ne sont jamais partagées avec des tiers. Vous pouvez supprimer vos données à tout moment.",
+      "SelfLens utilise la caméra de votre appareil exclusivement pour capturer des images à analyser (visage, corps, alimentation). Les photos sont traitées par notre infrastructure d'analyse pour générer des analyses de santé. Les images sont transmises de manière sécurisée via HTTPS et ne sont jamais partagées avec des tiers. Vous pouvez supprimer vos données à tout moment.",
     usage_title: '4. Utilisation des Données',
     usage_content: 'Vos données sont utilisées pour :',
     usage_analysis: 'Fournir des analyses de santé personnalisées',
@@ -1223,7 +1267,7 @@ export const FR_TRANSLATIONS = {
       'Droit de retrait : retirer votre consentement à tout moment',
     children_title: '8. Protection des Mineurs',
     children_content:
-      "Health Scan n'est pas destiné aux personnes de moins de 16 ans. Nous ne collectons pas sciemment de données concernant des mineurs. Si vous êtes parent et pensez que votre enfant nous a fourni des informations, contactez-nous pour les supprimer.",
+      "SelfLens n'est pas destiné aux personnes de moins de 16 ans. Nous ne collectons pas sciemment de données concernant des mineurs. Si vous êtes parent et pensez que votre enfant nous a fourni des informations, contactez-nous pour les supprimer.",
     updates_title: '9. Modifications',
     updates_content:
       "Nous pouvons mettre à jour cette politique de confidentialité. En cas de modifications importantes, nous vous en informerons via l'application ou par email. La date de dernière mise à jour est indiquée en haut de cette page.",
@@ -1436,7 +1480,7 @@ export const FR_TRANSLATIONS = {
         body: 'La régularité est la clé du succès !',
       },
       '6': {
-        title: 'Health Scan',
+        title: 'SelfLens',
         body: 'Votre coach santé vous attend.',
       },
     },
@@ -1502,7 +1546,7 @@ export const FR_TRANSLATIONS = {
       'Une fois votre compte supprimé, il sera impossible de revenir en arrière. Soyez certain de votre choix.',
     sign_out_button: 'Se déconnecter',
     sign_out_loading: 'Déconnexion...',
-    footer_version: 'Health Scan v1.0.0',
+    footer_version: 'SelfLens v1.0.0',
     select_language_title: 'Choisir la langue',
     cancel: 'Annuler',
     ok: 'OK',
@@ -1530,14 +1574,20 @@ export const FR_TRANSLATIONS = {
     logout_btn: 'Se Déconnecter',
   },
   auth: {
-    login_title: 'Health Scan',
-    login_subtitle: 'Connectez-vous ou récupérez votre compte',
+    login_title: 'SelfLens',
+    login_subtitle: 'Connectez-vous à votre compte',
+    oauth_google: 'Continuer avec Google',
+    oauth_apple: 'Continuer avec Apple',
+    welcome_title: 'Bienvenue sur SelfLens',
+    welcome_subtitle: 'Scannez, comprenez et suivez vos évolutions. Créez un compte ou connectez-vous pour commencer.',
+    welcome_create: 'Créer un compte',
+    welcome_login: 'Se connecter',
     email_placeholder: 'Votre email',
     password_placeholder: 'Votre mot de passe',
     password_confirm: 'Confirmer le mot de passe',
     login_btn: 'Se Connecter',
     no_account: 'Pas de compte ?',
-    signup_link: "S'inscrire",
+    signup_link: 'Créer un compte',
     signup_title: 'Créer un compte',
     signup_subtitle: 'Rejoignez-nous pour suivre votre santé',
     password_min_placeholder: 'Mot de passe (8+ car., minuscule + chiffre)',
@@ -1568,6 +1618,7 @@ export const FR_TRANSLATIONS = {
     cancel_verification_message:
       'Vous serez déconnecté et pourrez reprendre plus tard depuis la connexion.',
     cancel_verification_confirm: 'Se déconnecter',
+    cancel_verification_link: "Annuler l'inscription",
     error_verification_code: 'Code incorrect',
     error_auth_cancelled: 'Authentification annulée',
     verify_btn: 'Vérifier',
@@ -1659,8 +1710,9 @@ export const FR_TRANSLATIONS = {
       'Choisis un style, puis demande ton repas.',
     chef_selector_eyebrow: 'Ton style culinaire',
     chef_selector_title: 'Quel chef te tente ?',
-    feedback_primary_cta: 'Demander au chef',
-    feedback_secondary_cta: 'Reprendre',
+    feedback_primary_cta: 'Demander',
+    feedback_secondary_cta: 'Reprendre une photo',
+    feedback_home_cta: "Retour à l'accueil",
     feedback_cta: 'Reprendre',
     feedback_camera_badge: 'Photo caméra',
     feedback_gallery_badge: 'Photo galerie',
@@ -1777,7 +1829,7 @@ export const FR_TRANSLATIONS = {
     },
   },
   premium: {
-    title: 'Health Scan Premium',
+    title: 'SelfLens Premium',
     subtitle: 'Débloquez tout le potentiel de votre santé',
     already_premium_title: 'Vous êtes Premium !',
     already_premium_desc:
@@ -1834,7 +1886,7 @@ export const FR_TRANSLATIONS = {
     renewal_date: 'Renouvellement le : %{date}',
     manage_subscription: 'Gérer mon abonnement',
     subscription_page: {
-      hero_title: 'Débloquez l’expérience HealthScan complète',
+      hero_title: 'Débloquez l’expérience SelfLens complète',
       hero_subtitle:
         'Coach avancé, Super Scan, Chef Premium et analyses plus poussées.',
       free_title: 'Gratuit',
@@ -1925,7 +1977,7 @@ export const FR_TRANSLATIONS = {
     intro_step_note:
       'Choisissez un pseudo et une apparence, puis rattachez votre profil avec Google ou email.',
     intro_cta: 'Commencer',
-    existing_account_cta: "J'ai déjà un compte / Récupérer mon compte",
+    existing_account_cta: 'Déjà un compte ? Se connecter',
     profile_step_title: 'Préparez votre profil de scan',
     profile_step_subtitle:
       'Choisissez votre pseudo, ajoutez une photo si vous voulez, puis gardez un thème clair pour vous.',
@@ -1989,7 +2041,7 @@ export const FR_TRANSLATIONS = {
     slide_1_eyebrow: 'Scanner',
     slide_1_title: "Scanne d'abord. Devine moins.",
     slide_1_subtitle:
-      "Une photo pour vos repas, votre visage ou votre corps. Health Scan en fait un point de départ clair.",
+      "Une photo pour vos repas, votre visage ou votre corps. SelfLens en fait un point de départ clair.",
     slide_1_bullet_1: 'Visage, corps, repas',
     slide_1_bullet_2: 'Capture rapide',
     slide_1_bullet_3: 'Base nette',

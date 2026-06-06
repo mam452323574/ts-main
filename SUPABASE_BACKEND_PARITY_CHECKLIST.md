@@ -4,7 +4,7 @@ This checklist makes the currently active backend surface explicit for this repo
 
 The canonical deployable Edge Function surface now lives in `supabase/functions/active-edge-functions.json`.
 
-## HealthScan 2026-04-28 Parity Hotfix
+## SelfLens 2026-04-28 Parity Hotfix
 
 The current production bug set depends on these backend checks:
 

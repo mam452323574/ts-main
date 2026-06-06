@@ -16,7 +16,9 @@ export const PREMIUM_LOCKED_FIELDS: Record<PremiumGatedScanType, string[]> = {
     'muscle_definition_score',
     'midsection_definition_score',
     'shoulder_alignment_score',
-    'recovery_readiness_score',
+    // 'recovery_readiness_score' — ouvert en gratuit (rééquilibrage produit
+    //   2026-05-27) : la valeur chiffrée IA est désormais visible, sans label
+    //   qualitatif intermédiaire ("Élevée/Modérée/Faible").
     'upper_body_definition_score',
     'lower_body_definition_score',
     'arm_definition_score',
@@ -24,14 +26,16 @@ export const PREMIUM_LOCKED_FIELDS: Record<PremiumGatedScanType, string[]> = {
     'body_tension_indicator_score',
   ],
   face: [
-    'fatigue_level',
+    // 'fatigue_level' — ouvert en gratuit (rééquilibrage produit 2026-05-27) :
+    //   la valeur chiffrée IA est désormais visible (ex. `72/100`).
     'photogenic_score',
     'skin_quality_score',
     'energy_score',
     'collagen_level',
-    'skin_clarity_score',
-    'skin_evenness_score',
-    'under_eye_shadow_score',
+    // 'skin_clarity_score', 'skin_evenness_score', 'under_eye_shadow_score'
+    //   — ouverts en gratuit (rééquilibrage produit 2026-05-27) :
+    //   les valeurs chiffrées IA remplacent les labels qualitatifs
+    //   ("Peau nette / Teint uniforme / Regard reposé").
     'under_eye_volume_score',
     'eye_openness_score',
     'complexion_redness_score',
@@ -66,7 +70,8 @@ export const PREMIUM_LOCKED_FIELDS: Record<PremiumGatedScanType, string[]> = {
     'processing_level_score',
     'hydration_contribution_score',
     'sodium_level_score',
-    'meal_balance_score',
+    // 'meal_balance_score' — ouvert en gratuit (rééquilibrage produit
+    //   2026-05-27) : la valeur chiffrée IA remplace le label qualitatif.
     'inflammation_index_score',
     'color_diversity_score',
     'vegetable_portion_ratio',

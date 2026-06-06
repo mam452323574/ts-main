@@ -10,6 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 
 import SignUpScreen from '@/screens/SignUpScreen';
+import { loadPreAuthOnboardingDraft } from '@/utils/preAuthOnboarding';
 
 jest.mock('lucide-react-native', () => ({
   ArrowLeft: 'ArrowLeft',
@@ -50,7 +51,13 @@ jest.mock('@/components/OAuthButton', () => ({
         accessibilityState={{ disabled: disabled || loading }}
         testID={`oauth-${provider}-button`}
       >
-        <Text>{loading ? 'Google loading' : 'Continuer avec Google'}</Text>
+        <Text>
+          {loading
+            ? 'Google loading'
+            : provider === 'apple'
+              ? 'Continuer avec Apple'
+              : 'Continuer avec Google'}
+        </Text>
       </TouchableOpacity>
     );
   },
@@ -110,6 +117,7 @@ jest.mock('@/contexts/ThemeContext', () => ({
 
 const mockSignUp = jest.fn();
 const mockSignInWithGoogle = jest.fn();
+const mockSignInWithOAuth = jest.fn();
 const mockSendVerificationEmail = jest.fn();
 const mockIsDisposableEmail = jest.fn();
 const mockCreatePreparedAvatarLocalUri = jest.fn();
@@ -118,6 +126,7 @@ jest.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
     signUp: mockSignUp,
     signInWithGoogle: mockSignInWithGoogle,
+    signInWithOAuth: mockSignInWithOAuth,
     sendVerificationEmail: mockSendVerificationEmail,
     isDisposableEmail: mockIsDisposableEmail,
   }),
@@ -129,7 +138,8 @@ jest.mock('@/services/avatar', () => ({
 }));
 
 async function startSignup() {
-  fireEvent.press(await screen.findByText('Commencer'));
+  // Le wizard démarre directement à l'étape pseudo : l'intro est désormais
+  // l'écran d'accueil neutre (WelcomeScreen), hors du wizard.
   await screen.findByText('Comment doit-on vous appeler ?');
 }
 
@@ -140,15 +150,9 @@ async function reachAvatar() {
   await screen.findByText('Ajoutez une photo de profil');
 }
 
-async function reachAppearance() {
+async function reachAccountMethod() {
   await reachAvatar();
   fireEvent.press(screen.getByTestId('signup-avatar-skip'));
-  await screen.findByText('Apparence');
-}
-
-async function reachAccountMethod() {
-  await reachAppearance();
-  fireEvent.press(screen.getByText('Suivant'));
   await screen.findByText('Sauvegardez votre profil');
 }
 
@@ -164,6 +168,7 @@ describe('SignUpScreen mobile-first flow', () => {
     await AsyncStorage.clear();
     mockSignUp.mockResolvedValue({ userId: 'user-123', email: 'test@example.com' });
     mockSignInWithGoogle.mockResolvedValue(undefined);
+    mockSignInWithOAuth.mockResolvedValue(undefined);
     mockSendVerificationEmail.mockResolvedValue(undefined);
     mockIsDisposableEmail.mockResolvedValue(false);
     mockCreatePreparedAvatarLocalUri.mockResolvedValue('file:///cropped-avatar.jpg');
@@ -173,40 +178,34 @@ describe('SignUpScreen mobile-first flow', () => {
     });
   });
 
-  it('opens with one primary intro action and a returning-user route', async () => {
+  it('opens directly on the username step (intro now lives on the welcome screen)', async () => {
     render(<SignUpScreen />);
 
-    expect(await screen.findByText('Votre premier scan commence ici')).toBeTruthy();
-    expect(
-      screen.getByText(
-        'Choisissez un pseudo et une apparence, puis rattachez votre profil avec Google ou email.',
-      ),
-    ).toBeTruthy();
-    expect(screen.queryByTestId('signup-username-input')).toBeNull();
+    expect(await screen.findByText('Comment doit-on vous appeler ?')).toBeTruthy();
+    expect(screen.queryByText('Commencer')).toBeNull();
+    expect(screen.getByTestId('signup-username-input')).toBeTruthy();
+  });
 
-    fireEvent.press(screen.getByText("J'ai déjà un compte / Récupérer mon compte"));
+  it('routes returning users to login from the account method step', async () => {
+    render(<SignUpScreen />);
+    await reachAccountMethod();
+
+    fireEvent.press(screen.getByText('Déjà un compte ? Se connecter'));
     expect(mockPush).toHaveBeenCalledWith('/login');
   });
 
-  it('keeps pseudo, photo, appearance, method and email on distinct pages', async () => {
+  it('keeps pseudo, photo, method and email on distinct pages', async () => {
     render(<SignUpScreen />);
     await startSignup();
 
     expect(screen.getByTestId('signup-username-input')).toBeTruthy();
-    expect(screen.queryByText('Apparence')).toBeNull();
 
     fireEvent.changeText(screen.getByTestId('signup-username-input'), 'Friendly User!');
     expect(screen.getByTestId('signup-username-input').props.value).toBe('friendlyuser');
     fireEvent.press(screen.getByText('Suivant'));
 
     expect(await screen.findByText('Ajoutez une photo de profil')).toBeTruthy();
-    expect(screen.queryByText('Sombre')).toBeNull();
     fireEvent.press(screen.getByTestId('signup-avatar-skip'));
-
-    expect(await screen.findByText('Apparence')).toBeTruthy();
-    expect(screen.getByText('Clair')).toBeTruthy();
-    expect(screen.getByText('Sombre')).toBeTruthy();
-    fireEvent.press(screen.getByText('Suivant'));
 
     expect(await screen.findByText('Sauvegardez votre profil')).toBeTruthy();
     expect(screen.queryByPlaceholderText('Votre email')).toBeNull();
@@ -215,7 +214,7 @@ describe('SignUpScreen mobile-first flow', () => {
     expect(await screen.findByPlaceholderText('Votre email')).toBeTruthy();
   });
 
-  it('uses keyboard adjustment only after entering a text step', async () => {
+  it('enables keyboard adjustment on text steps but not on the avatar step', async () => {
     const originalOS = ReactNative.Platform.OS;
     Object.defineProperty(ReactNative.Platform, 'OS', {
       value: 'android',
@@ -224,14 +223,18 @@ describe('SignUpScreen mobile-first flow', () => {
 
     try {
       render(<SignUpScreen />);
-      await screen.findByText('Commencer');
-      expect(screen.UNSAFE_queryByType(ReactNative.KeyboardAvoidingView)).toBeNull();
-
-      await startSignup();
+      // Étape pseudo = étape texte → KeyboardAvoidingView actif d'emblée.
+      await screen.findByText('Comment doit-on vous appeler ?');
       expect(screen.UNSAFE_getByType(ReactNative.KeyboardAvoidingView).props.behavior).toBe(
         'height',
       );
       expect(screen.UNSAFE_getByType(ReactNative.ScrollView).props.bounces).toBe(false);
+
+      // Étape avatar = pas de saisie → pas de KeyboardAvoidingView.
+      fireEvent.changeText(screen.getByTestId('signup-username-input'), 'testuser');
+      fireEvent.press(screen.getByText('Suivant'));
+      await screen.findByText('Ajoutez une photo de profil');
+      expect(screen.UNSAFE_queryByType(ReactNative.KeyboardAvoidingView)).toBeNull();
     } finally {
       Object.defineProperty(ReactNative.Platform, 'OS', {
         value: originalOS,
@@ -254,6 +257,25 @@ describe('SignUpScreen mobile-first flow', () => {
       );
       expect(screen.getByText('Avatar preview')).toBeTruthy();
     });
+  });
+
+  it('offers Apple sign-in on the account method step and records the apple intent', async () => {
+    render(<SignUpScreen />);
+    expect(screen.queryByTestId('oauth-apple-button')).toBeNull();
+    await reachAccountMethod();
+
+    fireEvent.press(screen.getByTestId('oauth-apple-button'));
+
+    await waitFor(() =>
+      expect(mockSignInWithOAuth).toHaveBeenCalledWith('apple'),
+    );
+    await expect(loadPreAuthOnboardingDraft()).resolves.toEqual(
+      expect.objectContaining({
+        username: 'testuser',
+        completionIntent: 'signup-apple',
+        lastStep: 'accountMethod',
+      }),
+    );
   });
 
   it('offers Google only after profile setup and stores no password for email signup', async () => {

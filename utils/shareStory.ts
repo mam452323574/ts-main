@@ -31,7 +31,7 @@ interface BuildShareStoryPayloadOptions {
   locale?: string | null;
 }
 
-const FOOTER_BRAND = 'HEALTH SCAN';
+const FOOTER_BRAND = 'SELFLENS';
 const EMPTY_FOOTER_CTA = '';
 const SHARE_STORY_VARIANTS = ['face', 'body', 'nutrition', 'super'] as const;
 const SHARE_STORY_STATUS_TONES = ['neutral', 'warning'] as const;

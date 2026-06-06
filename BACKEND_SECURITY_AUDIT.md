@@ -1,4 +1,4 @@
-# Audit Sécurité Backend (suite) — HealthScan / TSE
+# Audit Sécurité Backend (suite) — SelfLens / TSE
 
 **Date :** 2026-04-25
 **Périmètre :** Edge Functions, migrations SQL, RLS, Storage — au-delà des findings XSS/HTML

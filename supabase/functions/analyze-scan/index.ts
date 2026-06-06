@@ -47,6 +47,11 @@ import {
   hasJpegMagicBytes,
   isAppScanType,
 } from '../../../shared/scanContract.ts';
+import {
+  resolveTierFromProfile,
+  sanitizeScanForTier,
+  type ScanResultTier,
+} from '../_shared/scanResultSanitizer.ts';
 
 const OBSERVABILITY_CONTROL_CHARS_PATTERN =
   /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g;
@@ -390,46 +395,46 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // S-09 — defense-in-depth tier check pour `super`. La RPC reserve_scan_quota
-    // bloque déjà les comptes free, mais un re-check ici protège contre toute
-    // régression future de la RPC ou contre un scan créé hors flux normal.
-    if (requestedScanType === 'super') {
-      const { data: tierProfile, error: tierError } = await client
-        .from('user_profiles')
-        .select('account_tier')
-        .eq('id', user.id)
-        .maybeSingle();
+    // S-09 — defense-in-depth tier lookup. Used both for the `super` scan
+    // 403 guard and to gate the premium fields stripped from the response
+    // payload of free accounts (see `sanitizeScanForTier` below).
+    const { data: tierProfile, error: tierError } = await client
+      .from('user_profiles')
+      .select('account_tier')
+      .eq('id', user.id)
+      .maybeSingle();
 
-      if (tierError || !tierProfile) {
-        throw new Phase2HttpError(
-          500,
-          'scan_tier_lookup_failed',
-          'Failed to verify account tier for super scan',
-        );
-      }
+    if (tierError || !tierProfile) {
+      throw new Phase2HttpError(
+        500,
+        'scan_tier_lookup_failed',
+        'Failed to verify account tier',
+      );
+    }
 
-      const accountTier =
-        tierProfile.account_tier === 'premium' || tierProfile.account_tier === 'admin'
-          ? tierProfile.account_tier
-          : 'free';
+    const accountTier: ScanResultTier = resolveTierFromProfile(
+      tierProfile.account_tier,
+    );
 
-      if (accountTier === 'free') {
-        throw new Phase2HttpError(
-          403,
-          'super_scan_premium_required',
-          'Super scan requires premium',
-        );
-      }
+    if (requestedScanType === 'super' && accountTier === 'free') {
+      throw new Phase2HttpError(
+        403,
+        'super_scan_premium_required',
+        'Super scan requires premium',
+      );
     }
 
     const canonicalPath = buildCanonicalScanImagePath(user.id, scanRow.id);
     if (isStoredScanAnalysisComplete(scanRow)) {
       return jsonResponse(req, {
         success: true,
-        scan: {
-          ...scanRow,
-          image_path: scanRow.image_path ?? canonicalPath,
-        },
+        scan: sanitizeScanForTier(
+          {
+            ...scanRow,
+            image_path: scanRow.image_path ?? canonicalPath,
+          },
+          accountTier,
+        ),
       });
     }
 
@@ -483,7 +488,10 @@ Deno.serve(async (req: Request) => {
           .eq('user_id', user.id)
           .maybeSingle();
         if (completedScan) {
-          return jsonResponse(req, { success: true, scan: completedScan });
+          return jsonResponse(req, {
+            success: true,
+            scan: sanitizeScanForTier(completedScan, accountTier),
+          });
         }
       }
       throw new Phase2HttpError(
@@ -734,7 +742,7 @@ Deno.serve(async (req: Request) => {
 
     return jsonResponse(req, {
       success: true,
-      scan: updatedScan,
+      scan: sanitizeScanForTier(updatedScan, accountTier),
     });
   } catch (error) {
     if (client && isPendingScanRollback(pendingRollback)) {

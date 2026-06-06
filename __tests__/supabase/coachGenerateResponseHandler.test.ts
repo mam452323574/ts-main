@@ -160,7 +160,7 @@ function createRequestClient(options: {
     } as Record<string, unknown>);
 
   return {
-    rpc: jest.fn((rpcName: string) => {
+    rpc: jest.fn((rpcName: string, _params: Record<string, unknown>) => {
       if (rpcName === 'record_coach_generation_attempt') {
         return Promise.resolve({
           data: rateLimitError ? null : rateLimitResult,
@@ -204,6 +204,13 @@ function createRequestClient(options: {
         });
       }
 
+      if (rpcName === 'upsert_coach_pending_entry') {
+        return Promise.resolve({
+          data: pendingEntry,
+          error: null,
+        });
+      }
+
       return Promise.resolve({
         data: null,
         error: { code: 'unexpected_rpc', message: rpcName },
@@ -241,14 +248,6 @@ function createRequestClient(options: {
 
             return filters;
           }),
-          upsert: jest.fn(() => ({
-            select: jest.fn(() => ({
-              single: jest.fn().mockResolvedValue({
-                data: pendingEntry,
-                error: null,
-              }),
-            })),
-          })),
         };
       }
 
@@ -725,19 +724,16 @@ describe('coach generate response handler', () => {
         "Quelles 3 actions simples auront le plus d'impact d'ici ce soir ?",
     });
 
-    const coachEntriesRelation = requestClient.from.mock.results
-      .filter((_, index) => requestClient.from.mock.calls[index]?.[0] === 'coach_entries')
-      .map((result) => result.value)
-      .find((relation) => relation?.upsert?.mock?.calls?.length > 0);
-
-    expect(coachEntriesRelation.upsert).toHaveBeenCalledWith(
+    expect(requestClient.rpc).toHaveBeenCalledWith(
+      'upsert_coach_pending_entry',
       expect.objectContaining({
-        question_key: 'latest_scan__three_simple_actions',
-        question_text:
-          "Quelles 3 actions simples auront le plus d'impact d'ici ce soir ?",
-      }),
-      expect.objectContaining({
-        onConflict: 'user_id,cache_key',
+        p_user_id: expect.any(String),
+        p_cache_key: expect.any(String),
+        p_values: expect.objectContaining({
+          question_key: 'latest_scan__three_simple_actions',
+          question_text:
+            "Quelles 3 actions simples auront le plus d'impact d'ici ce soir ?",
+        }),
       }),
     );
   });
@@ -811,20 +807,17 @@ describe('coach generate response handler', () => {
       }),
     });
 
-    const coachEntriesRelation = requestClient.from.mock.results
-      .filter((_, index) => requestClient.from.mock.calls[index]?.[0] === 'coach_entries')
-      .map((result) => result.value)
-      .find((relation) => relation?.upsert?.mock?.calls?.length > 0);
-
-    expect(coachEntriesRelation.upsert).toHaveBeenCalledWith(
+    expect(requestClient.rpc).toHaveBeenCalledWith(
+      'upsert_coach_pending_entry',
       expect.objectContaining({
-        prompt_type: 'free_question',
-        question_key: null,
-        question_text:
-          'Comment adapter ma semaine avec mes derniers scans ?',
-      }),
-      expect.objectContaining({
-        onConflict: 'user_id,cache_key',
+        p_user_id: expect.any(String),
+        p_cache_key: expect.any(String),
+        p_values: expect.objectContaining({
+          prompt_type: 'free_question',
+          question_key: null,
+          question_text:
+            'Comment adapter ma semaine avec mes derniers scans ?',
+        }),
       }),
     );
     expect(mockPostCoachGenerateWebhook).toHaveBeenCalledWith(
@@ -2599,26 +2592,21 @@ describe('coach generate response handler', () => {
 
     expect(response.status).toBe(200);
 
-    const coachEntriesRelation = requestClient.from.mock.results
-      .filter(
-        (_, index) =>
-          requestClient.from.mock.calls[index]?.[0] === 'coach_entries',
-      )
-      .map((result) => result.value)
-      .find((relation) => relation?.upsert?.mock?.calls?.length > 0);
-
-    expect(coachEntriesRelation).toBeDefined();
-    const upsertedValues = coachEntriesRelation.upsert.mock.calls[0]?.[0] as
-      | Record<string, unknown>
+    const rpcCall = requestClient.rpc.mock.calls.find(
+      (call: unknown[]) => call[0] === 'upsert_coach_pending_entry',
+    );
+    expect(rpcCall).toBeDefined();
+    const rpcArgs = rpcCall?.[1] as
+      | { p_cache_key?: string; p_values?: Record<string, unknown> }
       | undefined;
-    expect(upsertedValues).toBeDefined();
-    expect(typeof upsertedValues?.cache_key).toBe('string');
+    expect(rpcArgs).toBeDefined();
+    expect(typeof rpcArgs?.p_cache_key).toBe('string');
     // The new pending entry must NOT reuse the existing ready entry's cache_key
-    // (otherwise UPSERT would overwrite). It must start with the original
+    // (otherwise the upsert would overwrite). It must start with the original
     // cache_key prefix to remain logically linked, then append a uniqueness
     // marker (`__fr_`).
-    expect(upsertedValues?.cache_key).not.toBe('cache-key-1');
-    expect(upsertedValues?.cache_key as string).toMatch(/^cache-key-1__fr_/);
+    expect(rpcArgs?.p_cache_key).not.toBe('cache-key-1');
+    expect(rpcArgs?.p_cache_key as string).toMatch(/^cache-key-1__fr_/);
   });
 
   it('keeps the original cache_key when force_refresh is set but no existing ready entry is found', async () => {
@@ -2653,17 +2641,12 @@ describe('coach generate response handler', () => {
       }),
     );
 
-    const coachEntriesRelation = requestClient.from.mock.results
-      .filter(
-        (_, index) =>
-          requestClient.from.mock.calls[index]?.[0] === 'coach_entries',
-      )
-      .map((result) => result.value)
-      .find((relation) => relation?.upsert?.mock?.calls?.length > 0);
-
-    const upsertedValues = coachEntriesRelation?.upsert?.mock?.calls[0]?.[0] as
-      | Record<string, unknown>
+    const rpcCall = requestClient.rpc.mock.calls.find(
+      (call: unknown[]) => call[0] === 'upsert_coach_pending_entry',
+    );
+    const rpcArgs = rpcCall?.[1] as
+      | { p_cache_key?: string }
       | undefined;
-    expect(upsertedValues?.cache_key).toBe('cache-key-1');
+    expect(rpcArgs?.p_cache_key).toBe('cache-key-1');
   });
 });

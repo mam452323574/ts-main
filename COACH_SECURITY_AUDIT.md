@@ -1,4 +1,4 @@
-# Audit sécurité — module Coach (HealthScan / TSE)
+# Audit sécurité — module Coach (SelfLens / TSE)
 
 **Date :** 2026-04-26
 **Périmètre :** module coach (front React Native, Edge Function `coach-generate-response`, helpers `_shared/coach*`, migrations `coach_entries` + RPC pagination, composants `components/coach/*`, écran `screens/CoachScreen.tsx`).

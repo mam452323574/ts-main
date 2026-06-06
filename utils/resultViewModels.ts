@@ -24,7 +24,6 @@ import {
   localizeDisplayNutritionVitaminKeys,
   localizeDisplayQualitativeLevel,
   localizeDisplayVerdict,
-  localizeQualitativeLevel,
   localizeSuperScanDisclaimerKey,
   localizeSuperScanSummaryKey,
 } from '@/utils/resultLocalization';
@@ -648,75 +647,6 @@ function resolveTrajectoryScoreLabel(
   }
 }
 
-type QualitativeSignalLevel = 'low' | 'moderate' | 'high';
-
-/**
- * Classifie un score numérique en niveau qualitatif `low | moderate | high`.
- * Permet d'afficher en gratuit un signal compréhensible sans révéler le score
- * chiffré qui peut rester premium (ex. `fatigue_level`, `recovery_readiness_score`).
- *
- * Les seuils sont exprimés sur l'échelle native de la métrique. La sémantique
- * du niveau (bon vs mauvais) dépend du `direction` :
- *  - `higher_is_worse` (ex. fatigue) : `high` = niveau élevé de fatigue = mauvais
- *  - `higher_is_better` (ex. recovery, meal_balance) : `high` = bon niveau
- *
- * Retourne `null` si la valeur est absente / non finie.
- */
-function classifyToSignalLevel(
-  rawValue: number | null | undefined,
-  thresholds: { low: number; high: number },
-): QualitativeSignalLevel | null {
-  const value = parseSafeNumber(rawValue);
-  if (value === null) {
-    return null;
-  }
-
-  if (value < thresholds.low) {
-    return 'low';
-  }
-  if (value >= thresholds.high) {
-    return 'high';
-  }
-  return 'moderate';
-}
-
-/**
- * Construit une `ResultMetricViewModel` gratuite qui rend un signal qualitatif
- * (label `Faible / Modérée / Élevée`) sans exposer la valeur chiffrée.
- *
- * Retourne `null` si la classification n'a pas pu être faite (valeur manquante).
- */
-function qualitativeSignalMetric(options: {
-  scanType: ResultScanIconToken;
-  id: string;
-  icon: ResultMetricIconToken;
-  title: string;
-  level: QualitativeSignalLevel | null;
-  t: TranslateFn;
-}): ResultMetricViewModel | null {
-  if (!options.level) {
-    return null;
-  }
-
-  const value = localizeQualitativeLevel('severity', options.level, options.t, '');
-  if (!value) {
-    return null;
-  }
-
-  return metric(
-    options.scanType,
-    options.icon,
-    options.title,
-    value,
-    'text',
-    {
-      id: options.id,
-      semanticValueKey: options.level,
-      valueMaxLines: 2,
-    },
-  );
-}
-
 export function buildScanResultViewModel(options: {
   analysisData: AnalysisResult;
   t: TranslateFn;
@@ -736,7 +666,6 @@ export function buildScanResultViewModel(options: {
   switch (analysisData.scan_type) {
     case 'face':
       {
-        const isFreeFace = premiumRenderState !== 'unlocked';
         const quickStats = [
           quickStat(
             'face',
@@ -763,59 +692,39 @@ export function buildScanResultViewModel(options: {
             },
           ),
         ];
-        // Signal qualitatif fatigue affiché en gratuit (au lieu de seulement
-        // la carte teaser locked du score chiffré). Cf. PRD "faire croquer".
-        const fatigueSignal = isFreeFace
-          ? qualitativeSignalMetric({
-              scanType: 'face',
-              id: 'fatigue_signal',
-              icon: 'fatigue',
-              title: t('common.metrics.fatigue_signal'),
-              level: classifyToSignalLevel(analysisData.fatigue_level, {
-                low: 45,
-                high: 75,
-              }),
-              t,
-            })
-          : null;
         const extendedFaceMetrics = [
           // Skin radiance / éclat — gratuit (retiré de PREMIUM_LOCKED_FIELDS).
-          optionalPremiumScore100Metric({
-            scanType: 'face',
-            icon: 'skin_radiance',
-            title: t('common.metrics.skin_radiance'),
-            fieldKey: 'skin_radiance_score',
-            rawValue: analysisData.skin_radiance_score,
+          optionalScore100Metric(
+            'face',
+            'skin_radiance',
+            t('common.metrics.skin_radiance'),
+            analysisData.skin_radiance_score,
             formatOptions,
-            premiumRenderState,
-          }),
-          optionalPremiumScore100Metric({
-            scanType: 'face',
-            icon: 'skin_clarity',
-            title: t('common.metrics.skin_clarity'),
-            fieldKey: 'skin_clarity_score',
-            rawValue: analysisData.skin_clarity_score,
+          ),
+          // skin_clarity / skin_evenness / under_eye_shadow — ouverts en gratuit
+          //   (rééquilibrage produit 2026-05-27) : valeur chiffrée IA, sans
+          //   label qualitatif intermédiaire.
+          optionalScore100Metric(
+            'face',
+            'skin_clarity',
+            t('common.metrics.skin_clarity'),
+            analysisData.skin_clarity_score,
             formatOptions,
-            premiumRenderState,
-          }),
-          optionalPremiumScore100Metric({
-            scanType: 'face',
-            icon: 'skin_evenness',
-            title: t('common.metrics.skin_evenness'),
-            fieldKey: 'skin_evenness_score',
-            rawValue: analysisData.skin_evenness_score,
+          ),
+          optionalScore100Metric(
+            'face',
+            'skin_evenness',
+            t('common.metrics.skin_evenness'),
+            analysisData.skin_evenness_score,
             formatOptions,
-            premiumRenderState,
-          }),
-          optionalPremiumScore100Metric({
-            scanType: 'face',
-            icon: 'under_eye_shadow',
-            title: t('common.metrics.under_eye_shadow'),
-            fieldKey: 'under_eye_shadow_score',
-            rawValue: analysisData.under_eye_shadow_score,
+          ),
+          optionalScore100Metric(
+            'face',
+            'under_eye_shadow',
+            t('common.metrics.under_eye_shadow'),
+            analysisData.under_eye_shadow_score,
             formatOptions,
-            premiumRenderState,
-          }),
+          ),
           optionalPremiumScore100Metric({
             scanType: 'face',
             icon: 'pore_visibility',
@@ -852,17 +761,15 @@ export function buildScanResultViewModel(options: {
             formatPercentage(analysisData.symmetry_percentage, formatOptions),
             'numeric',
           ),
-          premiumMetric({
-            scanType: 'face',
-            icon: 'fatigue',
-            title: t('common.metrics.fatigue'),
-            fieldKey: 'fatigue_level',
-            unlockedValue: formatScore100(analysisData.fatigue_level, formatOptions),
-            valueVariant: 'fraction',
-            premiumRenderState,
-            t,
-          }),
-          fatigueSignal,
+          // fatigue_level — ouvert en gratuit (rééquilibrage produit
+          //   2026-05-27) : la valeur chiffrée IA est désormais visible.
+          metric(
+            'face',
+            'fatigue',
+            t('common.metrics.fatigue'),
+            formatScore100(analysisData.fatigue_level, formatOptions),
+            'fraction',
+          ),
           metric(
             'face',
             'hydration',
@@ -929,7 +836,6 @@ export function buildScanResultViewModel(options: {
 
     case 'body':
       {
-        const isFreeBody = premiumRenderState !== 'unlocked';
         const quickStats = [
           quickStat(
             'body',
@@ -966,21 +872,16 @@ export function buildScanResultViewModel(options: {
             },
           ),
         ];
-        // Signal qualitatif récupération en gratuit (le score chiffré
-        // `recovery_readiness_score` reste premium dans `premiumMetrics`).
-        const recoverySignal = isFreeBody
-          ? qualitativeSignalMetric({
-              scanType: 'body',
-              id: 'recovery_signal',
-              icon: 'sleep_quality',
-              title: t('common.metrics.recovery_signal'),
-              level: classifyToSignalLevel(analysisData.recovery_readiness_score, {
-                low: 50,
-                high: 75,
-              }),
-              t,
-            })
-          : null;
+        // recovery_readiness_score — ouvert en gratuit (rééquilibrage produit
+        //   2026-05-27) : la valeur chiffrée IA est affichée pour tout le monde.
+        const recoveryMetric = optionalScore100Metric(
+          'body',
+          'sleep_quality',
+          t('common.metrics.sleep_quality'),
+          analysisData.recovery_readiness_score,
+          formatOptions,
+          { id: 'recovery_readiness' },
+        );
         const metrics = [
           metric(
             'body',
@@ -1025,7 +926,7 @@ export function buildScanResultViewModel(options: {
             formatScore10(analysisData.posture_score, formatOptions),
             'fraction',
           ),
-          recoverySignal,
+          recoveryMetric,
         ].filter((item): item is ResultMetricViewModel => item !== null);
         const premiumMetrics = [
           premiumMetric({
@@ -1080,16 +981,6 @@ export function buildScanResultViewModel(options: {
           }),
           optionalPremiumScore100Metric({
             scanType: 'body',
-            id: 'recovery_readiness',
-            icon: 'fatigue',
-            title: t('common.metrics.sleep_quality'),
-            fieldKey: 'recovery_readiness_score',
-            rawValue: analysisData.recovery_readiness_score,
-            formatOptions,
-            premiumRenderState,
-          }),
-          optionalPremiumScore100Metric({
-            scanType: 'body',
             id: 'body_tension',
             icon: 'fatigue',
             title: t('common.metrics.fatigue'),
@@ -1115,7 +1006,6 @@ export function buildScanResultViewModel(options: {
     case 'nutrition':
     default:
       {
-        const isFreeNutrition = premiumRenderState !== 'unlocked';
         const proteinPremiumRenderState = resolvePremiumMetricRenderState({
           premiumRenderState,
           scanType: 'nutrition',
@@ -1131,21 +1021,17 @@ export function buildScanResultViewModel(options: {
           scanType: 'nutrition',
           fieldKey: 'fat_grams',
         });
-        // Signal qualitatif d'équilibre du repas en gratuit (le score chiffré
-        // `meal_balance_score` reste premium dans `premiumMetrics`).
-        const mealBalanceSignal = isFreeNutrition
-          ? qualitativeSignalMetric({
-              scanType: 'nutrition',
-              id: 'meal_balance_signal',
-              icon: 'verdict',
-              title: t('common.metrics.meal_balance_signal'),
-              level: classifyToSignalLevel(analysisData.meal_balance_score, {
-                low: 50,
-                high: 75,
-              }),
-              t,
-            })
-          : null;
+        // meal_balance_score — ouvert en gratuit (rééquilibrage produit
+        //   2026-05-27) : la valeur chiffrée IA est affichée sans label
+        //   qualitatif intermédiaire ("Équilibre du repas: Élevée").
+        const mealBalanceMetric = optionalScore100Metric(
+          'nutrition',
+          'verdict',
+          t('common.metrics.meal_balance'),
+          analysisData.meal_balance_score,
+          formatOptions,
+          { id: 'meal_balance' },
+        );
         const quickStats = [
           quickStat(
             'nutrition',
@@ -1200,7 +1086,7 @@ export function buildScanResultViewModel(options: {
               semanticValueKey: analysisData.ingredient_quality_key,
             },
           ),
-          mealBalanceSignal,
+          mealBalanceMetric,
         ].filter((item): item is ResultMetricViewModel => item !== null);
         const premiumMetrics = [
           premiumMetric({
@@ -1267,16 +1153,9 @@ export function buildScanResultViewModel(options: {
             formatOptions,
             premiumRenderState,
           }),
-          optionalPremiumScore100Metric({
-            scanType: 'nutrition',
-            id: 'meal_balance',
-            icon: 'verdict',
-            title: t('common.metrics.meal_balance'),
-            fieldKey: 'meal_balance_score',
-            rawValue: analysisData.meal_balance_score,
-            formatOptions,
-            premiumRenderState,
-          }),
+          // `meal_balance_score` est désormais rendu pour tout le monde dans
+          //   `metrics` (cf. `mealBalanceMetric` ci-dessus). Il ne figure plus
+          //   ici pour éviter le doublon premium.
           optionalPremiumScore100Metric({
             scanType: 'nutrition',
             id: 'inflammation_index',

@@ -1,7 +1,6 @@
 import { useEffect, useCallback, useMemo, useRef, useState } from 'react';
 import {
   Animated,
-  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -50,6 +49,7 @@ import {
   SPACING,
   BORDER_RADIUS,
   FONT_WEIGHTS,
+  getCtaColors,
   getAndroidLightSurface,
   getMainPageChrome,
   getObsidianSurface,
@@ -139,6 +139,10 @@ export default function HomeScreen() {
   const premiumBannerColors = useMemo(
     () => premiumHealth.premiumGradient,
     [premiumHealth],
+  );
+  const premiumCtaForeground = useMemo(
+    () => getCtaColors(colors, isDark).premiumForeground,
+    [colors, isDark],
   );
   const premiumBannerHighlights = useMemo(
     () => [t('tabs.coach'), t('scan_types.super'), t('tabs.analytics')],
@@ -457,9 +461,10 @@ export default function HomeScreen() {
                     {t('scan_limit.upgrade')}
                   </Text>
                   <ChevronRight
-                    color={colors.primaryText}
+                    color={premiumCtaForeground}
                     size={18}
                     strokeWidth={2.7}
+                    testID="home-super-scan-upsell-cta-icon"
                   />
                 </View>
               </View>
@@ -717,14 +722,15 @@ const createStyles = (
   scrollBottomPadding: number,
   premiumHealth: PremiumHealthPalette,
 ) => {
-  const isAndroidLight = Platform.OS === 'android' && !isDark;
+  const isLight = !isDark;
   const chrome = getMainPageChrome(colors, isDark, 'trust');
+  const premiumCtaForeground = getCtaColors(colors, isDark).premiumForeground;
   const companionSurface = getVisualMoodSurface(colors, isDark, {
     mood: 'obsidian',
     accentColor: chrome.accentColor,
     intensity: 'card',
   });
-  const scanCardSurface = isAndroidLight
+  const scanCardSurface = isLight
     ? getAndroidLightSurface(colors, {
         accentColor: colors.primary,
         backgroundAlpha: 0.025,
@@ -736,7 +742,7 @@ const createStyles = (
         elevation: 2,
       })
     : null;
-  const premiumBannerSurface = isAndroidLight
+  const premiumBannerSurface = isLight
     ? getAndroidLightSurface(colors, {
         accentColor: premiumHealth.premiumAccent,
         shadowColor: premiumHealth.premiumAccent,
@@ -873,7 +879,7 @@ const createStyles = (
       flex: 1,
       minWidth: 0,
       borderRadius: BORDER_RADIUS.xl,
-      ...(isAndroidLight ? scanCardSurface?.shadowStyle : obsidianScanSurface.shadowStyle), borderCurve: 'continuous',
+      ...(isLight ? scanCardSurface?.shadowStyle : obsidianScanSurface.shadowStyle), borderCurve: 'continuous',
     },
     scanLimitCardSurface: {
       minWidth: 0,
@@ -882,11 +888,11 @@ const createStyles = (
       paddingHorizontal: 6,
       paddingVertical: SPACING.md,
       alignItems: 'center',
-      backgroundColor: isAndroidLight
+      backgroundColor: isLight
         ? scanCardSurface?.backgroundColor
         : obsidianScanSurface.backgroundColor,
       borderWidth: 1,
-      borderColor: isAndroidLight
+      borderColor: isLight
         ? scanCardSurface?.borderColor
         : obsidianScanSurface.borderColor,
       overflow: 'hidden', borderCurve: 'continuous',
@@ -954,12 +960,16 @@ const createStyles = (
     superQuotaStateCard: {
       borderRadius: BORDER_RADIUS.xl,
       padding: SPACING.lg,
-      backgroundColor: obsidianScanSurface.backgroundColor,
+      backgroundColor: isLight
+        ? scanCardSurface?.backgroundColor
+        : obsidianScanSurface.backgroundColor,
       borderWidth: 1,
-      borderColor: obsidianScanSurface.borderColor,
+      borderColor: isLight
+        ? scanCardSurface?.borderColor
+        : obsidianScanSurface.borderColor,
       alignItems: 'center',
       gap: SPACING.xs,
-      ...obsidianScanSurface.shadowStyle, borderCurve: 'continuous',
+      ...(isLight ? scanCardSurface?.shadowStyle : obsidianScanSurface.shadowStyle), borderCurve: 'continuous',
     },
     superQuotaStateTitle: {
       fontSize: SIZES.text16,
@@ -975,18 +985,18 @@ const createStyles = (
     },
     superScanPromoShell: {
       borderRadius: BORDER_RADIUS.xl,
-      ...(isAndroidLight
+      ...(isLight
         ? premiumBannerSurface?.shadowStyle
         : obsidianPremiumSurface.shadowStyle), borderCurve: 'continuous',
     },
     superScanPromoSurface: {
       borderRadius: BORDER_RADIUS.xl,
       overflow: 'hidden',
-      backgroundColor: isAndroidLight
+      backgroundColor: isLight
         ? premiumBannerSurface?.backgroundColor
         : obsidianPremiumSurface.backgroundColor,
       borderWidth: 1,
-      borderColor: isAndroidLight
+      borderColor: isLight
         ? premiumBannerSurface?.borderColor
         : obsidianPremiumSurface.borderColor, borderCurve: 'continuous',
     },
@@ -1035,7 +1045,7 @@ const createStyles = (
       lineHeight: 18,
       color: withAlpha(
         isDark ? colors.white : colors.primaryText,
-        isDark ? (isAndroidLight ? 0.88 : 0.85) : 0.72,
+        isDark ? 0.85 : 0.72,
       ),
     },
     superScanPromoFooter: {
@@ -1082,7 +1092,7 @@ const createStyles = (
     superScanPromoCtaText: {
       fontSize: SIZES.text14,
       fontWeight: FONT_WEIGHTS.bold,
-      color: colors.primaryText,
+      color: premiumCtaForeground,
       fontFamily: FONT_FAMILIES.display,
     },
     companionSection: {

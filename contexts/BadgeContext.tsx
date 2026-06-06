@@ -18,7 +18,8 @@ interface BadgeContextType {
 
 const BadgeContext = createContext<BadgeContextType | undefined>(undefined);
 
-const BADGE_STORAGE_KEY = 'healthscan_badges';
+const BADGE_STORAGE_KEY = 'selflens_badges';
+const LEGACY_BADGE_STORAGE_KEY = 'healthscan_badges';
 
 export function BadgeProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -67,6 +68,11 @@ export function BadgeProvider({ children }: { children: ReactNode }) {
 
   const loadBadgeState = async () => {
     try {
+      const legacy = await AsyncStorage.getItem(LEGACY_BADGE_STORAGE_KEY);
+      if (legacy !== null) {
+        await AsyncStorage.setItem(BADGE_STORAGE_KEY, legacy);
+        await AsyncStorage.removeItem(LEGACY_BADGE_STORAGE_KEY);
+      }
       const stored = await AsyncStorage.getItem(BADGE_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);

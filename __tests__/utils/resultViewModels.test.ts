@@ -33,13 +33,17 @@ describe('result view models', () => {
     'common.metrics.photogenic': 'Fotogenia',
     'common.metrics.skin_quality': 'Piel',
     'common.metrics.skin_clarity': 'Claridad',
+    'common.metrics.skin_clarity_signal': 'Piel limpia',
     'common.metrics.skin_evenness': 'Tono uniforme',
+    'common.metrics.skin_evenness_signal': 'Tono uniforme',
     'common.metrics.under_eye_shadow': 'Ojeras',
+    'common.metrics.under_eye_freshness_signal': 'Mirada descansada',
     'common.metrics.pore_visibility': 'Poros',
     'common.metrics.complexion_redness': 'Rojeces',
     'common.metrics.sleep_quality': 'Sueno',
     'common.metrics.glow': 'Energia',
     'common.metrics.collagen': 'Colageno',
+    'common.metrics.fatigue_signal': 'Senal de fatiga',
     'common.metrics.body_type': 'Tipo corporal',
     'common.metrics.muscle_mass': 'Masa muscular',
     'common.metrics.waist': 'Cintura',
@@ -86,6 +90,18 @@ describe('result view models', () => {
     'qualitative_levels.muscle_mass.balanced': 'Equilibrada',
     'qualitative_levels.ingredient_quality.processed': 'Procesado',
     'qualitative_levels.glycemic_index.high': 'Alto',
+    'qualitative_levels.severity.low': 'Baja',
+    'qualitative_levels.severity.moderate': 'Media',
+    'qualitative_levels.severity.high': 'Alta',
+    'qualitative_levels.skin_clarity_signal.low': 'A reforzar',
+    'qualitative_levels.skin_clarity_signal.moderate': 'En progreso',
+    'qualitative_levels.skin_clarity_signal.high': 'Muy limpia',
+    'qualitative_levels.skin_evenness_signal.low': 'A armonizar',
+    'qualitative_levels.skin_evenness_signal.moderate': 'Equilibrado',
+    'qualitative_levels.skin_evenness_signal.high': 'Muy uniforme',
+    'qualitative_levels.under_eye_freshness_signal.low': 'Muy fresca',
+    'qualitative_levels.under_eye_freshness_signal.moderate': 'Descansada',
+    'qualitative_levels.under_eye_freshness_signal.high': 'A refrescar',
     'verdicts.balanced': 'Comida equilibrada',
     'scan.nutrition.vitamins.vitamin_a': 'Vitamina A',
     'scan.nutrition.vitamins.vitamin_c': 'Vitamina C',
@@ -622,6 +638,283 @@ describe('result view models', () => {
     expect(viewModel.metrics.slice(4).every((item) => item.titleMaxLines === 1)).toBe(
       true,
     );
+  });
+
+  it('shows numeric fatigue + glow-up scores to free face users (rééquilibrage 2026-05-27)', () => {
+    const viewModel = buildScanResultViewModel({
+      analysisData: {
+        schema_version: 4,
+        scan_type: 'face',
+        face_score: 78,
+        perceived_age: 28,
+        face_shape_key: 'oval',
+        symmetry_percentage: 82,
+        fatigue_level: 72,
+        hydration_level: 68,
+        photogenic_score: 8,
+        skin_quality_score: 74,
+        energy_score: 7,
+        collagen_level: 66,
+        skin_clarity_score: 80,
+        skin_evenness_score: 62,
+        under_eye_shadow_score: 31,
+        pore_visibility_score: 44,
+      },
+      t,
+      locale: 'es',
+      premiumRenderState: 'locked',
+      resolveFaceGlowScore: () => 7,
+    });
+
+    // fatigue_level affiché chiffré (au lieu d'un label `Élevée`/`Modérée`).
+    expect(viewModel.metrics.find((item) => item.icon === 'fatigue')).toMatchObject({
+      value: '72/100',
+      valueVariant: 'fraction',
+    });
+    // skin_clarity / skin_evenness / under_eye_shadow affichés chiffrés.
+    expect(
+      viewModel.metrics.find((item) => item.icon === 'skin_clarity'),
+    ).toMatchObject({ value: '80/100', valueVariant: 'fraction' });
+    expect(
+      viewModel.metrics.find((item) => item.icon === 'skin_evenness'),
+    ).toMatchObject({ value: '62/100', valueVariant: 'fraction' });
+    expect(
+      viewModel.metrics.find((item) => item.icon === 'under_eye_shadow'),
+    ).toMatchObject({ value: '31/100', valueVariant: 'fraction' });
+    // Plus aucun label qualitatif `*_signal` ne remplace ces chiffres.
+    expect(
+      viewModel.metrics.filter((item) => item.id.endsWith('_signal')),
+    ).toHaveLength(0);
+    // Les vrais champs premium-locked (skin_quality, glow, collagen, pores)
+    //   restent masqués pour le gratuit.
+    expect(
+      viewModel.metrics.find((item) => item.icon === 'pore_visibility'),
+    ).toMatchObject({
+      premiumRenderState: 'locked',
+      value: '••••••',
+    });
+    expect(viewModel.premiumMetrics.map((item) => item.icon)).toEqual([
+      'skin_quality',
+      'glow',
+      'collagen',
+    ]);
+    expect(
+      viewModel.premiumMetrics.every((item) => item.value === '••••••'),
+    ).toBe(true);
+  });
+
+  it('omits free glow-up metrics when extended face data is missing or invalid', () => {
+    const viewModel = buildScanResultViewModel({
+      analysisData: {
+        schema_version: 4,
+        scan_type: 'face',
+        face_score: 78,
+        perceived_age: 28,
+        face_shape_key: 'oval',
+        symmetry_percentage: 82,
+        fatigue_level: 24,
+        hydration_level: 68,
+        photogenic_score: 8,
+        skin_quality_score: 74,
+        energy_score: 7,
+        collagen_level: 66,
+        skin_clarity_score: null,
+        skin_evenness_score: undefined,
+        under_eye_shadow_score: 'invalid',
+      } as any,
+      t,
+      locale: 'es',
+      premiumRenderState: 'locked',
+      resolveFaceGlowScore: () => 7,
+    });
+
+    // Pas de cartes vides : les 3 métriques skin_* / under_eye sont absentes
+    //   du viewModel quand la valeur IA est manquante.
+    expect(
+      viewModel.metrics
+        .map((item) => item.icon)
+        .filter((icon) =>
+          ['skin_clarity', 'skin_evenness', 'under_eye_shadow'].includes(icon),
+        ),
+    ).toEqual([]);
+    // fatigue reste affiché car la valeur (24) est valide.
+    expect(viewModel.metrics.find((item) => item.icon === 'fatigue')).toMatchObject({
+      value: '24/100',
+    });
+  });
+
+  it('keeps detailed extended face metrics neutral while auth is loading', () => {
+    const viewModel = buildScanResultViewModel({
+      analysisData: {
+        schema_version: 4,
+        scan_type: 'face',
+        face_score: 78,
+        perceived_age: 28,
+        face_shape_key: 'oval',
+        symmetry_percentage: 82,
+        fatigue_level: 24,
+        hydration_level: 68,
+        photogenic_score: 8,
+        skin_quality_score: 74,
+        energy_score: 7,
+        collagen_level: 66,
+        skin_clarity_score: 79,
+        skin_evenness_score: 62,
+        under_eye_shadow_score: 31,
+      },
+      t,
+      locale: 'es',
+      premiumRenderState: 'loading',
+      resolveFaceGlowScore: () => 7,
+    });
+
+    expect(
+      viewModel.metrics.some((item) => item.id === 'skin_clarity_signal'),
+    ).toBe(false);
+    // Depuis 2026-05-27, skin_clarity/skin_evenness/under_eye_shadow ne sont
+    //   plus premium-gated : leur valeur chiffrée s'affiche directement, y
+    //   compris pendant le chargement auth (la valeur est juste celle de l'IA).
+    expect(
+      viewModel.metrics
+        .filter((item) =>
+          ['skin_clarity', 'skin_evenness', 'under_eye_shadow'].includes(item.icon),
+        )
+        .map((item) => ({ state: item.premiumRenderState, value: item.value })),
+    ).toEqual([
+      { state: undefined, value: '79/100' },
+      { state: undefined, value: '62/100' },
+      { state: undefined, value: '31/100' },
+    ]);
+  });
+
+  it('shows numeric recovery_readiness to free body users (rééquilibrage 2026-05-27)', () => {
+    const viewModel = buildScanResultViewModel({
+      analysisData: {
+        schema_version: 4,
+        scan_type: 'body',
+        body_score: 75,
+        body_type_key: 'athletic',
+        muscle_mass_key: 'balanced',
+        waist_estimation_cm: 79,
+        strength_index: 73,
+        bmi_estimate: 22.1,
+        metabolic_age: 28,
+        body_fat_percentage: 18,
+        posture_score: 8,
+        body_symmetry: 77,
+        recovery_readiness_score: 68,
+      } as any,
+      t,
+      locale: 'es',
+      premiumRenderState: 'locked',
+      resolveFaceGlowScore: () => 0,
+    });
+
+    // La valeur chiffrée IA est affichée pour le gratuit (pas un label).
+    expect(
+      viewModel.metrics.find((item) => item.id === 'recovery_readiness'),
+    ).toMatchObject({
+      value: '68/100',
+      valueVariant: 'fraction',
+    });
+    // Plus de label qualitatif `recovery_signal`.
+    expect(
+      viewModel.metrics.some((item) => item.id === 'recovery_signal'),
+    ).toBe(false);
+    // Les autres premium body (body_fat, strength, etc.) restent lockés.
+    expect(
+      viewModel.metrics.find((item) => item.icon === 'strength'),
+    ).toMatchObject({ premiumRenderState: 'locked', value: '••••••' });
+    expect(viewModel.premiumMetrics.map((item) => item.icon)).toEqual([
+      'body_fat',
+      'body_symmetry',
+    ]);
+  });
+
+  it('shows numeric meal_balance to free nutrition users (rééquilibrage 2026-05-27)', () => {
+    const viewModel = buildScanResultViewModel({
+      analysisData: {
+        schema_version: 4,
+        scan_type: 'nutrition',
+        plate_health_score: 82,
+        calories_estimate: 410,
+        protein_grams: 28,
+        carbs_grams: 33,
+        fat_grams: 14,
+        verdict_key: 'balanced',
+        glycemic_index_key: 'high',
+        satiety_index: 8,
+        ingredient_quality_key: 'processed',
+        main_vitamin_keys: ['vitamin_a', 'vitamin_c'],
+        meal_balance_score: 71,
+      } as any,
+      t,
+      locale: 'es',
+      premiumRenderState: 'locked',
+      resolveFaceGlowScore: () => 0,
+    });
+
+    expect(
+      viewModel.metrics.find((item) => item.id === 'meal_balance'),
+    ).toMatchObject({
+      value: '71/100',
+      valueVariant: 'fraction',
+    });
+    expect(
+      viewModel.metrics.some((item) => item.id === 'meal_balance_signal'),
+    ).toBe(false);
+    // meal_balance n'apparaît plus dans premiumMetrics (déplacé dans metrics).
+    expect(
+      viewModel.premiumMetrics.some((item) => item.id === 'meal_balance'),
+    ).toBe(false);
+    // satiety_index reste premium-locked.
+    expect(
+      viewModel.metrics.find((item) => item.icon === 'satiety'),
+    ).toMatchObject({ premiumRenderState: 'locked', value: '••••••' });
+  });
+
+  it('renders the same numeric values to premium users without regression', () => {
+    const viewModel = buildScanResultViewModel({
+      analysisData: {
+        schema_version: 4,
+        scan_type: 'face',
+        face_score: 78,
+        perceived_age: 28,
+        face_shape_key: 'oval',
+        symmetry_percentage: 82,
+        fatigue_level: 72,
+        hydration_level: 68,
+        photogenic_score: 8,
+        skin_quality_score: 74,
+        energy_score: 7,
+        collagen_level: 66,
+        skin_clarity_score: 80,
+        skin_evenness_score: 62,
+        under_eye_shadow_score: 31,
+      } as any,
+      t,
+      locale: 'es',
+      premiumRenderState: 'unlocked',
+      resolveFaceGlowScore: () => 7,
+    });
+
+    // Premium voit les mêmes chiffres que le gratuit pour ces 4 métriques.
+    expect(viewModel.metrics.find((item) => item.icon === 'fatigue')).toMatchObject({
+      value: '72/100',
+    });
+    expect(
+      viewModel.metrics.find((item) => item.icon === 'skin_clarity'),
+    ).toMatchObject({ value: '80/100' });
+    expect(
+      viewModel.metrics.find((item) => item.icon === 'skin_evenness'),
+    ).toMatchObject({ value: '62/100' });
+    expect(
+      viewModel.metrics.find((item) => item.icon === 'under_eye_shadow'),
+    ).toMatchObject({ value: '31/100' });
+    // Premium voit aussi les vrais champs premium.
+    expect(
+      viewModel.premiumMetrics.every((item) => item.premiumRenderState === 'unlocked'),
+    ).toBe(true);
   });
 
   it('localizes super scan summary and disclaimer while keeping normalized conditions sorted', () => {

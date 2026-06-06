@@ -7,13 +7,25 @@ import type { CoachConversationQuotaStatus } from '@/shared/coachConversation';
 import { getCoachConversationQuotaQueryKey } from './coachConversationQueryKeys';
 import { shouldRetryCoachReadQuery } from './coachQueryRetry';
 
-function getNextRechargeRefetchDelayMs(quota: CoachConversationQuotaStatus | undefined) {
-  if (!quota?.next_recharge_at) {
-    return false;
-  }
+function pickNextRechargeAt(quota: CoachConversationQuotaStatus | undefined) {
+  if (!quota) return null;
+  // The free rolling window has its own recharge timestamp now. Premium keeps
+  // the daily one. Whichever is sooner — and not null — is what we want to
+  // wake up on so the counter / banner stays fresh without a manual refresh.
+  const candidates: (string | null)[] = [
+    quota.free_next_recharge_at ?? null,
+    quota.next_recharge_at ?? null,
+  ];
+  const parsed = candidates
+    .map((value) => (value ? Date.parse(value) : Number.NaN))
+    .filter((value) => Number.isFinite(value)) as number[];
+  if (parsed.length === 0) return null;
+  return Math.min(...parsed);
+}
 
-  const nextRechargeMs = Date.parse(quota.next_recharge_at);
-  if (!Number.isFinite(nextRechargeMs)) {
+function getNextRechargeRefetchDelayMs(quota: CoachConversationQuotaStatus | undefined) {
+  const nextRechargeMs = pickNextRechargeAt(quota);
+  if (nextRechargeMs === null) {
     return false;
   }
 

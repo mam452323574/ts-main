@@ -1,4 +1,4 @@
-package com.healthscan.app
+package com.selflens.app
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

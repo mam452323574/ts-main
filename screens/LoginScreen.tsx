@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Eye, EyeOff, Lock, Mail } from 'lucide-react-native';
 
@@ -12,12 +12,14 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useStartupDiagnostics } from '@/contexts/StartupDiagnosticsContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { LoginCredentialsSchema } from '@/utils/authSchemas';
+import { isOAuthCancellationError } from '@/utils/oauthErrors';
 import { updatePreAuthOnboardingDraft } from '@/utils/preAuthOnboarding';
 import { Squircle } from '@/components/Squircle';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { signIn, signInWithGoogle, sendVerificationEmail } = useAuth();
+  const { signIn, signInWithGoogle, signInWithOAuth, sendVerificationEmail } =
+    useAuth();
   const { colors } = useTheme();
   const { t } = useLanguage();
   const { markStartup, settleStartup } = useStartupDiagnostics();
@@ -28,6 +30,7 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -108,13 +111,41 @@ export default function LoginScreen() {
       });
       await signInWithGoogle();
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : t('auth.errors.oauth_login', { provider: 'google' }),
-      );
+      // Annulation volontaire (l'utilisateur a fermé l'onglet Google) : on ne
+      // montre pas de bandeau d'erreur, on retombe juste sur le formulaire.
+      if (!isOAuthCancellationError(err)) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : t('auth.errors.oauth_login', { provider: 'google' }),
+        );
+      }
     } finally {
       setGoogleLoading(false);
+    }
+  };
+
+  const handleAppleLogin = async () => {
+    try {
+      setAppleLoading(true);
+      setError(null);
+      await updatePreAuthOnboardingDraft({
+        completionIntent: null,
+        createdUserId: null,
+      });
+      await signInWithOAuth('apple');
+    } catch (err) {
+      // Annulation volontaire (l'utilisateur a fermé l'onglet Apple) : on ne
+      // montre pas de bandeau d'erreur, on retombe juste sur le formulaire.
+      if (!isOAuthCancellationError(err)) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : t('auth.errors.oauth_login', { provider: 'apple' }),
+        );
+      }
+    } finally {
+      setAppleLoading(false);
     }
   };
 
@@ -122,7 +153,7 @@ export default function LoginScreen() {
     <AuthShell scroll>
       <AuthHero
         variant="step"
-        brand="HEALTH SCAN"
+        brand="SELFLENS"
         title={t('auth.login_title')}
         subtitle={t('auth.login_subtitle')}
       />
@@ -132,8 +163,16 @@ export default function LoginScreen() {
           provider="google"
           onPress={handleGoogleLogin}
           loading={googleLoading}
-          disabled={googleLoading || loading}
+          disabled={googleLoading || appleLoading || loading}
         />
+        {Platform.OS === 'ios' ? (
+          <OAuthButton
+            provider="apple"
+            onPress={handleAppleLogin}
+            loading={appleLoading}
+            disabled={googleLoading || appleLoading || loading}
+          />
+        ) : null}
       </View>
 
       <View style={styles.divider}>
@@ -213,6 +252,7 @@ const createStyles = (colors: any) =>
     },
     oauthSection: {
       width: '100%',
+      gap: SPACING.md,
     },
     divider: {
       flexDirection: 'row',

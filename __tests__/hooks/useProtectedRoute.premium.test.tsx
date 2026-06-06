@@ -44,7 +44,7 @@ jest.mock('@/constants/routes', () => ({
   ),
   isAdminRoute: jest.fn(() => false),
   isPremiumRoute: jest.fn((segment: string) =>
-    ['coach', 'coach-history', 'super-scan-result', 'recipes', 'exercises', 'entry-offer'].includes(segment),
+    ['coach-history', 'super-scan-result', 'recipes', 'exercises', 'entry-offer'].includes(segment),
   ),
   isSpecialRoute: jest.fn((segment: string) => segment === 'premium-upgrade'),
 }));
@@ -63,7 +63,7 @@ describe('useProtectedRoute — premium gate (P2-D)', () => {
 
   it('redirige un utilisateur free vers /premium-upgrade quand il visite une route premium', async () => {
     const { useSegments } = require('expo-router');
-    useSegments.mockReturnValue(['coach']);
+    useSegments.mockReturnValue(['coach-history']);
 
     mockUseAuth.mockReturnValue({
       user: { id: 'user-1', email: 'free@example.com' },
@@ -87,7 +87,7 @@ describe('useProtectedRoute — premium gate (P2-D)', () => {
 
   it('laisse un utilisateur premium accéder à une route premium', () => {
     const { useSegments } = require('expo-router');
-    useSegments.mockReturnValue(['coach']);
+    useSegments.mockReturnValue(['coach-history']);
 
     mockUseAuth.mockReturnValue({
       user: { id: 'user-2', email: 'premium@example.com' },
@@ -149,5 +149,171 @@ describe('useProtectedRoute — premium gate (P2-D)', () => {
     renderHook(() => useProtectedRoute());
 
     expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('laisse un utilisateur free accéder à /coach pour les usages gratuits', () => {
+    const { useSegments } = require('expo-router');
+    useSegments.mockReturnValue(['coach']);
+
+    mockUseAuth.mockReturnValue({
+      user: { id: 'user-4', email: 'free-coach@example.com' },
+      userProfile: {
+        id: 'user-4',
+        username: 'free_coach',
+        account_tier: 'free',
+        has_seen_tutorial: true,
+      },
+      loading: false,
+      isEmailVerified: true,
+      signOut: mockSignOut,
+    });
+
+    renderHook(() => useProtectedRoute());
+
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('laisse un utilisateur free accéder à /coach/chat pour Noah', () => {
+    const { useSegments } = require('expo-router');
+    useSegments.mockReturnValue(['coach', 'chat']);
+
+    mockUseAuth.mockReturnValue({
+      user: { id: 'user-5', email: 'free-chat@example.com' },
+      userProfile: {
+        id: 'user-5',
+        username: 'free_chat',
+        account_tier: 'free',
+        has_seen_tutorial: true,
+      },
+      loading: false,
+      isEmailVerified: true,
+      signOut: mockSignOut,
+    });
+
+    renderHook(() => useProtectedRoute());
+
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('laisse un utilisateur free accéder à /coach/conversations', () => {
+    const { useSegments } = require('expo-router');
+    useSegments.mockReturnValue(['coach', 'conversations']);
+
+    mockUseAuth.mockReturnValue({
+      user: { id: 'user-inbox', email: 'free-inbox@example.com' },
+      userProfile: {
+        id: 'user-inbox',
+        username: 'free_inbox',
+        account_tier: 'free',
+        has_seen_tutorial: true,
+      },
+      loading: false,
+      isEmailVerified: true,
+      signOut: mockSignOut,
+    });
+
+    renderHook(() => useProtectedRoute());
+
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['super-scan-result'],
+    ['recipes'],
+    ['exercises'],
+    ['entry-offer'],
+  ])(
+    'redirige un free vers /premium-upgrade quand il visite la route premium %s',
+    async (premiumSegment) => {
+      const { useSegments } = require('expo-router');
+      useSegments.mockReturnValue([premiumSegment]);
+
+      mockUseAuth.mockReturnValue({
+        user: { id: `user-${premiumSegment}`, email: 'free@example.com' },
+        userProfile: {
+          id: `user-${premiumSegment}`,
+          username: 'free',
+          account_tier: 'free',
+          has_seen_tutorial: true,
+        },
+        loading: false,
+        isEmailVerified: true,
+        signOut: mockSignOut,
+      });
+
+      renderHook(() => useProtectedRoute());
+
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith('/premium-upgrade');
+      });
+    },
+  );
+
+  it('laisse un premium accéder à /coach', () => {
+    const { useSegments } = require('expo-router');
+    useSegments.mockReturnValue(['coach']);
+
+    mockUseAuth.mockReturnValue({
+      user: { id: 'user-premium-coach', email: 'premium@example.com' },
+      userProfile: {
+        id: 'user-premium-coach',
+        username: 'premium_coach',
+        account_tier: 'premium',
+        has_seen_tutorial: true,
+      },
+      loading: false,
+      isEmailVerified: true,
+      signOut: mockSignOut,
+    });
+
+    renderHook(() => useProtectedRoute());
+
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('laisse un premium accéder à /coach/chat', () => {
+    const { useSegments } = require('expo-router');
+    useSegments.mockReturnValue(['coach', 'chat']);
+
+    mockUseAuth.mockReturnValue({
+      user: { id: 'user-premium-chat', email: 'premium@example.com' },
+      userProfile: {
+        id: 'user-premium-chat',
+        username: 'premium_chat',
+        account_tier: 'premium',
+        has_seen_tutorial: true,
+      },
+      loading: false,
+      isEmailVerified: true,
+      signOut: mockSignOut,
+    });
+
+    renderHook(() => useProtectedRoute());
+
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('bloque un free sur coach-history même si /coach reste accessible', async () => {
+    const { useSegments } = require('expo-router');
+    useSegments.mockReturnValue(['coach-history']);
+
+    mockUseAuth.mockReturnValue({
+      user: { id: 'user-coach-history', email: 'free@example.com' },
+      userProfile: {
+        id: 'user-coach-history',
+        username: 'free_history',
+        account_tier: 'free',
+        has_seen_tutorial: true,
+      },
+      loading: false,
+      isEmailVerified: true,
+      signOut: mockSignOut,
+    });
+
+    renderHook(() => useProtectedRoute());
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/premium-upgrade');
+    });
   });
 });

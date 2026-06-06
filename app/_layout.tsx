@@ -3,6 +3,8 @@
 // Voir P0-2 dans FRONTEND_SECURITY_AUDIT.md.
 import 'react-native-get-random-values';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo } from 'react';
@@ -26,6 +28,7 @@ import { NotificationProvider } from '@/contexts/NotificationContext';
 import { BadgeProvider } from '@/contexts/BadgeContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import { GamificationProvider } from '@/contexts/GamificationContext';
+import { AdsProvider } from '@/contexts/AdsContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import {
   ThemeProvider as AppThemeProvider,
@@ -33,6 +36,7 @@ import {
 } from '@/contexts/ThemeContext';
 import { DARK_COLORS } from '@/constants/theme';
 import { StartupDiagnosticsProvider } from '@/contexts/StartupDiagnosticsContext';
+import { StartupConfigGate } from '@/components/StartupConfigGate';
 import { loadPurchasesModule } from '@/services/purchasesRuntime';
 import { queryClient } from '@/services/queryClient';
 import { getRuntimeConfig } from '@/services/runtimeConfig';
@@ -59,6 +63,47 @@ if (Platform.OS === 'android') {
   void SystemUI.setBackgroundColorAsync(DEFAULT_ANDROID_SYSTEM_BACKGROUND).catch((error) => {
     console.error('[SystemUI] Failed to set initial Android background color:', error);
   });
+}
+
+// Filet de sécurité de démarrage : capture toute erreur JS fatale (l'IPS
+// d'Apple ne contient PAS le message JS) et la persiste pour pouvoir la lire au
+// prochain lancement. Best-effort, ne doit JAMAIS throw. N'empêche pas le crash
+// déjà corrigé en amont, mais rend diagnostiquable toute future régression de
+// démarrage. Cf. rejet App Store 2.1(a) build 1.0.0(6).
+const LAST_STARTUP_ERROR_KEY = 'selflens.lastStartupError';
+try {
+  const globalWithErrorUtils = globalThis as typeof globalThis & {
+    ErrorUtils?: {
+      getGlobalHandler?: () => ((error: unknown, isFatal?: boolean) => void) | undefined;
+      setGlobalHandler?: (
+        handler: (error: unknown, isFatal?: boolean) => void,
+      ) => void;
+    };
+  };
+  const errorUtils = globalWithErrorUtils.ErrorUtils;
+  const previousHandler = errorUtils?.getGlobalHandler?.();
+
+  errorUtils?.setGlobalHandler?.((error: unknown, isFatal?: boolean) => {
+    try {
+      const err = error as { name?: unknown; message?: unknown } | null;
+      const payload = JSON.stringify({
+        at: new Date().toISOString(),
+        fatal: Boolean(isFatal),
+        name: typeof err?.name === 'string' ? err.name : null,
+        message:
+          typeof err?.message === 'string'
+            ? err.message.slice(0, 500)
+            : String(error).slice(0, 500),
+      });
+      void AsyncStorage.setItem(LAST_STARTUP_ERROR_KEY, payload).catch(() => {});
+      console.error('[StartupCrash]', payload);
+    } catch {
+      // ne jamais throw depuis le handler global
+    }
+    previousHandler?.(error, isFatal);
+  });
+} catch {
+  // ErrorUtils indisponible — no-op
 }
 
 async function syncAndroidSystemBars(routeChrome: AndroidRouteChrome) {
@@ -144,6 +189,14 @@ function RootLayoutNav() {
           />
           <Stack.Screen
             name="coach"
+            options={{ contentStyle }}
+          />
+          <Stack.Screen
+            name="coach/conversations"
+            options={{ contentStyle }}
+          />
+          <Stack.Screen
+            name="coach/chat"
             options={{ contentStyle }}
           />
           <Stack.Screen
@@ -339,23 +392,27 @@ export default function RootLayout() {
       <QueryClientProvider client={queryClient}>
         <SafeAreaProvider>
           <StartupDiagnosticsProvider>
-            <ErrorBoundary>
-              <LanguageProvider>
-                <AuthProvider>
-                  <BootPrefetchController />
-                  <GamificationProvider>
-                    <AppThemeProvider>
-                      <NotificationProvider>
-                        <BadgeProvider>
-                          <SystemBarsController />
-                          <RootLayoutNav />
-                        </BadgeProvider>
-                      </NotificationProvider>
-                    </AppThemeProvider>
-                  </GamificationProvider>
-                </AuthProvider>
-              </LanguageProvider>
-            </ErrorBoundary>
+            <StartupConfigGate>
+              <ErrorBoundary>
+                <LanguageProvider>
+                  <AuthProvider>
+                    <BootPrefetchController />
+                    <GamificationProvider>
+                      <AppThemeProvider>
+                        <AdsProvider>
+                          <NotificationProvider>
+                            <BadgeProvider>
+                              <SystemBarsController />
+                              <RootLayoutNav />
+                            </BadgeProvider>
+                          </NotificationProvider>
+                        </AdsProvider>
+                      </AppThemeProvider>
+                    </GamificationProvider>
+                  </AuthProvider>
+                </LanguageProvider>
+              </ErrorBoundary>
+            </StartupConfigGate>
           </StartupDiagnosticsProvider>
         </SafeAreaProvider>
       </QueryClientProvider>

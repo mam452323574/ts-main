@@ -1,6 +1,6 @@
 import { memo, useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Archive, MessageSquare } from 'lucide-react-native';
+import { MessageSquare, Trash2 } from 'lucide-react-native';
 
 import { CoachPersonaAvatar } from '@/components/coach/CoachPersonaAvatar';
 import { Squircle } from '@/components/Squircle';
@@ -22,10 +22,11 @@ interface CoachConversationCardProps {
   personaLabel: string;
   counterLabel: string;
   statusLabel?: string | null;
+  statusTone?: 'neutral' | 'highlight';
   dateLabel?: string | null;
   onPress: () => void;
-  onArchive?: (() => void) | null;
-  archiveA11yLabel?: string;
+  onDelete?: (() => void) | null;
+  deleteA11yLabel?: string;
   testID?: string;
 }
 
@@ -35,10 +36,11 @@ function CoachConversationCardComponent({
   personaLabel,
   counterLabel,
   statusLabel,
+  statusTone = 'highlight',
   dateLabel,
   onPress,
-  onArchive,
-  archiveA11yLabel,
+  onDelete,
+  deleteA11yLabel,
   testID,
 }: CoachConversationCardProps) {
   const { colors } = useTheme();
@@ -86,8 +88,22 @@ function CoachConversationCardComponent({
           {(statusLabel || dateLabel) ? (
             <View style={styles.footerRow}>
               {statusLabel ? (
-                <View style={styles.statusBadge}>
-                  <Text style={styles.statusBadgeText}>{statusLabel}</Text>
+                <View
+                  style={[
+                    styles.statusBadge,
+                    statusTone === 'neutral' ? styles.statusBadgeNeutral : null,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.statusBadgeText,
+                      statusTone === 'neutral'
+                        ? styles.statusBadgeTextNeutral
+                        : null,
+                    ]}
+                  >
+                    {statusLabel}
+                  </Text>
                 </View>
               ) : null}
               {dateLabel ? (
@@ -96,15 +112,15 @@ function CoachConversationCardComponent({
             </View>
           ) : null}
         </View>
-        {onArchive ? (
+        {onDelete ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={archiveA11yLabel ?? 'Archiver'}
-            onPress={onArchive}
-            style={({ pressed }) => [styles.archiveButton, pressed ? styles.archiveButtonPressed : null]}
-            testID={testID ? `${testID}-archive` : undefined}
+            accessibilityLabel={deleteA11yLabel ?? 'Supprimer'}
+            onPress={onDelete}
+            style={({ pressed }) => [styles.deleteButton, pressed ? styles.deleteButtonPressed : null]}
+            testID={testID ? `${testID}-delete` : undefined}
           >
-            <Archive color={withAlpha(colors.primaryText, 0.55)} size={16} strokeWidth={2.2} />
+            <Trash2 color={withAlpha(colors.primaryText, 0.55)} size={16} strokeWidth={2.2} />
           </Pressable>
         ) : null}
       </Squircle>
@@ -182,17 +198,24 @@ const createStyles = (colors: any) =>
       borderWidth: 1,
       borderColor: withAlpha(colors.gold, 0.3),
     },
+    statusBadgeNeutral: {
+      backgroundColor: withAlpha(colors.primaryText, 0.06),
+      borderColor: withAlpha(colors.primaryText, 0.12),
+    },
     statusBadgeText: {
       fontSize: SIZES.text12,
       color: colors.gold,
       fontWeight: FONT_WEIGHTS.semiBold,
+    },
+    statusBadgeTextNeutral: {
+      color: withAlpha(colors.primaryText, 0.65),
     },
     dateLabel: {
       fontSize: SIZES.text12,
       color: withAlpha(colors.primaryText, 0.45),
       marginLeft: 'auto',
     },
-    archiveButton: {
+    deleteButton: {
       width: 32,
       height: 32,
       borderRadius: 16,
@@ -201,7 +224,7 @@ const createStyles = (colors: any) =>
       backgroundColor: withAlpha(colors.primaryText, 0.05),
       marginLeft: SPACING.xs,
     },
-    archiveButtonPressed: {
+    deleteButtonPressed: {
       opacity: 0.7,
     },
   });

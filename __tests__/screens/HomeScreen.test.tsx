@@ -13,6 +13,7 @@ import {
   buildPremiumHealthModulePalette,
   getPremiumHealthResponsiveCardMetrics,
 } from '@/constants/premiumHealth';
+import { getAndroidLightSurface, getCtaColors } from '@/constants/theme';
 
 const mockPush = jest.fn();
 const mockUseAuth = jest.fn();
@@ -37,6 +38,25 @@ const mockThemeColors = {
   gold: '#FFD700',
   goldLight: '#FFF8E1',
   white: '#FFFFFF',
+};
+const mockDarkThemeColors = {
+  ...mockThemeColors,
+  background: '#000000',
+  cardBackground: '#121212',
+  surfaceMuted: '#242426',
+  surfaceAccent: '#142238',
+  primaryText: '#F7F7F7',
+  secondaryText: '#B8B8BE',
+  textMuted: '#8E8E93',
+  gray: '#8E8E93',
+  lightGray: '#242426',
+  warning: '#D49A55',
+  gold: '#D7BD76',
+  goldLight: '#322817',
+};
+const mockThemeState = {
+  colors: mockThemeColors,
+  isDark: false,
 };
 
 // Mock dependencies
@@ -86,8 +106,8 @@ jest.mock('@/contexts/NotificationContext', () => ({
 
 jest.mock('@/contexts/ThemeContext', () => ({
   useTheme: () => ({
-    colors: mockThemeColors,
-    isDark: false,
+    colors: mockThemeState.colors,
+    isDark: mockThemeState.isDark,
     toggleTheme: jest.fn(),
   }),
 }));
@@ -406,6 +426,8 @@ describe('HomeScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockPush.mockReset();
+    mockThemeState.colors = mockThemeColors;
+    mockThemeState.isDark = false;
     Object.defineProperty(Platform, 'OS', {
       value: originalPlatform,
       configurable: true,
@@ -1035,6 +1057,69 @@ describe('HomeScreen', () => {
           borderWidth: 1,
         }),
       ]),
+    );
+  });
+
+  it('uses separated scan-card surfaces on iOS in light mode', () => {
+    Object.defineProperty(Platform, 'OS', {
+      value: 'ios',
+      configurable: true,
+    });
+    const expectedSurface = getAndroidLightSurface(mockThemeColors as any, {
+      accentColor: mockThemeColors.primary,
+      backgroundAlpha: 0.025,
+      borderAlpha: 0.08,
+      overlayAlpha: 0.04,
+      shadowOpacity: 0.05,
+      shadowRadius: 12,
+      shadowOffsetY: 4,
+      elevation: 2,
+    });
+    mockUseDashboard.mockReturnValue({
+      data: buildDashboardData(),
+      isLoading: false,
+      error: null,
+      refetch: jest.fn(),
+      isRefetching: false,
+    });
+    mockUseAllScanEligibility.mockReturnValue(
+      buildEligibilityHookResult({
+        data: {
+          body: { allowed: true, remaining: 3, limit: 3, current_count: 0 },
+          health: { allowed: true, remaining: 3, limit: 3, current_count: 0 },
+          nutrition: { allowed: true, remaining: 3, limit: 3, current_count: 0 },
+          super: { allowed: false, remaining: 0, message: 'locked' },
+        },
+      }),
+    );
+
+    const { getAllByTestId } = render(<HomeScreen />);
+    const surface = StyleSheet.flatten(getAllByTestId('scan-limit-card-surface')[0].props.style);
+
+    expect(surface.backgroundColor).toBe(expectedSurface.backgroundColor);
+    expect(surface.borderColor).toBe(expectedSurface.borderColor);
+  });
+
+  it('uses a dark foreground for the light Super Scan CTA in dark mode', () => {
+    mockThemeState.colors = mockDarkThemeColors;
+    mockThemeState.isDark = true;
+    mockUseDashboard.mockReturnValue({
+      data: buildDashboardData(),
+      isLoading: false,
+      error: null,
+      refetch: jest.fn(),
+      isRefetching: false,
+    });
+    mockUseAllScanEligibility.mockReturnValue(buildEligibilityHookResult());
+
+    const { getByTestId, getByText } = render(<HomeScreen />);
+    const expectedForeground = getCtaColors(mockDarkThemeColors as any, true).premiumForeground;
+
+    expect(StyleSheet.flatten(getByText('Go Premium').props.style).color).toBe(
+      expectedForeground,
+    );
+    expect(getByTestId('home-super-scan-upsell-cta-icon').props.color).toBe(
+      expectedForeground,
     );
   });
 

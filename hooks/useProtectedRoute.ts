@@ -211,7 +211,7 @@ export function useProtectedRoute() {
       redirectCountRef.current = 0;
       loopDetectedRef.current = false;
       setState({ forceLogout: false });
-      router.replace('/login');
+      router.replace('/welcome' as any);
       return;
     }
 
@@ -299,7 +299,7 @@ export function useProtectedRoute() {
           !routeState.isShared &&
           !routeState.isEmailVerification)
       ) {
-        safeRedirect('/login');
+        safeRedirect('/welcome');
       }
       return;
     }

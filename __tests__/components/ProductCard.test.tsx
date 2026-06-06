@@ -22,7 +22,7 @@ describe('ProductCard', () => {
     name: 'Omega 3 Premium',
     imageUrl: 'https://example.com/omega3.jpg',
     benefits: ['Santé Cardiovasculaire', 'Santé Cognitive'],
-    shopUrl: 'https://play.google.com/store/apps/details?id=com.healthscan.app',
+    shopUrl: 'https://play.google.com/store/apps/details?id=com.selflens.app',
   };
 
   beforeEach(() => {
@@ -53,7 +53,7 @@ describe('ProductCard', () => {
 
     await waitFor(() => {
       expect(openURLSpy).toHaveBeenCalledWith(
-        'https://play.google.com/store/apps/details?id=com.healthscan.app',
+        'https://play.google.com/store/apps/details?id=com.selflens.app',
       );
     });
   });

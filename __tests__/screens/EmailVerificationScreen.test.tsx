@@ -11,6 +11,7 @@ jest.mock('lucide-react-native', () => ({
   ArrowLeft: 'ArrowLeft',
   Check: 'Check',
   Shield: 'Shield',
+  X: 'X',
 }));
 
 jest.mock('@/components/Button', () => ({
@@ -48,6 +49,7 @@ jest.mock('@/contexts/LanguageContext', () => ({
         'auth.cancel_verification_message':
           'Vous serez déconnecté et pourrez reprendre plus tard depuis la connexion.',
         'auth.cancel_verification_confirm': 'Se déconnecter',
+        'auth.cancel_verification_link': "Annuler l'inscription",
         'common.error': 'Erreur',
         'settings.cancel': 'Annuler',
         'onboarding.error_session': 'Session invalide',
@@ -176,7 +178,7 @@ describe('EmailVerificationScreen', () => {
   it('asks for confirmation before signing out from verification', async () => {
     render(<EmailVerificationScreen />);
 
-    fireEvent.press(screen.getByTestId('email-verification-back'));
+    fireEvent.press(screen.getByTestId('email-verification-cancel'));
 
     expect(await screen.findByText('Annuler la vérification ?')).toBeTruthy();
     expect(mockSignOut).not.toHaveBeenCalled();

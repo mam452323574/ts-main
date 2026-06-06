@@ -517,7 +517,7 @@ describe('social service', () => {
         heroImageUri: 'file:///scan-result.jpg',
         metrics: [],
         accentColor: '#000000',
-        footerBrand: 'HEALTH SCAN',
+        footerBrand: 'SELFLENS',
         footerCta: 'Track your progress',
       }),
     ).toEqual(

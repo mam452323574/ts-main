@@ -1,3 +1,5 @@
+import type { CoachPersonaKey } from '@/shared/coachPersonas';
+
 export const COACH_CONVERSATIONS_INFINITE_QUERY_KEY = ['coachConversationsInfinite'] as const;
 export const COACH_CONVERSATION_QUERY_KEY = ['coachConversation'] as const;
 export const COACH_CONVERSATION_MESSAGES_QUERY_KEY = ['coachConversationMessages'] as const;
@@ -6,10 +8,12 @@ export const COACH_CONVERSATION_QUOTA_QUERY_KEY = ['coachConversationQuota'] as 
 export const getCoachConversationsInfiniteQueryKey = (
   userId?: string | null,
   includeArchived?: boolean,
+  personaKey?: CoachPersonaKey | null,
 ) => [
   ...COACH_CONVERSATIONS_INFINITE_QUERY_KEY,
   userId ?? 'anonymous',
   includeArchived ? 'with_archived' : 'active_only',
+  personaKey ?? 'all_personas',
 ] as const;
 
 export const getCoachConversationQueryKey = (

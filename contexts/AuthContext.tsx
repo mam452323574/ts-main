@@ -17,7 +17,7 @@ import { UserProfile } from '@/types';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useStartupDiagnostics } from '@/contexts/StartupDiagnosticsContext';
 import { loadPurchasesModule } from '@/services/purchasesRuntime';
-import { getRuntimeConfig, getSupabaseFunctionUrl } from '@/services/runtimeConfig';
+import { tryGetRuntimeConfig, getSupabaseFunctionUrl } from '@/services/runtimeConfig';
 import { clearAvatarUrlCache } from '@/services/avatar';
 import { trackFailureEvent } from '@/services/analytics';
 import {
@@ -27,6 +27,7 @@ import {
 } from '@/shared/coachPersonas';
 import { normalizePersistedInferredPersona } from '@/shared/coachProfileMemory';
 import {
+  logExpectedFailure,
   logOperationalError,
   sanitizeObservabilityProperties,
   type SafeObservabilityProperties,
@@ -39,12 +40,22 @@ import {
 } from '@/utils/runtimeCapabilities';
 import { queryClient } from '@/services/queryClient';
 import { createOAuthState } from '@/utils/oauthState';
+import {
+  createOAuthCancelledError,
+  isOAuthCancellationError,
+} from '@/utils/oauthErrors';
 import { invalidateScanEligibilityQueries } from '@/utils/scanEligibilityQuery';
 import { syncDeviceLocaleToProfile } from '@/services/userProfile';
 import { invalidateCoachProfileMemoryCache } from '@/services/coach';
 import { isPostgresUniqueViolation } from '@/utils/postgrestErrors';
 
-WebBrowser.maybeCompleteAuthSession();
+// Guard : un échec de cet appel natif au niveau module ne doit jamais faire
+// crasher le démarrage (cf. rejet App Store 2.1(a) build 1.0.0(6)).
+try {
+  WebBrowser.maybeCompleteAuthSession();
+} catch (error) {
+  console.warn('[Auth] maybeCompleteAuthSession a échoué au démarrage:', error);
+}
 
 type AuthNextStep = 'email_verification' | 'ready';
 
@@ -283,7 +294,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { t, locale } = useLanguage();
   const { markStartup } = useStartupDiagnostics();
   const runtime = getRuntimeCapabilities();
-  const runtimeConfig = getRuntimeConfig();
+  const runtimeConfigResult = tryGetRuntimeConfig();
+  const supabaseAnonKey = runtimeConfigResult.ok
+    ? runtimeConfigResult.config.supabaseAnonKey
+    : null;
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -377,7 +391,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     options: { allowAnon?: boolean } = {},
   ) => {
     const authToken =
-      token || (options.allowAnon ? runtimeConfig.supabaseAnonKey : null);
+      token || (options.allowAnon ? supabaseAnonKey : null);
 
     if (!authToken) {
       throw new Error('Authentication required for this request');
@@ -1459,7 +1473,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       limitError.code = secureCode;
       limitError.status = secureResponse.status;
       limitError.requestId = secureRequestId;
-      logOperationalError('[SignUp] secure-signup rate limited', null, {
+      // 429 réseau = throttle attendu (l'UI le présente proprement via
+      // `IpLimitError`). On log en WARN, pas en ERROR, pour éviter une stack
+      // trace bruyante sur une condition bénigne. Cf. le même pattern pour le
+      // rate-limit coach dans `services/coach.ts`.
+      logExpectedFailure('[SignUp] secure-signup rate limited', null, {
         status: secureResponse.status,
         code: secureCode,
         request_id: secureRequestId,
@@ -1622,11 +1640,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         provider,
         result_type: result.type,
       });
-      throw new Error(t('auth.error_auth_cancelled'));
+      // L'utilisateur a fermé/annulé l'onglet d'auth : ce n'est pas une panne.
+      // On tague l'erreur pour que le catch (ci-dessous) ne la remonte pas en
+      // ERROR et que les écrans n'affichent pas de bandeau rouge.
+      throw createOAuthCancelledError(t('auth.error_auth_cancelled'));
     } catch (error) {
-      logOAuthDebugError('[OAuth] OAuth flow failed', error, {
-        provider,
-      });
+      // Annulation volontaire : déjà tracée en info ("Auth session closed...").
+      // Inutile et trompeur de la logger comme erreur opérationnelle.
+      if (!isOAuthCancellationError(error)) {
+        logOAuthDebugError('[OAuth] OAuth flow failed', error, {
+          provider,
+        });
+      }
       throw error;
     }
   };
@@ -1635,7 +1660,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signInWithOAuthProvider('google');
   };
 
+  // Apple sur iOS = flux NATIF (expo-apple-authentication + signInWithIdToken).
+  // Pas de flux web Apple (evite la verification de domaine + le secret .p8 a
+  // renouveler). Sur les autres plateformes, le bouton Apple n'est pas affiche.
+  const signInWithAppleNative = async () => {
+    try {
+      const AppleAuthentication = require('expo-apple-authentication');
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      const identityToken = credential?.identityToken;
+      if (!identityToken) {
+        throw new Error('Apple identity token is missing');
+      }
+
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.signInWithIdToken({
+          provider: 'apple',
+          token: identityToken,
+        });
+
+      if (sessionError) {
+        logOAuthDebugError('[OAuth] Apple signInWithIdToken failed', sessionError, {
+          provider: 'apple',
+        });
+        throw sessionError;
+      }
+
+      if (sessionData.user) {
+        await handleOAuthUserSetup(sessionData.user, 'apple');
+      }
+    } catch (error) {
+      const code = (error as { code?: string })?.code;
+      // Annulation volontaire (l'utilisateur ferme la feuille Apple) : non bloquant.
+      if (code === 'ERR_REQUEST_CANCELED' || code === 'ERR_CANCELED') {
+        throw createOAuthCancelledError(t('auth.error_auth_cancelled'));
+      }
+      if (!isOAuthCancellationError(error)) {
+        logOAuthDebugError('[OAuth] Apple native flow failed', error, {
+          provider: 'apple',
+        });
+      }
+      throw error;
+    }
+  };
+
   const signInWithOAuth = async (provider: 'google' | 'apple') => {
+    if (provider === 'apple' && Platform.OS === 'ios') {
+      await signInWithAppleNative();
+      return;
+    }
     await signInWithOAuthProvider(provider);
   };
 

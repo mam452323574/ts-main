@@ -146,19 +146,20 @@ export default function AdminSocialModerationScreen() {
       return;
     }
     // Redirige si le client cote profil n'est pas admin OU si admin-whoami
-    // a confirme un non-admin (403). On attend la fin du fetch whoami avant
-    // de rediriger pour eviter un flash UI.
+    // a echoue (403 / network / payload invalide -> isError). Le type
+    // AdminWhoamiResponse.is_admin est `true` litteralement et fetchAdminWhoami
+    // throw si le payload retourne autre chose, donc un non-admin se traduit
+    // toujours par isError ici.
     if (!clientSideIsAdmin) {
       router.replace('/(tabs)' as any);
       return;
     }
-    if (adminWhoamiQuery.isError || adminWhoamiQuery.data?.is_admin === false) {
+    if (adminWhoamiQuery.isError) {
       router.replace('/(tabs)' as any);
     }
   }, [
     clientSideIsAdmin,
     adminWhoamiQuery.isError,
-    adminWhoamiQuery.data?.is_admin,
     loading,
     router,
     userProfile,

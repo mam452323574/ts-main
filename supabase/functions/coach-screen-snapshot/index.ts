@@ -24,6 +24,11 @@ import {
   readJsonBody,
 } from '../_shared/phase2Utils.ts';
 import { isCoachPersonaKey } from '../../../shared/coachPersonas.ts';
+import {
+  resolveTierFromProfile,
+  sanitizeScanForTier,
+  type ScanResultTier,
+} from '../_shared/scanResultSanitizer.ts';
 
 // N-D of COACH_SECURITY_AUDIT_2026_05: rate limit. The UI calls this endpoint
 // ~1× per Coach screen open; defaults are generous (30/min, 600/h, 2000/day)
@@ -149,7 +154,13 @@ function parseSnapshotRequest(payload: unknown) {
 }
 
 function applyReadyEntryFilters(query: any) {
+  // F-01 (audit 2026-05-27): soft-deleted coach entries must not surface on
+  // the Coach idle screen. This helper feeds both fetchLatestReadyEntry and
+  // fetchHistorySummary, so anchoring the filter here covers both consumers in
+  // one place. fetchCoachEntries does not go through this helper and applies
+  // the same filter inline.
   return query
+    .is('deleted_at', null)
     .eq('status', 'ready')
     .not('title', 'is', null)
     .not('body', 'is', null)
@@ -162,6 +173,10 @@ async function fetchCoachEntries(client: any, userId: string, limit: number) {
     .from('coach_entries')
     .select(COACH_ENTRY_PUBLIC_COLUMNS)
     .eq('user_id', userId)
+    // F-01 (audit 2026-05-27): mirror the deleted_at filter from
+    // applyReadyEntryFilters so the entries feeding the Coach idle list stay
+    // consistent with the latestReadyEntry and historySummary selections.
+    .is('deleted_at', null)
     .order('updated_at', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(limit);
@@ -231,6 +246,27 @@ async function fetchRecentScanRows(client: any, userId: string) {
   }
 
   return Array.isArray(data) ? data : [];
+}
+
+async function fetchAccountTier(
+  client: any,
+  userId: string,
+): Promise<ScanResultTier> {
+  const { data, error } = await client
+    .from('user_profiles')
+    .select('account_tier')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error) {
+    // Fail-closed: degrade to `free` (most restrictive) rather than leaking
+    // premium fields on a transient lookup failure.
+    return 'free';
+  }
+
+  return resolveTierFromProfile(
+    isRecord(data) ? (data as { account_tier?: unknown }).account_tier : null,
+  );
 }
 
 async function fetchHistorySummary(
@@ -316,6 +352,7 @@ Deno.serve(async (req: Request) => {
       recentScanRows,
       latestReadyEntry,
       historySummary,
+      accountTier,
     ] = await Promise.all([
       fetchCoachEntries(client, user.id, request.entriesLimit),
       getCoachQuotaStatus(client, user.id),
@@ -329,13 +366,21 @@ Deno.serve(async (req: Request) => {
         userId: user.id,
         excludeEntryId: request.excludeEntryId,
       }),
+      fetchAccountTier(client, user.id),
     ]);
+
+    // Defense-in-depth: strip premium-locked fields from each scan returned
+    // to a free account. The full payload remains in DB for premium analytics
+    // and server-side coach context.
+    const safeRecentScanRows = recentScanRows.map((row: unknown) =>
+      isRecord(row) ? sanitizeScanForTier(row, accountTier) : row,
+    );
 
     return jsonResponse(req, {
       success: true,
       entries,
       quota,
-      recent_scans: recentScanRows,
+      recent_scans: safeRecentScanRows,
       latest_ready_entry: latestReadyEntry,
       history_summary: historySummary,
       request_id: requestId,

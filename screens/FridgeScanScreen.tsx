@@ -60,7 +60,10 @@ import {
 } from '@/utils/scanLimitI18n';
 import { logOperationalError, logOperationalInfo } from '@/utils/observability';
 import { getMinimumBottomInsetPadding } from '@/utils/mobileLayout';
-import { hasPremiumAccessFromProfile } from '@/utils/subscription';
+import {
+  hasPremiumAccessFromProfile,
+  resolvePremiumRenderStateFromProfile,
+} from '@/utils/subscription';
 import { FRIDGE_CHEF_PERSONAS } from '@/shared/fridgeChefPersonas';
 import {
   resolveChefFlowVisualTheme,
@@ -266,7 +269,12 @@ export default function FridgeScanScreen() {
     () => createStyles(appColors, chefFlowTheme, insets, isCompactFeedback, isDark),
     [appColors, chefFlowTheme, insets, isCompactFeedback, isDark],
   );
+  const premiumRenderState = resolvePremiumRenderStateFromProfile(
+    userProfile,
+    authLoading,
+  );
   const hasPremiumAccess = hasPremiumAccessFromProfile(userProfile, authLoading);
+  const canRetakeFromReview = premiumRenderState === 'unlocked';
 
   const handleBack = useCallback(() => {
     if (typeof router.canGoBack === 'function' && router.canGoBack()) {
@@ -274,6 +282,10 @@ export default function FridgeScanScreen() {
       return;
     }
 
+    router.replace('/(tabs)' as any);
+  }, [router]);
+
+  const handleReturnHomeFromReview = useCallback(() => {
     router.replace('/(tabs)' as any);
   }, [router]);
 
@@ -928,7 +940,7 @@ export default function FridgeScanScreen() {
                   variant="premium"
                   size="lg"
                 />
-              ) : (
+              ) : premiumRenderState === 'loading' ? null : (
                 <View
                   style={[
                     styles.feedbackFooterActions,
@@ -940,11 +952,23 @@ export default function FridgeScanScreen() {
                       styles.feedbackFooterSecondaryAction,
                       useStackedFeedbackActions ? styles.feedbackFooterActionStacked : null,
                     ]}
-                    testID="fridge-scan-retake-action"
+                    testID={
+                      canRetakeFromReview
+                        ? 'fridge-scan-retake-action'
+                        : 'fridge-scan-home-action'
+                    }
                   >
                     <Button
-                      title={t('fridge_scan.feedback_secondary_cta')}
-                      onPress={handleResetReview}
+                      title={t(
+                        canRetakeFromReview
+                          ? 'fridge_scan.feedback_secondary_cta'
+                          : 'fridge_scan.feedback_home_cta',
+                      )}
+                      onPress={
+                        canRetakeFromReview
+                          ? handleResetReview
+                          : handleReturnHomeFromReview
+                      }
                       variant="outline"
                       tone="neutral"
                       disabled={isSubmitting}

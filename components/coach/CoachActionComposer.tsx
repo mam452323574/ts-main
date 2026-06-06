@@ -17,12 +17,12 @@ import {
   SPACING,
   getVisualMoodSurface,
   mixColors,
-  softenAccentColor,
   withAlpha,
 } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { CoachPersonaVisual } from '@/shared/coachPersonaVisuals';
 import { Squircle } from '@/components/Squircle';
+import { getCoachActionButtonChrome } from '@/utils/coachActionButtonChrome';
 
 interface CoachActionComposerProps {
   personaTitle: string;
@@ -117,7 +117,7 @@ export function CoachActionComposer({
         <Text
           adjustsFontSizeToFit
           minimumFontScale={0.84}
-          numberOfLines={1}
+          numberOfLines={2}
           style={[
             styles.actionLabel,
             muted || disabled ? styles.actionLabelMuted : null,
@@ -130,92 +130,6 @@ export function CoachActionComposer({
   );
 }
 
-function normalizeHexColor(color: string | null | undefined) {
-  if (!color || !color.startsWith('#')) {
-    return null;
-  }
-
-  const hex = color.slice(1);
-  if (hex.length === 3) {
-    return hex
-      .split('')
-      .map((char) => char + char)
-      .join('');
-  }
-
-  return hex.length === 6 ? hex : null;
-}
-
-function getRelativeLuminance(color: string | null | undefined) {
-  const normalized = normalizeHexColor(color);
-  if (!normalized) {
-    return null;
-  }
-
-  const channelToLinear = (channel: number) => {
-    const value = channel / 255;
-    return value <= 0.03928
-      ? value / 12.92
-      : ((value + 0.055) / 1.055) ** 2.4;
-  };
-  const [r, g, b] = [0, 2, 4].map((offset) =>
-    channelToLinear(Number.parseInt(normalized.slice(offset, offset + 2), 16)),
-  );
-
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
-
-function getContrastRatio(colorA: string, colorB: string) {
-  const luminanceA = getRelativeLuminance(colorA);
-  const luminanceB = getRelativeLuminance(colorB);
-  if (luminanceA === null || luminanceB === null) {
-    return null;
-  }
-
-  const lighter = Math.max(luminanceA, luminanceB);
-  const darker = Math.min(luminanceA, luminanceB);
-  return (lighter + 0.05) / (darker + 0.05);
-}
-
-function resolveReadableButtonForeground(backgroundColor: string, colors: any) {
-  const lightForeground = colors.white ?? '#FFFFFF';
-  const darkForeground = colors.primaryText ?? '#1C1C1E';
-  const backgroundLuminance = getRelativeLuminance(backgroundColor);
-  const lightContrast = getContrastRatio(lightForeground, backgroundColor) ?? 0;
-  const darkContrast = getContrastRatio(darkForeground, backgroundColor) ?? 0;
-
-  if (
-    backgroundLuminance !== null &&
-    backgroundLuminance > 0.72 &&
-    darkContrast >= 4.5
-  ) {
-    return darkForeground;
-  }
-
-  if (lightContrast >= 4.5 || lightContrast >= darkContrast) {
-    return lightForeground;
-  }
-
-  return darkForeground;
-}
-
-function getCoachActionButtonChrome(
-  colors: any,
-  isDark: boolean,
-  accentColor: string,
-) {
-  const buttonAccent = softenAccentColor(colors, isDark, accentColor, 'selected');
-  const backgroundColor = isDark
-    ? mixColors(colors.surfaceElevated ?? colors.cardBackground, buttonAccent, 0.26)
-    : mixColors(colors.primaryText, buttonAccent, 0.08);
-
-  return {
-    backgroundColor,
-    foregroundColor: resolveReadableButtonForeground(backgroundColor, colors),
-    accentColor: buttonAccent,
-    borderColor: withAlpha(buttonAccent, isDark ? 0.28 : 0.18),
-  };
-}
 
 const createStyles = (
   colors: any,
@@ -235,9 +149,13 @@ const createStyles = (
         mixColors(colors.surfaceElevated ?? colors.cardBackground ?? '#121212', accentColor, 0.08),
         isAndroid ? 0.98 : 0.96,
       )
-    : withAlpha(
+    : // Light theme: the near-opaque white card on top of the cream Coach
+      // canvas produced an overly intense "white halo" under the CTA. Soften
+      // the alpha so the surface reads as a subtle glassy panel rather than a
+      // hard white block. The dark branch above is intentionally untouched.
+      withAlpha(
         mixColors(colors.cardBackground ?? dockBackgroundColor, accentColor, 0.025),
-        isAndroid ? 0.99 : 0.97,
+        isAndroid ? 0.92 : 0.88,
       );
   const floatingSurfaceBorder = isDark
     ? withAlpha(colors.white ?? colors.primaryText, isAndroid ? 0.14 : 0.12)
@@ -290,6 +208,7 @@ const createStyles = (
     },
     actionButton: {
       minWidth: 124,
+      maxWidth: '72%',
       minHeight: 50,
       flexShrink: 0,
       flexDirection: 'row',

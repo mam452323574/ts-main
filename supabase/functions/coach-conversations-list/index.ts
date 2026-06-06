@@ -7,7 +7,11 @@ import {
   loadPhase2FeatureFlags,
   requireFeatureEnabled,
 } from '../_shared/phase2Config.ts';
-import { createServiceRoleClient, requireAuthenticatedUser } from '../_shared/phase2Auth.ts';
+import {
+  createAuthenticatedRequestClient,
+  createServiceRoleClient,
+  requireAuthenticatedUser,
+} from '../_shared/phase2Auth.ts';
 import {
   createPhase2DatabaseError,
   getPhase2ErrorStatus,
@@ -25,6 +29,7 @@ import {
   readOptionalNumber,
   readOptionalString,
 } from '../_shared/phase2Utils.ts';
+import { isCoachPersonaKey } from '../../../shared/coachPersonas.ts';
 
 const MAX_LIMIT = 50;
 const DEFAULT_LIMIT = 20;
@@ -40,11 +45,17 @@ interface CoachConversationsListRequest {
   limit: number;
   cursor: { updated_at: string; id: string } | null;
   include_archived: boolean;
+  persona_key: string | null;
 }
 
 function parseRequest(payload: unknown): CoachConversationsListRequest {
   if (payload === null || payload === undefined) {
-    return { limit: DEFAULT_LIMIT, cursor: null, include_archived: false };
+    return {
+      limit: DEFAULT_LIMIT,
+      cursor: null,
+      include_archived: false,
+      persona_key: null,
+    };
   }
   if (!isRecord(payload)) {
     throw new Phase2HttpError(400, 'invalid_payload', 'Request body must be a JSON object');
@@ -67,10 +78,24 @@ function parseRequest(payload: unknown): CoachConversationsListRequest {
     cursor = { updated_at: updatedAt, id };
   }
 
+  const rawPersonaKey = readOptionalString(payload.persona_key);
+  let personaKey: string | null = null;
+  if (rawPersonaKey !== null) {
+    if (!isCoachPersonaKey(rawPersonaKey)) {
+      throw new Phase2HttpError(
+        400,
+        'invalid_payload',
+        'persona_key must be a known coach persona',
+      );
+    }
+    personaKey = rawPersonaKey;
+  }
+
   return {
     limit,
     cursor,
     include_archived: readOptionalBoolean(payload.include_archived) === true,
+    persona_key: personaKey,
   };
 }
 
@@ -89,10 +114,10 @@ Deno.serve(async (req) => {
   try {
     requirePostMethod(req);
 
-    const supabase = createServiceRoleClient();
-    const user = await requireAuthenticatedUser(supabase, req);
+    const serviceRole = createServiceRoleClient();
+    const user = await requireAuthenticatedUser(serviceRole, req);
 
-    const featureFlags = await loadPhase2FeatureFlags(supabase);
+    const featureFlags = await loadPhase2FeatureFlags(serviceRole);
     requireFeatureEnabled(
       featureFlags.coach_chat_enabled === true,
       'coach_chat_disabled',
@@ -102,11 +127,14 @@ Deno.serve(async (req) => {
     const body = await readJsonBody(req, { maxBytes: REQUEST_MAX_BYTES }).catch(() => null);
     const params = parseRequest(body);
 
-    const { data, error } = await supabase.rpc('get_coach_conversations_page', {
+    const authenticatedClient = createAuthenticatedRequestClient(req);
+    const { data, error } = await authenticatedClient.rpc('get_coach_conversations_page', {
       p_limit: params.limit + 1,
       p_cursor_updated_at: params.cursor?.updated_at ?? null,
       p_cursor_id: params.cursor?.id ?? null,
       p_include_archived: params.include_archived,
+      p_include_hidden: false,
+      p_persona_key: params.persona_key,
     });
 
     if (error) {

@@ -49,13 +49,16 @@ const expectCompactResultTitle = (style: unknown) => {
 
 const expectCompactResultTopChrome = (
   style: unknown,
-  _isDark: boolean,
+  isDark: boolean,
 ) => {
+  const expectedBackground = isDark
+    ? mockThemeColors.background
+    : mockThemeColors.cardBackground;
   expect(StyleSheet.flatten(style)).toEqual(
     expect.objectContaining({
       paddingTop: SPACING.sm,
       paddingBottom: SPACING.sm,
-      backgroundColor: '#000000',
+      backgroundColor: expectedBackground,
       borderBottomWidth: 0,
       borderBottomColor: 'transparent',
     }),
@@ -517,6 +520,35 @@ describe('ScanResultScreen', () => {
     expect(getAllByText(/:locked:/).length).toBeGreaterThan(0);
   });
 
+  it('shows numeric glow-up face scores to free users (rééquilibrage 2026-05-27)', () => {
+    mockParams.mockReturnValue({
+      analysisData: JSON.stringify({
+        ...makeFaceResult(),
+        schema_version: 4,
+        fatigue_level: 72,
+        skin_clarity_score: 79,
+        skin_evenness_score: 62,
+        under_eye_shadow_score: 31,
+        pore_visibility_score: 44,
+      }),
+    });
+
+    const { getByText, queryByText } = render(<ScanResultScreen />);
+
+    // Valeurs chiffrées IA affichées directement (au lieu d'un label).
+    expect(getByText(/79\/100/)).toBeTruthy();
+    expect(getByText(/62\/100/)).toBeTruthy();
+    expect(getByText(/31\/100/)).toBeTruthy();
+    expect(getByText(/72\/100/)).toBeTruthy();
+    // Plus aucun label qualitatif `*_signal` rendu.
+    expect(queryByText(/Clear skin:unlocked:.*:Very clear/)).toBeNull();
+    expect(queryByText(/Even tone:unlocked:.*:Balanced/)).toBeNull();
+    expect(queryByText(/Rested eyes:unlocked:.*:Very fresh/)).toBeNull();
+    // Les vrais champs premium-locked restent bien lockés.
+    expect(getByText(/^Pores:locked:/)).toBeTruthy();
+    expect(getByText(/^Skin quality:locked:/)).toBeTruthy();
+  });
+
   it('promotes the coach next-step CTA near the top and navigates with auto submit', () => {
     mockParams.mockReturnValue({
       analysisData: JSON.stringify({
@@ -626,14 +658,24 @@ describe('ScanResultScreen', () => {
     (accountTier) => {
       mockUserProfile = { account_tier: accountTier };
       mockParams.mockReturnValue({
-        analysisData: JSON.stringify(makeFaceResult()),
+        analysisData: JSON.stringify({
+          ...makeFaceResult(),
+          schema_version: 4,
+          skin_clarity_score: 79,
+          skin_evenness_score: 62,
+          under_eye_shadow_score: 31,
+        }),
       });
 
-      const { getByTestId, queryByTestId, getByText } = render(<ScanResultScreen />);
+      const { getByTestId, queryByTestId, queryByText, getByText } = render(<ScanResultScreen />);
 
       expect(getByTestId('trajectory-premium-state')).toHaveTextContent('unlocked');
       expect(queryByTestId('trajectory-preview-cta')).toBeNull();
       expect(getByText(new RegExp(`^${i18n.t('common.metrics.skin_quality')}:unlocked:`))).toBeTruthy();
+      expect(getByText(/^Skin clarity:unlocked:.*:79\/100$/)).toBeTruthy();
+      expect(getByText(/^Even tone:unlocked:.*:62\/100$/)).toBeTruthy();
+      expect(getByText(/^Dark circles:unlocked:.*:31\/100$/)).toBeTruthy();
+      expect(queryByText(/^Clear skin:|^Rested eyes:/)).toBeNull();
     },
   );
 
@@ -641,14 +683,29 @@ describe('ScanResultScreen', () => {
     mockUserProfile = null;
     mockAuthLoading = true;
     mockParams.mockReturnValue({
-      analysisData: JSON.stringify(makeFaceResult()),
+      analysisData: JSON.stringify({
+        ...makeFaceResult(),
+        schema_version: 4,
+        skin_clarity_score: 79,
+        skin_evenness_score: 62,
+        under_eye_shadow_score: 31,
+      }),
     });
 
-    const { getByTestId, queryByTestId, getByText } = render(<ScanResultScreen />);
+    const { getByTestId, queryByTestId, queryByText, getByText } = render(<ScanResultScreen />);
 
     expect(getByTestId('trajectory-premium-state')).toHaveTextContent('loading');
     expect(queryByTestId('trajectory-preview-cta')).toBeNull();
+    // Les vrais champs premium-locked (skin_quality, etc.) restent en
+    //   placeholder pendant le chargement auth.
     expect(getByText(new RegExp(`^${i18n.t('common.metrics.skin_quality')}:loading:`))).toBeTruthy();
+    // skin_clarity / skin_evenness / under_eye_shadow ne sont plus
+    //   premium-gated depuis 2026-05-27 : leur valeur chiffrée IA est
+    //   affichée directement, même pendant le chargement auth.
+    expect(getByText(/^Skin clarity:unlocked:.*:79\/100$/)).toBeTruthy();
+    expect(getByText(/^Even tone:unlocked:.*:62\/100$/)).toBeTruthy();
+    expect(getByText(/^Dark circles:unlocked:.*:31\/100$/)).toBeTruthy();
+    expect(queryByText(/^Clear skin:|^Rested eyes:/)).toBeNull();
   });
 
   it('keeps the face CTA on the scan accent while passing the tightened semantic metric accents', () => {

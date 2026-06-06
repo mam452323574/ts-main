@@ -26,9 +26,9 @@ describe('urlSecurity', () => {
     );
     expect(
       resolveSafeExternalUrl(
-        'https://play.google.com/store/apps/details?id=com.healthscan.app',
+        'https://play.google.com/store/apps/details?id=com.selflens.app',
       ),
-    ).toBe('https://play.google.com/store/apps/details?id=com.healthscan.app');
+    ).toBe('https://play.google.com/store/apps/details?id=com.selflens.app');
 
     expect(resolveSafeExternalUrl('http://play.google.com/store')).toBeNull();
     expect(resolveSafeExternalUrl('javascript:alert(1)')).toBeNull();

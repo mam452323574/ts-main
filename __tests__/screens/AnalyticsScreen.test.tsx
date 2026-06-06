@@ -266,6 +266,32 @@ describe('AnalyticsScreen', () => {
     expect(screen.getByText(PERIOD_LABELS.year1)).toBeTruthy();
   });
 
+  it('renders locked premium period crowns with matching gold stroke and fill', () => {
+    mockUseAnalytics.mockImplementation((period: string) => makeQueryState(period));
+
+    render(<AnalyticsScreen />);
+
+    for (const period of ['3months', '1year']) {
+      const crown = screen.getByTestId(`analytics-period-crown-${period}`);
+
+      expect(crown.props.size).toBe(12);
+      expect(crown.props.color).toBeTruthy();
+      expect(crown.props.color).toBe(crown.props.fill);
+    }
+  });
+
+  it('does not render premium period crowns for a premium account', () => {
+    mockUseAuth.mockReturnValue({
+      userProfile: { account_tier: 'premium' },
+    });
+    mockUseAnalytics.mockImplementation((period: string) => makeQueryState(period));
+
+    render(<AnalyticsScreen />);
+
+    expect(screen.queryByTestId('analytics-period-crown-3months')).toBeNull();
+    expect(screen.queryByTestId('analytics-period-crown-1year')).toBeNull();
+  });
+
   it('renders charts when data is available', () => {
     mockUseAnalytics.mockImplementation((period: string) => makeQueryState(period));
 

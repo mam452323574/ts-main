@@ -34,11 +34,11 @@ export interface CoachPromptVisual {
   accentColor: string;
   artworkSource: ImageSourcePropType;
   /**
-   * Per-prompt cropping. Most prompt artworks have the subject centred but
-   * occupy only ~40–45% of the 768×768 source, so a small `imageScale` bump
-   * gives them more visual presence inside the artwork frame. A handful of
-   * prompts have a slightly off-centre subject (loupe, kettlebell) and use
-   * a small downscale or shifted position instead.
+   * Per-prompt cropping. The renderer defaults to `imageScale: 1.0` (no extra
+   * zoom on top of `contentFit="cover"`), so this field is only set when the
+   * asset genuinely needs to deviate — e.g. the apple's stem on
+   * `nutrition_focus` was being clipped by the historical 1.1 default, and
+   * the loupe on `risk_watch` overflows the wide frame at 1.0.
    */
   crop?: CoachImageCrop;
 }
@@ -66,76 +66,77 @@ export const COACH_PROMPT_VISUALS: Record<CoachGenerationPromptType, CoachPrompt
     icon: MessageCircle,
     accentColor: '#88A978',
     artworkSource: require('../assets/images/coach/prompts/latest_scan.webp'),
-    crop: { imageScale: 1.1 },
   },
   latest_scan: {
     icon: ScanSearch,
     accentColor: '#7FA9D4',
     artworkSource: require('../assets/images/coach/prompts/latest_scan.webp'),
-    crop: { imageScale: 1.1 },
   },
   latest_scan_issue_resolution: {
     icon: ScanSearch,
     accentColor: '#7FA9D4',
     artworkSource: require('../assets/images/coach/prompts/latest_scan.webp'),
-    crop: { imageScale: 1.1 },
   },
   weekly_plan: {
     icon: CalendarDays,
     accentColor: '#C99A64',
     artworkSource: require('../assets/images/coach/prompts/weekly_plan.webp'),
-    crop: { imageScale: 1.1 },
+    // Le calendrier est cadré avec beaucoup de padding interne dans l'asset
+    // source : à scale 1.0 il paraît trop distant dans la frame rectangulaire.
+    // Un léger upscale 1.10 le rend plus présent sans cropper d'élément clé.
+    crop: { imageScale: 1.1, contentPosition: 'center' },
   },
   recovery_plan: {
     icon: RefreshCw,
     accentColor: '#A99BCF',
     artworkSource: require('../assets/images/coach/prompts/recovery_plan.webp'),
-    crop: { imageScale: 1.1 },
   },
   nutrition_focus: {
     icon: Apple,
     accentColor: '#72AFA8',
     artworkSource: require('../assets/images/coach/prompts/nutrition_focus.webp'),
-    crop: { imageScale: 1.1 },
+    // Asset source complet fourni avec marges internes : aucun zoom additionnel.
+    crop: { contentPosition: 'center' },
   },
   body_focus: {
     icon: Dumbbell,
     accentColor: '#8D9EC8',
     artworkSource: require('../assets/images/coach/prompts/body_focus.webp'),
-    // Sujet (haltère) placé en diagonale et décalé bas-droite dans l'asset :
-    //   un imageScale > 1 pousse une des extrémités hors-frame. On garde 1.0
-    //   pour conserver l'haltère entier après le crop `contentFit="cover"`.
-    crop: { imageScale: 1.0 },
+    // Haltère en diagonale dans l'asset : les deux extrémités touchent déjà
+    // les bords après `contentFit="cover"`. Pas de zoom supplémentaire.
   },
   face_focus: {
     icon: ScanFace,
     accentColor: '#D98B86',
     artworkSource: require('../assets/images/coach/prompts/face_focus.webp'),
-    crop: { imageScale: 1.1 },
   },
   hydration_focus: {
     icon: Droplets,
     accentColor: '#78AAC8',
     artworkSource: require('../assets/images/coach/prompts/hydration_focus.webp'),
-    crop: { imageScale: 1.15 },
+    // Bouteille verticale : le sujet est haut/étroit et tient pile dans la
+    // bande verticale produite par `cover`. Tout zoom > 1 coupe le bouchon.
   },
   sleep_coach: {
     icon: Moon,
     accentColor: '#8C98BD',
     artworkSource: require('../assets/images/coach/prompts/sleep_coach.webp'),
-    crop: { imageScale: 1.1 },
+    // Asset source complet fourni avec marges internes : aucun zoom additionnel.
+    crop: { contentPosition: 'center' },
   },
   risk_watch: {
     icon: ShieldAlert,
     accentColor: '#C48667',
     artworkSource: require('../assets/images/coach/prompts/risk_watch.webp'),
-    crop: { imageScale: 0.95 },
+    // Pas de scale custom : le combo `cover` + `transform: scale(0.95)`
+    // créait une bande vide périphérique révélée par le gradient dark mode
+    // (effet de bordure / découpe). `contentFit="cover"` cadre déjà la loupe
+    // dans la frame sans débordement.
   },
   trend_review: {
     icon: LineChart,
     accentColor: '#7FA9D4',
     artworkSource: require('../assets/images/coach/prompts/trend_review.webp'),
-    crop: { imageScale: 1.1 },
   },
 };
 

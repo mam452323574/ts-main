@@ -1,11 +1,11 @@
-# Configuration OAuth Google pour Health Scan
+# Configuration OAuth Google pour SelfLens
 
 Ce guide vous accompagne dans la configuration complète de l'authentification Google OAuth pour permettre aux utilisateurs de se connecter avec leur compte Google.
 
 ## Prérequis
 
 - Un compte Google Cloud Platform
-- L'application Health Scan (package: `com.healthscan.app`)
+- L'application SelfLens (package: `com.selflens.app`)
 - Accès à votre projet Supabase
 
 ## Étape 1: Créer ou Sélectionner un Projet Google Cloud
@@ -13,7 +13,7 @@ Ce guide vous accompagne dans la configuration complète de l'authentification G
 1. Connectez-vous à [Google Cloud Console](https://console.cloud.google.com/)
 2. En haut de la page, cliquez sur le sélecteur de projet
 3. Deux options:
-   - **Option A:** Cliquez sur **"Nouveau projet"**, nommez-le "Health Scan" et créez-le
+   - **Option A:** Cliquez sur **"Nouveau projet"**, nommez-le "SelfLens" et créez-le
    - **Option B:** Sélectionnez un projet existant si vous en avez déjà un
 
 ## Étape 2: Activer l'API Google Identity
@@ -33,7 +33,7 @@ Ce guide vous accompagne dans la configuration complète de l'authentification G
 ### Page 1: Informations sur l'application
 
 4. Remplissez les champs obligatoires:
-   - **Nom de l'application:** Health Scan
+   - **Nom de l'application:** SelfLens
    - **E-mail d'assistance utilisateur:** Votre email
    - **Logo de l'application:** (optionnel pour l'instant)
    - **Domaine de l'application:** Laissez vide pour le moment
@@ -65,7 +65,7 @@ Ce guide vous accompagne dans la configuration complète de l'authentification G
 2. Cliquez sur **"+ Créer des identifiants"** → **"ID client OAuth"**
 3. Sélectionnez **"Application Web"**
 4. Remplissez:
-   - **Nom:** Health Scan Web Client
+   - **Nom:** SelfLens Web Client
    - **URI de redirection autorisés:**
      Cliquez sur **"+ Ajouter un URI"** et ajoutez:
      ```
@@ -85,8 +85,8 @@ Ce guide vous accompagne dans la configuration complète de l'authentification G
 8. Cliquez à nouveau sur **"+ Créer des identifiants"** → **"ID client OAuth"**
 9. Sélectionnez **"Android"**
 10. Remplissez:
-    - **Nom:** Health Scan Android Client
-    - **Nom du package:** `com.healthscan.app`
+    - **Nom:** SelfLens Android Client
+    - **Nom du package:** `com.selflens.app`
     - **Empreinte numérique du certificat SHA-1:**
 
       Pour obtenir votre SHA-1, exécutez cette commande dans votre terminal:
@@ -134,13 +134,13 @@ Dans votre dashboard Supabase, dans Authentication → URL Configuration, vous t
 
 **Site URL:**
 ```
-com.healthscan.app://
+com.selflens.app://
 ```
 
 **Redirect URLs:**
 Ajoutez ces URLs (séparées par des virgules):
 ```
-com.healthscan.app://oauth/callback,
+com.selflens.app://oauth/callback,
 http://localhost:19006/oauth/callback
 ```
 
@@ -153,12 +153,12 @@ Vérifiez que dans votre `app.json`, vous avez:
 ```json
 {
   "expo": {
-    "scheme": "healthscan",
+    "scheme": "selflens",
     "ios": {
-      "bundleIdentifier": "com.healthscan.app"
+      "bundleIdentifier": "com.selflens.app"
     },
     "android": {
-      "package": "com.healthscan.app"
+      "package": "com.selflens.app"
     }
   }
 }
@@ -191,8 +191,8 @@ Vérifiez que dans votre `app.json`, vous avez:
 - Vérifiez qu'ils correspondent au client créé pour "Application Web"
 
 ### La redirection ne fonctionne pas
-- Vérifiez que le scheme `healthscan` est bien configuré dans app.json
-- Vérifiez que l'URL de redirection Supabase inclut `com.healthscan.app://oauth/callback`
+- Vérifiez que le scheme `selflens` est bien configuré dans app.json
+- Vérifiez que l'URL de redirection Supabase inclut `com.selflens.app://oauth/callback`
 - Testez d'abord sur un navigateur web avant de tester sur mobile
 
 ### "L'utilisateur ne peut pas se connecter"

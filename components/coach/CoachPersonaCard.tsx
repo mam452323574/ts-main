@@ -150,12 +150,14 @@ export function CoachPersonaCard({
                 </Text>
               </View>
             )}
-            <LinearGradient
-              colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.72)']}
-              pointerEvents="none"
-              style={styles.portraitImageGradient}
-              testID={testID ? `${testID}-portrait-gradient` : undefined}
-            />
+            {isDark ? (
+              <LinearGradient
+                colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.72)']}
+                pointerEvents="none"
+                style={styles.portraitImageGradient}
+                testID={testID ? `${testID}-portrait-gradient` : undefined}
+              />
+            ) : null}
           </Squircle>
 
           {active ? (

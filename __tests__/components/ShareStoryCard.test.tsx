@@ -52,7 +52,7 @@ const basePayload: ShareStoryPayload = {
   ],
   accentColor: '#0A84FF',
   accentColorSecondary: '#5B8DEF',
-  footerBrand: 'HEALTH SCAN',
+  footerBrand: 'SELFLENS',
   footerCta: '',
 };
 
@@ -120,7 +120,7 @@ describe('ShareStoryCard', () => {
     expect(getByTestId('share-story-hero-section')).toBeTruthy();
     expect(getByTestId('share-story-metrics-row')).toBeTruthy();
     expect(getByTestId('share-story-footer')).toBeTruthy();
-    expect(getByText('HEALTH SCAN')).toBeTruthy();
+    expect(getByText('SELFLENS')).toBeTruthy();
     expect(getByTestId('share-story-primary-score').props.numberOfLines).toBe(1);
 
     if (payload.statusBadgeLabel) {
@@ -186,7 +186,7 @@ describe('ShareStoryCard', () => {
     expect(quality.props.android_hyphenationFrequency).toBe('none');
     expect(quality.props.textBreakStrategy).toBe('simple');
     expect(footerStyle.minHeight).toBeGreaterThan(38);
-    expect(getByText('HEALTH SCAN')).toBeTruthy();
+    expect(getByText('SELFLENS')).toBeTruthy();
   });
 
   it('gives text metrics more width for long single-word values without destabilizing the footer', () => {

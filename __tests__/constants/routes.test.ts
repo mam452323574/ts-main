@@ -1,5 +1,6 @@
 import {
   isPostSignupOnboardingRoute,
+  isPremiumRoute,
   isProtectedRoute,
   isPublicRoute,
   isSharedRoute,
@@ -23,9 +24,17 @@ describe('routes privacy policy access', () => {
     expect(isProtectedRoute('post-signup-onboarding')).toBe(true);
   });
 
-  it('treats coach and entry-offer as protected routes', () => {
+  it('keeps coach protected for authentication without making it globally premium', () => {
     expect(isProtectedRoute('coach')).toBe(true);
+    expect(isPremiumRoute('coach')).toBe(false);
+    expect(SCREEN_OPTIONS['coach/conversations']).toEqual({ presentation: 'modal' });
+  });
+
+  it('keeps true premium destinations globally gated', () => {
+    expect(isPremiumRoute('coach-history')).toBe(true);
+    expect(isPremiumRoute('super-scan-result')).toBe(true);
     expect(isProtectedRoute('entry-offer')).toBe(true);
+    expect(isPremiumRoute('entry-offer')).toBe(true);
   });
 
   it('treats the admin social moderation console as a protected route', () => {

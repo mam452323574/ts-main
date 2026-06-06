@@ -1,8 +1,8 @@
-# Audit de cybersécurité — Front-end HealthScan / TSE
+# Audit de cybersécurité — Front-end SelfLens / TSE
 
 **Date :** 2026-04-25
 **Auditeur :** Claude (Anthropic) sur invocation utilisateur
-**Périmètre :** Application mobile **React Native / Expo SDK 54** (Health Scan), configuration plateforme (Android/iOS), dépendances npm.
+**Périmètre :** Application mobile **React Native / Expo SDK 54** (SelfLens), configuration plateforme (Android/iOS), dépendances npm.
 **Hors périmètre :** Site `website/`, code Edge Functions Supabase (audité séparément dans [SECURITY_AUDIT_SUPABASE.md](SECURITY_AUDIT_SUPABASE.md)), pipelines EAS Build.
 **Méthodologie :** revue statique du code (lecture exhaustive de `app/`, `services/`, `contexts/`, `hooks/`, `screens/`, `constants/`, `utils/`, `i18n/`), inspection de la config (`app.json`, `eas.json`, `package.json`, `.env`), corrélation avec les audits backend déjà livrés, vérification ciblée sur points sensibles (OAuth, stockage, erreurs auth).
 

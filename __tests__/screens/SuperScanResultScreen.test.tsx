@@ -63,13 +63,16 @@ const expectCompactResultTitle = (style: unknown) => {
 
 const expectCompactResultTopChrome = (
   style: unknown,
-  _isDark: boolean,
+  isDark: boolean,
 ) => {
+  const expectedBackground = isDark
+    ? mockThemeColors.background
+    : mockThemeColors.cardBackground;
   expect(StyleSheet.flatten(style)).toEqual(
     expect.objectContaining({
       paddingTop: SPACING.sm,
       paddingBottom: SPACING.sm,
-      backgroundColor: '#000000',
+      backgroundColor: expectedBackground,
       borderBottomWidth: 0,
       borderBottomColor: 'transparent',
     }),

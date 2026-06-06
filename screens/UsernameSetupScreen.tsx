@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { UserRound } from 'lucide-react-native';
 
-import { AuthHero, AuthInput, type AuthInputStatus, AuthShell } from '@/components/auth';
+import { AuthHero, type AuthInputStatus, AuthShell, UsernameField } from '@/components/auth';
 import { Button } from '@/components/Button';
 import { ProfileAvatar } from '@/components/ProfileAvatar';
 import { Squircle } from '@/components/Squircle';
@@ -49,7 +48,7 @@ export default function UsernameSetupScreen() {
   const [avatarUploadFailed, setAvatarUploadFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>('idle');
-  const [autoCompletingGoogleDraft, setAutoCompletingGoogleDraft] = useState(false);
+  const [autoCompletingOAuthDraft, setAutoCompletingGoogleDraft] = useState(false);
   const checkTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoCompletionStartedRef = useRef(false);
 
@@ -93,7 +92,8 @@ export default function UsernameSetupScreen() {
       setUsername(savedDraft.username);
       setAutoCompletingGoogleDraft(
         isOAuthUser &&
-          savedDraft.completionIntent === 'signup-google' &&
+          (savedDraft.completionIntent === 'signup-google' ||
+            savedDraft.completionIntent === 'signup-apple') &&
           validateCanonicalUsername(savedDraft.username).valid,
       );
       if (savedDraft.selectedTheme) {
@@ -113,7 +113,7 @@ export default function UsernameSetupScreen() {
       clearTimeout(checkTimeoutRef.current);
     }
 
-    if (autoCompletingGoogleDraft) {
+    if (autoCompletingOAuthDraft) {
       return;
     }
 
@@ -141,7 +141,7 @@ export default function UsernameSetupScreen() {
         clearTimeout(checkTimeoutRef.current);
       }
     };
-  }, [autoCompletingGoogleDraft, checkUsernameAvailability, username]);
+  }, [autoCompletingOAuthDraft, checkUsernameAvailability, username]);
 
   const handleUsernameChange = (text: string) => {
     setUsername(normalizeUsernameInput(text));
@@ -211,7 +211,7 @@ export default function UsernameSetupScreen() {
     }
   };
 
-  const finishAutomaticGoogleDraft = useCallback(
+  const finishAutomaticOAuthDraft = useCallback(
     async (skipAvatarUpload = false) => {
       if (!user || !draft) {
         setAutoCompletingGoogleDraft(false);
@@ -283,7 +283,7 @@ export default function UsernameSetupScreen() {
   useEffect(() => {
     if (
       hydrating ||
-      !autoCompletingGoogleDraft ||
+      !autoCompletingOAuthDraft ||
       autoCompletionStartedRef.current ||
       !draft ||
       !user ||
@@ -293,11 +293,11 @@ export default function UsernameSetupScreen() {
     }
 
     autoCompletionStartedRef.current = true;
-    void finishAutomaticGoogleDraft();
+    void finishAutomaticOAuthDraft();
   }, [
-    autoCompletingGoogleDraft,
+    autoCompletingOAuthDraft,
     draft,
-    finishAutomaticGoogleDraft,
+    finishAutomaticOAuthDraft,
     hydrating,
     isEmailVerified,
     user,
@@ -336,7 +336,7 @@ export default function UsernameSetupScreen() {
     );
   }
 
-  if (autoCompletingGoogleDraft) {
+  if (autoCompletingOAuthDraft) {
     return (
       <AuthShell showLanguage={false} scroll>
         <View style={styles.page}>
@@ -367,7 +367,7 @@ export default function UsernameSetupScreen() {
             <View style={styles.footer}>
               <Button
                 title={t('onboarding.avatar_upload_retry')}
-                onPress={() => void finishAutomaticGoogleDraft()}
+                onPress={() => void finishAutomaticOAuthDraft()}
                 loading={loading}
                 disabled={loading}
                 variant="primary"
@@ -376,7 +376,7 @@ export default function UsernameSetupScreen() {
               />
               <Button
                 title={t('onboarding.avatar_upload_continue')}
-                onPress={() => void finishAutomaticGoogleDraft(true)}
+                onPress={() => void finishAutomaticOAuthDraft(true)}
                 disabled={loading}
                 variant="ghost"
                 flat
@@ -407,14 +407,9 @@ export default function UsernameSetupScreen() {
               />
             </View>
           ) : null}
-          <AuthInput
-            label={t('onboarding.username_label')}
-            icon={UserRound}
-            placeholder={t('onboarding.username_placeholder')}
+          <UsernameField
             value={username}
             onChangeText={handleUsernameChange}
-            autoCapitalize="none"
-            autoComplete="off"
             status={usernameInputStatus}
             statusMessage={usernameStatusMessage}
             testID="username-setup-input"

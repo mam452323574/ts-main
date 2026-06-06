@@ -67,8 +67,11 @@ export const DE_RESULT_TRANSLATIONS = {
       photogenic: 'Fotogenität',
       skin_quality: 'Hautqualität',
       skin_clarity: 'Hautklarheit',
+      skin_clarity_signal: 'Klare Haut',
       skin_evenness: 'Ebenmaß',
+      skin_evenness_signal: 'Ebenmäßiger Teint',
       under_eye_shadow: 'Augenringe',
+      under_eye_freshness_signal: 'Erholter Blick',
       pore_visibility: 'Poren',
       complexion_redness: 'Rötungen',
       sleep_quality: 'Schlaf',
@@ -293,6 +296,24 @@ export const DE_RESULT_TRANSLATIONS = {
       high: 'Hoch',
       unknown: 'Unbekannt',
     },
+    skin_clarity_signal: {
+      low: 'Zu unterstützen',
+      moderate: 'Im Fortschritt',
+      high: 'Sehr klar',
+      unknown: 'Nicht verfügbar',
+    },
+    skin_evenness_signal: {
+      low: 'Auszugleichen',
+      moderate: 'Ausgeglichen',
+      high: 'Sehr ebenmäßig',
+      unknown: 'Nicht verfügbar',
+    },
+    under_eye_freshness_signal: {
+      low: 'Sehr frisch',
+      moderate: 'Erholt',
+      high: 'Aufzufrischen',
+      unknown: 'Nicht verfügbar',
+    },
   },
   share_story: {
     header: {
@@ -315,7 +336,7 @@ export const DE_RESULT_TRANSLATIONS = {
       risk: 'Risiko',
     },
     dialog: {
-      title: 'Health-Scan-Visual teilen',
+      title: 'SelfLens-Visual teilen',
     },
     unavailable: {
       title: 'Teilen nicht verfügbar',

@@ -23,9 +23,12 @@ import type { CoachPromptType } from '@/types';
 import { CoachLockBadge } from '@/components/coach/CoachLockBadge';
 import { Squircle } from '@/components/Squircle';
 
-// Historical scale used by the artwork — preserved as the fallback when no
-// per-prompt `imageScale` is supplied.
-const ARTWORK_DEFAULT_SCALE = 1.06;
+// Default = 1.0 (no extra zoom). `contentFit="cover"` already crops the source
+// to the frame; an extra positive scale double-crops the subject (this used to
+// clip the apple's stem on `nutrition_focus`, the bottle's cap on
+// `hydration_focus`, etc.). Per-prompt entries in COACH_PROMPT_VISUALS opt
+// into a non-1.0 scale only when an asset genuinely needs it.
+const ARTWORK_DEFAULT_SCALE = 1;
 
 interface CoachPromptCardProps {
   promptType: CoachPromptType;
@@ -73,6 +76,11 @@ export function CoachPromptCard({
   } = getCoachPromptVisual(promptType);
   const artworkScale = artworkCrop?.imageScale ?? ARTWORK_DEFAULT_SCALE;
   const artworkContentPosition = artworkCrop?.contentPosition;
+  // Skip the transform entirely when no zoom is needed — a no-op `scale(1)`
+  // still forces an extra GPU layer and breaks the "no double-crop by default"
+  // invariant tests assert.
+  const artworkTransformStyle =
+    artworkScale !== 1 ? { transform: [{ scale: artworkScale }] } : null;
   const promptPalette = useMemo(
     () => getCoachPromptPalette(promptType, colors, isDark),
     [colors, isDark, promptType],
@@ -268,22 +276,22 @@ export function CoachPromptCard({
               source={artworkSource}
               contentFit="cover"
               contentPosition={artworkContentPosition}
-              style={[
-                styles.selectorArtwork,
-                { transform: [{ scale: artworkScale }] },
-              ]}
+              style={[styles.selectorArtwork, artworkTransformStyle]}
               testID={testID ? `${testID}-artwork` : undefined}
             />
-            <LinearGradient
-              colors={[
-                onMedia.scrimTransparent,
-                onMedia.scrimMedium,
-                withAlpha(colors.background, isDark ? 0.92 : 0.78),
-              ]}
-              locations={[0, 0.55, 1]}
-              pointerEvents="none"
-              style={styles.selectorArtworkGradient}
-            />
+            {isDark ? (
+              <LinearGradient
+                colors={[
+                  onMedia.scrimTransparent,
+                  onMedia.scrimMedium,
+                  withAlpha(colors.background, isDark ? 0.92 : 0.78),
+                ]}
+                locations={[0, 0.55, 1]}
+                pointerEvents="none"
+                style={styles.selectorArtworkGradient}
+                testID={testID ? `${testID}-artwork-gradient` : undefined}
+              />
+            ) : null}
           </Squircle>
 
           <Squircle

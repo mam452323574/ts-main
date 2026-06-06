@@ -1,6 +1,8 @@
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { render, screen, act } from '@testing-library/react-native';
 import { NextScanTimer } from '@/components/NextScanTimer';
+import { LIGHT_COLORS } from '@/constants/theme';
 
 // Mock lucide-react-native
 jest.mock('lucide-react-native', () => ({
@@ -45,6 +47,33 @@ describe('NextScanTimer', () => {
     
     // Should show "dans X" format
     expect(screen.getByText(/dans/)).toBeTruthy();
+  });
+
+  it('uses the themed muted foreground when no colors are provided', () => {
+    const futureDate = NOW + 3600000;
+    const { UNSAFE_getByType } = render(
+      <NextScanTimer nextAvailableDate={futureDate} scanLabel="Nutrition" />,
+    );
+
+    expect(StyleSheet.flatten(screen.getByText(/Nutrition/).props.style).color).toBe(
+      LIGHT_COLORS.textMuted,
+    );
+    expect(UNSAFE_getByType('Clock' as any).props.color).toBe(LIGHT_COLORS.textMuted);
+  });
+
+  it('lets explicit timer colors override the themed defaults', () => {
+    const futureDate = NOW + 3600000;
+    const { UNSAFE_getByType } = render(
+      <NextScanTimer
+        nextAvailableDate={futureDate}
+        scanLabel="Nutrition"
+        textColor="#123456"
+        iconColor="#654321"
+      />,
+    );
+
+    expect(StyleSheet.flatten(screen.getByText(/Nutrition/).props.style).color).toBe('#123456');
+    expect(UNSAFE_getByType('Clock' as any).props.color).toBe('#654321');
   });
 
   it('shows hours and minutes format for hour+ durations', () => {

@@ -6,7 +6,10 @@ export type QualitativeLevelCategory =
   | 'muscle_mass'
   | 'ingredient_quality'
   | 'glycemic_index'
-  | 'severity';
+  | 'severity'
+  | 'skin_clarity_signal'
+  | 'skin_evenness_signal'
+  | 'under_eye_freshness_signal';
 
 const missingResultTranslationWarnings = new Set<string>();
 
@@ -38,6 +41,18 @@ const NAMESPACE_FALLBACKS: Record<string, NamespaceFallbackConfig> = {
   },
   'qualitative_levels.severity': {
     translationKey: 'qualitative_levels.severity.unknown',
+    defaultText: 'Unknown',
+  },
+  'qualitative_levels.skin_clarity_signal': {
+    translationKey: 'qualitative_levels.skin_clarity_signal.unknown',
+    defaultText: 'Unknown',
+  },
+  'qualitative_levels.skin_evenness_signal': {
+    translationKey: 'qualitative_levels.skin_evenness_signal.unknown',
+    defaultText: 'Unknown',
+  },
+  'qualitative_levels.under_eye_freshness_signal': {
+    translationKey: 'qualitative_levels.under_eye_freshness_signal.unknown',
     defaultText: 'Unknown',
   },
   verdicts: {

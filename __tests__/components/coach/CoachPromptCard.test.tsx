@@ -167,10 +167,125 @@ describe('CoachPromptCard', () => {
     expect(selectorArtworkFrameStyle.backgroundColor).toBeUndefined();
     expect(selectorArtworkFrameStyle.height).toBe(142);
     expect(selectorArtwork).toBeTruthy();
-    // `latest_scan` declares `crop: { imageScale: 1.1 }` to give the centred
-    // compass artwork more presence inside the frame.
-    expect(selectorArtworkStyle.transform).toEqual([{ scale: 1.1 }]);
+    // `latest_scan` carries no per-prompt `crop` so it defaults to scale 1.0.
+    // The card must NOT apply a transform in that case — a residual scale 1.1
+    // double-crops the cover-fit image (this used to clip the compass top).
+    expect(selectorArtworkStyle.transform).toBeUndefined();
     expect(screen.queryByTestId('coach-prompt-selector-subtitle-chevron')).toBeNull();
+  });
+
+  it('does not render the artwork scrim over selector images in light mode', () => {
+    mockThemeState.colors = LIGHT_COLORS;
+    mockThemeState.isDark = false;
+
+    render(
+      <CoachPromptCard
+        promptType="latest_scan"
+        title="Latest scan"
+        onPress={jest.fn()}
+        variant="compact"
+        mode="selector"
+        testID="coach-prompt-selector-light-image"
+      />,
+    );
+
+    expect(
+      screen.queryByTestId('coach-prompt-selector-light-image-artwork-gradient'),
+    ).toBeNull();
+  });
+
+  it('keeps the existing artwork scrim over selector images in dark mode', () => {
+    render(
+      <CoachPromptCard
+        promptType="latest_scan"
+        title="Latest scan"
+        onPress={jest.fn()}
+        variant="compact"
+        mode="selector"
+        testID="coach-prompt-selector-dark-image"
+      />,
+    );
+
+    expect(
+      screen.getByTestId('coach-prompt-selector-dark-image-artwork-gradient').props.colors,
+    ).toEqual([
+      'rgba(0, 0, 0, 0)',
+      'rgba(0, 0, 0, 0.55)',
+      withAlpha(DARK_COLORS.background, 0.92),
+    ]);
+  });
+
+  it.each([
+    // weekly_plan: l'asset contient beaucoup de padding interne autour du
+    // calendrier -> leger upscale pour le rendre plus present.
+    { promptType: 'weekly_plan' as const, scale: 1.1 },
+  ])(
+    'applies the per-prompt scale transform for $promptType',
+    ({ promptType, scale }) => {
+      render(
+        <CoachPromptCard
+          promptType={promptType}
+          title={promptType}
+          onPress={jest.fn()}
+          variant="compact"
+          mode="selector"
+          testID={`coach-prompt-${promptType}-scale`}
+        />,
+      );
+
+      const artworkStyle = StyleSheet.flatten(
+        screen.getByTestId(`coach-prompt-${promptType}-scale-artwork`).props.style,
+      );
+      expect(artworkStyle.transform).toEqual([{ scale }]);
+    },
+  );
+
+  it.each([
+    'face_focus',
+    'hydration_focus',
+    'body_focus',
+    'nutrition_focus',
+    'sleep_coach',
+    'trend_review',
+    // risk_watch n'a plus de crop : `cover` + `transform: scale(0.95)`
+    // créait une bande vide périphérique révélée par le gradient dark mode.
+    'risk_watch',
+  ] as const)('does not double-crop %s with a default zoom transform', (promptType) => {
+    render(
+      <CoachPromptCard
+        promptType={promptType}
+        title={promptType}
+        onPress={jest.fn()}
+        variant="compact"
+        mode="selector"
+        testID={`coach-prompt-${promptType}`}
+      />,
+    );
+
+    const artworkStyle = StyleSheet.flatten(
+      screen.getByTestId(`coach-prompt-${promptType}-artwork`).props.style,
+    );
+    expect(artworkStyle.transform).toBeUndefined();
+  });
+
+  it('forwards crop.contentPosition from COACH_PROMPT_VISUALS to expo-image', () => {
+    // `nutrition_focus` is the one prompt that ships with an explicit
+    // contentPosition: 'center' — a regression that drops the JSX wire
+    // (e.g. removing `contentPosition={artworkContentPosition}`) would
+    // surface here as the prop becoming undefined.
+    render(
+      <CoachPromptCard
+        promptType="nutrition_focus"
+        title="Repas malin"
+        onPress={jest.fn()}
+        variant="compact"
+        mode="selector"
+        testID="coach-prompt-nutrition-pos"
+      />,
+    );
+
+    const art = screen.getByTestId('coach-prompt-nutrition-pos-artwork');
+    expect(art.props.contentPosition).toBe('center');
   });
 
   it('renders selector mode without subtitle or chevron and highlights the selected state', () => {

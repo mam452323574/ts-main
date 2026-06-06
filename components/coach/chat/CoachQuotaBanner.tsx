@@ -1,6 +1,6 @@
 import { memo, useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Crown, Sparkles, Timer } from 'lucide-react-native';
+import { MessageCircle } from 'lucide-react-native';
 
 import { Squircle } from '@/components/Squircle';
 import {
@@ -8,6 +8,7 @@ import {
   FONT_WEIGHTS,
   SIZES,
   SPACING,
+  getThemeTokens,
   withAlpha,
 } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -36,8 +37,10 @@ export function resolveCoachQuotaBannerKind(
   if (!quota) return null;
   if (quota.tier === 'admin') return null;
   if (quota.tier === 'free') {
-    if (quota.free_used) return 'free_exhausted';
     const remaining = quota.free_remaining_messages ?? 0;
+    if (quota.quota_exceeded || quota.free_used || remaining <= 0) {
+      return 'free_exhausted';
+    }
     if (remaining <= 1) return 'free_warning';
     return 'free_active';
   }
@@ -55,15 +58,18 @@ function CoachQuotaBannerComponent({
   onPress,
   testID,
 }: CoachQuotaBannerProps) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors, kind), [colors, kind]);
-
-  const Icon = kind === 'premium_normal' || kind === 'free_active' ? Sparkles : kind === 'premium_exhausted' || kind === 'free_exhausted' ? Crown : Timer;
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark, kind), [colors, isDark, kind]);
 
   const content = (
     <Squircle style={styles.bubble}>
       <View style={styles.iconShell}>
-        <Icon color={styles.iconColor.color} size={16} strokeWidth={2.2} />
+        <MessageCircle
+          color={styles.iconColor.color}
+          size={16}
+          strokeWidth={2.2}
+          testID={testID ? `${testID}-icon` : undefined}
+        />
       </View>
       <View style={styles.copy}>
         <Text style={styles.title} numberOfLines={1}>
@@ -99,14 +105,14 @@ function CoachQuotaBannerComponent({
   );
 }
 
-function resolveTone(colors: any, kind: CoachQuotaBannerKind) {
+function resolveTone(colors: any, isDark: boolean, kind: CoachQuotaBannerKind) {
   switch (kind) {
     case 'premium_exhausted':
     case 'free_exhausted':
       return {
         background: withAlpha(colors.gold, 0.16),
         border: withAlpha(colors.gold, 0.34),
-        iconColor: colors.gold,
+        iconColor: isDark ? colors.gold : getThemeTokens(false).premium.foreground,
         text: colors.primaryText,
       };
     case 'premium_warning':
@@ -135,8 +141,8 @@ function resolveTone(colors: any, kind: CoachQuotaBannerKind) {
   }
 }
 
-const createStyles = (colors: any, kind: CoachQuotaBannerKind) => {
-  const tone = resolveTone(colors, kind);
+const createStyles = (colors: any, isDark: boolean, kind: CoachQuotaBannerKind) => {
+  const tone = resolveTone(colors, isDark, kind);
   return StyleSheet.create({
     row: {
       width: '100%',

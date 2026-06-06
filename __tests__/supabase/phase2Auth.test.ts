@@ -7,6 +7,7 @@ jest.mock(
 );
 
 import {
+  createAuthenticatedRequestClient,
   createSocialModerationWorkerSignature,
   ensureUserProfileExistsForAuthenticatedUser,
   requireSocialModerationWorkerOrAdmin,
@@ -14,6 +15,10 @@ import {
   SOCIAL_MODERATION_WORKER_SIGNATURE_HEADER,
   SOCIAL_MODERATION_WORKER_TIMESTAMP_HEADER,
 } from '@/supabase/functions/_shared/phase2Auth';
+
+const mockSupabaseCreateClient = jest.requireMock(
+  'npm:@supabase/supabase-js@2.58.0',
+).createClient as jest.Mock;
 
 function createSelectProfileChain(result: { data: unknown; error: unknown }) {
   const chain: any = {
@@ -39,12 +44,56 @@ describe('phase2 auth user profile repair', () => {
   let env: Record<string, string | undefined>;
 
   beforeEach(() => {
+    mockSupabaseCreateClient.mockReset();
     env = {};
     (global as any).Deno = {
       env: {
         get: jest.fn((name: string) => env[name]),
       },
     };
+  });
+
+  it('creates a bearer-authenticated Supabase client for RLS-backed requests', () => {
+    env.SUPABASE_URL = 'https://project.supabase.co';
+    env.SUPABASE_ANON_KEY = 'anon-key';
+    const client = {};
+    mockSupabaseCreateClient.mockReturnValue(client);
+
+    expect(
+      createAuthenticatedRequestClient(
+        new Request('https://example.com/functions/v1/coach-conversations-list', {
+          headers: {
+            Authorization: 'Bearer user-jwt',
+          },
+        }),
+      ),
+    ).toBe(client);
+
+    expect(mockSupabaseCreateClient).toHaveBeenCalledWith(
+      'https://project.supabase.co',
+      'anon-key',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+        global: {
+          headers: {
+            Authorization: 'Bearer user-jwt',
+          },
+        },
+      },
+    );
+  });
+
+  it('rejects an authenticated-request client without a bearer before creating it', () => {
+    expect(() =>
+      createAuthenticatedRequestClient(
+        new Request('https://example.com/functions/v1/coach-conversations-list'),
+      ),
+    ).toThrow('Missing authorization header');
+
+    expect(mockSupabaseCreateClient).not.toHaveBeenCalled();
   });
 
   it('returns the existing profile without writing when the authenticated user profile already exists', async () => {

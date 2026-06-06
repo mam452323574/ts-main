@@ -7,21 +7,46 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "channel": "development"
+      "channel": "development",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://supabase.basedjew.com",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzgwMDcwOTA1LCJleHAiOjIwOTU0MzA5MDV9.DNcht8AWIXe3Uqgz3P3PmINu2JeYEfqt1jM8TxHa2Yk"
+      }
     },
     "preview": {
       "distribution": "internal",
-      "channel": "preview"
+      "channel": "preview",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://supabase.basedjew.com",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzgwMDcwOTA1LCJleHAiOjIwOTU0MzA5MDV9.DNcht8AWIXe3Uqgz3P3PmINu2JeYEfqt1jM8TxHa2Yk"
+      }
     },
     "production": {
       "autoIncrement": true,
-      "channel": "production"
+      "channel": "production",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://supabase.basedjew.com",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzgwMDcwOTA1LCJleHAiOjIwOTU0MzA5MDV9.DNcht8AWIXe3Uqgz3P3PmINu2JeYEfqt1jM8TxHa2Yk",
+        "EXPO_PUBLIC_REVENUECAT_IOS_API_KEY": "appl_quwALTkmmGXdVTOTTvfVeQCoMJW"
+      }
+    },
+    "production-ios": {
+      "extends": "production",
+      "credentialsSource": "local"
     }
   },
   "submit": {
     "production": {
       "android": {
         "track": "internal"
+      }
+    },
+    "production-ios": {
+      "ios": {
+        "ascAppId": "6775438896",
+        "ascApiKeyPath": "C:/Users/maloh/.appstoreconnect/private_keys/AuthKey_7W6VAAJ5LX.p8",
+        "ascApiKeyId": "7W6VAAJ5LX",
+        "ascApiKeyIssuerId": "c61bdc34-1eb6-43a8-bada-0f9dcf60bdf2"
       }
     }
   }

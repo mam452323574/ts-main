@@ -24,6 +24,13 @@ function readExpoExtraValue(key: PublicConfigKey) {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 }
 
+// IMPORTANT : les clés EXPO_PUBLIC_* doivent être DUPLIQUÉES dans
+// `app.json > extra` pour être lisibles dans un build release. Le fallback
+// `process.env[key]` ci-dessous est un accès DYNAMIQUE : `babel-preset-expo`
+// n'inline que les accès STATIQUES (`process.env.EXPO_PUBLIC_X`), donc dans le
+// bundle Hermes de production ce fallback renvoie `undefined`. C'est la cause du
+// crash au lancement de 1.0.0(6) (clés Supabase absentes de `extra`). En prod,
+// la source de vérité est donc `Constants.expoConfig.extra`.
 function readPublicConfigValue(key: PublicConfigKey) {
   const expoValue = readExpoExtraValue(key);
   if (expoValue) {
@@ -68,8 +75,15 @@ function assertValidSupabaseUrl(value: string): string {
 
   // Tolère *.supabase.co et *.supabase.in (deux TLDs officiels Supabase)
   // sans imposer un projet ref précis (les déploiements de pre-prod / staging
-  // peuvent avoir des refs différents).
-  if (!/\.supabase\.(co|in)$/i.test(parsed.hostname)) {
+  // peuvent avoir des refs différents), PLUS les hôtes self-hosted explicitement
+  // autorisés (backend SelfLens auto-hébergé). On garde la protection
+  // anti-tampering : tout autre hôte est refusé.
+  const ALLOWED_SELF_HOSTED_HOSTS = ['supabase.basedjew.com'];
+  const hostname = parsed.hostname.toLowerCase();
+  if (
+    !/\.supabase\.(co|in)$/i.test(hostname) &&
+    !ALLOWED_SELF_HOSTED_HOSTS.includes(hostname)
+  ) {
     throw new Error(
       `Invalid EXPO_PUBLIC_SUPABASE_URL: hostname "${parsed.hostname}" is not a Supabase host`,
     );
@@ -97,6 +111,27 @@ export function getRuntimeConfig(): RuntimeConfig {
   };
 
   return runtimeConfigCache;
+}
+
+export type RuntimeConfigResult =
+  | { ok: true; config: RuntimeConfig }
+  | { ok: false; error: Error };
+
+/**
+ * Variante NON-throwing de `getRuntimeConfig`. À utiliser au niveau module
+ * (imports évalués au démarrage) pour ne JAMAIS faire crasher le lancement :
+ * un échec de config doit afficher un écran d'erreur (cf. StartupConfigGate),
+ * pas un SIGABRT. Cf. rejet App Store 2.1(a) build 1.0.0(6).
+ */
+export function tryGetRuntimeConfig(): RuntimeConfigResult {
+  try {
+    return { ok: true, config: getRuntimeConfig() };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error : new Error(String(error)),
+    };
+  }
 }
 
 export function getSupabaseFunctionUrl(functionName: string) {

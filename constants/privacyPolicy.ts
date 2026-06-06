@@ -19,7 +19,7 @@ export interface PrivacyPolicyLocaleContent {
   sections: PrivacyPolicySection[];
 }
 
-export const PUBLIC_PRIVACY_POLICY_URL = 'https://healthscan.cloud/privacy-policy';
+export const PUBLIC_PRIVACY_POLICY_URL = 'https://privacy.selflens.org/privacy-policy/';
 
 export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleContent> = {
   fr: {
@@ -28,13 +28,13 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
     title: 'Politique de confidentialite',
     lastUpdated: 'Derniere mise a jour : 18 mars 2026',
     intro:
-      "Cette page explique comment Health Scan collecte, utilise et protege les donnees necessaires a l'analyse des scans sante et au fonctionnement du service.",
+      "Cette page explique comment SelfLens collecte, utilise et protege les donnees necessaires a l'analyse des scans sante et au fonctionnement du service.",
     sections: [
       {
         title: '1. Responsable et portee',
         paragraphs: [
-          "Health Scan fournit des fonctionnalites de scan photo et de suivi sante. Cette politique couvre l'application mobile, la page publique de politique de confidentialite et les services techniques relies a votre compte.",
-          'Si vous utilisez Health Scan, vous acceptez que nous traitions les donnees decrites ci-dessous pour fournir les scans, l historique, la facturation et la securite du compte.',
+          "SelfLens fournit des fonctionnalites de scan photo et de suivi sante. Cette politique couvre l'application mobile, la page publique de politique de confidentialite et les services techniques relies a votre compte.",
+          'Si vous utilisez SelfLens, vous acceptez que nous traitions les donnees decrites ci-dessous pour fournir les scans, l historique, la facturation et la securite du compte.',
         ],
       },
       {
@@ -53,7 +53,7 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
         title: '3. Utilisation de la camera et des photos',
         paragraphs: [
           'La camera est utilisee pour capturer les photos que vous choisissez de soumettre a un scan. Les photos peuvent aussi etre choisies depuis la galerie lorsque vous utilisez le selecteur systeme.',
-          "Les images sont televersees de maniere securisee vers notre backend, stockees dans l'infrastructure Supabase utilisee par Health Scan, puis transmises a notre infrastructure d'analyse pour produire les resultats affiches dans l'application.",
+          "Les images sont televersees de maniere securisee vers notre backend, stockees dans l'infrastructure Supabase utilisee par SelfLens, puis transmises a notre infrastructure d'analyse pour produire les resultats affiches dans l'application.",
         ],
       },
       {
@@ -95,14 +95,14 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
       {
         title: '8. Suppression des donnees',
         paragraphs: [
-          "Health Scan ne propose pas actuellement de suppression complete self-service dans l'application.",
+          "SelfLens ne propose pas actuellement de suppression complete self-service dans l'application.",
           'Pour demander la suppression de votre compte ou de vos donnees, ecrivez a privacy@healthscan.cloud depuis l adresse associee a votre compte.',
         ],
       },
       {
         title: '9. Mineurs et mises a jour',
         paragraphs: [
-          "Health Scan n'est pas destine aux personnes de moins de 16 ans.",
+          "SelfLens n'est pas destine aux personnes de moins de 16 ans.",
           'Nous pouvons mettre a jour cette politique pour refleter des evolutions legales, techniques ou produit. La date de mise a jour la plus recente est indiquee en haut de cette page.',
         ],
       },
@@ -121,13 +121,13 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
     title: 'Privacy Policy',
     lastUpdated: 'Last updated: March 18, 2026',
     intro:
-      'This page explains how Health Scan collects, uses, and protects the data required to run health scans and the service itself.',
+      'This page explains how SelfLens collects, uses, and protects the data required to run health scans and the service itself.',
     sections: [
       {
         title: '1. Controller and scope',
         paragraphs: [
-          'Health Scan provides photo scan and health tracking features. This policy applies to the mobile app, the public privacy policy page, and the technical services connected to your account.',
-          'If you use Health Scan, you agree that we process the data described below to provide scans, history, billing, and account security.',
+          'SelfLens provides photo scan and health tracking features. This policy applies to the mobile app, the public privacy policy page, and the technical services connected to your account.',
+          'If you use SelfLens, you agree that we process the data described below to provide scans, history, billing, and account security.',
         ],
       },
       {
@@ -146,7 +146,7 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
         title: '3. Camera and photo use',
         paragraphs: [
           'The camera is used to capture photos that you choose to submit for a scan. Photos may also be selected from the gallery when you use the system photo picker.',
-          'Images are uploaded securely to our backend, stored in the Supabase infrastructure used by Health Scan, and then sent to our analysis infrastructure to produce the results shown in the app.',
+          'Images are uploaded securely to our backend, stored in the Supabase infrastructure used by SelfLens, and then sent to our analysis infrastructure to produce the results shown in the app.',
         ],
       },
       {
@@ -188,14 +188,14 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
       {
         title: '8. Data deletion',
         paragraphs: [
-          'Health Scan does not currently provide a full self-service account deletion flow inside the app.',
+          'SelfLens does not currently provide a full self-service account deletion flow inside the app.',
           'To request deletion of your account or data, email privacy@healthscan.cloud from the address linked to your account.',
         ],
       },
       {
         title: '9. Children and updates',
         paragraphs: [
-          'Health Scan is not intended for people under 16 years old.',
+          'SelfLens is not intended for people under 16 years old.',
           'We may update this policy to reflect legal, technical, or product changes. The latest revision date appears at the top of this page.',
         ],
       },
@@ -214,13 +214,13 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
     title: 'Informativa sulla privacy',
     lastUpdated: 'Ultimo aggiornamento: 18 marzo 2026',
     intro:
-      'Questa pagina spiega come Health Scan raccoglie, utilizza e protegge i dati necessari per eseguire gli scan salute e far funzionare il servizio.',
+      'Questa pagina spiega come SelfLens raccoglie, utilizza e protegge i dati necessari per eseguire gli scan salute e far funzionare il servizio.',
     sections: [
       {
         title: '1. Titolare e ambito',
         paragraphs: [
-          "Health Scan offre funzioni di scan fotografico e monitoraggio del benessere. Questa informativa si applica all'app mobile, alla pagina pubblica dell'informativa sulla privacy e ai servizi tecnici collegati al tuo account.",
-          'Se utilizzi Health Scan, accetti che trattiamo i dati descritti di seguito per fornire scan, cronologia, fatturazione e sicurezza dell account.',
+          "SelfLens offre funzioni di scan fotografico e monitoraggio del benessere. Questa informativa si applica all'app mobile, alla pagina pubblica dell'informativa sulla privacy e ai servizi tecnici collegati al tuo account.",
+          'Se utilizzi SelfLens, accetti che trattiamo i dati descritti di seguito per fornire scan, cronologia, fatturazione e sicurezza dell account.',
         ],
       },
       {
@@ -239,7 +239,7 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
         title: '3. Uso della fotocamera e delle foto',
         paragraphs: [
           'La fotocamera viene usata per acquisire le foto che scegli di inviare a uno scan. Le foto possono anche essere selezionate dalla galleria tramite il selettore foto di sistema.',
-          "Le immagini vengono caricate in modo sicuro sul nostro backend, archiviate nell'infrastruttura Supabase usata da Health Scan e poi inviate alla nostra infrastruttura di analisi per produrre i risultati mostrati nell'app.",
+          "Le immagini vengono caricate in modo sicuro sul nostro backend, archiviate nell'infrastruttura Supabase usata da SelfLens e poi inviate alla nostra infrastruttura di analisi per produrre i risultati mostrati nell'app.",
         ],
       },
       {
@@ -281,14 +281,14 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
       {
         title: '8. Cancellazione dei dati',
         paragraphs: [
-          "Health Scan non offre attualmente un flusso completo di cancellazione self-service all'interno dell'app.",
+          "SelfLens non offre attualmente un flusso completo di cancellazione self-service all'interno dell'app.",
           'Per richiedere la cancellazione del tuo account o dei tuoi dati, scrivi a privacy@healthscan.cloud dall indirizzo collegato al tuo account.',
         ],
       },
       {
         title: '9. Minori e aggiornamenti',
         paragraphs: [
-          'Health Scan non e destinato a persone con meno di 16 anni.',
+          'SelfLens non e destinato a persone con meno di 16 anni.',
           'Possiamo aggiornare questa informativa per riflettere cambiamenti legali, tecnici o di prodotto. La data dell ultima revisione appare in alto in questa pagina.',
         ],
       },
@@ -307,13 +307,13 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
     title: 'Politica de privacidade',
     lastUpdated: 'Ultima atualizacao: 18 de marco de 2026',
     intro:
-      'Esta pagina explica como a Health Scan recolhe, utiliza e protege os dados necessarios para executar scans de saude e prestar o servico.',
+      'Esta pagina explica como a SelfLens recolhe, utiliza e protege os dados necessarios para executar scans de saude e prestar o servico.',
     sections: [
       {
         title: '1. Responsavel e ambito',
         paragraphs: [
-          'A Health Scan disponibiliza funcionalidades de scan por fotografia e acompanhamento de bem-estar. Esta politica aplica-se a app mobile, a pagina publica da politica de privacidade e aos servicos tecnicos ligados a sua conta.',
-          'Ao utilizar a Health Scan, aceita que tratemos os dados descritos abaixo para fornecer scans, historico, faturacao e seguranca da conta.',
+          'A SelfLens disponibiliza funcionalidades de scan por fotografia e acompanhamento de bem-estar. Esta politica aplica-se a app mobile, a pagina publica da politica de privacidade e aos servicos tecnicos ligados a sua conta.',
+          'Ao utilizar a SelfLens, aceita que tratemos os dados descritos abaixo para fornecer scans, historico, faturacao e seguranca da conta.',
         ],
       },
       {
@@ -332,7 +332,7 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
         title: '3. Utilizacao da camara e das fotos',
         paragraphs: [
           'A camara e utilizada para captar as fotos que escolher submeter a um scan. As fotos tambem podem ser selecionadas na galeria quando utiliza o seletor de fotos do sistema.',
-          'As imagens sao enviadas em seguranca para o nosso backend, armazenadas na infraestrutura Supabase utilizada pela Health Scan e depois encaminhadas para a nossa infraestrutura de analise para produzir os resultados apresentados na app.',
+          'As imagens sao enviadas em seguranca para o nosso backend, armazenadas na infraestrutura Supabase utilizada pela SelfLens e depois encaminhadas para a nossa infraestrutura de analise para produzir os resultados apresentados na app.',
         ],
       },
       {
@@ -374,14 +374,14 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
       {
         title: '8. Eliminacao de dados',
         paragraphs: [
-          'A Health Scan nao disponibiliza atualmente um fluxo completo de eliminacao self-service dentro da app.',
+          'A SelfLens nao disponibiliza atualmente um fluxo completo de eliminacao self-service dentro da app.',
           'Para solicitar a eliminacao da sua conta ou dos seus dados, envie um email para privacy@healthscan.cloud a partir do endereco associado a sua conta.',
         ],
       },
       {
         title: '9. Menores e atualizacoes',
         paragraphs: [
-          'A Health Scan nao se destina a menores de 16 anos.',
+          'A SelfLens nao se destina a menores de 16 anos.',
           'Podemos atualizar esta politica para refletir alteracoes legais, tecnicas ou de produto. A data da revisao mais recente aparece no topo desta pagina.',
         ],
       },
@@ -400,13 +400,13 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
     title: 'Politica de privacidad',
     lastUpdated: 'Ultima actualizacion: 18 de marzo de 2026',
     intro:
-      'Esta pagina explica como Health Scan recopila, utiliza y protege los datos necesarios para ejecutar escaneos de salud y prestar el servicio.',
+      'Esta pagina explica como SelfLens recopila, utiliza y protege los datos necesarios para ejecutar escaneos de salud y prestar el servicio.',
     sections: [
       {
         title: '1. Responsable y alcance',
         paragraphs: [
-          'Health Scan ofrece funciones de escaneo por foto y seguimiento del bienestar. Esta politica se aplica a la app movil, a la pagina publica de politica de privacidad y a los servicios tecnicos conectados a tu cuenta.',
-          'Si utilizas Health Scan, aceptas que tratemos los datos descritos a continuacion para ofrecer escaneos, historial, facturacion y seguridad de la cuenta.',
+          'SelfLens ofrece funciones de escaneo por foto y seguimiento del bienestar. Esta politica se aplica a la app movil, a la pagina publica de politica de privacidad y a los servicios tecnicos conectados a tu cuenta.',
+          'Si utilizas SelfLens, aceptas que tratemos los datos descritos a continuacion para ofrecer escaneos, historial, facturacion y seguridad de la cuenta.',
         ],
       },
       {
@@ -425,7 +425,7 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
         title: '3. Uso de la camara y de las fotos',
         paragraphs: [
           'La camara se utiliza para capturar las fotos que decides enviar a un escaneo. Las fotos tambien pueden seleccionarse desde la galeria mediante el selector de fotos del sistema.',
-          'Las imagenes se cargan de forma segura a nuestro backend, se almacenan en la infraestructura de Supabase utilizada por Health Scan y despues se envian a nuestra infraestructura de analisis para producir los resultados que se muestran en la app.',
+          'Las imagenes se cargan de forma segura a nuestro backend, se almacenan en la infraestructura de Supabase utilizada por SelfLens y despues se envian a nuestra infraestructura de analisis para producir los resultados que se muestran en la app.',
         ],
       },
       {
@@ -467,14 +467,14 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
       {
         title: '8. Eliminacion de datos',
         paragraphs: [
-          'Health Scan no ofrece actualmente un flujo completo de eliminacion self-service dentro de la app.',
+          'SelfLens no ofrece actualmente un flujo completo de eliminacion self-service dentro de la app.',
           'Para solicitar la eliminacion de tu cuenta o de tus datos, escribe a privacy@healthscan.cloud desde la direccion vinculada a tu cuenta.',
         ],
       },
       {
         title: '9. Menores y actualizaciones',
         paragraphs: [
-          'Health Scan no esta dirigido a menores de 16 anos.',
+          'SelfLens no esta dirigido a menores de 16 anos.',
           'Podemos actualizar esta politica para reflejar cambios legales, tecnicos o de producto. La fecha de la revision mas reciente aparece en la parte superior de esta pagina.',
         ],
       },
@@ -493,13 +493,13 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
     title: 'Datenschutzerklarung',
     lastUpdated: 'Zuletzt aktualisiert: 18. Marz 2026',
     intro:
-      'Diese Seite erklart, wie Health Scan die Daten erhebt, nutzt und schutzt, die fur Gesundheits-Scans und den Betrieb des Dienstes erforderlich sind.',
+      'Diese Seite erklart, wie SelfLens die Daten erhebt, nutzt und schutzt, die fur Gesundheits-Scans und den Betrieb des Dienstes erforderlich sind.',
     sections: [
       {
         title: '1. Verantwortlicher und Geltungsbereich',
         paragraphs: [
-          'Health Scan bietet Foto-Scan- und Wellness-Tracking-Funktionen. Diese Richtlinie gilt fur die mobile App, die offentliche Datenschutzseite und die technischen Dienste, die mit deinem Konto verbunden sind.',
-          'Wenn du Health Scan nutzt, stimmst du zu, dass wir die unten beschriebenen Daten verarbeiten, um Scans, Verlauf, Abrechnung und Kontosicherheit bereitzustellen.',
+          'SelfLens bietet Foto-Scan- und Wellness-Tracking-Funktionen. Diese Richtlinie gilt fur die mobile App, die offentliche Datenschutzseite und die technischen Dienste, die mit deinem Konto verbunden sind.',
+          'Wenn du SelfLens nutzt, stimmst du zu, dass wir die unten beschriebenen Daten verarbeiten, um Scans, Verlauf, Abrechnung und Kontosicherheit bereitzustellen.',
         ],
       },
       {
@@ -518,7 +518,7 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
         title: '3. Nutzung von Kamera und Fotos',
         paragraphs: [
           'Die Kamera wird verwendet, um Fotos aufzunehmen, die du fur einen Scan einreichst. Fotos konnen auch uber den System-Fotoauswahler aus der Galerie ausgewahlt werden.',
-          'Bilder werden sicher an unser Backend ubertragen, in der von Health Scan genutzten Supabase-Infrastruktur gespeichert und anschliessend an unsere Analyse-Infrastruktur weitergeleitet, um die in der App angezeigten Ergebnisse zu erzeugen.',
+          'Bilder werden sicher an unser Backend ubertragen, in der von SelfLens genutzten Supabase-Infrastruktur gespeichert und anschliessend an unsere Analyse-Infrastruktur weitergeleitet, um die in der App angezeigten Ergebnisse zu erzeugen.',
         ],
       },
       {
@@ -560,14 +560,14 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
       {
         title: '8. Loschung von Daten',
         paragraphs: [
-          'Health Scan bietet derzeit keinen vollstandigen Self-Service-Flow zur Kontoloschung innerhalb der App.',
+          'SelfLens bietet derzeit keinen vollstandigen Self-Service-Flow zur Kontoloschung innerhalb der App.',
           'Wenn du die Loschung deines Kontos oder deiner Daten beantragen mochtest, schreibe an privacy@healthscan.cloud uber die mit deinem Konto verknupfte Adresse.',
         ],
       },
       {
         title: '9. Minderjahrige und Aktualisierungen',
         paragraphs: [
-          'Health Scan ist nicht fur Personen unter 16 Jahren bestimmt.',
+          'SelfLens ist nicht fur Personen unter 16 Jahren bestimmt.',
           'Wir konnen diese Richtlinie aktualisieren, um rechtliche, technische oder produktbezogene Anderungen abzubilden. Das Datum der letzten Uberarbeitung steht oben auf dieser Seite.',
         ],
       },

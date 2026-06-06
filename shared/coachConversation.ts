@@ -8,6 +8,7 @@ export type CoachConversationAccountTier = 'free' | 'premium' | 'admin';
 
 export const COACH_CONVERSATION_USER_MESSAGE_MAX_LENGTH = 2000;
 export const COACH_CONVERSATION_FREE_USER_LIMIT = 4;
+export const COACH_CONVERSATION_FREE_WINDOW_SECONDS = 72 * 60 * 60;
 export const COACH_CONVERSATION_PREMIUM_DAILY_LIMIT = 40;
 export const COACH_CONVERSATION_PER_CONVERSATION_LIMIT = 20;
 export const COACH_CONVERSATION_TITLE_MAX_LENGTH = 80;
@@ -32,6 +33,12 @@ export interface CoachConversation {
   metadata: Record<string, unknown>;
 }
 
+export interface CoachConversationInboxItem extends CoachConversation {
+  first_user_message_preview: string | null;
+  last_message_preview: string | null;
+  last_message_at: string | null;
+}
+
 export interface CoachConversationMessage {
   id: string;
   conversation_id: string;
@@ -50,6 +57,12 @@ export interface CoachConversationMessage {
   metadata: Record<string, unknown>;
 }
 
+export interface CoachConversationPersonaLastSnapshot {
+  id: string;
+  updated_at: string;
+  last_user_message_at: string | null;
+}
+
 export interface CoachConversationQuotaStatus {
   tier: CoachConversationAccountTier;
   account_tier: CoachConversationAccountTier;
@@ -62,13 +75,21 @@ export interface CoachConversationQuotaStatus {
   per_conversation_limit: number;
   free_used: boolean;
   free_message_limit: number | null;
+  free_used_count: number | null;
   free_remaining_messages: number | null;
+  free_next_recharge_at: string | null;
+  free_window_seconds: number | null;
   free_conversation_id: string | null;
+  quota_exceeded: boolean;
   as_of: string;
+  last_conversation_by_persona: Partial<
+    Record<CoachPersonaKey, CoachConversationPersonaLastSnapshot | null>
+  >;
+  conversation_count_by_persona: Partial<Record<CoachPersonaKey, number>>;
 }
 
 export interface CoachConversationListPage {
-  items: CoachConversation[];
+  items: CoachConversationInboxItem[];
   has_more: boolean;
   next_cursor: { updated_at: string; id: string } | null;
 }
@@ -94,9 +115,42 @@ export function canSendMessageInCoachConversation(
   if (conversation.status !== 'active') return false;
   if (quota.tier === 'admin') return true;
   if (quota.tier === 'free') {
-    return !quota.free_used && (quota.free_remaining_messages ?? 0) > 0;
+    return !isCoachConversationFreeQuotaExhausted(quota);
   }
   return (quota.premium_today_available ?? 0) > 0;
+}
+
+export function isCoachConversationFreeQuotaExhausted(
+  quota: CoachConversationQuotaStatus,
+): boolean {
+  if (quota.tier !== 'free') return false;
+  if (quota.quota_exceeded) return true;
+  if (quota.free_used) return true;
+  // free_remaining_messages is the rolling 72h counter — when it is 0
+  // (or null/unknown but free_used is already true above), the user can
+  // no longer send until the next recharge.
+  return (quota.free_remaining_messages ?? 0) <= 0;
+}
+
+export function getCoachConversationFreeRemainingMessages(
+  quota: CoachConversationQuotaStatus,
+): number {
+  if (quota.tier !== 'free') return 0;
+  return Math.max(0, quota.free_remaining_messages ?? 0);
+}
+
+export function getCoachConversationFreeNextRechargeAt(
+  quota: CoachConversationQuotaStatus,
+): string | null {
+  if (quota.tier !== 'free') return null;
+  return quota.free_next_recharge_at ?? quota.next_recharge_at ?? null;
+}
+
+export function isCoachConversationFreeConversationAllowed(
+  quota: CoachConversationQuotaStatus,
+): boolean {
+  if (quota.tier !== 'free') return true;
+  return !isCoachConversationFreeQuotaExhausted(quota);
 }
 
 export function buildCoachConversationFallbackTitle(
@@ -108,4 +162,19 @@ export function buildCoachConversationFallbackTitle(
   if (!normalized) return fallback;
   if (normalized.length <= COACH_CONVERSATION_TITLE_MAX_LENGTH) return normalized;
   return `${normalized.slice(0, COACH_CONVERSATION_TITLE_MAX_LENGTH - 1)}…`;
+}
+
+export function getCoachConversationPersonaState(
+  quota: CoachConversationQuotaStatus | null | undefined,
+  personaKey: CoachPersonaKey,
+): {
+  lastConversation: CoachConversationPersonaLastSnapshot | null;
+  count: number;
+} {
+  if (!quota) {
+    return { lastConversation: null, count: 0 };
+  }
+  const last = quota.last_conversation_by_persona?.[personaKey] ?? null;
+  const count = quota.conversation_count_by_persona?.[personaKey] ?? 0;
+  return { lastConversation: last, count };
 }

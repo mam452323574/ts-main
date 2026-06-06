@@ -16,6 +16,7 @@ recipe-artifacts/
 *.p12
 *.key
 *.mobileprovision
+credentials.json
 
 # metro
 .metro-health-check*
@@ -68,9 +69,13 @@ _done.txt
 # local env files
 .env*.local
 .env
+.env.*-backup
 
 # typescript
 *.tsbuildinfo
+
+# scratch / local artifacts
+tmp/
 
 # claude code worktrees
 .claude/worktrees/

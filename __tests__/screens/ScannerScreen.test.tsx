@@ -4,7 +4,7 @@ import { Alert, Platform, StyleSheet } from 'react-native';
 import ScannerScreen from '@/screens/ScannerScreen';
 import { paywallSession } from '@/utils/paywallSession';
 import { ApiError } from '@/services/api';
-import { DARK_COLORS, LIGHT_COLORS, SPACING } from '@/constants/theme';
+import { DARK_COLORS, LIGHT_COLORS, SPACING, withAlpha } from '@/constants/theme';
 import { getMainTabBarMetrics } from '@/utils/mainTabBarMetrics';
 
 const mockUseCameraPermissions = jest.fn();
@@ -839,7 +839,48 @@ describe('ScannerScreen', () => {
       ]);
     });
 
-    it('renders the dark-first premium inner shutter in light theme', async () => {
+    it('uses white ready camera controls without changing their borders in light theme', async () => {
+      render(<ScannerScreen />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('scanner-capture-button-inner')).toBeTruthy();
+      });
+
+      const galleryStyle = StyleSheet.flatten(
+        screen.getByTestId('scanner-gallery-button').props.style,
+      );
+      const innerStyle = StyleSheet.flatten(
+        screen.getByTestId('scanner-capture-button-inner').props.style,
+      );
+      const outerStyle = StyleSheet.flatten(
+        screen.getByTestId('scanner-capture-button-outer').props.style,
+      );
+      const flipStyle = StyleSheet.flatten(
+        screen.getByTestId('scanner-flip-camera-button').props.style,
+      );
+
+      expect(galleryStyle.backgroundColor).toBe(LIGHT_COLORS.white);
+      expect(galleryStyle.borderColor).toBe(withAlpha(LIGHT_COLORS.white, 0.08));
+      expect(innerStyle.backgroundColor).toBe(LIGHT_COLORS.white);
+      expect(innerStyle.borderColor).toBe(
+        withAlpha('#F6FBFF', 0.16),
+      );
+      expect(outerStyle.borderColor).toBe(
+        withAlpha(LIGHT_COLORS.white, 0.68),
+      );
+      expect(flipStyle.backgroundColor).toBe(LIGHT_COLORS.white);
+      expect(flipStyle.borderColor).toBe(withAlpha(LIGHT_COLORS.white, 0.08));
+    });
+
+    it('keeps ready camera controls on their previous dark treatment', async () => {
+      mockUseTheme.mockReturnValue({
+        theme: 'dark',
+        colors: DARK_COLORS,
+        isDark: true,
+        toggleTheme: jest.fn(),
+        setTheme: jest.fn(),
+      });
+
       render(<ScannerScreen />);
 
       await waitFor(() => {
@@ -849,9 +890,23 @@ describe('ScannerScreen', () => {
       const innerStyle = StyleSheet.flatten(
         screen.getByTestId('scanner-capture-button-inner').props.style,
       );
+      const galleryStyle = StyleSheet.flatten(
+        screen.getByTestId('scanner-gallery-button').props.style,
+      );
+      const outerStyle = StyleSheet.flatten(
+        screen.getByTestId('scanner-capture-button-outer').props.style,
+      );
+      const flipStyle = StyleSheet.flatten(
+        screen.getByTestId('scanner-flip-camera-button').props.style,
+      );
 
+      expect(galleryStyle.backgroundColor).toBe(withAlpha(DARK_COLORS.white, 0.04));
+      expect(galleryStyle.borderColor).toBe(withAlpha(DARK_COLORS.white, 0.08));
       expect(innerStyle.backgroundColor).toBe('#F6FBFF');
       expect(innerStyle.borderColor).toBe('rgba(246, 251, 255, 0.16)');
+      expect(outerStyle.borderColor).toBe(withAlpha(DARK_COLORS.white, 0.68));
+      expect(flipStyle.backgroundColor).toBe(withAlpha(DARK_COLORS.white, 0.04));
+      expect(flipStyle.borderColor).toBe(withAlpha(DARK_COLORS.white, 0.08));
     });
 
     it('uses a stronger yellow treatment for selected Super Scan in light theme', async () => {
@@ -952,6 +1007,21 @@ describe('ScannerScreen', () => {
       expect(screen.getByTestId('scanner-capture-button')).toBeTruthy();
       expect(screen.getByTestId('scanner-gallery-button')).toBeTruthy();
       expect(screen.getByTestId('scanner-flip-camera-button')).toBeTruthy();
+
+      const pendingGalleryStyle = StyleSheet.flatten(
+        screen.getByTestId('scanner-gallery-button').props.style,
+      );
+      const pendingOuterStyle = StyleSheet.flatten(
+        screen.getByTestId('scanner-capture-button-outer').props.style,
+      );
+      const pendingInnerStyle = StyleSheet.flatten(
+        screen.getByTestId('scanner-capture-button-inner').props.style,
+      );
+      expect(pendingGalleryStyle.backgroundColor).toBe(withAlpha('#0C1720', 0.94));
+      expect(pendingGalleryStyle.borderColor).toBe(withAlpha(LIGHT_COLORS.white, 0.12));
+      expect(pendingOuterStyle.backgroundColor).toBe(withAlpha('#0B151D', 0.88));
+      expect(pendingInnerStyle.backgroundColor).toBe(withAlpha('#F6FBFF', 0.18));
+      expect(pendingInnerStyle.borderColor).toBe(withAlpha('#F6FBFF', 0.12));
 
       expect(mockShowAlert).not.toHaveBeenCalled();
       expect(ImagePicker.launchImageLibraryAsync).not.toHaveBeenCalled();

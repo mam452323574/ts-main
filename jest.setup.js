@@ -134,7 +134,7 @@ const mockLegacyTranslations = {
   'share_story.share_action': 'Partager',
   'share_story.preview_caption': 'Apercu 9:16 pret a partager.',
   // Auth
-  'auth.login_title': 'Health Scan',
+  'auth.login_title': 'SelfLens',
   'auth.login_subtitle': 'Connectez-vous à votre compte',
   'auth.login_btn': 'Se Connecter',
   'auth.email_label': 'Email',
@@ -148,7 +148,7 @@ const mockLegacyTranslations = {
   'auth.errors.fill_all': 'Veuillez remplir tous les champs',
   'auth.errors.invalid_credentials': 'Identifiants invalides',
   'auth.errors.general_error': 'Erreur gÃ©nÃ©rale',
-  'auth.signup_title': 'Health Scan',
+  'auth.signup_title': 'SelfLens',
   'auth.signup_subtitle': 'Creez votre compte',
   'auth.signup_btn': 'Continuer',
   'auth.has_account': 'Deja un compte ?',
@@ -188,7 +188,7 @@ const mockLegacyTranslations = {
   'auth.verification_sent_subtitle_login': 'Connexion...',
   'auth.error_login_generic': 'Erreur de connexion',
   // Premium
-  'premium.title': 'Health Scan Premium',
+  'premium.title': 'SelfLens Premium',
   'premium.subtitle': 'DÃ©bloquez tout le potentiel de votre santÃ©',
   'premium.feature_title': 'FonctionnalitÃ© Premium',
   'premium.upgrade_btn': 'Passer Ã  Premium',
@@ -291,7 +291,7 @@ const mockLegacyTranslations = {
   'onboarding.enter_app': 'Ouvrir l\'app',
   'onboarding.slide_1_eyebrow': 'Scanner',
   'onboarding.slide_1_title': 'Scanne d abord. Devine moins.',
-  'onboarding.slide_1_subtitle': 'Une photo pour vos repas, votre visage ou votre corps. Health Scan en fait un point de depart clair.',
+  'onboarding.slide_1_subtitle': 'Une photo pour vos repas, votre visage ou votre corps. SelfLens en fait un point de depart clair.',
   'onboarding.slide_1_bullet_1': 'Visage, corps, repas',
   'onboarding.slide_1_bullet_2': 'Capture rapide',
   'onboarding.slide_1_bullet_3': 'Base nette',
@@ -818,6 +818,17 @@ jest.mock('react-native-safe-area-context', () => ({
 jest.mock('@/contexts/AuthContext', () => ({
   useAuth: mockUseAuth,
   AuthProvider: ({ children }) => children,
+}));
+
+// Mock AdsContext — AdMob est un module natif indisponible en test. Le provider
+// est un passthrough et le gate publicitaire « fail-open » (jamais de pub, on
+// laisse passer le scan/coach), comme en web / Expo Go.
+jest.mock('@/contexts/AdsContext', () => ({
+  useAdsGate: () => ({
+    isReady: false,
+    presentRewardedAdGate: jest.fn(async () => 'rewarded'),
+  }),
+  AdsProvider: ({ children }) => children,
 }));
 
 // Mock Supabase

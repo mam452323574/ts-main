@@ -38,6 +38,8 @@ const mockTrackEvent = jest.fn();
 const mockRouterPush = jest.fn();
 const mockRouterBack = jest.fn();
 const mockRouterDismiss = jest.fn();
+const mockRouterDismissAll = jest.fn();
+const mockRouterReplace = jest.fn();
 const mockRouterCanDismiss = jest.fn();
 const mockLocalSearchParams = jest.fn();
 const mockUpdateCoachPersona = jest.fn();
@@ -226,6 +228,8 @@ jest.mock('expo-router', () => ({
     push: (...args: unknown[]) => mockRouterPush(...args),
     back: (...args: unknown[]) => mockRouterBack(...args),
     dismiss: (...args: unknown[]) => mockRouterDismiss(...args),
+    dismissAll: (...args: unknown[]) => mockRouterDismissAll(...args),
+    replace: (...args: unknown[]) => mockRouterReplace(...args),
     canDismiss: (...args: unknown[]) => mockRouterCanDismiss(...args),
   }),
   useFocusEffect: (callback: () => void | (() => void)) => {
@@ -3977,6 +3981,122 @@ describe('CoachScreen', () => {
     });
   });
 
+  it('returns a ready scan-response CTA to the underlying scanner result without clearing the stack', async () => {
+    mockLocalSearchParams.mockReturnValue({
+      source: 'scan_result',
+      scanId: 'scan-return-123',
+      promptType: 'latest_scan',
+      questionText: 'Que dois-je travailler apres ce scan ?',
+    });
+
+    const rendered = render(<CoachScreen />);
+
+    await waitFor(() => {
+      expect(
+        rendered.getByTestId('coach-settings-inline-question-input').props.value,
+      ).toBe('Que dois-je travailler apres ce scan ?');
+    });
+
+    fireEvent.press(rendered.getByTestId('coach-action-primary'));
+
+    await waitFor(() => {
+      expect(rendered.getByTestId('coach-ready-state')).toBeTruthy();
+    });
+    expect(rendered.getByText('Retour aux résultats du scanner')).toBeTruthy();
+    expect(
+      rendered.getByTestId('coach-action-primary').props.accessibilityLabel,
+    ).toBe('Retour aux résultats du scanner');
+
+    fireEvent.press(rendered.getByTestId('coach-action-primary'));
+
+    expect(mockRouterCanDismiss).toHaveBeenCalled();
+    expect(mockRouterBack).toHaveBeenCalled();
+    expect(mockRouterDismiss).not.toHaveBeenCalled();
+    expect(mockRouterDismissAll).not.toHaveBeenCalled();
+    expect(mockRouterReplace).not.toHaveBeenCalled();
+  });
+
+  it('uses the same modal dismissal for the scan-response CTA and the header back action', async () => {
+    mockRouterCanDismiss.mockReturnValue(true);
+    mockLocalSearchParams.mockReturnValue({
+      source: 'scan_result',
+      scanId: 'scan-modal-123',
+      promptType: 'latest_scan',
+      questionText: 'Que dois-je travailler apres ce scan ?',
+    });
+
+    const rendered = render(<CoachScreen />);
+
+    await waitFor(() => {
+      expect(
+        rendered.getByTestId('coach-settings-inline-question-input').props.value,
+      ).toBe('Que dois-je travailler apres ce scan ?');
+    });
+    fireEvent.press(rendered.getByTestId('coach-action-primary'));
+    await waitFor(() => {
+      expect(rendered.getByTestId('coach-ready-state')).toBeTruthy();
+    });
+
+    fireEvent.press(rendered.getByTestId('coach-action-primary'));
+    expect(mockRouterDismiss).toHaveBeenCalledTimes(1);
+    expect(mockRouterBack).not.toHaveBeenCalled();
+    expect(mockRouterDismissAll).not.toHaveBeenCalled();
+    expect(mockRouterReplace).not.toHaveBeenCalled();
+
+    mockRouterDismiss.mockClear();
+    mockRouterCanDismiss.mockClear();
+    fireEvent.press(rendered.getByTestId('coach-back-button'));
+
+    expect(mockRouterCanDismiss).toHaveBeenCalledTimes(1);
+    expect(mockRouterDismiss).toHaveBeenCalledTimes(1);
+    expect(mockRouterDismissAll).not.toHaveBeenCalled();
+    expect(mockRouterReplace).not.toHaveBeenCalled();
+  });
+
+  it('keeps scan-result back navigation available when auto-submit is blocked by exhausted quota', async () => {
+    mockCoachQuotaState = {
+      data: {
+        account_tier: 'free',
+        limit: 1,
+        used_count: 1,
+        available: 0,
+        next_recharge_at: new Date(Date.now() + 23 * 60 * 60_000).toISOString(),
+        unlimited: false,
+        window_seconds: 86400,
+        as_of: new Date().toISOString(),
+      },
+      error: null,
+      isFetching: false,
+      refetch: mockRefetchCoachQuota,
+    };
+    mockLocalSearchParams.mockReturnValue({
+      source: 'scan_result',
+      autoSubmit: '1',
+      scanId: 'scan-quota-123',
+      promptType: 'latest_scan',
+      questionText: 'Que dois-je travailler apres ce scan ?',
+    });
+
+    const rendered = render(<CoachScreen />);
+
+    await waitFor(() => {
+      expect(mockShowAlert).toHaveBeenCalledWith(
+        'Quota Coach atteint',
+        expect.stringMatching(/^Prochaine demande dans /),
+        expect.arrayContaining([expect.objectContaining({ text: expect.any(String) })]),
+        expect.anything(),
+        expect.objectContaining({ emoji: null }),
+      );
+    });
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+
+    fireEvent.press(rendered.getByTestId('coach-back-button'));
+
+    expect(mockRouterBack).toHaveBeenCalled();
+    expect(mockRouterDismissAll).not.toHaveBeenCalled();
+    expect(mockRouterReplace).not.toHaveBeenCalled();
+  });
+
   it('treats an edited scan result route question as a true free-text request', async () => {
     mockLocalSearchParams.mockReturnValue({
       source: 'scan_result',
@@ -4440,5 +4560,148 @@ describe('CoachScreen', () => {
       expect.anything(),
       expect.objectContaining({ emoji: null }),
     );
+  });
+
+  describe('CoachScreen — rolling free conversation quota (72h)', () => {
+    it('shows the Parler au coach hero for a free user that still has credits and routes to the coach inbox', () => {
+      mockUseCoachConversationQuota.mockReturnValue({
+        data: {
+          tier: 'free',
+          account_tier: 'free',
+          free_used: false,
+          quota_exceeded: false,
+          free_used_count: 1,
+          free_remaining_messages: 3,
+          free_next_recharge_at: '2026-05-29T10:00:00.000Z',
+          free_window_seconds: 259_200,
+          free_conversation_id: null,
+          free_message_limit: 4,
+          per_conversation_limit: 20,
+          window_seconds: 259_200,
+          unlimited: false,
+          premium_today_used: 0,
+          premium_today_limit: null,
+          premium_today_available: null,
+          next_recharge_at: null,
+          as_of: '2026-05-26T10:00:00.000Z',
+          last_conversation_by_persona: {},
+          conversation_count_by_persona: {},
+        },
+        isPending: false,
+        isFetching: false,
+        error: null,
+      });
+
+      render(<CoachScreen />);
+
+      const heroCard = screen.getByTestId('coach-conversation-hero-card');
+      fireEvent.press(heroCard);
+
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        pathname: '/coach/conversations',
+      });
+      expect(mockRouterPush).not.toHaveBeenCalledWith('/premium-upgrade');
+    });
+
+    it('shows the exhausted hero with a recharge hint and still opens the coach inbox', () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-05-26T10:00:00.000Z'));
+      mockUseCoachConversationQuota.mockReturnValue({
+        data: {
+          tier: 'free',
+          account_tier: 'free',
+          free_used: true,
+          quota_exceeded: true,
+          free_used_count: 4,
+          free_remaining_messages: 0,
+          free_next_recharge_at: '2026-05-29T10:00:00.000Z',
+          free_window_seconds: 259_200,
+          free_conversation_id: 'conv-1',
+          free_message_limit: 4,
+          per_conversation_limit: 20,
+          window_seconds: 259_200,
+          unlimited: false,
+          premium_today_used: 0,
+          premium_today_limit: null,
+          premium_today_available: null,
+          next_recharge_at: null,
+          as_of: '2026-05-26T10:00:00.000Z',
+          last_conversation_by_persona: {
+            gentle_supportive: {
+              id: 'conv-1',
+              updated_at: '2026-05-26T09:55:00.000Z',
+              last_user_message_at: '2026-05-26T09:55:00.000Z',
+            },
+          },
+          conversation_count_by_persona: { gentle_supportive: 1 },
+        },
+        isPending: false,
+        isFetching: false,
+        error: null,
+      });
+
+      const rendered = render(<CoachScreen />);
+
+      try {
+        const heroCard = screen.getByTestId('coach-conversation-hero-card');
+        expect(heroCard.props.accessibilityLabel).toContain(
+          'Prochain message dans 3 jours',
+        );
+        expect(heroCard.props.accessibilityLabel).not.toContain('72h 0m');
+        fireEvent.press(heroCard);
+
+        expect(mockRouterPush).toHaveBeenCalledWith({
+          pathname: '/coach/conversations',
+        });
+      } finally {
+        rendered.unmount();
+        jest.useRealTimers();
+      }
+    });
+
+    it('routes a free user with an existing conversation to the coach inbox', () => {
+      mockUseCoachConversationQuota.mockReturnValue({
+        data: {
+          tier: 'free',
+          account_tier: 'free',
+          free_used: false,
+          quota_exceeded: false,
+          free_used_count: 2,
+          free_remaining_messages: 2,
+          free_next_recharge_at: '2026-05-29T10:00:00.000Z',
+          free_window_seconds: 259_200,
+          free_conversation_id: 'conv-42',
+          free_message_limit: 4,
+          per_conversation_limit: 20,
+          window_seconds: 259_200,
+          unlimited: false,
+          premium_today_used: 0,
+          premium_today_limit: null,
+          premium_today_available: null,
+          next_recharge_at: null,
+          as_of: '2026-05-26T10:00:00.000Z',
+          last_conversation_by_persona: {
+            gentle_supportive: {
+              id: 'conv-42',
+              updated_at: '2026-05-26T09:55:00.000Z',
+              last_user_message_at: '2026-05-26T09:55:00.000Z',
+            },
+          },
+          conversation_count_by_persona: { gentle_supportive: 1 },
+        },
+        isPending: false,
+        isFetching: false,
+        error: null,
+      });
+
+      render(<CoachScreen />);
+
+      const heroCard = screen.getByTestId('coach-conversation-hero-card');
+      fireEvent.press(heroCard);
+
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        pathname: '/coach/conversations',
+      });
+    });
   });
 });

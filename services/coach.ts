@@ -44,7 +44,9 @@ import {
   sanitizeUntrustedAiText,
   sanitizeUntrustedAiTextArray,
 } from '@/utils/sanitizeUntrustedAiText';
+import { sanitizeScanForTier } from '@/utils/scanResultSanitizer';
 import type {
+  AccountTier,
   AnalysisResult,
   CoachComparisonToPrevious,
   CoachDataReliability,
@@ -5105,9 +5107,13 @@ export async function fetchCoachEntries(limit?: number): Promise<CoachEntry[]> {
     // C-05: explicit column list — no select('*') so internal columns never
     // leak to the client over the wire (see COACH_ENTRY_PUBLIC_COLUMNS_SELECT
     // above for the rationale).
+    // F-01 (audit 2026-05-27): soft-deleted entries (deleted_at IS NOT NULL)
+    // must stay hidden from the public Coach surface, otherwise an entry the
+    // user just deleted would resurface as the "latest advice" idle state.
     let query = supabase
       .from('coach_entries')
       .select(COACH_ENTRY_PUBLIC_COLUMNS_SELECT)
+      .is('deleted_at', null)
       .order('updated_at', { ascending: false })
       .order('created_at', { ascending: false });
 
@@ -5349,9 +5355,13 @@ export async function fetchLatestReadyCoachEntry(options: {
   try {
     // C-05: same explicit column list as fetchCoachEntries — keep the public
     // surface coherent so no consumer accidentally relies on an internal field.
+    // F-01 (audit 2026-05-27): mirror the deleted_at filter from
+    // fetchCoachEntries so a soft-deleted entry can never become the "latest
+    // ready" guidance surfaced on the idle Coach screen.
     let baseQuery = supabase
       .from('coach_entries')
       .select(COACH_ENTRY_PUBLIC_COLUMNS_SELECT)
+      .is('deleted_at', null)
       .eq('status', 'ready')
       .not('title', 'is', null)
       .not('body', 'is', null)
@@ -5405,8 +5415,18 @@ export async function fetchLatestReadyCoachEntry(options: {
   }
 }
 
+export interface FetchRecentCoachScansOptions {
+  // Defense-in-depth: when a free account loads its scan history into the
+  // client (e.g. the Coach screen UI), premium-locked fields must be
+  // stripped before they sit in client memory. Premium / admin / undefined
+  // tiers receive the full payload because they need the complete metrics
+  // for premium analytics, coach prompt building, and history-on-upgrade.
+  accountTier?: AccountTier | null;
+}
+
 export async function fetchRecentCoachScans(
   limit = RECENT_COACH_SCAN_LIMIT,
+  options: FetchRecentCoachScansOptions = {},
 ) {
   const normalizedLimit =
     Number.isFinite(limit) && limit > 0
@@ -5415,6 +5435,7 @@ export async function fetchRecentCoachScans(
   const pageSize = Math.max(normalizedLimit, RECENT_COACH_SCAN_LIMIT);
   const usableScans: CoachSourceScan[] = [];
   let offset = 0;
+  const shouldSanitizeForFree = options.accountTier === 'free';
 
   try {
     while (usableScans.length < normalizedLimit) {
@@ -5437,7 +5458,11 @@ export async function fetchRecentCoachScans(
 
       const rows = Array.isArray(data) ? data : [];
       for (const row of rows) {
-        const parsedScan = parseCoachSourceScan(row);
+        const safeRow =
+          shouldSanitizeForFree && isRecord(row)
+            ? sanitizeScanForTier(row as Record<string, unknown>, 'free')
+            : row;
+        const parsedScan = parseCoachSourceScan(safeRow);
         if (parsedScan) {
           usableScans.push(parsedScan);
         }

@@ -11,7 +11,10 @@ export type PreAuthOnboardingStep =
   | 'emailCredentials'
   | 'verification';
 
-export type PreAuthCompletionIntent = 'signup-email' | 'signup-google';
+export type PreAuthCompletionIntent =
+  | 'signup-email'
+  | 'signup-google'
+  | 'signup-apple';
 
 export interface PreAuthOnboardingDraft {
   selectedTheme: ThemeType | null;
@@ -61,7 +64,11 @@ function readTheme(value: unknown): ThemeType | null {
 }
 
 function readCompletionIntent(value: unknown): PreAuthCompletionIntent | null {
-  return value === 'signup-email' || value === 'signup-google' ? value : null;
+  return value === 'signup-email' ||
+    value === 'signup-google' ||
+    value === 'signup-apple'
+    ? value
+    : null;
 }
 
 function readStep(value: unknown): PreAuthOnboardingStep {

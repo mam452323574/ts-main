@@ -3,7 +3,13 @@ import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import { CoachConversationHeroCard } from '@/components/coach/CoachConversationHeroCard';
-import { BORDER_RADIUS, DARK_COLORS, LIGHT_COLORS } from '@/constants/theme';
+import {
+  BORDER_RADIUS,
+  DARK_COLORS,
+  LIGHT_COLORS,
+  getCoachPaperSurface,
+  withAlpha,
+} from '@/constants/theme';
 
 const mockThemeState = {
   colors: LIGHT_COLORS,
@@ -16,7 +22,7 @@ jest.mock('@/contexts/ThemeContext', () => ({
 
 const baseProps = {
   personaKey: 'gentle_supportive' as const,
-  title: 'Parler au coach',
+  title: null as string | null,
   subtitle: 'Pose ta question et reçois une réponse personnalisée.',
   ctaLabel: 'Démarrer une conversation',
   onPress: jest.fn(),
@@ -44,12 +50,148 @@ describe('CoachConversationHeroCard', () => {
     expect(screen.getByTestId('coach-conversation-hero-card-halo')).toBeTruthy();
     expect(screen.getByTestId('coach-conversation-hero-card-cta')).toBeTruthy();
     expect(screen.getByTestId('coach-conversation-hero-card-cta-icon')).toBeTruthy();
-    expect(screen.getByText('Parler au coach')).toBeTruthy();
+    expect(screen.getByText('Démarrer ma conversation')).toBeTruthy();
 
     const cardStyle = getPressableStyle('coach-conversation-hero-card');
     expect(cardStyle.borderRadius).toBe(BORDER_RADIUS.hero);
     expect(cardStyle.overflow).toBe('hidden');
     expect(cardStyle.minHeight).toBeGreaterThanOrEqual(280);
+  });
+
+  it('uses a light paper surface and dark copy in light mode', () => {
+    render(<CoachConversationHeroCard {...baseProps} variant="free_available" />);
+
+    const paper = getCoachPaperSurface(false);
+    const gradient = screen.getByTestId('coach-conversation-hero-card-gradient');
+    const title = StyleSheet.flatten(
+      screen.getByTestId('coach-conversation-hero-card-title').props.style,
+    );
+    const cta = StyleSheet.flatten(
+      screen.getByText(baseProps.ctaLabel).props.style,
+    );
+
+    expect(gradient.props.colors[0]).not.toBe('#0F1A2A');
+    expect(title.color).toBe(paper.ink);
+    expect(cta.color).toBe(paper.ink);
+  });
+
+  it('renders the parent-provided ctaLabel and subtitle in free_exhausted state (B-1)', () => {
+    render(
+      <CoachConversationHeroCard
+        {...baseProps}
+        variant="free_exhausted"
+        title="Conversation gratuite en pause"
+        ctaLabel="Voir la conversation"
+        subtitle="Attends la prochaine recharge ou passe premium pour continuer."
+      />,
+    );
+
+    const ctaLabel = screen.getByTestId('coach-conversation-hero-card-cta-label');
+    expect(ctaLabel.props.children).toBe('Voir la conversation');
+    expect(screen.queryByText('Parler au coach')).toBeNull();
+
+    const subtitle = screen.getByTestId('coach-conversation-hero-card-subtitle');
+    expect(subtitle.props.children).toBe(
+      'Attends la prochaine recharge ou passe premium pour continuer.',
+    );
+  });
+
+  it('falls back to "Parler au coach" when ctaLabel is empty (B-1)', () => {
+    render(
+      <CoachConversationHeroCard
+        {...baseProps}
+        variant="free_available"
+        ctaLabel=""
+      />,
+    );
+
+    const ctaLabel = screen.getByTestId('coach-conversation-hero-card-cta-label');
+    expect(ctaLabel.props.children).toBe('Parler au coach');
+  });
+
+  it('omits the subtitle slot when subtitle is empty (B-1)', () => {
+    render(
+      <CoachConversationHeroCard
+        {...baseProps}
+        variant="free_available"
+        subtitle=""
+      />,
+    );
+
+    expect(
+      screen.queryByTestId('coach-conversation-hero-card-subtitle'),
+    ).toBeNull();
+  });
+
+  it('omits the subtitle slot when subtitle is undefined (B-1)', () => {
+    // Production code typings require a subtitle string, but defensive runtime
+    // guards still matter when the parent forgets to pass the prop entirely.
+    render(
+      <CoachConversationHeroCard
+        {...baseProps}
+        variant="free_available"
+        subtitle={undefined as unknown as string}
+      />,
+    );
+
+    expect(
+      screen.queryByTestId('coach-conversation-hero-card-subtitle'),
+    ).toBeNull();
+  });
+
+  it('falls back to "Parler au coach" when ctaLabel is undefined (B-1)', () => {
+    render(
+      <CoachConversationHeroCard
+        {...baseProps}
+        variant="free_available"
+        ctaLabel={undefined as unknown as string}
+      />,
+    );
+
+    const ctaLabel = screen.getByTestId(
+      'coach-conversation-hero-card-cta-label',
+    );
+    expect(ctaLabel.props.children).toBe('Parler au coach');
+  });
+
+  it('renders the premium_exhausted CTA "Voir l’historique" (B-1)', () => {
+    render(
+      <CoachConversationHeroCard
+        {...baseProps}
+        variant="premium_exhausted"
+        title="Limite quotidienne atteinte"
+        ctaLabel="Voir l’historique"
+        subtitle="Consulte ton historique en attendant le prochain reset."
+      />,
+    );
+
+    expect(
+      screen.getByTestId('coach-conversation-hero-card-cta-label').props
+        .children,
+    ).toBe('Voir l’historique');
+    expect(
+      screen.getByTestId('coach-conversation-hero-card-subtitle').props
+        .children,
+    ).toBe('Consulte ton historique en attendant le prochain reset.');
+  });
+
+  it('propagates the dynamic ctaLabel into the accessibility label (B-1)', () => {
+    render(
+      <CoachConversationHeroCard
+        {...baseProps}
+        variant="free_exhausted"
+        title="Conversation gratuite en pause"
+        ctaLabel="Voir la conversation"
+        subtitle="Attends la prochaine recharge ou passe premium pour continuer."
+      />,
+    );
+
+    const button = screen.getByTestId('coach-conversation-hero-card');
+    expect(button.props.accessibilityLabel).toContain('Voir la conversation');
+    expect(button.props.accessibilityLabel).toContain(
+      'Attends la prochaine recharge ou passe premium pour continuer.',
+    );
+    expect(button.props.accessibilityLabel).not.toContain('Parler au coach');
   });
 
   it('injects the coach name from i18n into the title for free_available', () => {
@@ -74,6 +216,22 @@ describe('CoachConversationHeroCard', () => {
     expect(
       screen.getByTestId('coach-conversation-hero-card-title').props.children,
     ).toBe('Conversation Libre avec Milo');
+  });
+
+  it('keeps Leo hero crop bottom-aligned without the selector card scale', () => {
+    render(
+      <CoachConversationHeroCard
+        {...baseProps}
+        personaKey="motivational_energetic"
+        variant="premium_available"
+      />,
+    );
+
+    const portrait = screen.getByTestId('coach-conversation-hero-card-portrait');
+    const portraitStyle = StyleSheet.flatten(portrait.props.style);
+
+    expect(portrait.props.contentPosition).toBe('bottom');
+    expect(portraitStyle.transform).toBeUndefined();
   });
 
   it.each([
@@ -183,6 +341,14 @@ describe('CoachConversationHeroCard', () => {
     const cardStyle = getPressableStyle('coach-conversation-hero-card');
     expect(cardStyle.borderRadius).toBe(BORDER_RADIUS.hero);
     expect(cardStyle.overflow).toBe('hidden');
+    expect(screen.getByTestId('coach-conversation-hero-card-gradient').props.colors[0]).toBe(
+      '#0F1A2A',
+    );
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('coach-conversation-hero-card-title').props.style,
+      ).color,
+    ).toBe(withAlpha(DARK_COLORS.white, 0.96));
   });
 });
 

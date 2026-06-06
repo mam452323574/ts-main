@@ -20,6 +20,7 @@ type StartupMarker =
   | 'profile-loaded'
   | 'route-ready'
   | 'index-rendered'
+  | 'welcome-rendered'
   | 'login-rendered'
   | 'email-verification-rendered'
   | 'username-setup-rendered'

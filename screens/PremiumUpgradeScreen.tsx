@@ -617,7 +617,7 @@ export default function PremiumUpgradeScreen() {
 
     if (Platform.OS === 'android') {
       void safeOpenExternalUrl(
-        'https://play.google.com/store/account/subscriptions?package=com.healthscan.app',
+        'https://play.google.com/store/account/subscriptions?package=com.selflens.app',
         {
           context: '[PremiumUpgrade] Failed to open Play Store subscriptions',
         },

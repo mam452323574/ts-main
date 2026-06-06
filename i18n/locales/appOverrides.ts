@@ -129,7 +129,7 @@ export const APP_TRANSLATION_OVERRIDES: Record<LocaleCode, TranslationTree> = {
     social: {
       feed_title: 'Feed della community',
       feed_subtitle:
-        'Condividi i tuoi progressi, i tuoi pasti e le tue trasformazioni nel feed pubblico di Health Scan.',
+        'Condividi i tuoi progressi, i tuoi pasti e le tue trasformazioni nel feed pubblico di SelfLens.',
       empty: {
         title: 'Qui non c e ancora nulla',
         body: 'Sii il primo a pubblicare un prima/dopo, un pasto o un aggiornamento fisico.',
@@ -365,7 +365,7 @@ export const APP_TRANSLATION_OVERRIDES: Record<LocaleCode, TranslationTree> = {
     social: {
       feed_title: 'Feed da comunidade',
       feed_subtitle:
-        'Partilhe os seus progressos, as suas refeicoes e as suas transformacoes no feed publico da Health Scan.',
+        'Partilhe os seus progressos, as suas refeicoes e as suas transformacoes no feed publico da SelfLens.',
       empty: {
         title: 'Ainda nao ha nada por aqui',
         body: 'Seja a primeira pessoa a publicar um antes/depois, uma refeicao ou uma atualizacao fisica.',
@@ -602,7 +602,7 @@ export const APP_TRANSLATION_OVERRIDES: Record<LocaleCode, TranslationTree> = {
     social: {
       feed_title: 'Feed de la comunidad',
       feed_subtitle:
-        'Comparte tus progresos, tus comidas y tus transformaciones en el feed publico de Health Scan.',
+        'Comparte tus progresos, tus comidas y tus transformaciones en el feed publico de SelfLens.',
       empty: {
         title: 'Aun no hay nada aqui',
         body: 'Se la primera persona en publicar un antes/despues, una comida o una actualizacion fisica.',
@@ -840,7 +840,7 @@ export const APP_TRANSLATION_OVERRIDES: Record<LocaleCode, TranslationTree> = {
     social: {
       feed_title: 'Community-Feed',
       feed_subtitle:
-        'Teile deine Fortschritte, Mahlzeiten und Veranderungen im offentlichen Health-Scan-Feed.',
+        'Teile deine Fortschritte, Mahlzeiten und Veranderungen im offentlichen SelfLens-Feed.',
       empty: {
         title: 'Hier gibt es noch nichts',
         body: 'Sei die erste Person, die ein Vorher/Nachher, eine Mahlzeit oder ein Physique-Update veroffentlicht.',

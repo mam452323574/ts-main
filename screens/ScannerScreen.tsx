@@ -799,12 +799,41 @@ export default function ScannerScreen() {
         ? `${quotaState.remaining}/${quotaState.limit}`
         : t('scan_limit.limit_reached')
       : t(quotaStatusLabelKey ?? 'scan_limit.missing_payload');
+
+    // Light-theme overrides for UNSELECTED chips only. The Scanner camera chrome
+    // (scrim, capture button, banner) is intentionally always-dark via
+    // resolveScanCaptureVisualTheme(..., true). The unselected chip surface,
+    // however, should follow the app theme so that in light mode the chips read
+    // as white cards with dark content — matching the legacy light look.
+    // Selected and Super-selected states are left untouched in both themes.
+    const nonSelectedChipBackground = isDark
+      ? withAlpha(captureTheme.screenBackground, 0.72)
+      : withAlpha(colors.white, 0.92);
+    const nonSelectedChipBorder = isDark
+      ? captureTheme.chromeBorder
+      : (colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08));
+    const nonSelectedChipLabelColor = isDark
+      ? captureTheme.chromeMutedText
+      : colors.primaryText;
+    const nonSelectedChipMetaColor = isDark
+      ? captureTheme.chromeMutedText
+      : (colors.textMuted ?? colors.secondaryText ?? colors.primaryText);
+    const nonSelectedChipIconColor = isDark
+      ? captureTheme.chromeText
+      : colors.primaryText;
+    const nonSelectedChipIconWrapBackground = isDark
+      ? withAlpha(colors.white, 0.04)
+      : withAlpha(colors.primaryText, 0.05);
+    const nonSelectedChipIconWrapBorder = isDark
+      ? withAlpha(colors.white, 0.08)
+      : withAlpha(colors.primaryText, 0.08);
+
     const iconColor =
       isSelectedSuper
         ? SCANNER_TOKENS.superSelectedForeground
         : isSelected
         ? chipTheme.chipText
-        : captureTheme.chromeText;
+        : nonSelectedChipIconColor;
 
     const isPendingReady = !isCameraPreviewReady;
 
@@ -820,12 +849,12 @@ export default function ScannerScreen() {
                 ? isSelectedSuper
                   ? SCANNER_TOKENS.superSelectedBackground
                   : chipTheme.chipBackground
-                : withAlpha(captureTheme.screenBackground, 0.72),
+                : nonSelectedChipBackground,
               borderColor: isSelected
                 ? isSelectedSuper
                   ? SCANNER_TOKENS.superSelectedBorder
                   : chipTheme.chipBorder
-                : captureTheme.chromeBorder,
+                : nonSelectedChipBorder,
               shadowColor: isSelected
                 ? isSelectedSuper
                   ? SCANNER_TOKENS.superSelectedBorder
@@ -849,13 +878,13 @@ export default function ScannerScreen() {
                     ? withAlpha(SCANNER_TOKENS.superSelectedForeground, 0.14)
                     : isSelected
                     ? chipTheme.accentSoftBackground
-                    : withAlpha(colors.white, 0.04),
+                    : nonSelectedChipIconWrapBackground,
                 borderColor:
                   isSelectedSuper
                     ? withAlpha(SCANNER_TOKENS.superSelectedForeground, 0.18)
                     : isSelected
                     ? chipTheme.vignetteFrameBorder
-                    : withAlpha(colors.white, 0.08),
+                    : nonSelectedChipIconWrapBorder,
               },
               !isSelected && isPendingReady ? styles.scanChipIconWrapPendingReady : null,
             ]}
@@ -877,7 +906,7 @@ export default function ScannerScreen() {
                   ? isSelectedSuper
                     ? SCANNER_TOKENS.superSelectedForeground
                     : chipTheme.chipText
-                  : captureTheme.chromeMutedText,
+                  : nonSelectedChipLabelColor,
               },
             ]}
             testID={scanType === 'super' ? 'scanner-super-scan-label' : undefined}
@@ -910,7 +939,7 @@ export default function ScannerScreen() {
                       ? isSelectedSuper
                         ? SCANNER_TOKENS.superSelectedForeground
                         : chipTheme.chipText
-                      : captureTheme.chromeMutedText,
+                      : nonSelectedChipMetaColor,
                   },
                 ]}
               >
@@ -1036,7 +1065,15 @@ export default function ScannerScreen() {
                   disabled={interactionsLocked}
                   testID="scanner-gallery-button"
                 >
-                  <ImageIcon color={captureTheme.chromeText} size={24} strokeWidth={2} />
+                  <ImageIcon
+                    color={
+                      isCameraPreviewReady
+                        ? captureTheme.secondaryButtonText
+                        : captureTheme.chromeText
+                    }
+                    size={24}
+                    strokeWidth={2}
+                  />
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -1075,7 +1112,11 @@ export default function ScannerScreen() {
                 >
                   <CameraFlipIcon
                     size={28}
-                    color={captureTheme.chromeText}
+                    color={
+                      isCameraPreviewReady
+                        ? captureTheme.secondaryButtonText
+                        : captureTheme.chromeText
+                    }
                     strokeWidth={2}
                   />
                 </TouchableOpacity>
@@ -1308,8 +1349,12 @@ const createStyles = (
       backgroundColor: withAlpha(colors.white, 0.08),
       shadowColor: accentTheme.completionGlow,
       shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.38,
-      shadowRadius: 24,
+      // In light theme, the white shutter sits on a less-contrasting backdrop
+      // than in dark, so the accent-tinted glow reads visually stronger. We
+      // attenuate the shadow only in light to keep the halo subtle without
+      // touching the dark calibration or the visible button geometry.
+      shadowOpacity: isDark ? 0.38 : 0.22,
+      shadowRadius: isDark ? 24 : 16,
       elevation: 8, borderCurve: 'continuous',
     },
     captureButtonOuterPendingReady: {
@@ -1323,7 +1368,7 @@ const createStyles = (
       width: isCompactVerticalLayout ? 60 : 64,
       height: isCompactVerticalLayout ? 60 : 64,
       borderRadius: isCompactVerticalLayout ? 30 : 32,
-      backgroundColor: captureTheme.shutterInner,
+      backgroundColor: isDark ? captureTheme.shutterInner : colors.white,
       borderWidth: 1,
       borderColor: withAlpha(captureTheme.shutterInner, 0.16), borderCurve: 'continuous',
     },

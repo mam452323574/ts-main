@@ -21,38 +21,38 @@ const ALLOWED_LOCALES: Locale[] = ['fr', 'en', 'de', 'it', 'es', 'pt'];
 
 const TRANSLATIONS: Record<Locale, { subject: string; title: string; subtitle: string; expireText: string }> = {
   fr: {
-    subject: 'Bienvenue sur Health Scan',
-    title: 'Bienvenue sur Health Scan',
+    subject: 'Bienvenue sur SelfLens',
+    title: 'Bienvenue sur SelfLens',
     subtitle: 'Verifiez votre adresse email pour finaliser votre inscription.',
     expireText: 'Expire dans 15 minutes.',
   },
   en: {
-    subject: 'Welcome to Health Scan',
-    title: 'Welcome to Health Scan',
+    subject: 'Welcome to SelfLens',
+    title: 'Welcome to SelfLens',
     subtitle: 'Verify your email address to complete your registration.',
     expireText: 'Expires in 15 minutes.',
   },
   de: {
-    subject: 'Willkommen bei Health Scan',
-    title: 'Willkommen bei Health Scan',
+    subject: 'Willkommen bei SelfLens',
+    title: 'Willkommen bei SelfLens',
     subtitle: 'Bestaetigen Sie Ihre E-Mail-Adresse, um die Registrierung abzuschliessen.',
     expireText: 'Laeuft in 15 Minuten ab.',
   },
   it: {
-    subject: 'Benvenuto in Health Scan',
-    title: 'Benvenuto in Health Scan',
+    subject: 'Benvenuto in SelfLens',
+    title: 'Benvenuto in SelfLens',
     subtitle: 'Verifica il tuo indirizzo email per completare la registrazione.',
     expireText: 'Scade tra 15 minuti.',
   },
   es: {
-    subject: 'Bienvenido a Health Scan',
-    title: 'Bienvenido a Health Scan',
+    subject: 'Bienvenido a SelfLens',
+    title: 'Bienvenido a SelfLens',
     subtitle: 'Verifique su direccion de correo electronico para completar su registro.',
     expireText: 'Expira en 15 minutos.',
   },
   pt: {
-    subject: 'Bem-vindo ao Health Scan',
-    title: 'Bem-vindo ao Health Scan',
+    subject: 'Bem-vindo ao SelfLens',
+    title: 'Bem-vindo ao SelfLens',
     subtitle: 'Verifique seu endereco de e-mail para concluir o cadastro.',
     expireText: 'Expira em 15 minutos.',
   },
@@ -234,7 +234,7 @@ Deno.serve(async (req: Request) => {
     const { html, subject } = generateEmailTemplate(code, locale);
     const from =
       readOptionalServerEnv('VERIFICATION_EMAIL_FROM') ??
-      'Health Scan <noreply@healthscan.cloud>';
+      'SelfLens <noreply@selflens.org>';
 
     console.log('[send-verification-email] calling Resend', {
       from,

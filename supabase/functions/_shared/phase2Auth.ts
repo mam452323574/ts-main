@@ -59,6 +59,27 @@ export function createServiceRoleClient() {
   });
 }
 
+export function createAuthenticatedRequestClient(req: Request) {
+  const token = readAuthorizationBearerToken(req);
+  const supabaseUrl = getSupabaseUrlOrThrow();
+  const anonKey = requireServerEnv('SUPABASE_ANON_KEY', {
+    code: 'missing_supabase_anon_key',
+    message: 'SUPABASE_ANON_KEY is not configured',
+  });
+
+  return createClient(supabaseUrl, anonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+    global: {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  });
+}
+
 export function getSupabaseUrlOrThrow() {
   return requireServerEnv('SUPABASE_URL', {
     code: 'missing_supabase_url',

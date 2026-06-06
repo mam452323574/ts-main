@@ -6,6 +6,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import {
   BORDER_RADIUS,
   FONT_WEIGHTS,
+  getThemeTokens,
   mixColors,
   SPACING,
   withAlpha,
@@ -32,6 +33,9 @@ function CoachLockBadgeComponent({ label, style, testID }: CoachLockBadgeProps) 
   const { colors, isDark } = useTheme();
   const goldColor = colors.gold ?? '#FFD700';
   const goldLight = colors.goldLight ?? '#FFF8E1';
+  const foregroundColor = isDark
+    ? goldColor
+    : getThemeTokens(false).premium.foreground;
   const backgroundColor = mixColors(
     goldLight,
     colors.background,
@@ -46,18 +50,18 @@ function CoachLockBadgeComponent({ label, style, testID }: CoachLockBadgeProps) 
       testID={testID ? `${testID}-lock-badge` : undefined}
     >
       <Crown
-        color={goldColor}
-        fill={goldColor}
+        color={foregroundColor}
+        fill={foregroundColor}
         size={12}
         testID={testID ? `${testID}-lock-crown` : undefined}
       />
       <Lock
-        color={goldColor}
+        color={foregroundColor}
         size={12}
         testID={testID ? `${testID}-lock-icon` : undefined}
       />
       {label ? (
-        <Text style={[styles.label, { color: goldColor }]}>{label}</Text>
+        <Text style={[styles.label, { color: foregroundColor }]}>{label}</Text>
       ) : null}
     </View>
   );

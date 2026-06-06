@@ -61,7 +61,7 @@ describe('PrivacyPolicyScreen', () => {
     expect(screen.getByText('Ultimo aggiornamento: 18 marzo 2026')).toBeTruthy();
     expect(
       screen.getByText(
-        'Questa pagina spiega come Health Scan raccoglie, utilizza e protegge i dati necessari per eseguire gli scan salute e far funzionare il servizio.',
+        'Questa pagina spiega come SelfLens raccoglie, utilizza e protegge i dati necessari per eseguire gli scan salute e far funzionare il servizio.',
       ),
     ).toBeTruthy();
     expect(screen.queryByText('Privacy Policy / Politique de confidentialite')).toBeNull();
