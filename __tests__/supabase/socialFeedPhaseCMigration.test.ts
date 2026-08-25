@@ -6,7 +6,7 @@ const SCHEMA_PATH = path.join(
   REPO_ROOT,
   'supabase',
   'migrations',
-  '20260520120000_social_feed_phase_c.sql',
+  '20260520121000_social_feed_phase_c.sql',
 );
 const RPCS_PATH = path.join(
   REPO_ROOT,

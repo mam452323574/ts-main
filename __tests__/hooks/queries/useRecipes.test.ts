@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react-native';
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import { useRecipes, RECIPES_QUERY_KEY } from '@/hooks/queries/useRecipes';
@@ -12,6 +12,8 @@ jest.mock('@/services/api', () => ({
 
 import { ApiService } from '@/services/api';
 
+const testQueryClients = new Set<QueryClient>();
+
 const createWrapper = () => {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -20,12 +22,19 @@ const createWrapper = () => {
       },
     },
   });
+  testQueryClients.add(queryClient);
 
   return ({ children }: { children: React.ReactNode }) =>
     React.createElement(QueryClientProvider, { client: queryClient }, children);
 };
 
 describe('useRecipes', () => {
+  afterEach(() => {
+    cleanup();
+    testQueryClients.forEach((queryClient) => queryClient.clear());
+    testQueryClients.clear();
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -41,7 +50,7 @@ describe('useRecipes', () => {
     ];
     (ApiService.getRecipes as jest.Mock).mockResolvedValue(mockData);
 
-    const { result } = renderHook(() => useRecipes(), {
+    const { result, unmount } = renderHook(() => useRecipes(), {
       wrapper: createWrapper(),
     });
 
@@ -51,18 +60,31 @@ describe('useRecipes', () => {
 
     expect(result.current.data).toEqual(mockData);
     expect(ApiService.getRecipes).toHaveBeenCalled();
+    unmount();
   });
 
-  it('handles loading state', () => {
+  it('handles loading state', async () => {
+    let resolveRecipes!: (value: unknown[]) => void;
     (ApiService.getRecipes as jest.Mock).mockImplementation(
-      () => new Promise(() => {})
+      () =>
+        new Promise((resolve) => {
+          resolveRecipes = resolve;
+        }),
     );
 
-    const { result } = renderHook(() => useRecipes(), {
+    const { result, unmount } = renderHook(() => useRecipes(), {
       wrapper: createWrapper(),
     });
 
     expect(result.current.isLoading).toBe(true);
+
+    await act(async () => {
+      resolveRecipes([]);
+    });
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+    unmount();
   });
 
   it('handles error state', async () => {
@@ -70,7 +92,7 @@ describe('useRecipes', () => {
       new Error('Failed to fetch recipes')
     );
 
-    const { result } = renderHook(() => useRecipes(), {
+    const { result, unmount } = renderHook(() => useRecipes(), {
       wrapper: createWrapper(),
     });
 
@@ -79,12 +101,13 @@ describe('useRecipes', () => {
     });
 
     expect(result.current.error?.message).toBe('Failed to fetch recipes');
+    unmount();
   });
 
   it('returns empty array when no recipes', async () => {
     (ApiService.getRecipes as jest.Mock).mockResolvedValue([]);
 
-    const { result } = renderHook(() => useRecipes(), {
+    const { result, unmount } = renderHook(() => useRecipes(), {
       wrapper: createWrapper(),
     });
 
@@ -93,5 +116,6 @@ describe('useRecipes', () => {
     });
 
     expect(result.current.data).toEqual([]);
+    unmount();
   });
 });

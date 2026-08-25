@@ -16,7 +16,20 @@ const COLUMNS_MIGRATION_PATH = path.join(
 );
 
 function read(p: string) {
-  return fs.readFileSync(p, 'utf8');
+  return fs.readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
+}
+
+function readFunctionBlock(source: string, functionName: string) {
+  const signature = `CREATE OR REPLACE FUNCTION public.${functionName}`;
+  const blockStart = source.indexOf(signature);
+  const bodyStart = source.indexOf('AS $$', blockStart);
+  const blockEnd = source.indexOf('\n$$;', bodyStart);
+
+  if (blockStart < 0 || bodyStart < 0 || blockEnd < 0) {
+    throw new Error(`Unable to extract SQL function block for ${functionName}`);
+  }
+
+  return source.slice(blockStart, blockEnd + '\n$$;'.length);
 }
 
 describe('coach history soft-delete RPCs migration', () => {
@@ -55,40 +68,31 @@ describe('coach history soft-delete RPCs migration', () => {
     it('declare both RPCs as SECURITY DEFINER with a fixed search_path', () => {
       expect(sql).toContain('CREATE OR REPLACE FUNCTION public.delete_coach_entry');
       expect(sql).toContain('CREATE OR REPLACE FUNCTION public.restore_coach_entry');
-      const entryBlock = sql.match(
-        /CREATE OR REPLACE FUNCTION public\.delete_coach_entry[\s\S]+?\$\$/,
-      )?.[0];
+      const entryBlock = readFunctionBlock(sql, 'delete_coach_entry');
       expect(entryBlock).toContain('SECURITY DEFINER');
       expect(entryBlock).toContain('SET search_path = public, auth');
     });
 
     it('enforces (id, user_id) ownership on delete', () => {
-      const block = sql.match(
-        /CREATE OR REPLACE FUNCTION public\.delete_coach_entry[\s\S]+?\$\$/,
-      )?.[0];
+      const block = readFunctionBlock(sql, 'delete_coach_entry');
       expect(block).toMatch(/WHERE id = p_entry_id[\s\S]+AND user_id = p_user_id/);
     });
 
     it('only flips deleted_at on rows that are still live (idempotent)', () => {
-      const block = sql.match(
-        /CREATE OR REPLACE FUNCTION public\.delete_coach_entry[\s\S]+?\$\$/,
-      )?.[0];
+      const block = readFunctionBlock(sql, 'delete_coach_entry');
       expect(block).toContain('AND deleted_at IS NULL');
     });
 
     it('detects cache_key collisions on restore so we never violate the partial unique index', () => {
-      const block = sql.match(
-        /CREATE OR REPLACE FUNCTION public\.restore_coach_entry[\s\S]+?\$\$/,
-      )?.[0];
+      const block = readFunctionBlock(sql, 'restore_coach_entry');
       expect(block).toContain('coach_entry_restore_cache_key_conflict');
       expect(block).toContain('cache_key');
     });
   });
 
   describe('delete_coach_conversation', () => {
-    const block = sql.match(
-      /CREATE OR REPLACE FUNCTION public\.delete_coach_conversation[\s\S]+?\$\$/,
-    )?.[0] ?? '';
+    const block = readFunctionBlock(sql, 'delete_coach_conversation');
+    const executableBlock = block.replace(/--.*$/gm, '');
 
     it('is SECURITY DEFINER with a fixed search_path', () => {
       expect(block).toContain('SECURITY DEFINER');
@@ -102,8 +106,8 @@ describe('coach history soft-delete RPCs migration', () => {
     it('never touches coach_free_conversation_state.consumed (free-tier lifetime gate)', () => {
       // Critical security contract: a free user must not be able to start a
       // new free conversation by deleting their previous one.
-      expect(block).not.toContain('coach_free_conversation_state');
-      expect(block).not.toContain('consumed');
+      expect(executableBlock).not.toContain('coach_free_conversation_state');
+      expect(executableBlock).not.toContain('consumed');
     });
 
     it('only flips hidden_at on rows that are still visible (idempotent)', () => {
@@ -117,9 +121,7 @@ describe('coach history soft-delete RPCs migration', () => {
   });
 
   describe('restore_coach_conversation', () => {
-    const block = sql.match(
-      /CREATE OR REPLACE FUNCTION public\.restore_coach_conversation[\s\S]+?\$\$/,
-    )?.[0] ?? '';
+    const block = readFunctionBlock(sql, 'restore_coach_conversation');
 
     it('enforces ownership via (id, user_id)', () => {
       expect(block).toMatch(/WHERE id = p_conversation_id[\s\S]+AND user_id = p_user_id/);
@@ -153,9 +155,7 @@ describe('coach history soft-delete RPCs migration', () => {
     });
 
     it('is SECURITY INVOKER so RLS applies to the authenticated caller', () => {
-      const block = sql.match(
-        /CREATE OR REPLACE FUNCTION public\.get_coach_unified_history_page_v1[\s\S]+?\$\$/,
-      )?.[0];
+      const block = readFunctionBlock(sql, 'get_coach_unified_history_page_v1');
       expect(block).toContain('SECURITY INVOKER');
       expect(block).toContain('SET search_path = public, auth');
     });

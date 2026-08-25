@@ -367,7 +367,7 @@ describe('AvatarPicker', () => {
     expect(mockOnAvatarSelected).not.toHaveBeenCalled();
   });
 
-  it('shows a visible alert when gallery permission is denied', async () => {
+  it('opens the system gallery picker without a media-library permission preflight', async () => {
     (ImagePicker.getMediaLibraryPermissionsAsync as jest.Mock).mockResolvedValue({
       status: 'denied',
       granted: false,
@@ -392,16 +392,13 @@ describe('AvatarPicker', () => {
     await flushScheduledPickerAction();
 
     await waitFor(() => {
-      expect(mockShowAlert).toHaveBeenCalledWith(
-        'Permission requise',
-        "Veuillez autoriser l'accès à la galerie photo",
-        [{ text: 'OK' }],
-      );
+      expect(ImagePicker.launchImageLibraryAsync).toHaveBeenCalled();
     });
-    expect(ImagePicker.launchImageLibraryAsync).not.toHaveBeenCalled();
+    expect(ImagePicker.getMediaLibraryPermissionsAsync).not.toHaveBeenCalled();
+    expect(ImagePicker.requestMediaLibraryPermissionsAsync).not.toHaveBeenCalled();
   });
 
-  it('offers a native settings shortcut when gallery permission is permanently denied', async () => {
+  it('ignores stale gallery permission state when the system picker is canceled', async () => {
     (ImagePicker.getMediaLibraryPermissionsAsync as jest.Mock).mockResolvedValue({
       status: 'denied',
       granted: false,
@@ -414,6 +411,10 @@ describe('AvatarPicker', () => {
       canAskAgain: false,
       accessPrivileges: 'none',
     });
+    (ImagePicker.launchImageLibraryAsync as jest.Mock).mockResolvedValue({
+      canceled: true,
+      assets: [],
+    });
 
     const screen = render(<AvatarPicker {...defaultProps} />);
     fireEvent.press(screen.getByTestId('avatar-picker-trigger'));
@@ -425,14 +426,13 @@ describe('AvatarPicker', () => {
     });
     await flushScheduledPickerAction();
 
-    const permissionButtons = (mockShowAlert.mock.calls[0]?.[2] ?? []) as AlertButton[];
-    expect(getButton(permissionButtons, 'Ouvrir les paramètres')).toBeTruthy();
-
-    await act(async () => {
-      getButton(permissionButtons, 'Ouvrir les paramètres')?.onPress?.();
+    await waitFor(() => {
+      expect(ImagePicker.launchImageLibraryAsync).toHaveBeenCalled();
     });
-
-    expect(openSettingsSpy).toHaveBeenCalled();
+    expect(ImagePicker.getMediaLibraryPermissionsAsync).not.toHaveBeenCalled();
+    expect(ImagePicker.requestMediaLibraryPermissionsAsync).not.toHaveBeenCalled();
+    expect(openSettingsSpy).not.toHaveBeenCalled();
+    expect(mockShowAlert).not.toHaveBeenCalled();
   });
 
   it('shows a visible alert when camera permission is denied', async () => {

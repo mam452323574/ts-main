@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react-native';
+import { cleanup, renderHook, waitFor } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import { useNotificationsQuery, NOTIFICATIONS_QUERY_KEY } from '@/hooks/queries/useNotifications';
@@ -21,6 +21,8 @@ jest.mock('@/services/supabase', () => ({
 
 import { supabase } from '@/services/supabase';
 
+const testQueryClients = new Set<QueryClient>();
+
 const createWrapper = () => {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -29,12 +31,19 @@ const createWrapper = () => {
       },
     },
   });
+  testQueryClients.add(queryClient);
 
   return ({ children }: { children: React.ReactNode }) =>
     React.createElement(QueryClientProvider, { client: queryClient }, children);
 };
 
 describe('useNotificationsQuery', () => {
+  afterEach(() => {
+    cleanup();
+    testQueryClients.forEach((queryClient) => queryClient.clear());
+    testQueryClients.clear();
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -53,12 +62,13 @@ describe('useNotificationsQuery', () => {
   });
 
   it('returns empty array when userId is undefined', async () => {
-    const { result } = renderHook(() => useNotificationsQuery(undefined), {
+    const { result, unmount } = renderHook(() => useNotificationsQuery(undefined), {
       wrapper: createWrapper(),
     });
 
     // Query should be disabled when userId is undefined
     expect(result.current.fetchStatus).toBe('idle');
+    unmount();
   });
 
   it('fetches notifications when userId is provided', async () => {
@@ -92,28 +102,31 @@ describe('useNotificationsQuery', () => {
       select: mockSelect,
     });
 
-    const { result } = renderHook(() => useNotificationsQuery('user-123', 'all'), {
+    const { result, unmount } = renderHook(() => useNotificationsQuery('user-123', 'all'), {
       wrapper: createWrapper(),
     });
 
     await waitFor(() => {
       expect(result.current.isSuccess || result.current.isError).toBe(true);
     });
+    unmount();
   });
 
   it('filters by unread notifications', async () => {
-    const { result } = renderHook(() => useNotificationsQuery('user-123', 'unread'), {
+    const { result, unmount } = renderHook(() => useNotificationsQuery('user-123', 'unread'), {
       wrapper: createWrapper(),
     });
 
     expect(result.current.fetchStatus).toBeDefined();
+    unmount();
   });
 
   it('filters by read notifications', async () => {
-    const { result } = renderHook(() => useNotificationsQuery('user-123', 'read'), {
+    const { result, unmount } = renderHook(() => useNotificationsQuery('user-123', 'read'), {
       wrapper: createWrapper(),
     });
 
     expect(result.current.fetchStatus).toBeDefined();
+    unmount();
   });
 });

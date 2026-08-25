@@ -64,18 +64,18 @@ function buildRecipe(overrides = {}) {
 }
 
 describe('fridge-scan chef workflow export', () => {
-  test('uses a wrapped schema with payload anyOf instead of top-level oneOf', () => {
-    const schema =
-      getNode('OpenAI Chat Model').parameters.options.textFormat.textOptions[0]
-        .schema;
+  test('keeps the chat model bounded while response validation remains code-owned', () => {
+    const modelParameters = getNode('OpenAI Chat Model').parameters;
+    const validationCode = getNode('Validate completion').parameters.jsCode;
 
-    expect(schema.type).toBe('object');
-    expect(schema.additionalProperties).toBe(false);
-    expect(schema.required).toEqual(
-      expect.arrayContaining(['result_type', 'payload']),
-    );
-    expect(schema).not.toHaveProperty('oneOf');
-    expect(schema.properties.payload.anyOf).toHaveLength(2);
+    expect(modelParameters.model.value).toBe('gpt-4o-mini');
+    expect(modelParameters.options).toMatchObject({
+      maxTokens: 1200,
+      temperature: 0.3,
+    });
+    expect(modelParameters.options).not.toHaveProperty('textFormat');
+    expect(validationCode).toContain('result_type');
+    expect(validationCode).toContain('payload');
   });
 
   test('normalizes inbound chef payloads without embedding prompts in the callback context', () => {

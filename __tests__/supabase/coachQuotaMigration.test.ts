@@ -16,11 +16,13 @@ const SPLIT_BUCKETS_MIGRATION_PATH = path.join(
 );
 
 function readMigrationSource() {
-  return fs.readFileSync(MIGRATION_PATH, 'utf8');
+  return fs.readFileSync(MIGRATION_PATH, 'utf8').replace(/\r\n/g, '\n');
 }
 
 function readSplitBucketsMigrationSource() {
-  return fs.readFileSync(SPLIT_BUCKETS_MIGRATION_PATH, 'utf8');
+  return fs
+    .readFileSync(SPLIT_BUCKETS_MIGRATION_PATH, 'utf8')
+    .replace(/\r\n/g, '\n');
 }
 
 describe('coach quota migration', () => {

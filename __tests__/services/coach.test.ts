@@ -618,7 +618,10 @@ describe('coach service', () => {
   it('adds persisted coach profile memory as a separate payload field', async () => {
     supabase.from.mockReturnValue(
       createScansSelectMock([
-        createFaceScanRow('scan-face', '2026-04-07T10:00:00.000Z'),
+        createFaceScanRow(
+          'scan-face',
+          new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+        ),
       ]),
     );
     const scans = await fetchRecentCoachScans();

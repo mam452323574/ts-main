@@ -224,6 +224,7 @@ describe('active Edge Functions parity', () => {
       // U2-γ Phase 3 — Edge Function appelée avant signup (verify_jwt = false).
       'check-signup-eligibility',
       'fridge-scan-complete',
+      'purge-soft-deleted-social-assets',
       'revenuecat-webhook',
       'secure-login',
       'secure-signup',

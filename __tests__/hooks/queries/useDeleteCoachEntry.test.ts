@@ -54,7 +54,7 @@ function createHarness(): TestHarness {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { gcTime: Infinity, retry: false, staleTime: Infinity },
-      mutations: { retry: false },
+      mutations: { gcTime: Infinity, retry: false },
     },
   });
   const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');

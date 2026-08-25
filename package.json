@@ -12,6 +12,7 @@
     "lint": "npx expo lint",
     "typecheck": "tsc --noEmit",
     "check:encoding": "node scripts/check-mojibake.js",
+    "smoke:production": "node scripts/verify-production-services.mjs",
     "assets:app-icons": "node scripts/generate-app-icons.mjs",
     "assets:store": "node scripts/generate-store-assets.mjs",
     "assets:store-refresh": "node scripts/generate-store-refresh-assets.mjs",

@@ -130,7 +130,7 @@ describe('useProtectedRoute', () => {
     expect(mockReplace).not.toHaveBeenCalled();
   });
 
-  it('redirects to /login when user is not authenticated', async () => {
+  it('redirects to /welcome when user is not authenticated', async () => {
     const { useSegments } = require('expo-router');
     useSegments.mockReturnValue(['some-protected-route']);
     
@@ -145,7 +145,7 @@ describe('useProtectedRoute', () => {
     renderHook(() => useProtectedRoute());
     
     await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/login');
+      expect(mockReplace).toHaveBeenCalledWith('/welcome');
     });
   });
 
@@ -461,7 +461,7 @@ describe('useProtectedRoute', () => {
       expect(mockReplace).not.toHaveBeenCalled();
     });
 
-    it('redirects to login on index route when unauthenticated', async () => {
+    it('redirects to welcome on index route when unauthenticated', async () => {
       const { useSegments } = require('expo-router');
       useSegments.mockReturnValue(['index']);
       
@@ -476,11 +476,11 @@ describe('useProtectedRoute', () => {
       renderHook(() => useProtectedRoute());
 
       await waitFor(() => {
-        expect(mockReplace).toHaveBeenCalledWith('/login');
+        expect(mockReplace).toHaveBeenCalledWith('/welcome');
       });
     });
 
-    it('redirects to login on empty segment when unauthenticated', async () => {
+    it('redirects to welcome on empty segment when unauthenticated', async () => {
       const { useSegments } = require('expo-router');
       useSegments.mockReturnValue(['']);
       
@@ -495,7 +495,7 @@ describe('useProtectedRoute', () => {
       renderHook(() => useProtectedRoute());
 
       await waitFor(() => {
-        expect(mockReplace).toHaveBeenCalledWith('/login');
+        expect(mockReplace).toHaveBeenCalledWith('/welcome');
       });
     });
 

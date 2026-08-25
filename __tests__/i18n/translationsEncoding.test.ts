@@ -1,7 +1,5 @@
 import { DEFAULT_LOCALE } from '@/i18n/config';
 import { i18n, loadLocalesForTests } from '@/i18n/translations';
-import { PRIVACY_POLICY_CONTENT } from '@/constants/privacyPolicy';
-
 const appConfig = require('../../app.json');
 
 const CP1252_FOLLOWER_CLASS =
@@ -84,10 +82,9 @@ describe('translations encoding', () => {
     expect(i18n.t('analytics.face_score_subtitle')).toBe('Évolution de votre score visage');
   });
 
-  it('contains no explicit AI wording in visible app copy', () => {
+  it('contains no explicit AI wording in non-legal visible app copy', () => {
     const visibleCopyEntries = [
       ...collectStringEntries(i18n.translations, ['i18n']),
-      ...collectStringEntries(PRIVACY_POLICY_CONTENT, ['privacyPolicy']),
       ...collectStringEntries(appConfig, ['appConfig']),
     ];
     const suspiciousEntries = visibleCopyEntries

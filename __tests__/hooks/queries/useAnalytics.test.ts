@@ -12,6 +12,8 @@ jest.mock('@/services/api', () => ({
 
 import { ApiService } from '@/services/api';
 
+const testQueryClients = new Set<QueryClient>();
+
 const createWrapper = () => {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -21,6 +23,7 @@ const createWrapper = () => {
       },
     },
   });
+  testQueryClients.add(queryClient);
 
   return ({ children }: { children: React.ReactNode }) =>
     React.createElement(QueryClientProvider, { client: queryClient }, children);
@@ -29,6 +32,8 @@ const createWrapper = () => {
 describe('useAnalytics', () => {
   afterEach(() => {
     cleanup();
+    testQueryClients.forEach((queryClient) => queryClient.clear());
+    testQueryClients.clear();
   });
 
   beforeEach(() => {
@@ -48,7 +53,7 @@ describe('useAnalytics', () => {
     };
     (ApiService.getAnalytics as jest.Mock).mockResolvedValue(mockData);
 
-    const { result } = renderHook(() => useAnalytics('7days'), {
+    const { result, unmount } = renderHook(() => useAnalytics('7days'), {
       wrapper: createWrapper(),
     });
 
@@ -58,12 +63,13 @@ describe('useAnalytics', () => {
 
     expect(result.current.data).toEqual(mockData);
     expect(ApiService.getAnalytics).toHaveBeenCalledWith('7days');
+    unmount();
   });
 
   it('handles error state', async () => {
     (ApiService.getAnalytics as jest.Mock).mockRejectedValue(new Error('API Error'));
 
-    const { result } = renderHook(() => useAnalytics('30days'), {
+    const { result, unmount } = renderHook(() => useAnalytics('30days'), {
       wrapper: createWrapper(),
     });
 
@@ -72,6 +78,7 @@ describe('useAnalytics', () => {
     });
 
     expect(result.current.error?.message).toBe('API Error');
+    unmount();
   });
 
   it('fetches with different periods', async () => {
@@ -81,7 +88,7 @@ describe('useAnalytics', () => {
     const periods = ['7days', '30days'] as const;
 
     for (const period of periods) {
-      const { result } = renderHook(() => useAnalytics(period), {
+      const { result, unmount } = renderHook(() => useAnalytics(period), {
         wrapper: createWrapper(),
       });
 
@@ -90,6 +97,7 @@ describe('useAnalytics', () => {
       });
 
       expect(ApiService.getAnalytics).toHaveBeenCalledWith(period);
+      unmount();
     }
   });
 });
