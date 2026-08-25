@@ -14,7 +14,7 @@ export const COACH_GENERATE_FALLBACK_WEBHOOK_ENV_NAME =
 export const DEFAULT_COACH_GENERATE_WEBHOOK_TIMEOUT_MS = 10_000;
 // Coach generation runs inline against n8n + the LLM provider and can take
 // longer than the generic webhook timeout before a final answer is ready.
-export const COACH_GENERATE_RESPONSE_WEBHOOK_TIMEOUT_MS = 45_000;
+export const COACH_GENERATE_RESPONSE_WEBHOOK_TIMEOUT_MS = 75_000;
 // Cap the webhook response so a misconfigured/compromised provider can't bloat
 // coach_entries.response_payload_json or starve Edge Runtime memory (C-03).
 export const COACH_GENERATE_RESPONSE_MAX_BYTES = 32 * 1024;

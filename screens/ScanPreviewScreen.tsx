@@ -444,6 +444,7 @@ export default function ScanPreviewScreen() {
   const { setBadge } = useBadges();
   const { incrementScanCount } = useGamification();
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const confirmInFlightRef = useRef(false);
   const isCompactVerticalLayout = windowHeight < 760;
   const isTightVerticalLayout = windowHeight < 700;
   const safeBottomInset = getMinimumBottomInsetPadding(
@@ -730,14 +731,17 @@ export default function ScanPreviewScreen() {
   );
 
   async function handleConfirm() {
-    if (loading) {
+    if (loading || confirmInFlightRef.current) {
       return;
     }
+
+    confirmInFlightRef.current = true;
 
     // Pub récompensée avant le scan (utilisateurs gratuits uniquement ; no-op
     // immédiat pour premium/admin). Un refus annule sans réserver de crédit.
     const adOutcome = await presentRewardedAdGate('scan');
     if (adOutcome === 'skipped') {
+      confirmInFlightRef.current = false;
       return;
     }
 
@@ -782,10 +786,12 @@ export default function ScanPreviewScreen() {
           });
         }, 1500);
       } else {
+        confirmInFlightRef.current = false;
         setLoading(false);
         showScanErrorAlert(result.analysisError);
       }
     } catch (err) {
+      confirmInFlightRef.current = false;
       setLoading(false);
       showScanErrorAlert(err);
     }

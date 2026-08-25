@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -308,6 +309,10 @@ export default function FridgeScanScreen() {
   const handleRequestPermission = useCallback(() => {
     void requestPermission();
   }, [requestPermission]);
+
+  const handleOpenSettings = useCallback(() => {
+    void Linking.openSettings();
+  }, []);
 
   const handleOpenPrivacyPolicy = useCallback(() => {
     router.push('/privacy-policy' as any);
@@ -649,8 +654,16 @@ export default function FridgeScanScreen() {
               variant="outline"
             />
             <Button
-              title={t('fridge_scan.permission_cta')}
-              onPress={handleRequestPermission}
+              title={
+                permission.canAskAgain === false
+                  ? t('components.avatar.open_settings')
+                  : t('common.next')
+              }
+              onPress={
+                permission.canAskAgain === false
+                  ? handleOpenSettings
+                  : handleRequestPermission
+              }
             />
           </View>
         </Squircle>

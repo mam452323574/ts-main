@@ -1,5 +1,5 @@
 import React from 'react';
-import { renderHook, waitFor } from '@testing-library/react-native';
+import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { useNotifications } from '@/hooks/useNotifications';
 
 const mockDismissAllModalsAndNavigate = jest.fn();
@@ -94,7 +94,7 @@ describe('useNotifications', () => {
     expect(Notifications.addNotificationReceivedListener).not.toHaveBeenCalled();
   });
 
-  it('registers for notifications when user is present', async () => {
+  it('registers notification listeners when user is present', async () => {
     const Notifications = require('expo-notifications');
     mockUseAuth.mockReturnValue({ user: mockUser });
 
@@ -103,6 +103,20 @@ describe('useNotifications', () => {
     await waitFor(() => {
       expect(Notifications.addNotificationReceivedListener).toHaveBeenCalled();
     });
+  });
+
+  it('does not request push permission automatically when user is present', async () => {
+    const Notifications = require('expo-notifications');
+    mockUseAuth.mockReturnValue({ user: mockUser });
+
+    renderHook(() => useNotifications());
+
+    await waitFor(() => {
+      expect(Notifications.addNotificationReceivedListener).toHaveBeenCalled();
+    });
+
+    expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
+    expect(Notifications.getExpoPushTokenAsync).not.toHaveBeenCalled();
   });
 
   it('registers response listener when user is present', async () => {
@@ -247,7 +261,8 @@ describe('useNotifications', () => {
 
       mockUseAuth.mockReturnValue({ user: mockUser });
 
-      const { unmount } = renderHook(() => useNotifications());
+      const { result, unmount } = renderHook(() => useNotifications());
+      const registrationPromise = result.current.registerForPushNotifications();
 
       // Unmount before the token resolves
       unmount();
@@ -257,6 +272,7 @@ describe('useNotifications', () => {
         // @ts-ignore
         (resolveTokenFn as any)({ data: 'late-token' });
       }
+      await registrationPromise;
 
       // Wait a bit to ensure no warnings are triggered
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -270,7 +286,7 @@ describe('useNotifications', () => {
       consoleSpy.mockRestore();
     });
 
-    it('saves push token to database when user is present', async () => {
+    it('saves push token to database after explicit registration', async () => {
       const { supabase } = require('@/services/supabase');
       const Notifications = require('expo-notifications');
 
@@ -279,7 +295,10 @@ describe('useNotifications', () => {
 
       mockUseAuth.mockReturnValue({ user: mockUser });
 
-      renderHook(() => useNotifications());
+      const { result } = renderHook(() => useNotifications());
+      await act(async () => {
+        await result.current.registerForPushNotifications();
+      });
 
       await waitFor(() => {
         expect(supabase.from).toHaveBeenCalledWith('user_profiles');

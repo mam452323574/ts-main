@@ -27,6 +27,7 @@ import {
   withAlpha,
 } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAdsGate } from '@/contexts/AdsContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useInfiniteCoachConversations } from '@/hooks/queries/useInfiniteCoachConversations';
@@ -64,6 +65,7 @@ export function CoachConversationsScreen() {
   const params = useLocalSearchParams<{ persona_key?: string | string[] }>();
   const { locale, t } = useLanguage();
   const { colors, isDark } = useTheme();
+  const { presentRewardedAdGate } = useAdsGate();
   const { userProfile } = useAuth();
   const chrome = useMemo(
     () => getMainPageChrome(colors, isDark, 'coach'),
@@ -126,6 +128,11 @@ export function CoachConversationsScreen() {
     }
 
     try {
+      const adGateOutcome = await presentRewardedAdGate('coach');
+      if (adGateOutcome === 'skipped') {
+        return;
+      }
+
       const result = await startMutation.mutateAsync({
         personaKey: newConversationPersonaKey,
       });
@@ -139,7 +146,7 @@ export function CoachConversationsScreen() {
         resolveCoachUserFacingErrorMessage(error, t),
       );
     }
-  }, [newConversationPersonaKey, router, startMutation, t]);
+  }, [newConversationPersonaKey, presentRewardedAdGate, router, startMutation, t]);
 
   const resolveTitle = useCallback(
     (conversation: CoachConversationInboxItem) => {

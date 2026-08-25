@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  Linking,
   View,
   Text,
   StyleSheet,
@@ -963,6 +964,8 @@ export default function ScannerScreen() {
   }
 
   if (!permission.granted) {
+    const isPermissionBlocked = permission.canAskAgain === false;
+
     return (
       <ScreenState
         tone="info"
@@ -970,8 +973,18 @@ export default function ScannerScreen() {
         title={t('scanner.camera_permission_msg')}
         message={`${t('scanner.camera_permission_detail')}\n${t('scanner.camera_permission_backend')}\n${PUBLIC_PRIVACY_POLICY_URL}`}
         icon={<Camera />}
-        actionLabel={t('scanner.authorize_camera')}
-        onAction={requestPermission}
+        actionLabel={
+          isPermissionBlocked
+            ? t('components.avatar.open_settings')
+            : t('common.next')
+        }
+        onAction={
+          isPermissionBlocked
+            ? () => {
+                void Linking.openSettings();
+              }
+            : requestPermission
+        }
         secondaryActionLabel={t('settings.privacy_policy')}
         onSecondaryAction={() => router.push('/privacy-policy')}
         testID="scanner-permission-state"

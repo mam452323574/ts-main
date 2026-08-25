@@ -10,6 +10,7 @@ const mockRouterPush = jest.fn();
 const mockRouterBack = jest.fn();
 const mockRouterReplace = jest.fn();
 const mockShowAlert = jest.fn();
+const mockDeleteAccount = jest.fn();
 let latestFocusEffectCallback: (() => void) | undefined;
 
 jest.mock('expo-router', () => ({
@@ -48,6 +49,7 @@ jest.mock('lucide-react-native', () => ({
   Settings: 'Settings',
   Globe: 'Globe',
   Check: 'Check',
+  Trash2: 'Trash2',
 }));
 
 jest.mock('@/contexts/AuthContext', () => ({
@@ -99,6 +101,18 @@ jest.mock('@/contexts/LanguageContext', () => ({
           'settings.sign_out_confirm_msg': 'Your session will close safely, and you can come back anytime.',
           'settings.sign_out_error_title': 'Sign out interrupted',
           'settings.sign_out_error_msg': 'A small issue happened. Please try again in a moment, your data is safe.',
+          'settings.delete_account_button': 'Delete account',
+          'settings.delete_account_desc': 'Permanently deletes your account, scans, and associated data.',
+          'settings.delete_account_loading': 'Deleting account...',
+          'settings.delete_account_confirm_title': 'Delete your account?',
+          'settings.delete_account_confirm_msg':
+            'This will delete your profile, scans, images, and associated data. This action is permanent. Active App Store subscriptions must be cancelled in your Apple subscriptions.',
+          'settings.delete_account_continue': 'Continue',
+          'settings.delete_account_final_title': 'Final confirmation',
+          'settings.delete_account_final_msg':
+            'Your account will be deleted now. This operation cannot be undone. Deleting your account does not cancel an active App Store subscription.',
+          'settings.delete_account_error_title': 'Could not delete account',
+          'settings.delete_account_error_msg': 'We could not delete your account right now. Please try again in a moment.',
           'home.items_available': 'Available Scans',
           'scan_types.health': 'Face',
           'scan_types.body': 'Body',
@@ -233,6 +247,7 @@ describe('SettingsScreen', () => {
     mockUseAuth.mockReturnValue({
       userProfile: buildUserProfile(),
       signOut: jest.fn(),
+      deleteAccount: mockDeleteAccount,
       updateAvatarUrl: jest.fn(),
     });
     mockUseAllScanEligibility.mockReturnValue(
@@ -364,6 +379,7 @@ describe('SettingsScreen', () => {
         email: 'premium@example.com',
       }),
       signOut: jest.fn(),
+      deleteAccount: mockDeleteAccount,
       updateAvatarUrl: jest.fn(),
     });
 
@@ -395,5 +411,45 @@ describe('SettingsScreen', () => {
         emoji: '👋',
       }),
     );
+  });
+
+  it('deletes the account only after the second destructive confirmation', async () => {
+    render(<SettingsScreen />);
+
+    fireEvent.press(screen.getByTestId('settings-delete-account'));
+
+    expect(mockShowAlert).toHaveBeenCalledWith(
+      'Delete your account?',
+      'This will delete your profile, scans, images, and associated data. This action is permanent. Active App Store subscriptions must be cancelled in your Apple subscriptions.',
+      expect.any(Array),
+      undefined,
+      expect.objectContaining({
+        variant: 'danger',
+      }),
+    );
+    expect(mockDeleteAccount).not.toHaveBeenCalled();
+
+    const firstConfirm = mockShowAlert.mock.calls[0][2][1];
+    act(() => {
+      firstConfirm.onPress();
+    });
+
+    expect(mockShowAlert).toHaveBeenLastCalledWith(
+      'Final confirmation',
+      'Your account will be deleted now. This operation cannot be undone. Deleting your account does not cancel an active App Store subscription.',
+      expect.any(Array),
+      undefined,
+      expect.objectContaining({
+        variant: 'danger',
+      }),
+    );
+
+    const secondConfirm = mockShowAlert.mock.calls[1][2][1];
+    await act(async () => {
+      await secondConfirm.onPress();
+    });
+
+    expect(mockDeleteAccount).toHaveBeenCalledTimes(1);
+    expect(mockRouterReplace).toHaveBeenCalledWith('/login');
   });
 });

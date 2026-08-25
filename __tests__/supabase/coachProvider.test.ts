@@ -30,7 +30,7 @@ describe('coach provider configuration', () => {
   });
 
   it('exposes the explicit long-running timeout for coach response generation', () => {
-    expect(COACH_GENERATE_RESPONSE_WEBHOOK_TIMEOUT_MS).toBe(45_000);
+    expect(COACH_GENERATE_RESPONSE_WEBHOOK_TIMEOUT_MS).toBe(75_000);
   });
 
   it('marks the coach entry as errored and throws the canonical payload when the webhook is missing', async () => {

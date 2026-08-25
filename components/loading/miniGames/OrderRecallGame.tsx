@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Pressable, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useTheme } from '@/contexts/ThemeContext';

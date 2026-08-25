@@ -1663,7 +1663,7 @@ export const FR_TRANSLATIONS = {
     general_error: 'Une erreur est survenue',
   },
   scanner: {
-    authorize_camera: 'Autoriser la caméra',
+    authorize_camera: 'Suivant',
     camera_permission_msg:
       "Nous avons besoin d'accéder à votre caméra pour scanner.",
     camera_permission_detail:
@@ -1701,7 +1701,7 @@ export const FR_TRANSLATIONS = {
     permission_denied_title: "L'accès caméra est toujours refusé",
     permission_denied_body:
       'Autorise la caméra pour lancer Chef. Tu peux aussi consulter la politique de confidentialité avant.',
-    permission_cta: 'Autoriser la caméra',
+    permission_cta: 'Suivant',
     camera_unavailable_title: 'Caméra indisponible',
     camera_unavailable_body:
       "La caméra dédiée à Chef n'a pas pu démarrer pour le moment. Réessaie ou reviens à l'accueil.",

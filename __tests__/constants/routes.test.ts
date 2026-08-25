@@ -14,6 +14,12 @@ describe('routes privacy policy access', () => {
     expect(isProtectedRoute('privacy-policy')).toBe(false);
   });
 
+  it('treats terms-of-use as a shared route', () => {
+    expect(isSharedRoute('terms-of-use')).toBe(true);
+    expect(isPublicRoute('terms-of-use')).toBe(false);
+    expect(isProtectedRoute('terms-of-use')).toBe(false);
+  });
+
   it('keeps login as a public guest-only route', () => {
     expect(isPublicRoute('login')).toBe(true);
     expect(isSharedRoute('login')).toBe(false);

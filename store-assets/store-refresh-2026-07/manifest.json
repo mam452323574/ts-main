@@ -1,0 +1,370 @@
+[
+  {
+    "lang": "fr",
+    "platform": "apple-phone",
+    "slug": "01-scan",
+    "path": "store-assets/store-refresh-2026-07/app-store/fr/iphone-6.9/01-scan.png",
+    "width": 1290,
+    "height": 2796
+  },
+  {
+    "lang": "fr",
+    "platform": "tablet",
+    "slug": "01-scan",
+    "path": "store-assets/store-refresh-2026-07/app-store/fr/ipad-13/01-scan.png",
+    "width": 2064,
+    "height": 2752
+  },
+  {
+    "lang": "fr",
+    "platform": "google-phone",
+    "slug": "01-scan",
+    "path": "store-assets/store-refresh-2026-07/google-play/fr/phone/01-scan.png",
+    "width": 1080,
+    "height": 1920
+  },
+  {
+    "lang": "fr",
+    "platform": "google-tablet",
+    "slug": "01-scan",
+    "path": "store-assets/store-refresh-2026-07/google-play/fr/tablet/01-scan.png",
+    "width": 1600,
+    "height": 2560
+  },
+  {
+    "lang": "fr",
+    "platform": "apple-phone",
+    "slug": "02-results",
+    "path": "store-assets/store-refresh-2026-07/app-store/fr/iphone-6.9/02-results.png",
+    "width": 1290,
+    "height": 2796
+  },
+  {
+    "lang": "fr",
+    "platform": "tablet",
+    "slug": "02-results",
+    "path": "store-assets/store-refresh-2026-07/app-store/fr/ipad-13/02-results.png",
+    "width": 2064,
+    "height": 2752
+  },
+  {
+    "lang": "fr",
+    "platform": "google-phone",
+    "slug": "02-results",
+    "path": "store-assets/store-refresh-2026-07/google-play/fr/phone/02-results.png",
+    "width": 1080,
+    "height": 1920
+  },
+  {
+    "lang": "fr",
+    "platform": "google-tablet",
+    "slug": "02-results",
+    "path": "store-assets/store-refresh-2026-07/google-play/fr/tablet/02-results.png",
+    "width": 1600,
+    "height": 2560
+  },
+  {
+    "lang": "fr",
+    "platform": "apple-phone",
+    "slug": "03-trends",
+    "path": "store-assets/store-refresh-2026-07/app-store/fr/iphone-6.9/03-trends.png",
+    "width": 1290,
+    "height": 2796
+  },
+  {
+    "lang": "fr",
+    "platform": "tablet",
+    "slug": "03-trends",
+    "path": "store-assets/store-refresh-2026-07/app-store/fr/ipad-13/03-trends.png",
+    "width": 2064,
+    "height": 2752
+  },
+  {
+    "lang": "fr",
+    "platform": "google-phone",
+    "slug": "03-trends",
+    "path": "store-assets/store-refresh-2026-07/google-play/fr/phone/03-trends.png",
+    "width": 1080,
+    "height": 1920
+  },
+  {
+    "lang": "fr",
+    "platform": "google-tablet",
+    "slug": "03-trends",
+    "path": "store-assets/store-refresh-2026-07/google-play/fr/tablet/03-trends.png",
+    "width": 1600,
+    "height": 2560
+  },
+  {
+    "lang": "fr",
+    "platform": "apple-phone",
+    "slug": "04-coach",
+    "path": "store-assets/store-refresh-2026-07/app-store/fr/iphone-6.9/04-coach.png",
+    "width": 1290,
+    "height": 2796
+  },
+  {
+    "lang": "fr",
+    "platform": "tablet",
+    "slug": "04-coach",
+    "path": "store-assets/store-refresh-2026-07/app-store/fr/ipad-13/04-coach.png",
+    "width": 2064,
+    "height": 2752
+  },
+  {
+    "lang": "fr",
+    "platform": "google-phone",
+    "slug": "04-coach",
+    "path": "store-assets/store-refresh-2026-07/google-play/fr/phone/04-coach.png",
+    "width": 1080,
+    "height": 1920
+  },
+  {
+    "lang": "fr",
+    "platform": "google-tablet",
+    "slug": "04-coach",
+    "path": "store-assets/store-refresh-2026-07/google-play/fr/tablet/04-coach.png",
+    "width": 1600,
+    "height": 2560
+  },
+  {
+    "lang": "fr",
+    "platform": "apple-phone",
+    "slug": "05-chef",
+    "path": "store-assets/store-refresh-2026-07/app-store/fr/iphone-6.9/05-chef.png",
+    "width": 1290,
+    "height": 2796
+  },
+  {
+    "lang": "fr",
+    "platform": "tablet",
+    "slug": "05-chef",
+    "path": "store-assets/store-refresh-2026-07/app-store/fr/ipad-13/05-chef.png",
+    "width": 2064,
+    "height": 2752
+  },
+  {
+    "lang": "fr",
+    "platform": "google-phone",
+    "slug": "05-chef",
+    "path": "store-assets/store-refresh-2026-07/google-play/fr/phone/05-chef.png",
+    "width": 1080,
+    "height": 1920
+  },
+  {
+    "lang": "fr",
+    "platform": "apple-phone",
+    "slug": "06-modes",
+    "path": "store-assets/store-refresh-2026-07/app-store/fr/iphone-6.9/06-modes.png",
+    "width": 1290,
+    "height": 2796
+  },
+  {
+    "lang": "fr",
+    "platform": "tablet",
+    "slug": "06-modes",
+    "path": "store-assets/store-refresh-2026-07/app-store/fr/ipad-13/06-modes.png",
+    "width": 2064,
+    "height": 2752
+  },
+  {
+    "lang": "fr",
+    "platform": "google-phone",
+    "slug": "06-modes",
+    "path": "store-assets/store-refresh-2026-07/google-play/fr/phone/06-modes.png",
+    "width": 1080,
+    "height": 1920
+  },
+  {
+    "lang": "fr",
+    "platform": "google-feature",
+    "slug": "feature-graphic",
+    "path": "store-assets/store-refresh-2026-07/google-play/fr/feature-graphic-1024x500.png",
+    "width": 1024,
+    "height": 500
+  },
+  {
+    "lang": "en",
+    "platform": "apple-phone",
+    "slug": "01-scan",
+    "path": "store-assets/store-refresh-2026-07/app-store/en/iphone-6.9/01-scan.png",
+    "width": 1290,
+    "height": 2796
+  },
+  {
+    "lang": "en",
+    "platform": "tablet",
+    "slug": "01-scan",
+    "path": "store-assets/store-refresh-2026-07/app-store/en/ipad-13/01-scan.png",
+    "width": 2064,
+    "height": 2752
+  },
+  {
+    "lang": "en",
+    "platform": "google-phone",
+    "slug": "01-scan",
+    "path": "store-assets/store-refresh-2026-07/google-play/en/phone/01-scan.png",
+    "width": 1080,
+    "height": 1920
+  },
+  {
+    "lang": "en",
+    "platform": "google-tablet",
+    "slug": "01-scan",
+    "path": "store-assets/store-refresh-2026-07/google-play/en/tablet/01-scan.png",
+    "width": 1600,
+    "height": 2560
+  },
+  {
+    "lang": "en",
+    "platform": "apple-phone",
+    "slug": "02-results",
+    "path": "store-assets/store-refresh-2026-07/app-store/en/iphone-6.9/02-results.png",
+    "width": 1290,
+    "height": 2796
+  },
+  {
+    "lang": "en",
+    "platform": "tablet",
+    "slug": "02-results",
+    "path": "store-assets/store-refresh-2026-07/app-store/en/ipad-13/02-results.png",
+    "width": 2064,
+    "height": 2752
+  },
+  {
+    "lang": "en",
+    "platform": "google-phone",
+    "slug": "02-results",
+    "path": "store-assets/store-refresh-2026-07/google-play/en/phone/02-results.png",
+    "width": 1080,
+    "height": 1920
+  },
+  {
+    "lang": "en",
+    "platform": "google-tablet",
+    "slug": "02-results",
+    "path": "store-assets/store-refresh-2026-07/google-play/en/tablet/02-results.png",
+    "width": 1600,
+    "height": 2560
+  },
+  {
+    "lang": "en",
+    "platform": "apple-phone",
+    "slug": "03-trends",
+    "path": "store-assets/store-refresh-2026-07/app-store/en/iphone-6.9/03-trends.png",
+    "width": 1290,
+    "height": 2796
+  },
+  {
+    "lang": "en",
+    "platform": "tablet",
+    "slug": "03-trends",
+    "path": "store-assets/store-refresh-2026-07/app-store/en/ipad-13/03-trends.png",
+    "width": 2064,
+    "height": 2752
+  },
+  {
+    "lang": "en",
+    "platform": "google-phone",
+    "slug": "03-trends",
+    "path": "store-assets/store-refresh-2026-07/google-play/en/phone/03-trends.png",
+    "width": 1080,
+    "height": 1920
+  },
+  {
+    "lang": "en",
+    "platform": "google-tablet",
+    "slug": "03-trends",
+    "path": "store-assets/store-refresh-2026-07/google-play/en/tablet/03-trends.png",
+    "width": 1600,
+    "height": 2560
+  },
+  {
+    "lang": "en",
+    "platform": "apple-phone",
+    "slug": "04-coach",
+    "path": "store-assets/store-refresh-2026-07/app-store/en/iphone-6.9/04-coach.png",
+    "width": 1290,
+    "height": 2796
+  },
+  {
+    "lang": "en",
+    "platform": "tablet",
+    "slug": "04-coach",
+    "path": "store-assets/store-refresh-2026-07/app-store/en/ipad-13/04-coach.png",
+    "width": 2064,
+    "height": 2752
+  },
+  {
+    "lang": "en",
+    "platform": "google-phone",
+    "slug": "04-coach",
+    "path": "store-assets/store-refresh-2026-07/google-play/en/phone/04-coach.png",
+    "width": 1080,
+    "height": 1920
+  },
+  {
+    "lang": "en",
+    "platform": "google-tablet",
+    "slug": "04-coach",
+    "path": "store-assets/store-refresh-2026-07/google-play/en/tablet/04-coach.png",
+    "width": 1600,
+    "height": 2560
+  },
+  {
+    "lang": "en",
+    "platform": "apple-phone",
+    "slug": "05-chef",
+    "path": "store-assets/store-refresh-2026-07/app-store/en/iphone-6.9/05-chef.png",
+    "width": 1290,
+    "height": 2796
+  },
+  {
+    "lang": "en",
+    "platform": "tablet",
+    "slug": "05-chef",
+    "path": "store-assets/store-refresh-2026-07/app-store/en/ipad-13/05-chef.png",
+    "width": 2064,
+    "height": 2752
+  },
+  {
+    "lang": "en",
+    "platform": "google-phone",
+    "slug": "05-chef",
+    "path": "store-assets/store-refresh-2026-07/google-play/en/phone/05-chef.png",
+    "width": 1080,
+    "height": 1920
+  },
+  {
+    "lang": "en",
+    "platform": "apple-phone",
+    "slug": "06-modes",
+    "path": "store-assets/store-refresh-2026-07/app-store/en/iphone-6.9/06-modes.png",
+    "width": 1290,
+    "height": 2796
+  },
+  {
+    "lang": "en",
+    "platform": "tablet",
+    "slug": "06-modes",
+    "path": "store-assets/store-refresh-2026-07/app-store/en/ipad-13/06-modes.png",
+    "width": 2064,
+    "height": 2752
+  },
+  {
+    "lang": "en",
+    "platform": "google-phone",
+    "slug": "06-modes",
+    "path": "store-assets/store-refresh-2026-07/google-play/en/phone/06-modes.png",
+    "width": 1080,
+    "height": 1920
+  },
+  {
+    "lang": "en",
+    "platform": "google-feature",
+    "slug": "feature-graphic",
+    "path": "store-assets/store-refresh-2026-07/google-play/en/feature-graphic-1024x500.png",
+    "width": 1024,
+    "height": 500
+  }
+]

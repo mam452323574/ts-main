@@ -3,7 +3,7 @@ import { Animated, Pressable, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useTheme } from '@/contexts/ThemeContext';
-import { BORDER_RADIUS, SPACING, withAlpha } from '@/constants/theme';
+import { BORDER_RADIUS, withAlpha } from '@/constants/theme';
 
 import type { LoadingMiniGameGameProps } from '../LoadingMiniGame';
 import { triggerLoadingMiniGameHaptic } from '../loadingMiniGameHaptics';

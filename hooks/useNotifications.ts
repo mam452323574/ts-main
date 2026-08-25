@@ -148,13 +148,6 @@ export function useNotifications() {
           'expo-go-limitations',
         );
       }
-    } else {
-      registerForPushNotificationsAsync().then(async (token) => {
-        if (!isMountedRef.current || !token) return;
-
-        setExpoPushToken(token);
-        await savePushTokenToDatabase(token);
-      });
     }
 
     notificationListener.current =
@@ -187,7 +180,7 @@ export function useNotifications() {
     };
   }, [user]);
 
-  const savePushTokenToDatabase = async (token: string) => {
+  const savePushTokenToDatabase = useCallback(async (token: string) => {
     if (!user) return;
 
     const { error } = await supabase
@@ -200,7 +193,20 @@ export function useNotifications() {
         context: 'push_token_persistence',
       });
     }
-  };
+  }, [user]);
+
+  const registerForPushNotifications = useCallback(async () => {
+    if (!user) return null;
+    if (!runtimeCapabilities.canRegisterForPushNotifications) return null;
+
+    const token = await registerForPushNotificationsAsync();
+
+    if (!isMountedRef.current || !token) return token;
+
+    setExpoPushToken(token);
+    await savePushTokenToDatabase(token);
+    return token;
+  }, [savePushTokenToDatabase, user]);
 
   const handleNotificationResponse = (data: unknown) => {
     try {
@@ -429,6 +435,7 @@ export function useNotifications() {
     scheduleMotivationalNotification,
     scheduleScanReadyNotification,
     cancelAllScheduledNotifications,
+    registerForPushNotifications,
   };
 }
 

@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { Crown, ChevronRight, Shield, ShieldAlert, LogOut, Bell, Settings, Globe, Check } from 'lucide-react-native';
+import { Crown, ChevronRight, Shield, ShieldAlert, LogOut, Bell, Settings, Globe, Check, Trash2 } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { AppScreen } from '@/components/AppScreen';
 import { AvatarPicker } from '@/components/AvatarPicker';
@@ -38,7 +38,7 @@ const EMPTY_LOADING_BY_SCAN_TYPE = {
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { userProfile, signOut, updateAvatarUrl } = useAuth();
+  const { userProfile, signOut, updateAvatarUrl, deleteAccount } = useAuth();
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors, isDark, insets), [colors, insets, isDark]);
@@ -46,6 +46,7 @@ export default function SettingsScreen() {
   const { t, locale, changeLanguage, isChangingLanguage } = useLanguage();
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [isSavingAvatar, setIsSavingAvatar] = useState(false);
   const { showAlert, alertElement } = useCustomAlert();
   const accountTier = userProfile?.account_tier ?? null;
@@ -154,7 +155,7 @@ export default function SettingsScreen() {
   };
 
   const handleSignOut = async () => {
-    if (isSigningOut) {
+    if (isSigningOut || isDeletingAccount) {
       return;
     }
 
@@ -178,6 +179,69 @@ export default function SettingsScreen() {
         emoji: '👋',
         dismissible: true,
       }
+    );
+  };
+
+  const performDeleteAccount = async () => {
+    try {
+      setIsDeletingAccount(true);
+
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      }
+
+      await deleteAccount();
+      router.replace('/login');
+    } catch (error) {
+      console.error('[Settings] Delete account error:', error);
+      setIsDeletingAccount(false);
+      showAlert(
+        t('settings.delete_account_error_title'),
+        t('settings.delete_account_error_msg'),
+        [{ text: t('settings.ok') }],
+        undefined,
+        { variant: 'danger', emoji: null },
+      );
+    }
+  };
+
+  const handleDeleteAccount = () => {
+    if (isSigningOut || isDeletingAccount) {
+      return;
+    }
+
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+
+    showAlert(
+      t('settings.delete_account_confirm_title'),
+      t('settings.delete_account_confirm_msg'),
+      [
+        { text: t('settings.cancel'), style: 'cancel' },
+        {
+          text: t('settings.delete_account_continue'),
+          style: 'destructive',
+          onPress: () => {
+            showAlert(
+              t('settings.delete_account_final_title'),
+              t('settings.delete_account_final_msg'),
+              [
+                { text: t('settings.cancel'), style: 'cancel' },
+                {
+                  text: t('settings.delete_account_button'),
+                  style: 'destructive',
+                  onPress: performDeleteAccount,
+                },
+              ],
+              undefined,
+              { variant: 'danger', emoji: null, dismissible: true },
+            );
+          },
+        },
+      ],
+      undefined,
+      { variant: 'danger', emoji: null, dismissible: true },
     );
   };
 
@@ -352,8 +416,23 @@ export default function SettingsScreen() {
               )
             }
             onPress={handleSignOut}
-            disabled={isSigningOut}
+            disabled={isSigningOut || isDeletingAccount}
             destructive
+          />
+          <SettingRow
+            title={isDeletingAccount ? t('settings.delete_account_loading') : t('settings.delete_account_button')}
+            description={t('settings.delete_account_desc')}
+            icon={
+              isDeletingAccount ? (
+                <ActivityIndicator color={colors.error} size="small" />
+              ) : (
+                <Trash2 color={colors.error} size={22} strokeWidth={2.5} />
+              )
+            }
+            onPress={handleDeleteAccount}
+            disabled={isSigningOut || isDeletingAccount}
+            destructive
+            testID="settings-delete-account"
           />
         </ScreenSection>
 

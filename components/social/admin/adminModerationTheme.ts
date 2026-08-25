@@ -21,7 +21,6 @@ const IVORY = '#F4F1EA';
 const FOG = '#B8C3CF';
 const MUTED = '#7F91A3';
 const TRUST_BLUE = '#6FC5FF';
-const TRUST_BLUE_DEEP = '#2E8BC4';
 const AMBER = '#F1B369';
 const CORAL = '#F47A61';
 const ROSE = '#FF6B68';

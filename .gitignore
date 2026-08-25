@@ -87,3 +87,6 @@ tmp/
 # scripts/add_coach_webhook_hmac_node.py rollout — the actual secret should
 # live in Supabase Edge Function secrets and n8n env vars, not here.
 secrets/
+
+# Local Graphify knowledge graph
+graphify-out/

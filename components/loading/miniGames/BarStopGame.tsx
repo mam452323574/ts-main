@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 
 import { useTheme } from '@/contexts/ThemeContext';
 import { withAlpha } from '@/constants/theme';

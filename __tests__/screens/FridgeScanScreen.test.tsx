@@ -160,6 +160,7 @@ const translations: Record<string, string> = {
   'common.hours': 'hours',
   'common.minute': 'minute',
   'common.minutes': 'minutes',
+  'common.next': 'Next',
   'fridge_scan.limit_reached_with_time': 'Chef quota reached (5 requests). Next request available in {{time}}',
   'settings.privacy_policy': 'Privacy policy',
   'fridge_scan.title': 'Chef',
@@ -169,8 +170,8 @@ const translations: Record<string, string> = {
   'fridge_scan.permission_title': 'Camera access is needed for Chef',
   'fridge_scan.permission_body': 'Take a photo of your foods. The image is only sent when you confirm the analysis.',
   'fridge_scan.permission_denied_title': 'Camera access is still blocked',
-  'fridge_scan.permission_denied_body': 'Allow camera access to launch Chef. You can also review the privacy policy first.',
-  'fridge_scan.permission_cta': 'Allow camera',
+  'fridge_scan.permission_denied_body': 'Camera access is required to launch Chef. You can also review the privacy policy first.',
+  'fridge_scan.permission_cta': 'Next',
   'fridge_scan.camera_unavailable_title': 'Camera unavailable',
   'fridge_scan.camera_unavailable_body': 'The Chef camera could not start right now. Retry or go back to Home.',
   'fridge_scan.feedback_title': 'Choose your chef',
@@ -419,7 +420,7 @@ describe('FridgeScanScreen', () => {
 
     expect(screen.getByTestId('fridge-scan-permission-card')).toBeTruthy();
     expect(screen.getByText('Camera access is needed for Chef')).toBeTruthy();
-    expect(screen.getByText('Allow camera')).toBeTruthy();
+    expect(screen.getByText('Next')).toBeTruthy();
   });
 
   it('renders the permission card with the light chef palette', () => {
@@ -453,7 +454,7 @@ describe('FridgeScanScreen', () => {
 
     render(<FridgeScanScreen />);
 
-    fireEvent.press(screen.getByText('Allow camera'));
+    fireEvent.press(screen.getByText('Next'));
 
     expect(requestPermission).toHaveBeenCalledTimes(1);
   });

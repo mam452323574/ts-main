@@ -6,6 +6,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import * as AppleAuthentication from 'expo-apple-authentication';
 
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -17,11 +18,14 @@ import {
 } from '@/constants/theme';
 import { Squircle } from '@/components/Squircle';
 
+type AppleOAuthButtonType = 'signIn' | 'signUp' | 'continue';
+
 interface OAuthButtonProps {
   provider: 'google' | 'apple';
   onPress: () => void;
   loading?: boolean;
   disabled?: boolean;
+  appleButtonType?: AppleOAuthButtonType;
 }
 
 export function OAuthButton({
@@ -29,34 +33,44 @@ export function OAuthButton({
   onPress,
   loading = false,
   disabled = false,
+  appleButtonType = 'continue',
 }: OAuthButtonProps) {
   const { colors, isDark } = useTheme();
   const { t } = useLanguage();
-  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const isDisabled = disabled || loading;
-
+  const appleLabel = t('auth.oauth_apple');
   const config = useMemo(() => {
-    if (provider === 'google') {
-      return {
-        label: t('auth.oauth_google'),
-        backgroundColor: colors.cardBackground,
-        borderColor:
-          colors.borderSubtle ?? withAlpha(colors.primaryText, isDark ? 0.12 : 0.08),
-        textColor: colors.primaryText,
-        loaderColor: colors.primary,
-      };
-    }
-
     return {
-      label: t('auth.oauth_apple'),
-      backgroundColor: isDark ? '#F7F7F7' : '#111111',
-      borderColor: isDark
-        ? withAlpha(colors.white, 0.26)
-        : withAlpha(colors.primaryText, 0.12),
-      textColor: isDark ? '#111111' : '#FFFFFF',
-      loaderColor: isDark ? '#111111' : '#FFFFFF',
+      label: t('auth.oauth_google'),
+      backgroundColor: colors.cardBackground,
+      borderColor:
+        colors.borderSubtle ?? withAlpha(colors.primaryText, isDark ? 0.12 : 0.08),
+      textColor: colors.primaryText,
+      loaderColor: colors.primary,
     };
-  }, [colors, isDark, provider, t]);
+  }, [colors, isDark, t]);
+
+  if (provider === 'apple') {
+    const buttonType = getAppleButtonType(appleButtonType);
+    const buttonStyle = isDark
+      ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+      : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK;
+
+    return (
+      <AppleAuthentication.AppleAuthenticationButton
+        accessibilityLabel={appleLabel}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: isDisabled, busy: loading }}
+        buttonStyle={buttonStyle}
+        buttonType={buttonType}
+        cornerRadius={28}
+        onPress={isDisabled ? () => undefined : onPress}
+        style={[styles.appleButton, isDisabled ? styles.disabled : null]}
+        testID="oauth-apple-button"
+      />
+    );
+  }
 
   return (
     <Pressable
@@ -80,13 +94,7 @@ export function OAuthButton({
         <ActivityIndicator color={config.loaderColor} />
       ) : (
         <View style={styles.content}>
-          {provider === 'google' ? (
-            <GoogleMark styles={styles} />
-          ) : (
-            <Squircle style={styles.appleMark}>
-              <Text style={styles.appleMarkText}>A</Text>
-            </Squircle>
-          )}
+          <GoogleMark styles={styles} />
           <Text style={[styles.label, { color: config.textColor }]}>
             {config.label}
           </Text>
@@ -94,6 +102,18 @@ export function OAuthButton({
       )}
     </Pressable>
   );
+}
+
+function getAppleButtonType(type: AppleOAuthButtonType) {
+  switch (type) {
+    case 'signIn':
+      return AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN;
+    case 'signUp':
+      return AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP;
+    case 'continue':
+    default:
+      return AppleAuthentication.AppleAuthenticationButtonType.CONTINUE;
+  }
 }
 
 function GoogleMark({
@@ -112,7 +132,7 @@ function GoogleMark({
   );
 }
 
-const createStyles = (colors: any, isDark: boolean) =>
+const createStyles = (colors: any) =>
   StyleSheet.create({
     button: {
       width: '100%',
@@ -131,6 +151,10 @@ const createStyles = (colors: any, isDark: boolean) =>
     },
     disabled: {
       opacity: 0.62,
+    },
+    appleButton: {
+      width: '100%',
+      height: 56,
     },
     content: {
       width: '100%',
@@ -185,19 +209,6 @@ const createStyles = (colors: any, isDark: boolean) =>
       bottom: 3,
       transform: [{ rotate: '-28deg' }],
       backgroundColor: '#34A853',
-    },
-    appleMark: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: isDark ? '#111111' : '#FFFFFF', borderCurve: 'continuous',
-    },
-    appleMarkText: {
-      color: isDark ? '#FFFFFF' : '#111111',
-      fontSize: SIZES.sm,
-      fontWeight: '800',
     },
     label: {
       flexShrink: 1,

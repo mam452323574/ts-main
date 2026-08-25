@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="SelfLens monochrome icon">
+  <g fill="#FFFFFF">
+    <path d="M512 678C426 608 350 540 350 448c0-62 46-108 105-108 34 0 64 15 83 41 19-26 49-41 83-41 59 0 105 46 105 108 0 92-76 160-214 230Z"/>
+  </g>
+  <g fill="none" stroke="#FFFFFF" stroke-width="50" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M360 316h-44c-34 0-62 28-62 62v44"/>
+    <path d="M664 316h44c34 0 62 28 62 62v44"/>
+    <path d="M360 708h-44c-34 0-62-28-62-62v-44"/>
+    <path d="M664 708h44c34 0 62-28 62-62v-44"/>
+  </g>
+</svg>

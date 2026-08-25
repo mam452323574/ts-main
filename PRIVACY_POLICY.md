@@ -21,6 +21,15 @@ La camera est utilisee pour capturer des photos que vous choisissez de soumettre
 
 Les images sont televersees de maniere securisee vers notre backend, stockees dans l infrastructure Supabase utilisee par SelfLens, puis transmises a notre infrastructure d analyse accessible via `n8n.basedjew.com` pour produire les resultats affiches dans l application.
 
+### 3.1 Donnees de visage
+Les donnees de visage comprennent les photos de visage que vous choisissez de soumettre, ainsi que les resultats, scores et indicateurs derives du scan.
+
+Nous utilisons ces donnees uniquement pour fournir votre analyse sante, votre historique, vos tendances et les conseils du coach dans SelfLens.
+
+SelfLens n utilise pas ces donnees pour identifier une personne, creer une identification biometrique, authentifier un utilisateur par reconnaissance faciale, faire de la publicite ou entrainer des modeles d intelligence artificielle.
+
+Les photos et resultats sont stockes dans Supabase et traites via notre infrastructure d analyse. Ils sont conserves jusqu a la suppression du scan ou du compte, et les uploads orphelins sont purges automatiquement apres 24 heures.
+
 ### 4. Finalites du traitement
 Nous utilisons vos donnees pour :
 - executer les scans et generer des resultats d analyse sante par IA
@@ -53,7 +62,9 @@ Selon la legislation applicable, vous pouvez demander :
 ### 8. Suppression des donnees
 Vous pouvez supprimer un scan individuel depuis votre historique dans l application. La suppression efface immediatement la ligne d analyse et l image associee dans le stockage.
 
-Pour demander la suppression complete de votre compte et de toutes les donnees associees, ecrivez a `privacy@healthscan.cloud` depuis l adresse associee a votre compte. Les scans, resultats et images sont alors purges sous 30 jours.
+Vous pouvez supprimer votre compte directement dans l application depuis Reglages > Zone de danger > Supprimer le compte. Cette action supprime vos scans, images stockees, avatar, profil, donnees associees et compte d authentification, puis ferme la session.
+
+Vous pouvez aussi contacter `privacy@healthscan.cloud` depuis l adresse associee a votre compte pour toute question ou demande liee a la suppression.
 
 ### 9. Mineurs et mises a jour
 SelfLens n est pas destine aux personnes de moins de 16 ans.
@@ -82,6 +93,15 @@ We only collect categories of data that are necessary to operate the service:
 The camera is used to capture photos that you choose to submit for a scan. Photos may also be selected from the gallery when you use the system photo picker.
 
 Images are uploaded securely to our backend, stored in the Supabase infrastructure used by SelfLens, and then sent to our analysis infrastructure reachable via `n8n.basedjew.com` to produce the results shown in the app.
+
+### 3.1 Face data
+Face data includes the face photos you choose to submit, plus the scan results, scores, and metrics derived from those photos.
+
+We use this data only to provide your health analysis, scan history, trends, and coach guidance inside SelfLens.
+
+SelfLens does not use this data to identify a person, create biometric identification, authenticate a user with facial recognition, serve advertising, or train AI models.
+
+Photos and results are stored in Supabase and processed through our analysis infrastructure. They are retained until you delete the scan or account, and orphaned uploads are automatically purged after 24 hours.
 
 ### 4. Why we process data
 We use your data to:
@@ -115,7 +135,9 @@ Depending on applicable law, you may request:
 ### 8. Data deletion
 You can delete an individual scan from your history inside the app. Deletion immediately removes the analysis row and its associated image from storage.
 
-To request full account deletion and removal of all associated data, email `privacy@healthscan.cloud` from the address linked to your account. Scans, results, and images are then purged within 30 days.
+You can delete your account directly in the app from Settings > Danger zone > Delete account. This deletes your scans, stored images, avatar, profile, associated data, and authentication account, then signs you out.
+
+You can also contact `privacy@healthscan.cloud` from the address linked to your account for any deletion-related question or request.
 
 ### 9. Children and updates
 SelfLens is not intended for people under 16 years old.

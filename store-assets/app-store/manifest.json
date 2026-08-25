@@ -1,0 +1,98 @@
+[
+  {
+    "language": "fr",
+    "slug": "01-scan",
+    "title": "Scanne ton bien-etre en quelques secondes",
+    "path": "store-assets/app-store/fr/01-scan.png",
+    "width": 1290,
+    "height": 2796
+  },
+  {
+    "language": "fr",
+    "slug": "02-results",
+    "title": "Des resultats visuels faciles a lire",
+    "path": "store-assets/app-store/fr/02-results.png",
+    "width": 1290,
+    "height": 2796
+  },
+  {
+    "language": "fr",
+    "slug": "03-trends",
+    "title": "Suis tes tendances dans le temps",
+    "path": "store-assets/app-store/fr/03-trends.png",
+    "width": 1290,
+    "height": 2796
+  },
+  {
+    "language": "fr",
+    "slug": "04-coach",
+    "title": "Un coach pour passer a l'action",
+    "path": "store-assets/app-store/fr/04-coach.png",
+    "width": 1290,
+    "height": 2796
+  },
+  {
+    "language": "fr",
+    "slug": "05-modes",
+    "title": "Visage, corps, nutrition, au meme endroit",
+    "path": "store-assets/app-store/fr/05-modes.png",
+    "width": 1290,
+    "height": 2796
+  },
+  {
+    "language": "fr",
+    "slug": "06-premium",
+    "title": "Debloque le suivi avance quand tu veux",
+    "path": "store-assets/app-store/fr/06-premium.png",
+    "width": 1290,
+    "height": 2796
+  },
+  {
+    "language": "en",
+    "slug": "01-scan",
+    "title": "Scan your wellness in seconds",
+    "path": "store-assets/app-store/en/01-scan.png",
+    "width": 1290,
+    "height": 2796
+  },
+  {
+    "language": "en",
+    "slug": "02-results",
+    "title": "Clear visual insights after each scan",
+    "path": "store-assets/app-store/en/02-results.png",
+    "width": 1290,
+    "height": 2796
+  },
+  {
+    "language": "en",
+    "slug": "03-trends",
+    "title": "Track your trends over time",
+    "path": "store-assets/app-store/en/03-trends.png",
+    "width": 1290,
+    "height": 2796
+  },
+  {
+    "language": "en",
+    "slug": "04-coach",
+    "title": "Turn scans into guided next steps",
+    "path": "store-assets/app-store/en/04-coach.png",
+    "width": 1290,
+    "height": 2796
+  },
+  {
+    "language": "en",
+    "slug": "05-modes",
+    "title": "Face, body, and nutrition in one place",
+    "path": "store-assets/app-store/en/05-modes.png",
+    "width": 1290,
+    "height": 2796
+  },
+  {
+    "language": "en",
+    "slug": "06-premium",
+    "title": "Unlock deeper tracking when you are ready",
+    "path": "store-assets/app-store/en/06-premium.png",
+    "width": 1290,
+    "height": 2796
+  }
+]

@@ -820,7 +820,7 @@ jest.mock('@/contexts/AuthContext', () => ({
   AuthProvider: ({ children }) => children,
 }));
 
-// Mock AdsContext — AdMob est un module natif indisponible en test. Le provider
+// Mock AdsContext — AppLovin MAX est un module natif indisponible en test. Le provider
 // est un passthrough et le gate publicitaire « fail-open » (jamais de pub, on
 // laisse passer le scan/coach), comme en web / Expo Go.
 jest.mock('@/contexts/AdsContext', () => ({
@@ -880,6 +880,7 @@ jest.mock('@/services/supabase', () => ({
       setSession: jest.fn().mockResolvedValue({ data: { user: { id: 'test-user' }, session: { access_token: 'test-token', refresh_token: 'refresh-token' } }, error: null }),
       signInWithPassword: jest.fn().mockResolvedValue({ data: { user: { id: 'test-user' }, session: { access_token: 'test-token' } }, error: null }),
       signInWithOAuth: jest.fn().mockResolvedValue({ data: { url: 'https://oauth.example/authorize' }, error: null }),
+      signInWithIdToken: jest.fn().mockResolvedValue({ data: { user: { id: 'test-user' }, session: { access_token: 'test-token' } }, error: null }),
       signUp: jest.fn().mockResolvedValue({ data: { user: { id: 'test-user' }, session: null }, error: null }),
       signOut: jest.fn().mockResolvedValue({ error: null }),
       exchangeCodeForSession: jest.fn().mockResolvedValue({ data: { user: { id: 'test-user' }, session: { access_token: 'test-token' } }, error: null }),

@@ -58,10 +58,16 @@ describe('PrivacyPolicyScreen', () => {
     render(<PrivacyPolicyScreen />);
 
     expect(screen.getAllByText('Informativa sulla privacy')).toHaveLength(2);
-    expect(screen.getByText('Ultimo aggiornamento: 18 marzo 2026')).toBeTruthy();
+    expect(screen.getByText('Ultimo aggiornamento: 26 aprile 2026')).toBeTruthy();
     expect(
       screen.getByText(
         'Questa pagina spiega come SelfLens raccoglie, utilizza e protegge i dati necessari per eseguire gli scan salute e far funzionare il servizio.',
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText('3.1 Dati del volto')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'SelfLens non usa questi dati per identificare una persona, creare identificazione biometrica, autenticare un utente con riconoscimento facciale, mostrare pubblicita o addestrare modelli di intelligenza artificiale.',
       ),
     ).toBeTruthy();
     expect(screen.queryByText('Privacy Policy / Politique de confidentialite')).toBeNull();

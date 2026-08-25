@@ -14,6 +14,20 @@ export const APP_TRANSLATION_OVERRIDES: Record<LocaleCode, TranslationTree> = {
     settings: {
       danger_zone_desc:
         'Vous pouvez fermer votre session sur cet appareil a tout moment et vous reconnecter quand vous le souhaitez.',
+      delete_account_button: 'Supprimer le compte',
+      delete_account_desc:
+        'Supprime definitivement votre compte, vos scans et vos donnees associees.',
+      delete_account_loading: 'Suppression du compte...',
+      delete_account_confirm_title: 'Supprimer votre compte ?',
+      delete_account_confirm_msg:
+        'Cette action supprimera votre profil, vos scans, vos images et vos donnees associees. Elle est definitive. Un abonnement App Store actif doit etre annule depuis vos abonnements Apple.',
+      delete_account_continue: 'Continuer',
+      delete_account_final_title: 'Derniere confirmation',
+      delete_account_final_msg:
+        'Votre compte sera supprime maintenant. Cette operation ne peut pas etre annulee. La suppression du compte n annule pas un abonnement App Store actif.',
+      delete_account_error_title: 'Suppression impossible',
+      delete_account_error_msg:
+        'Nous n avons pas pu supprimer votre compte pour le moment. Reessayez dans quelques instants.',
     },
     social: {
       errors: {
@@ -65,6 +79,20 @@ export const APP_TRANSLATION_OVERRIDES: Record<LocaleCode, TranslationTree> = {
     settings: {
       danger_zone_desc:
         'You can safely sign out on this device at any time and come back whenever you want.',
+      delete_account_button: 'Delete account',
+      delete_account_desc:
+        'Permanently deletes your account, scans, and associated data.',
+      delete_account_loading: 'Deleting account...',
+      delete_account_confirm_title: 'Delete your account?',
+      delete_account_confirm_msg:
+        'This will delete your profile, scans, images, and associated data. This action is permanent. Active App Store subscriptions must be cancelled in your Apple subscriptions.',
+      delete_account_continue: 'Continue',
+      delete_account_final_title: 'Final confirmation',
+      delete_account_final_msg:
+        'Your account will be deleted now. This operation cannot be undone. Deleting your account does not cancel an active App Store subscription.',
+      delete_account_error_title: 'Could not delete account',
+      delete_account_error_msg:
+        'We could not delete your account right now. Please try again in a moment.',
     },
     social: {
       errors: {
@@ -125,6 +153,20 @@ export const APP_TRANSLATION_OVERRIDES: Record<LocaleCode, TranslationTree> = {
       admin_moderation_subtitle: 'Rivedi e modera i contenuti social',
       danger_zone_desc:
         'Puoi disconnetterti da questo dispositivo in qualsiasi momento e tornare quando vuoi.',
+      delete_account_button: 'Elimina account',
+      delete_account_desc:
+        'Elimina definitivamente account, scan e dati associati.',
+      delete_account_loading: 'Eliminazione account...',
+      delete_account_confirm_title: 'Eliminare il tuo account?',
+      delete_account_confirm_msg:
+        'Questa azione eliminera profilo, scan, immagini e dati associati. E definitiva. Gli abbonamenti App Store attivi devono essere annullati negli abbonamenti Apple.',
+      delete_account_continue: 'Continua',
+      delete_account_final_title: 'Conferma finale',
+      delete_account_final_msg:
+        'Il tuo account verra eliminato ora. L operazione non puo essere annullata. Eliminare l account non annulla un abbonamento App Store attivo.',
+      delete_account_error_title: 'Eliminazione non riuscita',
+      delete_account_error_msg:
+        'Non siamo riusciti a eliminare il tuo account ora. Riprova tra poco.',
     },
     social: {
       feed_title: 'Feed della community',
@@ -361,6 +403,20 @@ export const APP_TRANSLATION_OVERRIDES: Record<LocaleCode, TranslationTree> = {
       admin_moderation_subtitle: 'Rever e moderar conteudos sociais',
       danger_zone_desc:
         'Pode terminar a sessao neste dispositivo a qualquer momento e voltar quando quiser.',
+      delete_account_button: 'Excluir conta',
+      delete_account_desc:
+        'Exclui permanentemente sua conta, scans e dados associados.',
+      delete_account_loading: 'Excluindo conta...',
+      delete_account_confirm_title: 'Excluir sua conta?',
+      delete_account_confirm_msg:
+        'Isso excluira seu perfil, scans, imagens e dados associados. A acao e permanente. Assinaturas ativas da App Store devem ser canceladas nas assinaturas Apple.',
+      delete_account_continue: 'Continuar',
+      delete_account_final_title: 'Confirmacao final',
+      delete_account_final_msg:
+        'Sua conta sera excluida agora. Esta operacao nao pode ser desfeita. Excluir a conta nao cancela uma assinatura ativa da App Store.',
+      delete_account_error_title: 'Nao foi possivel excluir',
+      delete_account_error_msg:
+        'Nao conseguimos excluir sua conta agora. Tente novamente em alguns instantes.',
     },
     social: {
       feed_title: 'Feed da comunidade',
@@ -598,6 +654,20 @@ export const APP_TRANSLATION_OVERRIDES: Record<LocaleCode, TranslationTree> = {
       admin_moderation_subtitle: 'Revisa y modera el contenido social',
       danger_zone_desc:
         'Puedes cerrar sesion en este dispositivo cuando quieras y volver en cualquier momento.',
+      delete_account_button: 'Eliminar cuenta',
+      delete_account_desc:
+        'Elimina definitivamente tu cuenta, escaneos y datos asociados.',
+      delete_account_loading: 'Eliminando cuenta...',
+      delete_account_confirm_title: 'Eliminar tu cuenta?',
+      delete_account_confirm_msg:
+        'Esto eliminara tu perfil, escaneos, imagenes y datos asociados. La accion es permanente. Las suscripciones activas de App Store deben cancelarse en las suscripciones de Apple.',
+      delete_account_continue: 'Continuar',
+      delete_account_final_title: 'Confirmacion final',
+      delete_account_final_msg:
+        'Tu cuenta se eliminara ahora. Esta operacion no se puede deshacer. Eliminar la cuenta no cancela una suscripcion activa de App Store.',
+      delete_account_error_title: 'No se pudo eliminar',
+      delete_account_error_msg:
+        'No pudimos eliminar tu cuenta ahora. Intentalo de nuevo en unos instantes.',
     },
     social: {
       feed_title: 'Feed de la comunidad',
@@ -836,6 +906,20 @@ export const APP_TRANSLATION_OVERRIDES: Record<LocaleCode, TranslationTree> = {
       admin_moderation_subtitle: 'Soziale Inhalte prufen und moderieren',
       danger_zone_desc:
         'Du kannst dich auf diesem Gerat jederzeit sicher abmelden und jederzeit zuruckkehren.',
+      delete_account_button: 'Konto loeschen',
+      delete_account_desc:
+        'Loescht dein Konto, deine Scans und zugehoerige Daten dauerhaft.',
+      delete_account_loading: 'Konto wird geloescht...',
+      delete_account_confirm_title: 'Dein Konto loeschen?',
+      delete_account_confirm_msg:
+        'Dadurch werden Profil, Scans, Bilder und zugehoerige Daten geloescht. Diese Aktion ist dauerhaft. Aktive App Store Abos muessen in den Apple Abonnements gekuendigt werden.',
+      delete_account_continue: 'Weiter',
+      delete_account_final_title: 'Letzte Bestaetigung',
+      delete_account_final_msg:
+        'Dein Konto wird jetzt geloescht. Dieser Vorgang kann nicht rueckgaengig gemacht werden. Das Loeschen des Kontos kuendigt kein aktives App Store Abo.',
+      delete_account_error_title: 'Loeschen fehlgeschlagen',
+      delete_account_error_msg:
+        'Wir konnten dein Konto gerade nicht loeschen. Bitte versuche es gleich noch einmal.',
     },
     social: {
       feed_title: 'Community-Feed',

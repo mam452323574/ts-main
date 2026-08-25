@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import {
-  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,

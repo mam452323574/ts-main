@@ -20,6 +20,7 @@ const mockInvalidateQueries = jest.fn();
 const mockRefetchQueries = jest.fn();
 const mockSetQueryData = jest.fn();
 const mockSetQueriesData = jest.fn();
+const mockPresentRewardedAdGate = jest.fn();
 const mockUseSafeAreaInsets = jest.fn(() => ({
   top: 0,
   bottom: 0,
@@ -124,6 +125,15 @@ jest.mock('@/contexts/BadgeContext', () => ({
   }),
 }));
 
+jest.mock('@/contexts/AdsContext', () => ({
+  useAdsGate: () => ({
+    isReady: true,
+    presentRewardedAdGate: (...args: unknown[]) =>
+      mockPresentRewardedAdGate(...args),
+  }),
+  AdsProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
 const mockIncrementScanCount = jest.fn();
 jest.mock('@/contexts/GamificationContext', () => ({
   useGamification: () => ({
@@ -218,6 +228,7 @@ describe('ScanPreviewScreen', () => {
       imageUri: 'file:///test-image.jpg',
       scanType: 'health',
     });
+    mockPresentRewardedAdGate.mockResolvedValue('rewarded');
   });
 
   afterEach(() => {
@@ -274,7 +285,7 @@ describe('ScanPreviewScreen', () => {
     expect(screen.getByText('Annuler')).toBeTruthy();
   });
 
-  it('uses a light action panel tint and readable text when the app theme is light', async () => {
+  it('uses the premium dark action panel tint and readable text', async () => {
     mockCreateScanWithAnalysis.mockImplementation(() => new Promise(() => {}));
 
     render(<ScanPreviewScreen />);
@@ -285,9 +296,9 @@ describe('ScanPreviewScreen', () => {
       screen.getByText('Annuler').props.style,
     );
 
-    expect(actionPanel.props.tint).toBe('light');
-    expect(actionPanelStyle.backgroundColor).not.toBe('rgba(11, 19, 27, 0.94)');
-    expect(cancelTextStyle.color).toBe('#1C1C1E');
+    expect(actionPanel.props.tint).toBe('dark');
+    expect(actionPanelStyle.backgroundColor).toBe('rgba(11, 19, 27, 0.94)');
+    expect(cancelTextStyle.color).toBe('#F6FBFF');
 
     fireEvent.press(screen.getByTestId('confirm-button'));
 
@@ -302,10 +313,8 @@ describe('ScanPreviewScreen', () => {
       screen.getByTestId('scan-preview-progress-card').props.style,
     );
 
-    expect(loadingOverlayStyle.backgroundColor).not.toBe('rgba(2, 7, 12, 0.94)');
-    expect(progressCardStyle.backgroundColor).not.toBe(
-      'rgba(12, 20, 28, 0.96)',
-    );
+    expect(loadingOverlayStyle.backgroundColor).toBe('rgba(2, 7, 12, 0.94)');
+    expect(progressCardStyle.backgroundColor).toBe('rgba(12, 20, 28, 0.96)');
   });
 
   it('keeps Android preview spacing while using tight loading metrics for limited usable height', async () => {
@@ -776,6 +785,40 @@ describe('ScanPreviewScreen', () => {
   });
 
   describe('confirm action', () => {
+    it('cancels the scan when the rewarded gate is declined', async () => {
+      mockPresentRewardedAdGate.mockResolvedValueOnce('skipped');
+
+      render(<ScanPreviewScreen />);
+
+      fireEvent.press(screen.getByTestId('confirm-button'));
+
+      await waitFor(() => {
+        expect(mockPresentRewardedAdGate).toHaveBeenCalledWith('scan');
+      });
+      expect(mockCreateScanWithAnalysis).not.toHaveBeenCalled();
+      expect(screen.queryByTestId('scan-preview-loading-overlay')).toBeNull();
+    });
+
+    it('continues the scan when the rewarded gate is unavailable', async () => {
+      mockPresentRewardedAdGate.mockResolvedValueOnce('unavailable');
+      mockCreateScanWithAnalysis.mockImplementation(
+        () => new Promise(() => {}),
+      );
+
+      render(<ScanPreviewScreen />);
+
+      fireEvent.press(screen.getByTestId('confirm-button'));
+
+      await waitFor(() => {
+        expect(mockPresentRewardedAdGate).toHaveBeenCalledWith('scan');
+        expect(mockCreateScanWithAnalysis).toHaveBeenCalledWith(
+          'file:///test-image.jpg',
+          'health',
+          'fr',
+        );
+      });
+    });
+
     it('shows loading state when confirming', async () => {
       mockCreateScanWithAnalysis.mockImplementation(
         () => new Promise(() => {}),

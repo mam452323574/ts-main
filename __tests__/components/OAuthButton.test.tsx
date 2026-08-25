@@ -3,6 +3,28 @@ import { render, screen, fireEvent } from '@testing-library/react-native';
 import { ActivityIndicator } from 'react-native';
 import { OAuthButton } from '@/components/OAuthButton';
 
+jest.mock('expo-apple-authentication', () => ({
+  AppleAuthenticationButton: ({ onPress, testID, ...props }: any) => {
+    const { Text, TouchableOpacity } = require('react-native');
+    return (
+      <TouchableOpacity onPress={onPress} testID={testID}>
+        <Text>Native Apple Button</Text>
+        <Text testID="oauth-apple-native-props">{JSON.stringify(props)}</Text>
+      </TouchableOpacity>
+    );
+  },
+  AppleAuthenticationButtonStyle: {
+    WHITE: 0,
+    WHITE_OUTLINE: 1,
+    BLACK: 2,
+  },
+  AppleAuthenticationButtonType: {
+    SIGN_IN: 0,
+    CONTINUE: 1,
+    SIGN_UP: 2,
+  },
+}));
+
 describe('OAuthButton', () => {
   const mockOnPress = jest.fn();
 
@@ -19,10 +41,24 @@ describe('OAuthButton', () => {
     );
   });
 
-  it('renders Apple button correctly', () => {
-    render(<OAuthButton provider="apple" onPress={mockOnPress} />);
-    
-    expect(screen.getByText('Continuer avec Apple')).toBeTruthy();
+  it('renders Apple with the native Apple authentication button', () => {
+    render(
+      <OAuthButton
+        provider="apple"
+        appleButtonType="signIn"
+        onPress={mockOnPress}
+      />,
+    );
+
+    const button = screen.getByTestId('oauth-apple-button');
+    expect(button).toBeTruthy();
+    expect(screen.getByText('Native Apple Button')).toBeTruthy();
+    expect(screen.getByTestId('oauth-apple-native-props').props.children).toContain(
+      '"buttonType":0',
+    );
+    expect(screen.getByTestId('oauth-apple-native-props').props.children).toContain(
+      '"buttonStyle":2',
+    );
   });
 
   it('calls onPress when pressed', () => {
@@ -70,10 +106,25 @@ describe('OAuthButton', () => {
     expect(screen.getByText('G')).toBeTruthy();
   });
 
-  it('renders Apple icon (empty for Apple logo)', () => {
-    render(<OAuthButton provider="apple" onPress={mockOnPress} />);
-    
-    // Apple uses an empty string for icon as it would use the Apple logo
-    expect(screen.getByText('Continuer avec Apple')).toBeTruthy();
+  it('uses the native Apple sign-up type when requested', () => {
+    render(
+      <OAuthButton
+        provider="apple"
+        appleButtonType="signUp"
+        onPress={mockOnPress}
+      />,
+    );
+
+    expect(
+      screen.getByTestId('oauth-apple-native-props').props.children,
+    ).toContain('"buttonType":2');
+  });
+
+  it('blocks Apple onPress when disabled', () => {
+    render(<OAuthButton provider="apple" onPress={mockOnPress} disabled />);
+
+    fireEvent.press(screen.getByTestId('oauth-apple-button'));
+
+    expect(mockOnPress).not.toHaveBeenCalled();
   });
 });

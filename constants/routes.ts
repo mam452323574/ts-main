@@ -7,7 +7,7 @@
 export const PUBLIC_ROUTES = ['welcome', 'login', 'signup'] as const;
 
 // Routes accessibles quel que soit l'etat d'authentification
-export const SHARED_ROUTES = ['privacy-policy'] as const;
+export const SHARED_ROUTES = ['privacy-policy', 'terms-of-use'] as const;
 
 // Routes de vérification d'email
 export const EMAIL_VERIFICATION_ROUTES = ['email-verification'] as const;

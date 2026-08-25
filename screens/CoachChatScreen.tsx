@@ -32,6 +32,7 @@ import {
   withAlpha,
 } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAdsGate } from '@/contexts/AdsContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useArchiveCoachConversation } from '@/hooks/queries/useArchiveCoachConversation';
@@ -275,6 +276,7 @@ type OutboxUserMessage = {
 export default function CoachChatScreen() {
   const router = useRouter();
   const { user, userProfile } = useAuth();
+  const { presentRewardedAdGate } = useAdsGate();
   const { locale } = useLanguage();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -623,6 +625,13 @@ export default function CoachChatScreen() {
   const handleSend = useCallback(async () => {
     const trimmed = composerValue.trim();
     if (!trimmed) return;
+    if (!activeConversationId) {
+      const adGateOutcome = await presentRewardedAdGate('coach');
+      if (adGateOutcome === 'skipped') {
+        return;
+      }
+    }
+
     const clientRequestId = generateCoachConversationClientRequestId();
     setComposerValue('');
     setOutboxUserMessages((prev) => [
@@ -643,7 +652,7 @@ export default function CoachChatScreen() {
       content: trimmed,
       conversationId: activeConversationId,
     });
-  }, [composerValue, activeConversationId, performSend]);
+  }, [composerValue, activeConversationId, performSend, presentRewardedAdGate]);
 
   const handleRetryUserMessage = useCallback(
     (entry: OutboxUserMessage) => {

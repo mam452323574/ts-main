@@ -39,15 +39,15 @@ describe('Coach LLM node retry / timeout settings (N-B)', () => {
       );
 
       it.each(llmNodes.map((node) => [node.name, node]))(
-        'node "%s" has a bounded request timeout (≤ 45 s)',
+        'node "%s" has a bounded request timeout (≤ 75 s)',
         (_name, node) => {
           const timeout = node?.parameters?.options?.requestTimeout;
           expect(typeof timeout).toBe('number');
           expect(timeout).toBeGreaterThan(0);
-          // Edge function caller waits at most 45 s (cf.
+          // Edge function caller waits at most 75 s (cf.
           // COACH_CONVERSATION_WEBHOOK_TIMEOUT_MS); the LLM timeout must be
           // strictly smaller so the worker can fail fast and retry.
-          expect(timeout).toBeLessThanOrEqual(45_000);
+          expect(timeout).toBeLessThanOrEqual(75_000);
         },
       );
     });

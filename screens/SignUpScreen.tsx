@@ -63,10 +63,6 @@ const SIGNUP_STEPS: PreAuthOnboardingStep[] = [
   'emailCredentials',
 ];
 
-function isMediaLibraryGranted(permission: ImagePicker.MediaLibraryPermissionResponse) {
-  return permission.granted || permission.accessPrivileges === 'limited';
-}
-
 export default function SignUpScreen() {
   const router = useRouter();
   const {
@@ -242,16 +238,6 @@ export default function SignUpScreen() {
 
   const pickAvatarFromLibrary = async () => {
     try {
-      const currentPermission = await ImagePicker.getMediaLibraryPermissionsAsync();
-      const permission = isMediaLibraryGranted(currentPermission)
-        ? currentPermission
-        : await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-      if (!isMediaLibraryGranted(permission)) {
-        showPermissionAlert(t('components.avatar.perm_gallery'));
-        return;
-      }
-
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsEditing: false,
@@ -503,11 +489,7 @@ export default function SignUpScreen() {
       // Annulation volontaire (l'utilisateur a fermé l'onglet Google) : on ne
       // montre pas de bandeau d'erreur, on reste juste sur l'étape en cours.
       if (!isOAuthCancellationError(oauthError)) {
-        setError(
-          oauthError instanceof Error
-            ? oauthError.message
-            : t('auth.errors.oauth_login', { provider: 'google' }),
-        );
+        setError(t('auth.errors.oauth_login', { provider: 'google' }));
       }
     } finally {
       setGoogleLoading(false);
@@ -542,11 +524,7 @@ export default function SignUpScreen() {
       // Annulation volontaire (l'utilisateur a fermé l'onglet Apple) : on ne
       // montre pas de bandeau d'erreur, on reste juste sur l'étape en cours.
       if (!isOAuthCancellationError(oauthError)) {
-        setError(
-          oauthError instanceof Error
-            ? oauthError.message
-            : t('auth.errors.oauth_login', { provider: 'apple' }),
-        );
+        setError(t('auth.errors.oauth_login', { provider: 'apple' }));
       }
     } finally {
       setAppleLoading(false);
@@ -680,6 +658,7 @@ export default function SignUpScreen() {
         {Platform.OS === 'ios' ? (
           <OAuthButton
             provider="apple"
+            appleButtonType="signUp"
             onPress={handleAppleSignUp}
             loading={appleLoading}
             disabled={googleLoading || appleLoading || loading}

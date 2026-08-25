@@ -13,6 +13,7 @@ import { SIZES, SPACING } from '@/constants/theme';
 
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
+import { useNotifications } from '@/hooks/useNotifications';
 
 export default function NotificationSettingsScreen() {
   const router = useRouter();
@@ -22,6 +23,7 @@ export default function NotificationSettingsScreen() {
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const [saving, setSaving] = useState(false);
   const { showAlert, alertElement } = useCustomAlert();
+  const { registerForPushNotifications } = useNotifications();
 
   const [settings, setSettings] = useState({
     reminders: true,
@@ -47,6 +49,9 @@ export default function NotificationSettingsScreen() {
       setSaving(true);
 
       await updateNotificationSettings(settings);
+      if (Object.values(settings).some(Boolean)) {
+        await registerForPushNotifications();
+      }
 
       showAlert(
         t('notification_settings.saved_title'),

@@ -1523,7 +1523,7 @@ export const ES_TRANSLATIONS = {
     general_error: 'Ocurrió un error',
   },
   scanner: {
-    authorize_camera: 'Permitir cámara',
+    authorize_camera: 'Siguiente',
     camera_permission_msg: 'Necesitamos acceso a su cámara para escanear.',
     camera_permission_detail: 'Las fotos de rostro, cuerpo y comida se usan para ejecutar el analisis de salud dentro de la app.',
     camera_permission_backend: 'Las imagenes se cargan de forma segura en nuestro backend y se procesan en nuestra infraestructura de analisis. Puede revisar la politica de privacidad antes de permitir el acceso.',
@@ -1553,7 +1553,7 @@ export const ES_TRANSLATIONS = {
     permission_body: 'Haz una foto de tus alimentos. La imagen solo se envia cuando confirmas el analisis.',
     permission_denied_title: 'El acceso a la camara sigue bloqueado',
     permission_denied_body: 'Autoriza la camara para iniciar Chef. Tambien puedes revisar antes la politica de privacidad.',
-    permission_cta: 'Autorizar camara',
+    permission_cta: 'Siguiente',
     camera_unavailable_title: 'Camara no disponible',
     camera_unavailable_body: 'La camara dedicada de Chef no puede iniciarse ahora mismo. Reintenta o vuelve al inicio.',
     feedback_title: 'Elige tu chef',

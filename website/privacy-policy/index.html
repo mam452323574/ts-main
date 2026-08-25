@@ -288,7 +288,7 @@
             <span class="locale-badge">FR</span>
             <h2>Politique de confidentialite</h2>
           </div>
-          <p class="last-updated">Derniere mise a jour : 18 mars 2026</p>
+          <p class="last-updated">Derniere mise a jour : 26 avril 2026</p>
           <p class="intro">
             Cette page explique comment SelfLens collecte, utilise et protege
             les donnees necessaires a l'analyse des scans sante et au
@@ -339,6 +339,32 @@
           </section>
 
           <section class="section">
+            <h3>3.1 Donnees de visage</h3>
+            <p>
+              Les donnees de visage comprennent les photos de visage que vous
+              choisissez de soumettre, ainsi que les resultats, scores et
+              indicateurs derives du scan.
+            </p>
+            <p>
+              Nous utilisons ces donnees uniquement pour fournir votre analyse
+              sante, votre historique, vos tendances et les conseils du coach
+              dans SelfLens.
+            </p>
+            <p>
+              SelfLens n'utilise pas ces donnees pour identifier une personne,
+              creer une identification biometrique, authentifier un utilisateur
+              par reconnaissance faciale, faire de la publicite ou entrainer des
+              modeles d'intelligence artificielle.
+            </p>
+            <p>
+              Les photos et resultats sont stockes dans Supabase et traites via
+              notre infrastructure d'analyse. Ils sont conserves jusqu'a la
+              suppression du scan ou du compte, et les uploads orphelins sont
+              purges automatiquement apres 24 heures.
+            </p>
+          </section>
+
+          <section class="section">
             <h3>4. Finalites du traitement</h3>
             <p>Nous utilisons vos donnees pour :</p>
             <ul>
@@ -369,8 +395,13 @@
             <h3>6. Conservation et securite</h3>
             <p>
               Les donnees de compte et l'historique de scans sont conserves tant
-              que votre compte reste actif ou jusqu'a reception d'une demande de
-              suppression valide.
+              que votre compte reste actif, jusqu'a la suppression d'un scan
+              individuel ou jusqu'a la suppression de votre compte.
+            </p>
+            <p>
+              Les images de scan et uploads associes sont supprimes avec le scan
+              ou le compte. Une routine automatisee supprime aussi les uploads
+              orphelins au-dela de 24 heures.
             </p>
             <p>
               Les communications entre l'application et nos services utilisent
@@ -394,14 +425,22 @@
           <section class="section">
             <h3>8. Suppression des donnees</h3>
             <p>
-              SelfLens ne propose pas actuellement de suppression complete
-              self-service dans l'application.
+              Vous pouvez supprimer un scan individuel depuis votre historique
+              dans l'application. La suppression efface la ligne d'analyse et
+              l'image associee dans le stockage.
             </p>
             <p>
-              Pour demander la suppression de votre compte ou de vos donnees,
-              ecrivez a
+              Vous pouvez supprimer votre compte directement dans l'application
+              depuis Reglages &gt; Zone de danger &gt; Supprimer le compte. Cette
+              action supprime vos scans, images stockees, avatar, profil,
+              donnees associees et compte d'authentification, puis ferme la
+              session.
+            </p>
+            <p>
+              Vous pouvez aussi contacter
               <a href="mailto:privacy@healthscan.cloud">privacy@healthscan.cloud</a>
-              depuis l'adresse associee a votre compte.
+              depuis l'adresse associee a votre compte pour toute question ou
+              demande liee a la suppression.
             </p>
           </section>
 
@@ -434,7 +473,7 @@
             <span class="locale-badge">EN</span>
             <h2>Privacy Policy</h2>
           </div>
-          <p class="last-updated">Last updated: March 18, 2026</p>
+          <p class="last-updated">Last updated: April 26, 2026</p>
           <p class="intro">
             This page explains how SelfLens collects, uses, and protects the
             data required to run health scans and the service itself.
@@ -481,6 +520,29 @@
           </section>
 
           <section class="section">
+            <h3>3.1 Face data</h3>
+            <p>
+              Face data includes the face photos you choose to submit, plus the
+              scan results, scores, and metrics derived from those photos.
+            </p>
+            <p>
+              We use this data only to provide your health analysis, scan
+              history, trends, and coach guidance inside SelfLens.
+            </p>
+            <p>
+              SelfLens does not use this data to identify a person, create
+              biometric identification, authenticate a user with facial
+              recognition, serve advertising, or train AI models.
+            </p>
+            <p>
+              Photos and results are stored in Supabase and processed through
+              our analysis infrastructure. They are retained until you delete
+              the scan or account, and orphaned uploads are automatically purged
+              after 24 hours.
+            </p>
+          </section>
+
+          <section class="section">
             <h3>4. Why we process data</h3>
             <p>We use your data to:</p>
             <ul>
@@ -510,7 +572,13 @@
             <h3>6. Retention and security</h3>
             <p>
               Account data and scan history are retained while your account
-              remains active or until we receive a valid deletion request.
+              remains active, until you delete an individual scan, or until you
+              delete your account.
+            </p>
+            <p>
+              Scan images and associated uploads are deleted with the scan or
+              account. An automated routine also removes orphaned uploads after
+              24 hours.
             </p>
             <p>
               Communications between the app and our services use HTTPS. Access
@@ -534,13 +602,21 @@
           <section class="section">
             <h3>8. Data deletion</h3>
             <p>
-              SelfLens does not currently provide a full self-service account
-              deletion flow inside the app.
+              You can delete an individual scan from your history inside the
+              app. Deletion removes the analysis row and its associated image
+              from storage.
             </p>
             <p>
-              To request deletion of your account or data, email
+              You can delete your account directly in the app from Settings
+              &gt; Danger zone &gt; Delete account. This deletes your scans,
+              stored images, avatar, profile, associated data, and
+              authentication account, then signs you out.
+            </p>
+            <p>
+              You can also contact
               <a href="mailto:privacy@healthscan.cloud">privacy@healthscan.cloud</a>
-              from the address linked to your account.
+              from the address linked to your account for any deletion-related
+              question or request.
             </p>
           </section>
 

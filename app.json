@@ -2,7 +2,7 @@
   "expo": {
     "name": "SelfLens",
     "slug": "health-scan",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "selflens",
@@ -10,9 +10,9 @@
     "jsEngine": "hermes",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/icon.png",
+      "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#1E3A2B"
+      "backgroundColor": "#0D2A64"
     },
     "ios": {
       "supportsTablet": true,
@@ -29,20 +29,22 @@
       "versionCode": 3,
       "edgeToEdgeEnabled": true,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
-        "backgroundColor": "#1E3A2B"
+        "foregroundImage": "./assets/images/android-adaptive-foreground.png",
+        "monochromeImage": "./assets/images/android-adaptive-monochrome.png",
+        "backgroundColor": "#0D2A64"
       },
       "package": "com.selflens.app",
       "permissions": [
         "android.permission.CAMERA",
-        "android.permission.READ_MEDIA_IMAGES",
         "android.permission.RECORD_AUDIO",
         "com.android.vending.BILLING"
       ],
       "blockedPermissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
         "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
         "android.permission.SYSTEM_ALERT_WINDOW"
       ],
       "runtimeVersion": "1.0.0"
@@ -72,22 +74,22 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "SelfLens a besoin d'acceder a votre camera pour capturer des photos destinees a l'analyse sante."
+          "cameraPermission": "SelfLens uses the camera only when you choose to take a photo for a wellness scan."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "SelfLens a besoin d'acceder a vos photos pour choisir une photo de profil.",
-          "cameraPermission": "SelfLens a besoin d'acceder a votre camera pour capturer des photos destinees a l'analyse sante.",
-          "microphonePermission": "SelfLens a besoin d'acceder a votre micro pour la dictee vocale dans la conversation avec ton coach."
+          "photosPermission": "SelfLens uses your photo library only when you choose a profile photo or scan image.",
+          "cameraPermission": "SelfLens uses the camera only when you choose to take a photo for a wellness scan.",
+          "microphonePermission": "SelfLens uses the microphone only when you choose voice dictation in Coach."
         }
       ],
       [
         "expo-speech-recognition",
         {
-          "microphonePermission": "SelfLens a besoin d'acceder a votre micro pour la dictee vocale dans la conversation avec ton coach.",
-          "speechRecognitionPermission": "SelfLens utilise la reconnaissance vocale pour transcrire ce que tu dis dans la conversation avec ton coach.",
+          "microphonePermission": "SelfLens uses the microphone only when you choose voice dictation in Coach.",
+          "speechRecognitionPermission": "SelfLens uses speech recognition only to transcribe your voice dictation in Coach.",
           "androidSpeechServicePackages": [
             "com.google.android.googlequicksearchbox"
           ]
@@ -96,28 +98,13 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/icon.png",
-          "color": "#1E3A2B",
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#2F66C5",
           "sounds": [],
           "mode": "production"
         }
       ],
-      "expo-localization",
-      [
-        "react-native-google-mobile-ads",
-        {
-          "androidAppId": "ca-app-pub-7622840244305747~9488642668",
-          "iosAppId": "ca-app-pub-7622840244305747~8095669949",
-          "delayAppMeasurementInit": true,
-          "userTrackingUsageDescription": "SelfLens utilise cet identifiant publicitaire pour vous proposer des publicites plus pertinentes. Vous pouvez refuser sans perdre aucune fonctionnalite."
-        }
-      ],
-      [
-        "expo-tracking-transparency",
-        {
-          "userTrackingPermission": "SelfLens utilise cet identifiant publicitaire pour vous proposer des publicites plus pertinentes. Vous pouvez refuser sans perdre aucune fonctionnalite."
-        }
-      ]
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true
@@ -130,8 +117,9 @@
       "EXPO_PUBLIC_SUPABASE_URL": "https://supabase.basedjew.com",
       "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzgwMDcwOTA1LCJleHAiOjIwOTU0MzA5MDV9.DNcht8AWIXe3Uqgz3P3PmINu2JeYEfqt1jM8TxHa2Yk",
       "EXPO_PUBLIC_REVENUECAT_IOS_API_KEY": "appl_quwALTkmmGXdVTOTTvfVeQCoMJW",
-      "EXPO_PUBLIC_ADMOB_ANDROID_REWARDED": "ca-app-pub-7622840244305747/7987858730",
-      "EXPO_PUBLIC_ADMOB_IOS_REWARDED": "ca-app-pub-7622840244305747/1422450383"
+      "EXPO_PUBLIC_APPLOVIN_SDK_KEY": "",
+      "EXPO_PUBLIC_APPLOVIN_ANDROID_REWARDED": "",
+      "EXPO_PUBLIC_APPLOVIN_IOS_REWARDED": ""
     },
     "owner": "malo6002",
     "updates": {

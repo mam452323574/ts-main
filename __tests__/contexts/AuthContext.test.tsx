@@ -1,5 +1,5 @@
 import React from 'react';
-import { AppState, Text } from 'react-native';
+import { AppState, Platform, Text } from 'react-native';
 import { act, render, waitFor } from '@testing-library/react-native';
 
 jest.unmock('@/contexts/AuthContext');
@@ -15,6 +15,8 @@ const mockTrackFailureEvent = jest.fn();
 const mockLogOperationalError = jest.fn();
 const mockLogExpectedFailure = jest.fn();
 const mockCreateOAuthState = jest.fn(() => 'oauth-state-1');
+const mockCreateAppleNonceHash = jest.fn(async (rawNonce: string) => `hashed-${rawNonce}`);
+const mockAppleSignInAsync = jest.fn();
 
 jest.mock('@/utils/runtimeCapabilities', () => ({
   getRuntimeCapabilities: () => mockGetRuntimeCapabilities(),
@@ -56,6 +58,18 @@ jest.mock('@/utils/oauthState', () => ({
   createOAuthState: () => mockCreateOAuthState(),
 }));
 
+jest.mock('@/utils/appleNonce', () => ({
+  createAppleNonceHash: (rawNonce: string) => mockCreateAppleNonceHash(rawNonce),
+}));
+
+jest.mock('expo-apple-authentication', () => ({
+  signInAsync: (...args: unknown[]) => mockAppleSignInAsync(...args),
+  AppleAuthenticationScope: {
+    FULL_NAME: 'FULL_NAME',
+    EMAIL: 'EMAIL',
+  },
+}));
+
 jest.mock('@/utils/observability', () => ({
   logOperationalError: (...args: unknown[]) => mockLogOperationalError(...args),
   logExpectedFailure: (...args: unknown[]) => mockLogExpectedFailure(...args),
@@ -73,6 +87,7 @@ jest.mock('expo-web-browser', () => ({
 }));
 
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { secureStorage } from '@/services/secureStorage';
 
 const { supabase } = jest.requireMock('@/services/supabase') as {
   supabase: {
@@ -83,6 +98,7 @@ const { supabase } = jest.requireMock('@/services/supabase') as {
       startAutoRefresh: jest.Mock;
       stopAutoRefresh: jest.Mock;
       signInWithOAuth: jest.Mock;
+      signInWithIdToken: jest.Mock;
       exchangeCodeForSession: jest.Mock;
       signOut: jest.Mock;
     };
@@ -166,6 +182,12 @@ const mockTableUpdate = jest.fn(() => ({
 const { openAuthSessionAsync } = jest.requireMock('expo-web-browser') as {
   openAuthSessionAsync: jest.Mock;
 };
+const SecureStoreMock = jest.requireMock('expo-secure-store') as {
+  __resetSecureStoreMock?: () => void;
+};
+
+const APPLE_AUTHORIZATION_CODE_STORAGE_KEY =
+  'selflens.apple.authorization_code.v1';
 
 const renderProvider = (onAuthRender: jest.Mock = jest.fn()) =>
   render(
@@ -184,6 +206,7 @@ function AuthStateProbe({ onRender }: { onRender: jest.Mock }) {
     signUp: auth.signUp,
     signInWithGoogle: auth.signInWithGoogle,
     signInWithOAuth: auth.signInWithOAuth,
+    deleteAccount: auth.deleteAccount,
   });
   return <Text testID="auth-child">ready</Text>;
 }
@@ -211,6 +234,7 @@ function getLastAuthRender(onAuthRender: jest.Mock) {
         }>;
         signInWithGoogle: () => Promise<void>;
         signInWithOAuth: (provider: 'google' | 'apple') => Promise<void>;
+        deleteAccount: () => Promise<void>;
       }
     | undefined;
 }
@@ -218,6 +242,10 @@ function getLastAuthRender(onAuthRender: jest.Mock) {
 describe('AuthProvider RevenueCat startup behavior', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    SecureStoreMock.__resetSecureStoreMock?.();
+    mockCreateAppleNonceHash.mockImplementation(
+      async (rawNonce: string) => `hashed-${rawNonce}`,
+    );
     authStateCallback = null;
     appStateCallback = null;
     mockCurrentAppState = 'active';
@@ -268,6 +296,10 @@ describe('AuthProvider RevenueCat startup behavior', () => {
       data: { url: 'https://oauth.example/authorize' },
       error: null,
     });
+    supabase.auth.signInWithIdToken.mockResolvedValue({
+      data: { user, session },
+      error: null,
+    });
     supabase.auth.exchangeCodeForSession.mockResolvedValue({
       data: { user, session },
       error: null,
@@ -290,6 +322,11 @@ describe('AuthProvider RevenueCat startup behavior', () => {
     openAuthSessionAsync.mockResolvedValue({
       type: 'success',
       url: 'exp://auth/callback?code=oauth-code&state=oauth-state-1',
+    });
+    mockAppleSignInAsync.mockResolvedValue({
+      identityToken: 'apple-identity-token',
+      authorizationCode: 'apple-authorization-code',
+      state: 'apple-state-1',
     });
   });
 
@@ -500,6 +537,85 @@ describe('AuthProvider RevenueCat startup behavior', () => {
         })
       );
     });
+  });
+
+  it('calls the delete-account Edge Function and clears local auth state', async () => {
+    mockGetRuntimeCapabilities.mockReturnValue({
+      platform: 'ios',
+      appOwnership: 'expo',
+      isExpoGo: true,
+      canUseNativePurchases: false,
+      canUseLocalNotifications: true,
+      canRegisterForPushNotifications: false,
+    });
+    const onAuthRender = jest.fn();
+
+    renderProvider(onAuthRender);
+
+    await waitFor(() => {
+      expect(getLastAuthRender(onAuthRender)?.user?.id).toBe(user.id);
+    });
+    mockFetch.mockClear();
+
+    const deleteAccount = getLastAuthRender(onAuthRender)?.deleteAccount;
+    await act(async () => {
+      await deleteAccount?.();
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://example.supabase.co/functions/v1/delete-account',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${session.access_token}`,
+        }),
+        body: JSON.stringify({ confirmation: 'DELETE_ACCOUNT' }),
+      }),
+    );
+    expect(supabase.auth.signOut).toHaveBeenCalled();
+    expect(getLastAuthRender(onAuthRender)).toEqual(
+      expect.objectContaining({
+        user: null,
+        session: null,
+        userProfile: null,
+      }),
+    );
+  });
+
+  it('passes a stored Apple authorization code to account deletion for revocation', async () => {
+    mockGetRuntimeCapabilities.mockReturnValue({
+      platform: 'ios',
+      appOwnership: 'expo',
+      isExpoGo: true,
+      canUseNativePurchases: false,
+      canUseLocalNotifications: true,
+      canRegisterForPushNotifications: false,
+    });
+    await secureStorage.setItem(
+      APPLE_AUTHORIZATION_CODE_STORAGE_KEY,
+      'apple-code-for-revoke',
+    );
+    const onAuthRender = jest.fn();
+
+    renderProvider(onAuthRender);
+
+    await waitFor(() => {
+      expect(getLastAuthRender(onAuthRender)?.user?.id).toBe(user.id);
+    });
+    mockFetch.mockClear();
+
+    const deleteAccount = getLastAuthRender(onAuthRender)?.deleteAccount;
+    await act(async () => {
+      await deleteAccount?.();
+    });
+
+    expect(JSON.parse(mockFetch.mock.calls[0][1].body)).toEqual({
+      confirmation: 'DELETE_ACCOUNT',
+      apple_authorization_code: 'apple-code-for-revoke',
+    });
+    await expect(
+      secureStorage.getItem(APPLE_AUTHORIZATION_CODE_STORAGE_KEY),
+    ).resolves.toBeNull();
   });
 
   it('does not repair a missing profile after a stale signed-in hydration is superseded by sign-out', async () => {
@@ -1126,6 +1242,212 @@ describe('AuthProvider RevenueCat startup behavior', () => {
         }),
       }),
     );
+  });
+
+  it('uses native Apple sign-in with nonce instead of web OAuth on iOS', async () => {
+    const originalPlatformOS = Platform.OS;
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: 'ios',
+    });
+    mockGetRuntimeCapabilities.mockReturnValue({
+      platform: 'ios',
+      appOwnership: 'expo',
+      isExpoGo: true,
+      canUseNativePurchases: false,
+      canRegisterForPushNotifications: false,
+      canUseLocalNotifications: true,
+    });
+    mockCreateOAuthState
+      .mockReturnValueOnce('apple-nonce-1')
+      .mockReturnValueOnce('apple-state-1');
+    const onAuthRender = jest.fn();
+
+    try {
+      supabase.auth.getSession.mockResolvedValueOnce({ data: { session: null } });
+
+      renderProvider(onAuthRender);
+
+      await waitFor(() => {
+        expect(getLastAuthRender(onAuthRender)?.loading).toBe(false);
+      });
+
+      const signInWithOAuth = getLastAuthRender(onAuthRender)?.signInWithOAuth;
+      await expect(signInWithOAuth?.('apple')).resolves.toBeUndefined();
+
+      expect(mockCreateAppleNonceHash).toHaveBeenCalledWith('apple-nonce-1');
+      expect(mockAppleSignInAsync).toHaveBeenCalledWith({
+        requestedScopes: ['FULL_NAME', 'EMAIL'],
+        nonce: 'hashed-apple-nonce-1',
+        state: 'apple-state-1',
+      });
+      expect(supabase.auth.signInWithIdToken).toHaveBeenCalledWith({
+        provider: 'apple',
+        token: 'apple-identity-token',
+        nonce: 'apple-nonce-1',
+      });
+      expect(supabase.auth.signInWithOAuth).not.toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'apple' }),
+      );
+    } finally {
+      Object.defineProperty(Platform, 'OS', {
+        configurable: true,
+        value: originalPlatformOS,
+      });
+    }
+  });
+
+  it('logs Apple id-token exchange failures without token material', async () => {
+    const originalPlatformOS = Platform.OS;
+    const appleError = new Error('Apple nonce mismatch');
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: 'ios',
+    });
+    mockGetRuntimeCapabilities.mockReturnValue({
+      platform: 'ios',
+      appOwnership: 'expo',
+      isExpoGo: true,
+      canUseNativePurchases: false,
+      canRegisterForPushNotifications: false,
+      canUseLocalNotifications: true,
+    });
+    mockCreateOAuthState
+      .mockReturnValueOnce('apple-nonce-2')
+      .mockReturnValueOnce('apple-state-2');
+    mockAppleSignInAsync.mockResolvedValueOnce({
+      identityToken: 'apple-identity-token-secret',
+      authorizationCode: 'apple-authorization-code-secret',
+      state: 'apple-state-2',
+    });
+    supabase.auth.signInWithIdToken.mockResolvedValueOnce({
+      data: { user: null, session: null },
+      error: appleError,
+    });
+    const onAuthRender = jest.fn();
+
+    try {
+      supabase.auth.getSession.mockResolvedValueOnce({ data: { session: null } });
+
+      renderProvider(onAuthRender);
+
+      await waitFor(() => {
+        expect(getLastAuthRender(onAuthRender)?.loading).toBe(false);
+      });
+
+      const signInWithOAuth = getLastAuthRender(onAuthRender)?.signInWithOAuth;
+      await expect(signInWithOAuth?.('apple')).rejects.toThrow(
+        'Apple nonce mismatch',
+      );
+
+      expect(mockLogOperationalError).toHaveBeenCalledWith(
+        '[OAuth] Apple signInWithIdToken failed',
+        appleError,
+        { provider: 'apple' },
+      );
+      expect(mockLogOperationalError).toHaveBeenCalledWith(
+        '[OAuth] Apple native flow failed',
+        appleError,
+        { provider: 'apple' },
+      );
+      const loggedPayload = JSON.stringify(mockLogOperationalError.mock.calls);
+      expect(loggedPayload).not.toContain('apple-identity-token-secret');
+      expect(loggedPayload).not.toContain('apple-authorization-code-secret');
+    } finally {
+      Object.defineProperty(Platform, 'OS', {
+        configurable: true,
+        value: originalPlatformOS,
+      });
+    }
+  });
+
+  it('soft-allows Apple OAuth signup when shared review-network IP rate limit is hit', async () => {
+    const originalPlatformOS = Platform.OS;
+    const originalDev = (globalThis as typeof globalThis & { __DEV__?: boolean }).__DEV__;
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: 'ios',
+    });
+    Object.defineProperty(globalThis, '__DEV__', {
+      configurable: true,
+      value: false,
+    });
+    mockGetRuntimeCapabilities.mockReturnValue({
+      platform: 'ios',
+      appOwnership: 'standalone',
+      isExpoGo: false,
+      canUseNativePurchases: true,
+      canRegisterForPushNotifications: true,
+      canUseLocalNotifications: true,
+    });
+    mockCreateOAuthState
+      .mockReturnValueOnce('apple-nonce-3')
+      .mockReturnValueOnce('apple-state-3');
+    mockAppleSignInAsync.mockResolvedValueOnce({
+      identityToken: 'apple-identity-token',
+      state: 'apple-state-3',
+    });
+    mockProfileMaybeSingle
+      .mockResolvedValueOnce({ data: null, error: null })
+      .mockResolvedValue({ data: userProfile, error: null });
+    supabase.auth.getSession.mockResolvedValue({ data: { session } });
+    supabase.auth.getSession.mockResolvedValueOnce({ data: { session: null } });
+    supabase.rpc.mockResolvedValueOnce({ data: userProfile, error: null });
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        json: jest.fn().mockResolvedValue({
+          code: 'ip_signup_rate_limited',
+          error: 'Signup limit reached',
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({ allowed: true }),
+      })
+      .mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({ success: true }),
+      });
+    const onAuthRender = jest.fn();
+
+    try {
+      renderProvider(onAuthRender);
+
+      await waitFor(() => {
+        expect(getLastAuthRender(onAuthRender)?.loading).toBe(false);
+      });
+
+      const signInWithOAuth = getLastAuthRender(onAuthRender)?.signInWithOAuth;
+      await expect(signInWithOAuth?.('apple')).resolves.toBeUndefined();
+
+      expect(mockLogOperationalError).toHaveBeenCalledWith(
+        '[OAuth] IP eligibility rate limit soft-allowed',
+        expect.objectContaining({ name: 'IpLimitError' }),
+        { provider: 'apple' },
+      );
+      expect(mockLogOperationalError).not.toHaveBeenCalledWith(
+        '[OAuth] IP eligibility blocked signup',
+        expect.anything(),
+        expect.anything(),
+      );
+      expect(supabase.rpc).toHaveBeenCalledWith(
+        'repair_missing_user_profile',
+        expect.any(Object),
+      );
+    } finally {
+      Object.defineProperty(Platform, 'OS', {
+        configurable: true,
+        value: originalPlatformOS,
+      });
+      Object.defineProperty(globalThis, '__DEV__', {
+        configurable: true,
+        value: originalDev,
+      });
+    }
   });
 
   it('treats a dismissed OAuth browser session as a clean cancellation', async () => {

@@ -1751,7 +1751,7 @@ export const EN_TRANSLATIONS = {
     general_error: 'An error has occurred',
   },
   scanner: {
-    authorize_camera: 'Authorize Camera',
+    authorize_camera: 'Next',
     camera_permission_msg: 'We need access to your camera to scan.',
     camera_permission_detail:
       'Face, body, and food photos are used to run health analysis inside the app.',
@@ -1786,8 +1786,8 @@ export const EN_TRANSLATIONS = {
       'Take a photo of your foods. The image is only sent when you confirm the analysis.',
     permission_denied_title: 'Camera access is still blocked',
     permission_denied_body:
-      'Allow camera access to launch Chef. You can also review the privacy policy first.',
-    permission_cta: 'Allow camera',
+      'Camera access is required to launch Chef. You can also review the privacy policy first.',
+    permission_cta: 'Next',
     camera_unavailable_title: 'Camera unavailable',
     camera_unavailable_body:
       'The Chef camera could not start right now. Retry or go back to Home.',

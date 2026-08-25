@@ -12,6 +12,7 @@ const mockStartMutateAsync = jest.fn();
 const mockArchiveMutateAsync = jest.fn();
 const mockSetQueryData = jest.fn();
 const mockInvalidateQueries = jest.fn();
+const mockPresentRewardedAdGate = jest.fn();
 
 jest.mock('@tanstack/react-query', () => ({
   useMutation: () => ({ mutateAsync: jest.fn(), isPending: false }),
@@ -23,6 +24,14 @@ jest.mock('@tanstack/react-query', () => ({
 
 jest.mock('@/hooks/queries/useCoachConversationQuota', () => ({
   useCoachConversationQuota: () => mockUseCoachConversationQuota(),
+}));
+jest.mock('@/contexts/AdsContext', () => ({
+  useAdsGate: () => ({
+    isReady: true,
+    presentRewardedAdGate: (...args: unknown[]) =>
+      mockPresentRewardedAdGate(...args),
+  }),
+  AdsProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 jest.mock('@/hooks/queries/useCoachConversation', () => ({
   useCoachConversation: (...args: unknown[]) => mockUseCoachConversation(...args),
@@ -150,6 +159,7 @@ describe('CoachChatScreen — rolling free quota', () => {
       items: [],
       dataUpdatedAt: Date.now(),
     });
+    mockPresentRewardedAdGate.mockResolvedValue('rewarded');
   });
 
   it('lets a free user with credits enter the chat with the composer enabled', () => {
@@ -427,6 +437,139 @@ describe('CoachChatScreen — rolling free quota', () => {
         expect.anything(),
         newQuota,
       );
+    });
+  });
+
+  describe('rewarded ad gate for conversation starts', () => {
+    it('gates the first message when it starts a new conversation', async () => {
+      mockUseCoachConversationQuota.mockReturnValue({
+        data: makeQuota({ free_remaining_messages: 4 }),
+        isPending: false,
+      });
+      mockStartMutateAsync.mockResolvedValueOnce({
+        conversation_id: 'new-chat-conv',
+      });
+      mockSendMutateAsync.mockResolvedValueOnce(undefined);
+
+      render(<CoachChatScreen />);
+
+      fireEvent.changeText(
+        screen.getByTestId('coach-chat-composer-input'),
+        'Premier message',
+      );
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('coach-chat-composer-send-button'));
+      });
+
+      await waitFor(() => {
+        expect(mockPresentRewardedAdGate).toHaveBeenCalledWith('coach');
+        expect(mockStartMutateAsync).toHaveBeenCalledWith({
+          personaKey: 'gentle_supportive',
+        });
+        expect(mockSendMutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({
+            conversationId: 'new-chat-conv',
+            content: 'Premier message',
+          }),
+        );
+      });
+    });
+
+    it('cancels the first message when the rewarded gate is declined', async () => {
+      mockUseCoachConversationQuota.mockReturnValue({
+        data: makeQuota({ free_remaining_messages: 4 }),
+        isPending: false,
+      });
+      mockPresentRewardedAdGate.mockResolvedValueOnce('skipped');
+
+      render(<CoachChatScreen />);
+
+      const input = screen.getByTestId('coach-chat-composer-input');
+      fireEvent.changeText(input, 'Je veux commencer');
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('coach-chat-composer-send-button'));
+      });
+
+      await waitFor(() => {
+        expect(mockPresentRewardedAdGate).toHaveBeenCalledWith('coach');
+      });
+      expect(mockStartMutateAsync).not.toHaveBeenCalled();
+      expect(mockSendMutateAsync).not.toHaveBeenCalled();
+      expect(screen.getByTestId('coach-chat-composer-input').props.value).toBe(
+        'Je veux commencer',
+      );
+    });
+
+    it('fails open when the rewarded gate is unavailable for a new conversation', async () => {
+      mockUseCoachConversationQuota.mockReturnValue({
+        data: makeQuota({ free_remaining_messages: 4 }),
+        isPending: false,
+      });
+      mockPresentRewardedAdGate.mockResolvedValueOnce('unavailable');
+      mockStartMutateAsync.mockResolvedValueOnce({
+        conversation_id: 'new-chat-fail-open',
+      });
+      mockSendMutateAsync.mockResolvedValueOnce(undefined);
+
+      render(<CoachChatScreen />);
+
+      fireEvent.changeText(
+        screen.getByTestId('coach-chat-composer-input'),
+        'Même si la pub manque',
+      );
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('coach-chat-composer-send-button'));
+      });
+
+      await waitFor(() => {
+        expect(mockStartMutateAsync).toHaveBeenCalledWith({
+          personaKey: 'gentle_supportive',
+        });
+        expect(mockSendMutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({
+            conversationId: 'new-chat-fail-open',
+            content: 'Même si la pub manque',
+          }),
+        );
+      });
+    });
+
+    it('does not gate messages in an existing conversation', async () => {
+      mockSearchParams = { id: 'resume-conv-id' };
+      mockUseCoachConversationQuota.mockReturnValue({
+        data: makeQuota({ free_remaining_messages: 4 }),
+        isPending: false,
+      });
+      mockUseCoachConversation.mockReturnValue({
+        data: {
+          id: 'resume-conv-id',
+          persona_key: 'gentle_supportive',
+          status: 'active',
+        },
+        isPending: false,
+      });
+      mockSendMutateAsync.mockResolvedValueOnce(undefined);
+
+      render(<CoachChatScreen />);
+
+      fireEvent.changeText(
+        screen.getByTestId('coach-chat-composer-input'),
+        'Suite du thread',
+      );
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('coach-chat-composer-send-button'));
+      });
+
+      await waitFor(() => {
+        expect(mockSendMutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({
+            conversationId: 'resume-conv-id',
+            content: 'Suite du thread',
+          }),
+        );
+      });
+      expect(mockPresentRewardedAdGate).not.toHaveBeenCalled();
+      expect(mockStartMutateAsync).not.toHaveBeenCalled();
     });
   });
 

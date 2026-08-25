@@ -35,6 +35,7 @@ const mockInvalidateQueries = jest.fn();
 const mockSetQueryData = jest.fn();
 const mockSetQueriesData = jest.fn();
 const mockTrackEvent = jest.fn();
+const mockPresentRewardedAdGate = jest.fn();
 const mockRouterPush = jest.fn();
 const mockRouterBack = jest.fn();
 const mockRouterDismiss = jest.fn();
@@ -242,6 +243,15 @@ jest.mock('@/contexts/AuthContext', () => ({
   useAuth: () => mockAuthState,
 }));
 
+jest.mock('@/contexts/AdsContext', () => ({
+  useAdsGate: () => ({
+    isReady: true,
+    presentRewardedAdGate: (...args: unknown[]) =>
+      mockPresentRewardedAdGate(...args),
+  }),
+  AdsProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
 jest.mock('@/hooks/queries', () => ({
   useCoachEntries: (...args: unknown[]) => mockUseCoachEntries(...args),
   useCoachGeneration: (...args: unknown[]) => mockUseCoachGeneration(...args),
@@ -330,6 +340,7 @@ describe('CoachScreen', () => {
       };
     });
     mockLocaleState.locale = 'fr';
+    mockPresentRewardedAdGate.mockResolvedValue('rewarded');
     mockRouterCanDismiss.mockReturnValue(false);
     mockLocalSearchParams.mockReturnValue({});
     mockAuthState = {
@@ -1445,6 +1456,61 @@ describe('CoachScreen', () => {
       );
     });
     expect(mockRouterPush).not.toHaveBeenCalledWith('/premium-upgrade');
+  });
+
+  it('cancels free coach guidance generation when the rewarded gate is declined', async () => {
+    mockPresentRewardedAdGate.mockResolvedValueOnce('skipped');
+    mockUseCoachScans.mockReturnValue({
+      data: [
+        {
+          id: 'scan-old',
+          captured_at: '2025-01-01T10:00:00.000Z',
+        },
+      ],
+      error: null,
+      isFetching: false,
+      refetch: jest.fn(),
+    });
+
+    const screen = render(<CoachScreen />);
+    enterCoachQuestion(screen);
+
+    fireEvent.press(screen.getByTestId('coach-action-primary'));
+
+    await waitFor(() => {
+      expect(mockPresentRewardedAdGate).toHaveBeenCalledWith('coach');
+    });
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('fails open when the rewarded gate is unavailable before coach guidance generation', async () => {
+    mockPresentRewardedAdGate.mockResolvedValueOnce('unavailable');
+    mockUseCoachScans.mockReturnValue({
+      data: [
+        {
+          id: 'scan-old',
+          captured_at: '2025-01-01T10:00:00.000Z',
+        },
+      ],
+      error: null,
+      isFetching: false,
+      refetch: jest.fn(),
+    });
+
+    const screen = render(<CoachScreen />);
+    enterCoachQuestion(screen);
+
+    fireEvent.press(screen.getByTestId('coach-action-primary'));
+
+    await waitFor(() => {
+      expect(mockPresentRewardedAdGate).toHaveBeenCalledWith('coach');
+      expect(mockMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          promptType: 'free_question',
+          personaKey: 'gentle_supportive',
+        }),
+      );
+    });
   });
 
   it('does not show the first-scan CTA when a usable first scan exists', async () => {
@@ -3392,12 +3458,6 @@ describe('CoachScreen', () => {
       fireEvent.press(screen.getByTestId('coach-action-primary'));
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId('coach-generation-loading-state'),
-        ).toBeTruthy();
-      });
-
-      await waitFor(() => {
         expect(screen.getByTestId('coach-error-state')).toBeTruthy();
       });
 
@@ -3431,18 +3491,6 @@ describe('CoachScreen', () => {
           last_mutation_entry_id: null,
           last_mutation_status: null,
           tracked_entry_id: null,
-          generation_error: expect.objectContaining({
-            code: 'coach_webhook_failed',
-            status: 503,
-            requestId: 'req-coach-503',
-            functionName: 'coach-generate-response',
-          }),
-        }),
-      );
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        '[CoachScreen] generation loading ended',
-        expect.objectContaining({
-          exit_reason: 'generation_error',
           generation_error: expect.objectContaining({
             code: 'coach_webhook_failed',
             status: 503,

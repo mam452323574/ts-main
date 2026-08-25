@@ -1523,7 +1523,7 @@ export const DE_TRANSLATIONS = {
     general_error: 'Es ist ein Fehler aufgetreten',
   },
   scanner: {
-    authorize_camera: 'Kamera zulassen',
+    authorize_camera: 'Weiter',
     camera_permission_msg: 'Wir benötigen Zugriff auf Ihre Kamera, um zu scannen.',
     camera_permission_detail: 'Gesichts-, Koerper- und Essensfotos werden verwendet, um eine Gesundheitsanalyse in der App auszufuehren.',
     camera_permission_backend: 'Bilder werden sicher an unser Backend uebertragen und von unserer Analyse-Infrastruktur verarbeitet. Sie koennen die Datenschutzerklaerung vor der Freigabe lesen.',
@@ -1553,7 +1553,7 @@ export const DE_TRANSLATIONS = {
     permission_body: 'Mach ein Foto von deinen Lebensmitteln. Das Bild wird erst gesendet, wenn du die Analyse bestaetigst.',
     permission_denied_title: 'Kamerazugriff ist noch blockiert',
     permission_denied_body: 'Erlaube den Kamerazugriff, um Chef zu starten. Du kannst vorher auch die Datenschutzrichtlinie ansehen.',
-    permission_cta: 'Kamera erlauben',
+    permission_cta: 'Weiter',
     camera_unavailable_title: 'Kamera nicht verfuegbar',
     camera_unavailable_body: 'Die Kamera fuer Chef konnte gerade nicht starten. Versuch es erneut oder geh zur Startseite zurueck.',
     feedback_title: 'Waehle deinen Chef',

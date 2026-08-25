@@ -9,6 +9,7 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -31,7 +32,6 @@ import {
   BORDER_RADIUS,
   FONT_WEIGHTS,
   SHADOWS,
-  mixColors,
   withAlpha,
 } from '@/constants/theme';
 import { buildPremiumHealthPalette, type PremiumHealthPalette } from '@/constants/premiumHealth';
@@ -366,6 +366,15 @@ export default function PremiumUpgradeScreen() {
     () => packages.find((pack) => pack.packageType === 'MONTHLY') ?? null,
     [packages],
   );
+  const selectedPackage = useMemo(() => {
+    if (highlightedPackageId) {
+      return sortedPackages.find((pack) => pack.identifier === highlightedPackageId) ??
+        sortedPackages[0] ??
+        null;
+    }
+
+    return sortedPackages[0] ?? null;
+  }, [highlightedPackageId, sortedPackages]);
   const buildSubscriptionAnalyticsProps = useCallback(
     (pack?: PurchasesPackage | null) => ({
       offering_id:
@@ -569,15 +578,6 @@ export default function PremiumUpgradeScreen() {
   const isPremium = hasPremiumAccessFromProfile(userProfile);
 
   // ─── Feature lists ───
-  const freeFeatures: FeatureItem[] = [
-    { label: t('premium.subscription_page.free_feat_face'), included: true },
-    { label: t('premium.subscription_page.free_feat_body'), included: true },
-    { label: t('premium.subscription_page.free_feat_nutrition'), included: true },
-    { label: t('premium.subscription_page.free_feat_partial'), included: true },
-    { label: t('premium.subscription_page.free_feat_no_super'), included: false },
-    { label: t('premium.subscription_page.free_feat_no_history'), included: false },
-  ];
-
   const premiumFeatures: FeatureItem[] = [
     {
       label: t('premium.subscription_page.prem_feat_coach_quota'),
@@ -631,6 +631,31 @@ export default function PremiumUpgradeScreen() {
     );
   }, [showAlert, t]);
 
+  const purchaseDisabled =
+    restoring ||
+    loadingPackages ||
+    !isNativePurchasesAvailable ||
+    purchasingPackageId !== null ||
+    !selectedPackage;
+  const primaryCtaLabel =
+    activeEntryOfferPackage
+      ? t('premium.subscription_page.entry_offer_cta')
+      : t('premium.subscription_page.cta_generic');
+  const heroBadgeLabel =
+    activeEntryOfferPackage?.badge ??
+    (selectedPackage?.packageType === 'ANNUAL'
+      ? t('premium.subscription_page.annual_badge')
+      : t('premium.subscription_page.premium_title'));
+  const heroSubtitle =
+    activeEntryOfferPackage?.introLabel ??
+    activeEntryOfferPackage?.subheadline ??
+    t('premium.subscription_page.hero_subtitle');
+  const proofTiles = [
+    premiumFeatures[0],
+    premiumFeatures[2],
+    premiumFeatures[3],
+  ].filter(Boolean);
+
   // ─── Already premium view ───
   if (isPremium) {
     let formattedDate = '';
@@ -648,46 +673,69 @@ export default function PremiumUpgradeScreen() {
     }
 
     return (
-      <View style={styles.container}>
-        {alertElement}
+      <AppScreen topInset={false} bottomInset={false} style={styles.container}>
+        <LinearGradient colors={premiumHealth.paywall.screenGradient} style={styles.screenGradient}>
+          {alertElement}
+          <ModalHandle />
+          <ScreenHeader
+            title={t('premium.title')}
+            onClose={dismissToOrigin}
+            centered
+            testID="premium-screen-header"
+          />
+
           <View style={styles.alreadyPremiumContainer}>
-          <Squircle style={styles.premiumBadge}>
-            <Crown color={colors.gold} size={64} fill={withAlpha(colors.gold, 0.2)} />
-          </Squircle>
-          <Text style={styles.alreadyPremiumTitle}>{t('premium.already_premium_title')}</Text>
-          <Text style={[styles.alreadyPremiumText, { color: colors.primaryText, fontWeight: 'bold' }]}>
-            {t('premium.already_premium_active')}
-          </Text>
-          {formattedDate ? (
-            <Text style={styles.alreadyPremiumText}>
-              {t('premium.renewal_date').replace('%{date}', formattedDate)}
-            </Text>
-          ) : (
-            <Text style={styles.alreadyPremiumText}>
-              {t('premium.already_premium_desc')}
-            </Text>
-          )}
+            <Squircle style={styles.alreadyPremiumCard}>
+              <LinearGradient
+                colors={premiumHealth.paywall.heroGradient}
+                style={styles.alreadyPremiumSurface}
+              >
+                <Squircle style={styles.premiumBadge}>
+                  <Crown color={colors.gold} size={54} fill={withAlpha(colors.gold, 0.2)} />
+                </Squircle>
+                <Text style={styles.alreadyPremiumTitle}>
+                  {t('premium.already_premium_title')}
+                </Text>
+                <Text style={styles.alreadyPremiumText}>
+                  {t('premium.already_premium_active')}
+                </Text>
+                {formattedDate ? (
+                  <Text style={styles.alreadyPremiumText}>
+                    {t('premium.renewal_date').replace('%{date}', formattedDate)}
+                  </Text>
+                ) : (
+                  <Text style={styles.alreadyPremiumText}>
+                    {t('premium.already_premium_desc')}
+                  </Text>
+                )}
 
-          <TouchableOpacity
-            style={[styles.ctaButton, { backgroundColor: colors.primaryText, width: '100%', maxWidth: 300, marginBottom: SPACING.md }]}
-            onPress={handleManageSubscription}
-          >
-            <Text style={styles.ctaButtonText}>{t('premium.manage_subscription')}</Text>
-          </TouchableOpacity>
+                <View style={styles.alreadyPremiumActions}>
+                  <TouchableOpacity
+                    style={styles.primaryCtaButton}
+                    onPress={handleManageSubscription}
+                  >
+                    <Text style={styles.primaryCtaText}>
+                      {t('premium.manage_subscription')}
+                    </Text>
+                  </TouchableOpacity>
 
-          <TouchableOpacity style={{ padding: SPACING.md }} onPress={dismissToOrigin}>
-            <Text style={[styles.ctaButtonText, { color: colors.gray }]}>{t('common.back')}</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+                  <TouchableOpacity style={styles.secondaryButton} onPress={dismissToOrigin}>
+                    <Text style={styles.secondaryButtonText}>{t('common.back')}</Text>
+                  </TouchableOpacity>
+                </View>
+              </LinearGradient>
+            </Squircle>
+          </View>
+        </LinearGradient>
+      </AppScreen>
     );
   }
 
-  // ─── Render a feature row ───
-  const renderFeatureRow = (item: FeatureItem, index: number, isHighlighted: boolean) => {
+  // ─── Render helpers ───
+  const renderFeatureRow = (item: FeatureItem, index: number) => {
     const Icon = item.icon;
     const iconColor = item.included
-      ? (isHighlighted ? colors.gold : colors.success)
+      ? premiumHealth.trustAccent
       : colors.error;
 
     return (
@@ -697,8 +745,11 @@ export default function PremiumUpgradeScreen() {
             styles.featureIcon,
             {
               backgroundColor: item.included
-                ? (isHighlighted ? withAlpha(colors.gold, 0.14) : withAlpha(colors.success, 0.14))
+                ? premiumHealth.paywall.benefitIconBackground
                 : withAlpha(colors.error, 0.12),
+              borderColor: item.included
+                ? premiumHealth.paywall.benefitIconBorder
+                : withAlpha(colors.error, 0.16),
             },
           ]}
         >
@@ -725,258 +776,265 @@ export default function PremiumUpgradeScreen() {
     );
   };
 
-  const renderPackageCard = (pack: PurchasesPackage) => {
-    const isHighlighted = highlightedPackageId === pack.identifier;
+  const renderProofTile = (item: FeatureItem, index: number) => {
+    const Icon = item.icon ?? Check;
+
+    return (
+      <Squircle key={`${item.label}-${index}`} style={styles.proofTile}>
+        <Squircle style={styles.proofIcon}>
+          <Icon color={premiumHealth.trustAccent} size={16} strokeWidth={2.4} />
+        </Squircle>
+        <Text numberOfLines={2} style={styles.proofTileText}>
+          {item.label}
+        </Text>
+      </Squircle>
+    );
+  };
+
+  const renderPlanOption = (pack: PurchasesPackage) => {
+    const isSelected = selectedPackage?.identifier === pack.identifier;
     const isAnnual = pack.packageType === 'ANNUAL';
     const comparedPrice = isAnnual ? buildComparedPrice(monthlyPackage, pack, locale) : null;
     const badge =
-      isHighlighted && activeEntryOfferPackage
+      isSelected && activeEntryOfferPackage
         ? activeEntryOfferPackage.badge ?? t('premium.subscription_page.entry_offer_badge')
         : isAnnual && comparedPrice
           ? t('premium.subscription_page.annual_badge')
           : null;
     const packageSubtitle =
-      isHighlighted && activeEntryOfferPackage
+      isSelected && activeEntryOfferPackage
         ? activeEntryOfferPackage.introLabel ??
           activeEntryOfferPackage.billingLabel ??
           activeEntryOfferPackage.subheadline
         : buildBillingSubtitle(pack, locale, t);
-    const ctaLabel =
-      isHighlighted && activeEntryOfferPackage
-        ? t('premium.subscription_page.entry_offer_cta')
-        : t('premium.subscription_page.cta_generic');
     const packageTestIdSuffix = resolvePackageTestIdSuffix(pack);
-    const purchaseDisabled =
-      restoring ||
-      loadingPackages ||
-      !isNativePurchasesAvailable ||
-      purchasingPackageId !== null;
 
     return (
-      <Squircle
+      <View
         key={pack.identifier}
-        style={[
-          styles.cardShell,
-          isHighlighted ? styles.cardShellSelected : styles.cardShellMonthly,
-        ]}
+        style={styles.planOptionShell}
         testID={`premium-card-${packageTestIdSuffix}-shell`}
       >
-        {badge ? (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{badge}</Text>
-          </View>
-        ) : null}
-
-        <Squircle
-          style={[
-            styles.cardSurface,
-            isHighlighted ? styles.cardSurfaceSelected : styles.cardSurfaceMonthly,
-          ]}
-          testID={`premium-card-${packageTestIdSuffix}-surface`}
+        <TouchableOpacity
+          activeOpacity={0.86}
+          disabled={purchasingPackageId !== null}
+          onPress={() => setHighlightedPackageId(pack.identifier)}
+          testID={`premium-plan-option-${packageTestIdSuffix}`}
         >
-          <View style={[styles.cardHeader, badge ? { marginTop: SPACING.lg } : null]}>
-            <Text style={[styles.cardTitle, { color: colors.primaryText }]}>
-              {resolvePackageTitle(pack, t)}
-            </Text>
-            <Text style={[styles.cardPrice, { color: isHighlighted ? colors.gold : colors.primaryText }]}>
-              {pack.product.priceString}
-            </Text>
-            {packageSubtitle ? (
-              <Text style={[styles.cardSubPrice, { color: colors.gray }]}>
-                {packageSubtitle}
-              </Text>
-            ) : null}
-            {comparedPrice ? (
-              <Text
-                style={[styles.crossedPrice, { color: colors.error }]}
-                testID={`premium-card-${packageTestIdSuffix}-compared-price`}
-              >
-                {comparedPrice}
-              </Text>
-            ) : null}
-          </View>
-
-          <View style={styles.cardDivider} />
-
-          <View style={styles.featuresList} testID="premium-card-features-list">
-            {premiumFeatures.map((feature, index) =>
-              renderFeatureRow(feature, index, isHighlighted),
-            )}
-          </View>
-
-          <TouchableOpacity
+          <Squircle
             style={[
-              styles.ctaButton,
-              {
-                backgroundColor: colors.primaryText,
-                opacity: purchaseDisabled ? 0.7 : 1,
-              },
+              styles.planOptionSurface,
+              isSelected ? styles.planOptionSurfaceSelected : null,
             ]}
-            onPress={() => {
-              void handlePurchase(pack);
-            }}
-            disabled={purchaseDisabled}
-            testID={`premium-card-${packageTestIdSuffix}-cta`}
+            testID={`premium-card-${packageTestIdSuffix}-surface`}
           >
-            {purchasingPackageId === pack.identifier ? (
-              <ActivityIndicator color={colors.background} />
-            ) : (
-              <Text style={styles.ctaButtonText}>{ctaLabel}</Text>
-            )}
-          </TouchableOpacity>
-        </Squircle>
-      </Squircle>
+            <View style={styles.planOptionMain}>
+              <View style={styles.planTitleRow}>
+                <Text style={styles.planTitle}>{resolvePackageTitle(pack, t)}</Text>
+                {badge ? (
+                  <Squircle style={styles.planBadge}>
+                    <Text style={styles.planBadgeText}>{badge}</Text>
+                  </Squircle>
+                ) : null}
+              </View>
+              {packageSubtitle ? (
+                <Text style={styles.planSubtitle}>{packageSubtitle}</Text>
+              ) : null}
+              {comparedPrice ? (
+                <Text
+                  style={styles.crossedPrice}
+                  testID={`premium-card-${packageTestIdSuffix}-compared-price`}
+                >
+                  {comparedPrice}
+                </Text>
+              ) : null}
+            </View>
+
+            <View style={styles.planPriceCluster}>
+              <Text style={styles.planPrice}>{pack.product.priceString}</Text>
+              <Squircle
+                style={[
+                  styles.planSelectionMark,
+                  isSelected ? null : styles.planSelectionMarkIdle,
+                ]}
+              >
+                {isSelected ? (
+                  <Check
+                    color={premiumHealth.paywall.selectionText}
+                    size={14}
+                    strokeWidth={3}
+                  />
+                ) : null}
+              </Squircle>
+            </View>
+          </Squircle>
+        </TouchableOpacity>
+      </View>
     );
   };
 
   // ─── Main render ───
   return (
-    <AppScreen topInset={false} bottomInset={false} style={[styles.container, { backgroundColor: colors.background }]}>
-      {alertElement}
-      <ModalHandle />
+    <AppScreen topInset={false} bottomInset={false} style={styles.container}>
+      <LinearGradient colors={premiumHealth.paywall.screenGradient} style={styles.screenGradient}>
+        {alertElement}
+        <ModalHandle />
 
-      <ScreenHeader
-        title={t('premium.title')}
-        onClose={dismissToOrigin}
-        centered
-        testID="premium-screen-header"
-      />
+        <ScreenHeader
+          title={t('premium.title')}
+          onClose={dismissToOrigin}
+          centered
+          testID="premium-screen-header"
+        />
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.content}>
-          {/* ─── Hero section ─── */}
-          <Squircle style={styles.heroShell}>
-            <View style={styles.heroSection}>
-              <Squircle style={styles.heroCrownContainer}>
-                <Crown color={colors.gold} size={26} />
-              </Squircle>
-              <Text style={[styles.heroTitle, { color: colors.primaryText }]}>
-                {t('premium.subscription_page.hero_title')}
-              </Text>
-              <Text style={[styles.heroSubtitle, { color: colors.gray }]}>
-                {activeEntryOfferPackage?.introLabel ??
-                  activeEntryOfferPackage?.subheadline ??
-                  t('premium.subscription_page.hero_subtitle')}
-              </Text>
-            </View>
-          </Squircle>
-
-          <Squircle style={styles.contextCard}>
-            <Squircle style={styles.contextIconWrap}>
-              <ChartNoAxesCombined color={colors.primary} size={18} />
-            </Squircle>
-            <View style={styles.contextCopy}>
-              <Text style={styles.contextTitle}>
-                {t('premium.subscription_page.contextual_analytics_title')}
-              </Text>
-              <Text style={styles.contextBody}>
-                {t('premium.subscription_page.contextual_analytics_body')}
-              </Text>
-            </View>
-          </Squircle>
-
-          {/* ─── Cards horizontal scroll ─── */}
-          <View style={styles.cardsContainer} testID="premium-cards-scroll">
-            {loadingPackages ? (
-              <Squircle style={[styles.cardShell, styles.cardShellMonthly]}>
-                <Squircle style={[styles.cardSurface, styles.cardSurfaceMonthly, styles.loadingCard]}>
-                  <ActivityIndicator color={colors.primary} />
-                </Squircle>
-              </Squircle>
-            ) : sortedPackages.length > 0 ? (
-              sortedPackages.map(renderPackageCard)
-            ) : (
-              <Squircle style={[styles.cardShell, styles.cardShellMonthly]}>
-                <Squircle style={[styles.cardSurface, styles.cardSurfaceMonthly, styles.emptyCard]}>
-                  <Text style={[styles.emptyCardTitle, { color: colors.primaryText }]}>
-                    {t('premium.subscription_page.packages_unavailable')}
-                  </Text>
-                  {!isNativePurchasesAvailable ? (
-                    <Text style={[styles.emptyCardBody, { color: colors.gray }]}>
-                      {Platform.OS === 'web'
-                        ? t('premium.web_disclaimer')
-                        : t('premium.native_unavailable')}
-                    </Text>
-                  ) : null}
-                </Squircle>
-              </Squircle>
-            )}
-
-            <Squircle style={[styles.cardShell, styles.cardShellFree]} testID="premium-card-free-shell">
-              <Squircle style={[styles.cardSurface, styles.cardSurfaceFree]} testID="premium-card-free-surface">
-                <View style={styles.cardHeader}>
-                  <Text style={[styles.cardTitle, { color: colors.gray }]}>
-                    {t('premium.subscription_page.free_title')}
-                  </Text>
-                  <Text style={[styles.cardPrice, { color: colors.gray }]}>
-                    {t('premium.subscription_page.free_price')}
-                  </Text>
-                </View>
-
-                <View style={styles.cardDivider} />
-
-                <View style={styles.featuresList} testID="premium-card-features-list">
-                  {freeFeatures.map((f, i) => renderFeatureRow(f, i, false))}
-                </View>
-              </Squircle>
-            </Squircle>
-          </View>
-
-          {/* ─── Bottom section ─── */}
-          <Squircle style={styles.bottomSection}>
-            {/* Restore purchases */}
-            {Platform.OS !== 'web' && (
-              <TouchableOpacity
-                style={styles.restoreButton}
-                onPress={() => {
-                  void handleRestorePurchases();
-                }}
-                disabled={purchasingPackageId !== null || restoring}
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.content}>
+            <Squircle style={styles.heroShell}>
+              <LinearGradient
+                colors={premiumHealth.paywall.heroGradient}
+                style={styles.heroSection}
               >
-                <RefreshCw color={colors.primary} size={16} />
-                <Text style={[styles.restoreButtonText, { color: colors.primary }]}>
-                  {restoring ? t('premium.restoring') : t('premium.restore_btn')}
-                </Text>
-              </TouchableOpacity>
-            )}
+                <View style={styles.heroTopRow}>
+                  <Squircle style={styles.heroCrownContainer}>
+                    <Crown color={colors.gold} size={24} />
+                  </Squircle>
+                  <Squircle style={styles.heroBadge}>
+                    <Text style={styles.heroBadgeText}>{heroBadgeLabel}</Text>
+                  </Squircle>
+                </View>
 
-            {/* Legal text */}
-            <Text style={[styles.legalText, { color: colors.gray }]}>
-              {t('premium.subscription_page.legal')}
-            </Text>
+                <Text style={styles.heroTitle}>
+                  {t('premium.subscription_page.hero_title')}
+                </Text>
+                <Text style={styles.heroSubtitle}>{heroSubtitle}</Text>
 
-            {/* Links */}
-            <View style={styles.linksRow}>
-              <TouchableOpacity onPress={() => router.push('/privacy-policy')}>
-                <Text style={[styles.linkText, { color: colors.primary }]}>
-                  {t('premium.subscription_page.privacy_link')}
+                <View style={styles.proofGrid}>
+                  {proofTiles.map(renderProofTile)}
+                </View>
+              </LinearGradient>
+            </Squircle>
+
+            <Squircle style={styles.benefitsPanel}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionEyebrow}>
+                  {t('premium.subscription_page.contextual_analytics_title')}
                 </Text>
-              </TouchableOpacity>
-              <Text style={[styles.linkSeparator, { color: colors.gray }]}>•</Text>
-              <TouchableOpacity onPress={() => router.push('/privacy-policy')}>
-                <Text style={[styles.linkText, { color: colors.primary }]}>
-                  {t('premium.subscription_page.terms_link')}
+                <Text style={styles.sectionBody}>
+                  {t('premium.subscription_page.contextual_analytics_body')}
                 </Text>
-              </TouchableOpacity>
+              </View>
+
+              <View style={styles.featuresList} testID="premium-card-features-list">
+                {premiumFeatures.map(renderFeatureRow)}
+              </View>
+            </Squircle>
+
+            <Squircle style={styles.planPanel} testID="premium-cards-scroll">
+              <View style={styles.planPanelHeader}>
+                <Text style={styles.planPanelTitle}>
+                  {t('premium.subscription_page.premium_title')}
+                </Text>
+                <Text style={styles.planPanelSubtitle}>
+                  {t('premium.subscription_page.legal')}
+                </Text>
+              </View>
+
+              <View style={styles.planOptions}>
+                {loadingPackages ? (
+                  <Squircle style={styles.loadingCard}>
+                    <ActivityIndicator color={premiumHealth.trustAccent} />
+                  </Squircle>
+                ) : sortedPackages.length > 0 ? (
+                  sortedPackages.map(renderPlanOption)
+                ) : (
+                  <Squircle style={styles.emptyCard}>
+                    <Text style={styles.emptyCardTitle}>
+                      {t('premium.subscription_page.packages_unavailable')}
+                    </Text>
+                    {!isNativePurchasesAvailable ? (
+                      <Text style={styles.emptyCardBody}>
+                        {Platform.OS === 'web'
+                          ? t('premium.web_disclaimer')
+                          : t('premium.native_unavailable')}
+                      </Text>
+                    ) : null}
+                  </Squircle>
+                )}
+              </View>
+
+              {selectedPackage ? (
+                <TouchableOpacity
+                  style={[
+                    styles.primaryCtaButton,
+                    purchaseDisabled ? styles.disabledAction : null,
+                  ]}
+                  onPress={() => {
+                    void handlePurchase(selectedPackage);
+                  }}
+                  disabled={purchaseDisabled}
+                  testID="premium-primary-cta"
+                >
+                  {purchasingPackageId === selectedPackage.identifier ? (
+                    <ActivityIndicator color={premiumHealth.paywall.ctaText} />
+                  ) : (
+                    <Text style={styles.primaryCtaText}>{primaryCtaLabel}</Text>
+                  )}
+                </TouchableOpacity>
+              ) : null}
+            </Squircle>
+
+            <View style={styles.footerSection}>
+              {Platform.OS !== 'web' && (
+                <TouchableOpacity
+                  style={styles.restoreButton}
+                  onPress={() => {
+                    void handleRestorePurchases();
+                  }}
+                  disabled={purchasingPackageId !== null || restoring}
+                >
+                  <RefreshCw color={premiumHealth.trustAccent} size={16} />
+                  <Text style={styles.restoreButtonText}>
+                    {restoring ? t('premium.restoring') : t('premium.restore_btn')}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              <Text style={styles.legalText}>
+                {t('premium.subscription_page.legal')}
+              </Text>
+
+              <View style={styles.linksRow}>
+                <TouchableOpacity onPress={() => router.push('/privacy-policy')}>
+                  <Text style={styles.linkText}>
+                    {t('premium.subscription_page.privacy_link')}
+                  </Text>
+                </TouchableOpacity>
+                <Text style={styles.linkSeparator}>•</Text>
+                <TouchableOpacity onPress={() => router.push('/terms-of-use')}>
+                  <Text style={styles.linkText}>
+                    {t('premium.subscription_page.terms_link')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {Platform.OS !== 'web' ? (
+                <Text style={styles.storeNote}>
+                  {t('premium.store_note', {
+                    store: Platform.OS === 'android' ? 'Google Play' : 'App Store',
+                  })}
+                </Text>
+              ) : (
+                <Text style={styles.storeNote}>
+                  {t('premium.web_note')}
+                </Text>
+              )}
             </View>
-
-            {/* Store note */}
-            {Platform.OS !== 'web' ? (
-              <Text style={[styles.storeNote, { color: colors.gray }]}>
-                {t('premium.store_note', { store: Platform.OS === 'android' ? 'Google Play' : 'App Store' })}
-              </Text>
-            ) : (
-              <Text style={[styles.storeNote, { color: colors.gray }]}>
-                {t('premium.web_note')}
-              </Text>
-            )}
-          </Squircle>
-
-        </View>
-      </ScrollView>
+          </View>
+        </ScrollView>
+      </LinearGradient>
     </AppScreen>
   );
 }
@@ -991,369 +1049,486 @@ const createStyles = (
   isDark: boolean,
   premiumHealth: PremiumHealthPalette,
 ) => {
+  const paywall = premiumHealth.paywall;
+
   return StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: premiumHealth.canvas,
-  },
-
-  // ─── Header ───
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.page || 20,
-    paddingVertical: SPACING.md,
-    paddingTop: insets.top + SPACING.sm,
-    backgroundColor: isDark ? withAlpha(colors.background, 0.94) : colors.cardBackground,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSubtle ?? withAlpha(colors.primaryText, 0.08),
-  },
-  headerTitle: {
-    fontSize: SIZES.lg,
-    fontWeight: FONT_WEIGHTS.semiBold,
-  },
-
-  // ─── Scroll ───
-  scrollContent: {
-    paddingBottom: SPACING.xxxl + insets.bottom,
-  },
-  content: {
-    gap: SPACING.xl,
-  },
-
-  // ─── Hero ───
-  heroSection: {
-    alignItems: 'center',
-    paddingHorizontal: SPACING.page,
-    paddingTop: SPACING.lg,
-    paddingBottom: SPACING.lg,
-    borderRadius: BORDER_RADIUS.hero,
-    borderWidth: 1,
-    borderColor: premiumHealth.borderSubtle,
-    backgroundColor: premiumHealth.surfaceRaised,
-    gap: SPACING.sm, borderCurve: 'continuous',
-  },
-  heroShell: {
-    marginHorizontal: SPACING.page,
-    borderRadius: BORDER_RADIUS.hero,
-    ...SHADOWS.none, borderCurve: 'continuous',
-  },
-  heroCrownContainer: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: premiumHealth.premiumAccentSoft,
-    borderWidth: 1,
-    borderColor: withAlpha(premiumHealth.premiumAccent, isDark ? 0.2 : 0.16),
-    marginBottom: SPACING.sm,
-    ...SHADOWS.none, borderCurve: 'continuous',
-  },
-  heroTitle: {
-    fontSize: SIZES.xl,
-    fontWeight: FONT_WEIGHTS.bold,
-    textAlign: 'center',
-    marginBottom: SPACING.xs,
-  },
-  heroSubtitle: {
-    fontSize: SIZES.md,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  contextCard: {
-    marginHorizontal: SPACING.page,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    borderColor: premiumHealth.borderSubtle,
-    backgroundColor: premiumHealth.surfaceRaised,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-    ...SHADOWS.none, borderCurve: 'continuous',
-  },
-  contextIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: withAlpha(colors.primary, isDark ? 0.16 : 0.1), borderCurve: 'continuous',
-  },
-  contextCopy: {
-    flex: 1,
-    minWidth: 0,
-    gap: 2,
-  },
-  contextTitle: {
-    fontSize: SIZES.text14,
-    lineHeight: 18,
-    color: colors.primaryText,
-    fontWeight: FONT_WEIGHTS.bold,
-  },
-  contextBody: {
-    fontSize: SIZES.text12,
-    lineHeight: 18,
-    color: colors.gray,
-  },
-
-  // ─── Cards container ───
-  cardsContainer: {
-    paddingHorizontal: SPACING.page,
-    gap: SPACING.lg,
-    paddingTop: SPACING.lg,
-    paddingBottom: SPACING.sm,
-    alignItems: 'center',
-  },
-
-  // ─── Card base ───
-  cardShell: {
-    width: '100%',
-    maxWidth: 460,
-    borderRadius: BORDER_RADIUS.hero,
-    overflow: 'visible',
-    alignSelf: 'center', borderCurve: 'continuous',
-  },
-  cardShellFree: {
-    opacity: 0.76,
-    ...SHADOWS.none,
-  },
-  cardShellMonthly: {
-    ...SHADOWS.none,
-  },
-  cardShellSelected: {
-    position: 'relative',
-    ...SHADOWS.none,
-  },
-  cardSurface: {
-    borderRadius: BORDER_RADIUS.hero,
-    padding: SPACING.lg,
-    overflow: 'hidden',
-    borderWidth: 1, borderCurve: 'continuous',
-  },
-  cardSurfaceFree: {
-    backgroundColor: isDark ? premiumHealth.surfaceBase : premiumHealth.surfaceRaised,
-    borderColor: premiumHealth.borderSubtle,
-  },
-  cardSurfaceMonthly: {
-    backgroundColor: premiumHealth.surfaceRaised,
-    borderColor: premiumHealth.borderSubtle,
-  },
-  cardSurfaceSelected: {
-    backgroundColor: premiumHealth.surfaceRaised,
-    borderColor: withAlpha(premiumHealth.premiumAccent, isDark ? 0.34 : 0.25),
-    borderWidth: 1.5,
-  },
-
-  // ─── Badge ───
-  badge: {
-    position: 'absolute',
-    top: -12,
-    alignSelf: 'center',
-    left: '50%',
-    marginLeft: -65,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs + 2,
-    borderRadius: BORDER_RADIUS.full,
-    zIndex: 10,
-    borderWidth: 1,
-    borderColor: withAlpha(premiumHealth.premiumAccent, isDark ? 0.24 : 0.18),
-    backgroundColor: premiumHealth.premiumAccentSoft, borderCurve: 'continuous',
-  },
-  badgeText: {
-    // Auparavant `premiumAccent` (or) sur fond `premiumAccentSoft` (or à 6 %
-    // d'opacité en light → ~#FAF6EE) donnait un contraste ~3.5:1, sous le
-    // seuil WCAG AA pour 12 px bold. Même pattern que PremiumTeaserCard :
-    // garder le fond or signature et passer le texte à `primaryText` pour
-    // rétablir un contraste ≥14:1 dans les deux thèmes.
-    color: colors.primaryText,
-    fontSize: SIZES.xs,
-    fontWeight: FONT_WEIGHTS.bold,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-
-  // ─── Card header ───
-  cardHeader: {
-    alignItems: 'center',
-    marginBottom: SPACING.md,
-  },
-  cardTitle: {
-    fontSize: SIZES.lg,
-    fontWeight: FONT_WEIGHTS.bold,
-    marginBottom: SPACING.xs,
-  },
-  cardPrice: {
-    fontSize: 28,
-    fontWeight: FONT_WEIGHTS.bold,
-  },
-  cardSubPrice: {
-    fontSize: SIZES.sm,
-    marginTop: 2,
-  },
-  crossedPrice: {
-    fontSize: SIZES.sm,
-    textDecorationLine: 'line-through',
-    marginTop: 2,
-    opacity: 0.8,
-  },
-
-  // ─── Card divider ───
-  cardDivider: {
-    height: 1,
-    backgroundColor: premiumHealth.borderSubtle,
-    marginVertical: SPACING.md,
-  },
-
-  // ─── Features list ───
-  featuresList: {
-    gap: SPACING.sm,
-  },
-  featureRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
-  featureIcon: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    justifyContent: 'center',
-    alignItems: 'center', borderCurve: 'continuous',
-  },
-  featureText: {
-    fontSize: SIZES.sm - 1,
-    flex: 1,
-    lineHeight: 18,
-  },
-
-  // ─── CTA button ───
-  ctaButton: {
-    paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.button,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: SPACING.lg,
-    borderWidth: 1,
-    borderColor: premiumHealth.primaryActionBorder,
-    backgroundColor: premiumHealth.primaryActionBackground, borderCurve: 'continuous',
-  },
-  ctaButtonText: {
-    color: premiumHealth.primaryActionText,
-    fontSize: SIZES.sm,
-    fontWeight: FONT_WEIGHTS.bold,
-  },
-  loadingCard: {
-    minHeight: 320,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyCard: {
-    minHeight: 320,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.sm,
-  },
-  emptyCardTitle: {
-    fontSize: SIZES.lg,
-    fontWeight: FONT_WEIGHTS.bold,
-    textAlign: 'center',
-  },
-  emptyCardBody: {
-    fontSize: SIZES.sm,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-
-  // ─── Bottom section ───
-  bottomSection: {
-    paddingHorizontal: SPACING.page,
-    paddingVertical: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    borderColor: premiumHealth.borderSubtle,
-    backgroundColor: premiumHealth.surfaceRaised,
-    marginHorizontal: SPACING.page,
-    alignItems: 'center',
-    gap: SPACING.md,
-    ...SHADOWS.none, borderCurve: 'continuous',
-  },
-  restoreButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.xs,
-    padding: SPACING.sm,
-  },
-  restoreButtonText: {
-    fontSize: SIZES.sm,
-    fontWeight: '500' as const,
-  },
-  legalText: {
-    fontSize: SIZES.xs,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  linksRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
-  linkText: {
-    fontSize: SIZES.xs,
-    fontWeight: FONT_WEIGHTS.medium,
-  },
-  linkSeparator: {
-    fontSize: SIZES.xs,
-  },
-  storeNote: {
-    fontSize: SIZES.xs,
-    textAlign: 'center',
-    lineHeight: 18,
-    marginTop: SPACING.xs,
-  },
-
-  // ─── Already premium ───
-  alreadyPremiumContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: SPACING.xl,
-    paddingRight: SPACING.xl,
-    paddingBottom: SPACING.xl + insets.bottom,
-    paddingLeft: SPACING.xl,
-  },
-  premiumBadge: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: isDark
-      ? mixColors(colors.cardBackground, colors.gold, 0.12)
-      : mixColors(colors.cardBackground, colors.gold, 0.18),
-    borderWidth: 1,
-    borderColor: withAlpha(colors.gold, 0.34),
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: SPACING.xl,
-    ...SHADOWS.none, borderCurve: 'continuous',
-  },
-  alreadyPremiumTitle: {
-    fontSize: SIZES.xxxl,
-    fontWeight: 'bold' as const,
-    marginBottom: SPACING.md,
-    color: colors.primaryText,
-  },
-  alreadyPremiumText: {
-    fontSize: SIZES.md,
-    textAlign: 'center',
-    marginBottom: SPACING.xl,
-    color: colors.gray,
-    lineHeight: 24,
-  },
+    container: {
+      flex: 1,
+      backgroundColor: premiumHealth.canvas,
+    },
+    screenGradient: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingTop: SPACING.sm,
+      paddingBottom: SPACING.xxxl + insets.bottom,
+    },
+    content: {
+      paddingHorizontal: SPACING.page,
+      gap: SPACING.lg,
+    },
+    heroShell: {
+      borderRadius: BORDER_RADIUS.hero,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: paywall.heroBorder,
+      ...SHADOWS.soft,
+      shadowColor: paywall.shadowColor,
+      shadowOpacity: isDark ? 0.16 : 0.08,
+      shadowRadius: 28,
+      shadowOffset: { width: 0, height: 12 },
+      elevation: 4,
+      borderCurve: 'continuous',
+    },
+    heroSection: {
+      borderRadius: BORDER_RADIUS.hero,
+      padding: SPACING.lg,
+      gap: SPACING.md,
+      overflow: 'hidden',
+      borderCurve: 'continuous',
+    },
+    heroTopRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: SPACING.md,
+    },
+    heroCrownContainer: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: paywall.heroIconBackground,
+      borderWidth: 1,
+      borderColor: paywall.heroIconBorder,
+      borderCurve: 'continuous',
+    },
+    heroBadge: {
+      maxWidth: '72%',
+      borderRadius: BORDER_RADIUS.full,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.xs + 2,
+      backgroundColor: paywall.heroBadgeBackground,
+      borderWidth: 1,
+      borderColor: paywall.heroBadgeBorder,
+      borderCurve: 'continuous',
+    },
+    heroBadgeText: {
+      color: colors.primaryText,
+      fontSize: SIZES.text12,
+      fontWeight: FONT_WEIGHTS.bold,
+      textTransform: 'uppercase',
+      letterSpacing: 0,
+    },
+    heroTitle: {
+      color: colors.primaryText,
+      fontSize: SIZES.text28,
+      lineHeight: 34,
+      fontWeight: FONT_WEIGHTS.bold,
+      textAlign: 'left',
+    },
+    heroSubtitle: {
+      color: paywall.softText,
+      fontSize: SIZES.text15,
+      lineHeight: 22,
+    },
+    proofGrid: {
+      flexDirection: 'row',
+      gap: SPACING.sm,
+    },
+    proofTile: {
+      flex: 1,
+      minHeight: 86,
+      borderRadius: BORDER_RADIUS.lg,
+      padding: SPACING.sm,
+      justifyContent: 'space-between',
+      backgroundColor: paywall.proofTileBackground,
+      borderWidth: 1,
+      borderColor: paywall.proofTileBorder,
+      borderCurve: 'continuous',
+    },
+    proofIcon: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: paywall.proofTileIconBackground,
+      borderWidth: 1,
+      borderColor: paywall.proofTileIconBorder,
+      borderCurve: 'continuous',
+    },
+    proofTileText: {
+      color: colors.primaryText,
+      fontSize: SIZES.text12,
+      lineHeight: 16,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      flexShrink: 1,
+    },
+    benefitsPanel: {
+      borderRadius: BORDER_RADIUS.hero,
+      padding: SPACING.lg,
+      gap: SPACING.lg,
+      backgroundColor: paywall.benefitsBackground,
+      borderWidth: 1,
+      borderColor: paywall.benefitsBorder,
+      borderCurve: 'continuous',
+    },
+    sectionHeader: {
+      gap: SPACING.xs,
+    },
+    sectionEyebrow: {
+      color: premiumHealth.trustAccent,
+      fontSize: SIZES.text14,
+      lineHeight: 18,
+      fontWeight: FONT_WEIGHTS.bold,
+    },
+    sectionBody: {
+      color: paywall.softText,
+      fontSize: SIZES.text14,
+      lineHeight: 21,
+    },
+    featuresList: {
+      gap: SPACING.sm,
+    },
+    featureRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: SPACING.sm,
+    },
+    featureIcon: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1,
+      marginTop: 1,
+      borderCurve: 'continuous',
+    },
+    featureText: {
+      fontSize: SIZES.text14,
+      flex: 1,
+      lineHeight: 20,
+    },
+    planPanel: {
+      borderRadius: BORDER_RADIUS.hero,
+      padding: SPACING.lg,
+      gap: SPACING.lg,
+      backgroundColor: paywall.planPanelBackground,
+      borderWidth: 1,
+      borderColor: paywall.planPanelBorder,
+      ...SHADOWS.card,
+      shadowColor: paywall.shadowColor,
+      shadowOpacity: isDark ? 0.14 : 0.06,
+      shadowRadius: 24,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 3,
+      borderCurve: 'continuous',
+    },
+    planPanelHeader: {
+      gap: SPACING.xs,
+    },
+    planPanelTitle: {
+      color: colors.primaryText,
+      fontSize: SIZES.text22,
+      lineHeight: 28,
+      fontWeight: FONT_WEIGHTS.bold,
+    },
+    planPanelSubtitle: {
+      color: paywall.softText,
+      fontSize: SIZES.text12,
+      lineHeight: 18,
+    },
+    planOptions: {
+      gap: SPACING.sm,
+    },
+    planOptionShell: {
+      width: '100%',
+      ...SHADOWS.none,
+    },
+    planOptionSurface: {
+      minHeight: 88,
+      borderRadius: BORDER_RADIUS.xl,
+      padding: SPACING.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: SPACING.md,
+      backgroundColor: paywall.planOptionBackground,
+      borderWidth: 1,
+      borderColor: paywall.planOptionBorder,
+      borderCurve: 'continuous',
+    },
+    planOptionSurfaceSelected: {
+      backgroundColor: paywall.planOptionSelectedBackground,
+      borderColor: paywall.planOptionSelectedBorder,
+      borderWidth: 1.5,
+    },
+    planOptionMain: {
+      flex: 1,
+      minWidth: 0,
+      gap: SPACING.xs,
+    },
+    planTitleRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      gap: SPACING.xs,
+    },
+    planTitle: {
+      color: colors.primaryText,
+      fontSize: SIZES.text16,
+      lineHeight: 20,
+      fontWeight: FONT_WEIGHTS.bold,
+      flexShrink: 1,
+    },
+    planSubtitle: {
+      color: paywall.softText,
+      fontSize: SIZES.text12,
+      lineHeight: 17,
+    },
+    crossedPrice: {
+      color: colors.error,
+      fontSize: SIZES.text12,
+      lineHeight: 16,
+      textDecorationLine: 'line-through',
+      opacity: 0.82,
+    },
+    planBadge: {
+      borderRadius: BORDER_RADIUS.full,
+      paddingHorizontal: SPACING.sm,
+      paddingVertical: SPACING.xs,
+      backgroundColor: paywall.planBadgeBackground,
+      borderWidth: 1,
+      borderColor: paywall.planBadgeBorder,
+      borderCurve: 'continuous',
+    },
+    planBadgeText: {
+      color: paywall.planBadgeText,
+      fontSize: SIZES.text10,
+      lineHeight: 12,
+      fontWeight: FONT_WEIGHTS.bold,
+      textTransform: 'uppercase',
+      letterSpacing: 0,
+    },
+    planPriceCluster: {
+      alignItems: 'flex-end',
+      gap: SPACING.sm,
+    },
+    planPrice: {
+      color: colors.primaryText,
+      fontSize: SIZES.text18,
+      lineHeight: 22,
+      fontWeight: FONT_WEIGHTS.bold,
+      textAlign: 'right',
+    },
+    planSelectionMark: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: paywall.selectionBackground,
+      borderWidth: 1,
+      borderColor: paywall.selectionBorder,
+      borderCurve: 'continuous',
+    },
+    planSelectionMarkIdle: {
+      backgroundColor: paywall.planOptionMutedBackground,
+      borderColor: paywall.planOptionBorder,
+    },
+    primaryCtaButton: {
+      minHeight: 56,
+      borderRadius: BORDER_RADIUS.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: SPACING.xl,
+      paddingVertical: SPACING.md,
+      backgroundColor: paywall.ctaBackground,
+      borderWidth: 1,
+      borderColor: paywall.ctaBorder,
+      shadowColor: paywall.ctaShadow,
+      shadowOffset: { width: 0, height: 12 },
+      shadowOpacity: isDark ? 0.18 : 0.14,
+      shadowRadius: 22,
+      elevation: 5,
+      borderCurve: 'continuous',
+    },
+    primaryCtaText: {
+      color: paywall.ctaText,
+      fontSize: SIZES.text16,
+      lineHeight: 20,
+      fontWeight: FONT_WEIGHTS.bold,
+      textAlign: 'center',
+    },
+    disabledAction: {
+      opacity: 0.62,
+    },
+    loadingCard: {
+      minHeight: 156,
+      borderRadius: BORDER_RADIUS.xl,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: paywall.planOptionMutedBackground,
+      borderWidth: 1,
+      borderColor: paywall.planOptionBorder,
+      borderCurve: 'continuous',
+    },
+    emptyCard: {
+      minHeight: 172,
+      borderRadius: BORDER_RADIUS.xl,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: SPACING.lg,
+      gap: SPACING.sm,
+      backgroundColor: paywall.planOptionMutedBackground,
+      borderWidth: 1,
+      borderColor: paywall.planOptionBorder,
+      borderCurve: 'continuous',
+    },
+    emptyCardTitle: {
+      color: colors.primaryText,
+      fontSize: SIZES.text18,
+      lineHeight: 23,
+      fontWeight: FONT_WEIGHTS.bold,
+      textAlign: 'center',
+    },
+    emptyCardBody: {
+      color: paywall.softText,
+      fontSize: SIZES.text14,
+      textAlign: 'center',
+      lineHeight: 20,
+    },
+    footerSection: {
+      alignItems: 'center',
+      gap: SPACING.sm,
+      paddingHorizontal: SPACING.md,
+      paddingBottom: SPACING.lg,
+    },
+    restoreButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: SPACING.xs,
+      paddingVertical: SPACING.sm,
+      paddingHorizontal: SPACING.md,
+      borderRadius: BORDER_RADIUS.full,
+      backgroundColor: paywall.footerBackground,
+      borderWidth: 1,
+      borderColor: paywall.footerBorder,
+      borderCurve: 'continuous',
+    },
+    restoreButtonText: {
+      color: premiumHealth.trustAccent,
+      fontSize: SIZES.text14,
+      fontWeight: FONT_WEIGHTS.semiBold,
+    },
+    legalText: {
+      color: paywall.softText,
+      fontSize: SIZES.xs,
+      textAlign: 'center',
+      lineHeight: 18,
+    },
+    linksRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: SPACING.sm,
+    },
+    linkText: {
+      color: premiumHealth.trustAccent,
+      fontSize: SIZES.xs,
+      fontWeight: FONT_WEIGHTS.medium,
+    },
+    linkSeparator: {
+      color: paywall.softText,
+      fontSize: SIZES.xs,
+    },
+    storeNote: {
+      color: paywall.softText,
+      fontSize: SIZES.xs,
+      textAlign: 'center',
+      lineHeight: 18,
+      marginTop: SPACING.xs,
+    },
+    alreadyPremiumContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingTop: SPACING.xl,
+      paddingRight: SPACING.page,
+      paddingBottom: SPACING.xl + insets.bottom,
+      paddingLeft: SPACING.page,
+    },
+    alreadyPremiumCard: {
+      width: '100%',
+      maxWidth: 440,
+      borderRadius: BORDER_RADIUS.hero,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: paywall.heroBorder,
+      ...SHADOWS.soft,
+      shadowColor: paywall.shadowColor,
+      shadowOpacity: isDark ? 0.16 : 0.08,
+      shadowRadius: 28,
+      shadowOffset: { width: 0, height: 12 },
+      elevation: 4,
+      borderCurve: 'continuous',
+    },
+    alreadyPremiumSurface: {
+      borderRadius: BORDER_RADIUS.hero,
+      padding: SPACING.xl,
+      alignItems: 'center',
+      gap: SPACING.md,
+      borderCurve: 'continuous',
+    },
+    premiumBadge: {
+      width: 104,
+      height: 104,
+      borderRadius: 52,
+      backgroundColor: paywall.heroIconBackground,
+      borderWidth: 1,
+      borderColor: paywall.heroIconBorder,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: SPACING.sm,
+      borderCurve: 'continuous',
+    },
+    alreadyPremiumTitle: {
+      fontSize: SIZES.text28,
+      lineHeight: 34,
+      fontWeight: FONT_WEIGHTS.bold,
+      textAlign: 'center',
+      color: colors.primaryText,
+    },
+    alreadyPremiumText: {
+      fontSize: SIZES.text15,
+      textAlign: 'center',
+      color: paywall.softText,
+      lineHeight: 22,
+    },
+    alreadyPremiumActions: {
+      width: '100%',
+      gap: SPACING.sm,
+      marginTop: SPACING.md,
+    },
+    secondaryButton: {
+      minHeight: 48,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: BORDER_RADIUS.full,
+      backgroundColor: paywall.footerBackground,
+      borderWidth: 1,
+      borderColor: paywall.footerBorder,
+      borderCurve: 'continuous',
+    },
+    secondaryButtonText: {
+      color: paywall.softText,
+      fontSize: SIZES.text14,
+      fontWeight: FONT_WEIGHTS.semiBold,
+    },
   });
 };

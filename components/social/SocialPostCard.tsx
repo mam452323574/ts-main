@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import {
-  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,

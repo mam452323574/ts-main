@@ -14,6 +14,7 @@ const mockRouterPush = jest.fn();
 const mockRouterBack = jest.fn();
 const mockUseInfiniteCoachConversations = jest.fn();
 const mockStartMutateAsync = jest.fn();
+const mockPresentRewardedAdGate = jest.fn();
 let mockPersonaKey: string | undefined = 'patient_calm';
 let mockIsStartPending = false;
 const { useAuth: mockUseAuth } = jest.requireMock('@/contexts/AuthContext') as {
@@ -49,6 +50,15 @@ jest.mock('expo-router', () => ({
 
 jest.mock('@/components/ModalHandle', () => ({
   ModalHandle: () => null,
+}));
+
+jest.mock('@/contexts/AdsContext', () => ({
+  useAdsGate: () => ({
+    isReady: true,
+    presentRewardedAdGate: (...args: unknown[]) =>
+      mockPresentRewardedAdGate(...args),
+  }),
+  AdsProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 jest.mock('@/hooks/queries/useInfiniteCoachConversations', () => ({
@@ -109,6 +119,7 @@ describe('CoachConversationsScreen', () => {
     mockPersonaKey = 'patient_calm';
     mockIsStartPending = false;
     mockUseAuth.mockReturnValue(defaultAuthState);
+    mockPresentRewardedAdGate.mockResolvedValue('rewarded');
     mockQuery();
   });
 
@@ -163,12 +174,48 @@ describe('CoachConversationsScreen', () => {
     fireEvent.press(screen.getByTestId('coach-conversations-empty-new'));
 
     await waitFor(() => {
+      expect(mockPresentRewardedAdGate).toHaveBeenCalledWith('coach');
       expect(mockStartMutateAsync).toHaveBeenCalledWith({
         personaKey: 'patient_calm',
       });
       expect(mockRouterPush).toHaveBeenCalledWith({
         pathname: '/coach/chat',
         params: { id: 'conversation-new' },
+      });
+    });
+  });
+
+  it('cancels new conversation creation when the rewarded gate is declined', async () => {
+    mockPresentRewardedAdGate.mockResolvedValueOnce('skipped');
+
+    const screen = render(<CoachConversationsScreen />);
+
+    fireEvent.press(screen.getByTestId('coach-conversations-empty-new'));
+
+    await waitFor(() => {
+      expect(mockPresentRewardedAdGate).toHaveBeenCalledWith('coach');
+    });
+    expect(mockStartMutateAsync).not.toHaveBeenCalled();
+    expect(mockRouterPush).not.toHaveBeenCalled();
+  });
+
+  it('fails open when the rewarded gate is unavailable', async () => {
+    mockPresentRewardedAdGate.mockResolvedValueOnce('unavailable');
+    mockStartMutateAsync.mockResolvedValue({
+      conversation_id: 'conversation-unavailable-open',
+    });
+
+    const screen = render(<CoachConversationsScreen />);
+
+    fireEvent.press(screen.getByTestId('coach-conversations-empty-new'));
+
+    await waitFor(() => {
+      expect(mockStartMutateAsync).toHaveBeenCalledWith({
+        personaKey: 'patient_calm',
+      });
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        pathname: '/coach/chat',
+        params: { id: 'conversation-unavailable-open' },
       });
     });
   });

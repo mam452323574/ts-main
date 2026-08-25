@@ -206,7 +206,7 @@ describe('PremiumUpgradeScreen', () => {
     });
 
     expect(screen.getByText('$119.88')).toBeTruthy();
-    expect(screen.getByText(String(i18n.t('premium.subscription_page.free_title')))).toBeTruthy();
+    expect(screen.getByTestId('premium-primary-cta')).toBeTruthy();
   });
 
   it('renders the current Premium benefits without promising unlimited scans', async () => {
@@ -221,6 +221,21 @@ describe('PremiumUpgradeScreen', () => {
     expect(screen.getAllByText(String(i18n.t('premium.subscription_page.prem_feat_chef'))).length).toBeGreaterThan(0);
     expect(screen.getAllByText(String(i18n.t('premium.subscription_page.prem_feat_complete_analysis'))).length).toBeGreaterThan(0);
     expect(screen.queryByText(/unlimited scans/i)).toBeNull();
+  });
+
+  it('routes privacy and terms links to separate legal screens', async () => {
+    render(<PremiumUpgradeScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText(String(i18n.t('premium.subscription_page.privacy_link')))).toBeTruthy();
+      expect(screen.getByText(String(i18n.t('premium.subscription_page.terms_link')))).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByText(String(i18n.t('premium.subscription_page.privacy_link'))));
+    fireEvent.press(screen.getByText(String(i18n.t('premium.subscription_page.terms_link'))));
+
+    expect(mockPush).toHaveBeenCalledWith('/privacy-policy');
+    expect(mockPush).toHaveBeenCalledWith('/terms-of-use');
   });
 
   it('keeps the selected Android package card flat with a restrained border highlight', async () => {
@@ -313,7 +328,7 @@ describe('PremiumUpgradeScreen', () => {
     render(<PremiumUpgradeScreen />);
 
     await waitFor(() => {
-      expect(screen.getByText('Welcome offer')).toBeTruthy();
+      expect(screen.getAllByText('Welcome offer').length).toBeGreaterThan(0);
       expect(screen.getAllByText('3 days free trial').length).toBeGreaterThan(0);
       expect(
         screen.getAllByText(String(i18n.t('premium.subscription_page.entry_offer_cta'))).length,
@@ -330,7 +345,7 @@ describe('PremiumUpgradeScreen', () => {
       expect.arrayContaining([expect.objectContaining({ borderWidth: 1 })]),
     );
 
-    fireEvent.press(screen.getByTestId('premium-card-monthly-cta'));
+    fireEvent.press(screen.getByTestId('premium-primary-cta'));
 
     await waitFor(() => {
       expect(mockPurchaseRevenueCatPackage).toHaveBeenCalledWith(
@@ -410,10 +425,12 @@ describe('PremiumUpgradeScreen', () => {
     render(<PremiumUpgradeScreen />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('premium-card-monthly-cta')).toBeTruthy();
+      expect(screen.getByTestId('premium-plan-option-monthly')).toBeTruthy();
+      expect(screen.getByTestId('premium-primary-cta')).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByTestId('premium-card-monthly-cta'));
+    fireEvent.press(screen.getByTestId('premium-plan-option-monthly'));
+    fireEvent.press(screen.getByTestId('premium-primary-cta'));
 
     await waitFor(() => {
       expect(mockTrackFailureEvent).toHaveBeenCalledWith(

@@ -40,7 +40,7 @@ export function GreenLightGame({
   cardHeight,
 }: LoadingMiniGameGameProps) {
   const chrome = useMiniGameChrome({ accentColor, compact, variant, cardHeight });
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const [score, setScore] = useState(0);
   const [light, setLight] = useState<Light>('red');
   const cooldownRef = useRef(false);

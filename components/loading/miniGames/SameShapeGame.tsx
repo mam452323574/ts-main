@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, View } from 'react-native';
 
 import { useTheme } from '@/contexts/ThemeContext';
@@ -14,7 +14,6 @@ import {
   useGameCompletion,
   useMiniGameChrome,
   useScoreBump,
-  useShakeTrigger,
 } from './MiniGameFrame';
 
 type Chrome = ReturnType<typeof useMiniGameChrome>;
@@ -122,7 +121,6 @@ function ShapeCandidate({
 }: ShapeCandidateProps) {
   const { scale, opacity } = useEntryPulse();
   const translateX = useRef(new Animated.Value(0)).current;
-  const triggerShake = useShakeTrigger(translateX);
   const pulseScale = useRef(new Animated.Value(1)).current;
   const onPressRef = useRef(onPress);
   useEffect(() => {

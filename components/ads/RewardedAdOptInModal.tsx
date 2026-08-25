@@ -16,7 +16,7 @@ interface RewardedAdOptInModalProps {
 }
 
 /**
- * Écran d'opt-in obligatoire avant une vidéo récompensée AdMob (règle Google :
+ * Écran d'opt-in obligatoire avant une vidéo récompensée AppLovin MAX :
  * une pub récompensée doit être initiée par l'utilisateur). Réutilise le
  * composant maison `CustomAlert` pour rester cohérent avec le reste de l'app.
  */

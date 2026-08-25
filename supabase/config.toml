@@ -133,6 +133,9 @@ verify_jwt = true
 [functions.cleanup-orphan-user]
 verify_jwt = true
 
+[functions.delete-account]
+verify_jwt = true
+
 [functions.social-admin-moderate-user]
 verify_jwt = true
 

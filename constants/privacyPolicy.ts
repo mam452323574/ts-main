@@ -26,7 +26,7 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
     locale: 'fr',
     label: 'FR',
     title: 'Politique de confidentialite',
-    lastUpdated: 'Derniere mise a jour : 18 mars 2026',
+    lastUpdated: 'Derniere mise a jour : 26 avril 2026',
     intro:
       "Cette page explique comment SelfLens collecte, utilise et protege les donnees necessaires a l'analyse des scans sante et au fonctionnement du service.",
     sections: [
@@ -57,6 +57,15 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
         ],
       },
       {
+        title: '3.1 Donnees de visage',
+        paragraphs: [
+          'Les donnees de visage comprennent les photos de visage que vous choisissez de soumettre, ainsi que les resultats, scores et indicateurs derives du scan.',
+          'Nous utilisons ces donnees uniquement pour fournir votre analyse sante, votre historique, vos tendances et les conseils du coach dans SelfLens.',
+          "SelfLens n'utilise pas ces donnees pour identifier une personne, creer une identification biometrique, authentifier un utilisateur par reconnaissance faciale, faire de la publicite ou entrainer des modeles d intelligence artificielle.",
+          "Les photos et resultats sont stockes dans Supabase et traites via notre infrastructure d'analyse. Ils sont conserves jusqu a la suppression du scan ou du compte, et les uploads orphelins sont purges automatiquement apres 24 heures.",
+        ],
+      },
+      {
         title: '4. Finalites du traitement',
         paragraphs: ['Nous utilisons vos donnees pour :'],
         bullets: [
@@ -77,7 +86,8 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
       {
         title: '6. Conservation et securite',
         paragraphs: [
-          'Les donnees de compte et l historique de scans sont conserves tant que votre compte reste actif ou jusqu a reception d une demande de suppression valide.',
+          'Les donnees de compte et l historique de scans sont conserves tant que votre compte reste actif, jusqu a la suppression d un scan individuel ou jusqu a la suppression de votre compte.',
+          'Les images de scan et uploads associes sont supprimes avec le scan ou le compte. Une routine automatisee supprime aussi les uploads orphelins au-dela de 24 heures.',
           "Les communications entre l'application et nos services utilisent HTTPS. L'acces aux donnees est restreint aux besoins du service et des operations de support.",
         ],
       },
@@ -95,8 +105,9 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
       {
         title: '8. Suppression des donnees',
         paragraphs: [
-          "SelfLens ne propose pas actuellement de suppression complete self-service dans l'application.",
-          'Pour demander la suppression de votre compte ou de vos donnees, ecrivez a privacy@healthscan.cloud depuis l adresse associee a votre compte.',
+          "Vous pouvez supprimer un scan individuel depuis votre historique dans l'application. La suppression efface la ligne d analyse et l image associee dans le stockage.",
+          "Vous pouvez supprimer votre compte directement dans l'application depuis Reglages > Zone de danger > Supprimer le compte. Cette action supprime vos scans, images stockees, avatar, profil, donnees associees et compte d authentification, puis ferme la session.",
+          'Vous pouvez aussi contacter privacy@healthscan.cloud depuis l adresse associee a votre compte pour toute question ou demande liee a la suppression.',
         ],
       },
       {
@@ -119,7 +130,7 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
     locale: 'en',
     label: 'EN',
     title: 'Privacy Policy',
-    lastUpdated: 'Last updated: March 18, 2026',
+    lastUpdated: 'Last updated: April 26, 2026',
     intro:
       'This page explains how SelfLens collects, uses, and protects the data required to run health scans and the service itself.',
     sections: [
@@ -150,6 +161,15 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
         ],
       },
       {
+        title: '3.1 Face data',
+        paragraphs: [
+          'Face data includes the face photos you choose to submit, plus the scan results, scores, and metrics derived from those photos.',
+          'We use this data only to provide your health analysis, scan history, trends, and coach guidance inside SelfLens.',
+          'SelfLens does not use this data to identify a person, create biometric identification, authenticate a user with facial recognition, serve advertising, or train AI models.',
+          'Photos and results are stored in Supabase and processed through our analysis infrastructure. They are retained until you delete the scan or account, and orphaned uploads are automatically purged after 24 hours.',
+        ],
+      },
+      {
         title: '4. Why we process data',
         paragraphs: ['We use your data to:'],
         bullets: [
@@ -170,7 +190,8 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
       {
         title: '6. Retention and security',
         paragraphs: [
-          'Account data and scan history are retained while your account remains active or until we receive a valid deletion request.',
+          'Account data and scan history are retained while your account remains active, until you delete an individual scan, or until you delete your account.',
+          'Scan images and associated uploads are deleted with the scan or account. An automated routine also removes orphaned uploads after 24 hours.',
           'Communications between the app and our services use HTTPS. Access to data is limited to what is required to operate and support the service.',
         ],
       },
@@ -188,8 +209,9 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
       {
         title: '8. Data deletion',
         paragraphs: [
-          'SelfLens does not currently provide a full self-service account deletion flow inside the app.',
-          'To request deletion of your account or data, email privacy@healthscan.cloud from the address linked to your account.',
+          'You can delete an individual scan from your history inside the app. Deletion removes the analysis row and its associated image from storage.',
+          'You can delete your account directly in the app from Settings > Danger zone > Delete account. This deletes your scans, stored images, avatar, profile, associated data, and authentication account, then signs you out.',
+          'You can also contact privacy@healthscan.cloud from the address linked to your account for any deletion-related question or request.',
         ],
       },
       {
@@ -212,7 +234,7 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
     locale: 'it',
     label: 'IT',
     title: 'Informativa sulla privacy',
-    lastUpdated: 'Ultimo aggiornamento: 18 marzo 2026',
+    lastUpdated: 'Ultimo aggiornamento: 26 aprile 2026',
     intro:
       'Questa pagina spiega come SelfLens raccoglie, utilizza e protegge i dati necessari per eseguire gli scan salute e far funzionare il servizio.',
     sections: [
@@ -243,6 +265,15 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
         ],
       },
       {
+        title: '3.1 Dati del volto',
+        paragraphs: [
+          'I dati del volto includono le foto del volto che scegli di inviare, oltre ai risultati, punteggi e metriche derivati dallo scan.',
+          'Usiamo questi dati solo per fornire analisi salute, cronologia, tendenze e consigli del coach dentro SelfLens.',
+          'SelfLens non usa questi dati per identificare una persona, creare identificazione biometrica, autenticare un utente con riconoscimento facciale, mostrare pubblicita o addestrare modelli di intelligenza artificiale.',
+          'Foto e risultati sono archiviati in Supabase e trattati tramite la nostra infrastruttura di analisi. Restano conservati fino alla cancellazione dello scan o dell account, e gli upload orfani sono eliminati automaticamente dopo 24 ore.',
+        ],
+      },
+      {
         title: '4. Finalita del trattamento',
         paragraphs: ['Utilizziamo i tuoi dati per:'],
         bullets: [
@@ -263,7 +294,8 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
       {
         title: '6. Conservazione e sicurezza',
         paragraphs: [
-          'I dati dell account e la cronologia degli scan vengono conservati finche il tuo account resta attivo o finche non riceviamo una richiesta valida di cancellazione.',
+          'I dati dell account e la cronologia degli scan vengono conservati finche il tuo account resta attivo, finche non elimini uno scan individuale o finche non elimini il tuo account.',
+          'Le immagini di scan e gli upload associati vengono eliminati con lo scan o con l account. Una routine automatica rimuove anche gli upload orfani dopo 24 ore.',
           "Le comunicazioni tra l'app e i nostri servizi usano HTTPS. L'accesso ai dati e limitato a quanto necessario per far funzionare e supportare il servizio.",
         ],
       },
@@ -281,8 +313,9 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
       {
         title: '8. Cancellazione dei dati',
         paragraphs: [
-          "SelfLens non offre attualmente un flusso completo di cancellazione self-service all'interno dell'app.",
-          'Per richiedere la cancellazione del tuo account o dei tuoi dati, scrivi a privacy@healthscan.cloud dall indirizzo collegato al tuo account.',
+          "Puoi eliminare uno scan individuale dalla cronologia nell'app. La cancellazione rimuove la riga di analisi e l immagine associata dallo storage.",
+          "Puoi eliminare il tuo account direttamente nell'app da Impostazioni > Area pericolosa > Elimina account. Questa azione elimina scan, immagini archiviate, avatar, profilo, dati associati e account di autenticazione, poi chiude la sessione.",
+          'Puoi anche contattare privacy@healthscan.cloud dall indirizzo collegato al tuo account per qualsiasi domanda o richiesta relativa alla cancellazione.',
         ],
       },
       {
@@ -305,7 +338,7 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
     locale: 'pt',
     label: 'PT',
     title: 'Politica de privacidade',
-    lastUpdated: 'Ultima atualizacao: 18 de marco de 2026',
+    lastUpdated: 'Ultima atualizacao: 26 de abril de 2026',
     intro:
       'Esta pagina explica como a SelfLens recolhe, utiliza e protege os dados necessarios para executar scans de saude e prestar o servico.',
     sections: [
@@ -336,6 +369,15 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
         ],
       },
       {
+        title: '3.1 Dados faciais',
+        paragraphs: [
+          'Os dados faciais incluem as fotos de rosto que escolher submeter, alem dos resultados, pontuacoes e metricas derivados do scan.',
+          'Utilizamos estes dados apenas para fornecer a analise de saude, o historico, as tendencias e a orientacao do coach dentro da SelfLens.',
+          'A SelfLens nao utiliza estes dados para identificar uma pessoa, criar identificacao biometrica, autenticar utilizadores por reconhecimento facial, apresentar publicidade ou treinar modelos de inteligencia artificial.',
+          'As fotos e os resultados sao armazenados na Supabase e tratados pela nossa infraestrutura de analise. Sao conservados ate eliminar o scan ou a conta, e os uploads orfaos sao removidos automaticamente apos 24 horas.',
+        ],
+      },
+      {
         title: '4. Finalidades do tratamento',
         paragraphs: ['Utilizamos os seus dados para:'],
         bullets: [
@@ -356,7 +398,8 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
       {
         title: '6. Conservacao e seguranca',
         paragraphs: [
-          'Os dados da conta e o historico de scans sao conservados enquanto a sua conta permanecer ativa ou ate recebermos um pedido valido de eliminacao.',
+          'Os dados da conta e o historico de scans sao conservados enquanto a sua conta permanecer ativa, ate eliminar um scan individual ou ate eliminar a sua conta.',
+          'As imagens de scan e uploads associados sao eliminados com o scan ou com a conta. Uma rotina automatica tambem remove uploads orfaos apos 24 horas.',
           'As comunicacoes entre a app e os nossos servicos utilizam HTTPS. O acesso aos dados e limitado ao necessario para operar e dar suporte ao servico.',
         ],
       },
@@ -374,8 +417,9 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
       {
         title: '8. Eliminacao de dados',
         paragraphs: [
-          'A SelfLens nao disponibiliza atualmente um fluxo completo de eliminacao self-service dentro da app.',
-          'Para solicitar a eliminacao da sua conta ou dos seus dados, envie um email para privacy@healthscan.cloud a partir do endereco associado a sua conta.',
+          'Pode eliminar um scan individual a partir do historico na app. A eliminacao remove a linha de analise e a imagem associada do armazenamento.',
+          'Pode eliminar a sua conta diretamente na app em Definicoes > Zona de perigo > Excluir conta. Esta acao elimina scans, imagens armazenadas, avatar, perfil, dados associados e conta de autenticacao, e termina a sessao.',
+          'Tambem pode contactar privacy@healthscan.cloud a partir do endereco associado a sua conta para qualquer questao ou pedido relacionado com eliminacao.',
         ],
       },
       {
@@ -398,7 +442,7 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
     locale: 'es',
     label: 'ES',
     title: 'Politica de privacidad',
-    lastUpdated: 'Ultima actualizacion: 18 de marzo de 2026',
+    lastUpdated: 'Ultima actualizacion: 26 de abril de 2026',
     intro:
       'Esta pagina explica como SelfLens recopila, utiliza y protege los datos necesarios para ejecutar escaneos de salud y prestar el servicio.',
     sections: [
@@ -429,6 +473,15 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
         ],
       },
       {
+        title: '3.1 Datos faciales',
+        paragraphs: [
+          'Los datos faciales incluyen las fotos de rostro que decides enviar, mas los resultados, puntuaciones y metricas derivados del escaneo.',
+          'Usamos estos datos solo para ofrecer tu analisis de salud, historial, tendencias y orientacion del coach dentro de SelfLens.',
+          'SelfLens no usa estos datos para identificar a una persona, crear identificacion biometrica, autenticar usuarios con reconocimiento facial, mostrar publicidad ni entrenar modelos de inteligencia artificial.',
+          'Las fotos y resultados se almacenan en Supabase y se tratan mediante nuestra infraestructura de analisis. Se conservan hasta que eliminas el escaneo o la cuenta, y las cargas huerfanas se purgan automaticamente despues de 24 horas.',
+        ],
+      },
+      {
         title: '4. Por que tratamos los datos',
         paragraphs: ['Utilizamos tus datos para:'],
         bullets: [
@@ -449,7 +502,8 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
       {
         title: '6. Conservacion y seguridad',
         paragraphs: [
-          'Los datos de la cuenta y el historial de escaneos se conservan mientras tu cuenta permanezca activa o hasta que recibamos una solicitud valida de eliminacion.',
+          'Los datos de la cuenta y el historial de escaneos se conservan mientras tu cuenta permanezca activa, hasta que elimines un escaneo individual o hasta que elimines tu cuenta.',
+          'Las imagenes de escaneo y cargas asociadas se eliminan con el escaneo o con la cuenta. Una rutina automatica tambien elimina cargas huerfanas despues de 24 horas.',
           'Las comunicaciones entre la app y nuestros servicios utilizan HTTPS. El acceso a los datos se limita a lo necesario para operar y dar soporte al servicio.',
         ],
       },
@@ -467,8 +521,9 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
       {
         title: '8. Eliminacion de datos',
         paragraphs: [
-          'SelfLens no ofrece actualmente un flujo completo de eliminacion self-service dentro de la app.',
-          'Para solicitar la eliminacion de tu cuenta o de tus datos, escribe a privacy@healthscan.cloud desde la direccion vinculada a tu cuenta.',
+          'Puedes eliminar un escaneo individual desde tu historial en la app. La eliminacion borra la fila de analisis y la imagen asociada del almacenamiento.',
+          'Puedes eliminar tu cuenta directamente en la app desde Ajustes > Zona de peligro > Eliminar cuenta. Esta accion elimina escaneos, imagenes almacenadas, avatar, perfil, datos asociados y cuenta de autenticacion, y luego cierra la sesion.',
+          'Tambien puedes contactar con privacy@healthscan.cloud desde la direccion vinculada a tu cuenta para cualquier pregunta o solicitud relacionada con eliminacion.',
         ],
       },
       {
@@ -491,7 +546,7 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
     locale: 'de',
     label: 'DE',
     title: 'Datenschutzerklarung',
-    lastUpdated: 'Zuletzt aktualisiert: 18. Marz 2026',
+    lastUpdated: 'Zuletzt aktualisiert: 26. April 2026',
     intro:
       'Diese Seite erklart, wie SelfLens die Daten erhebt, nutzt und schutzt, die fur Gesundheits-Scans und den Betrieb des Dienstes erforderlich sind.',
     sections: [
@@ -522,6 +577,15 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
         ],
       },
       {
+        title: '3.1 Gesichtsdaten',
+        paragraphs: [
+          'Gesichtsdaten umfassen die Gesichtsfotos, die du einreichst, sowie die daraus abgeleiteten Scan-Ergebnisse, Scores und Metriken.',
+          'Wir verwenden diese Daten nur, um deine Gesundheitsanalyse, deinen Verlauf, Trends und Coach-Empfehlungen in SelfLens bereitzustellen.',
+          'SelfLens verwendet diese Daten nicht, um eine Person zu identifizieren, eine biometrische Identifikation zu erstellen, Nutzer per Gesichtserkennung zu authentifizieren, Werbung auszuspielen oder KI-Modelle zu trainieren.',
+          'Fotos und Ergebnisse werden in Supabase gespeichert und uber unsere Analyse-Infrastruktur verarbeitet. Sie bleiben bis zur Loschung des Scans oder Kontos gespeichert; verwaiste Uploads werden nach 24 Stunden automatisch entfernt.',
+        ],
+      },
+      {
         title: '4. Zwecke der Verarbeitung',
         paragraphs: ['Wir verwenden deine Daten, um:'],
         bullets: [
@@ -542,7 +606,8 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
       {
         title: '6. Speicherung und Sicherheit',
         paragraphs: [
-          'Kontodaten und Scan-Verlauf werden gespeichert, solange dein Konto aktiv bleibt oder bis wir einen gultigen Loschantrag erhalten.',
+          'Kontodaten und Scan-Verlauf werden gespeichert, solange dein Konto aktiv bleibt, bis du einen einzelnen Scan loschst oder bis du dein Konto loschst.',
+          'Scan-Bilder und zugehorige Uploads werden mit dem Scan oder Konto geloscht. Eine automatisierte Routine entfernt ausserdem verwaiste Uploads nach 24 Stunden.',
           'Die Kommunikation zwischen der App und unseren Diensten erfolgt uber HTTPS. Der Datenzugriff ist auf das beschrankt, was fur Betrieb und Support des Dienstes erforderlich ist.',
         ],
       },
@@ -560,8 +625,9 @@ export const PRIVACY_POLICY_CONTENT: Record<LocaleCode, PrivacyPolicyLocaleConte
       {
         title: '8. Loschung von Daten',
         paragraphs: [
-          'SelfLens bietet derzeit keinen vollstandigen Self-Service-Flow zur Kontoloschung innerhalb der App.',
-          'Wenn du die Loschung deines Kontos oder deiner Daten beantragen mochtest, schreibe an privacy@healthscan.cloud uber die mit deinem Konto verknupfte Adresse.',
+          'Du kannst einen einzelnen Scan in deinem Verlauf in der App loschen. Die Loschung entfernt den Analyseeintrag und das zugehorige Bild aus dem Speicher.',
+          'Du kannst dein Konto direkt in der App unter Einstellungen > Gefahrenbereich > Konto loeschen loschen. Dadurch werden Scans, gespeicherte Bilder, Avatar, Profil, zugehorige Daten und das Authentifizierungskonto geloscht; anschliessend wirst du abgemeldet.',
+          'Du kannst privacy@healthscan.cloud auch uber die mit deinem Konto verknupfte Adresse fur Fragen oder Anfragen zur Loschung kontaktieren.',
         ],
       },
       {

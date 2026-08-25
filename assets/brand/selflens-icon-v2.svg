@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="SelfLens app icon">
+  <defs>
+    <linearGradient id="background" x1="90" y1="930" x2="920" y2="80" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0B38E8"/>
+      <stop offset="0.48" stop-color="#246FD6"/>
+      <stop offset="1" stop-color="#47DDEB"/>
+    </linearGradient>
+    <radialGradient id="focusGlow" cx="50%" cy="48%" r="44%">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.2"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="heart" x1="390" y1="350" x2="650" y2="720" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="0.58" stop-color="#F7FCFF"/>
+      <stop offset="1" stop-color="#D8F8EF"/>
+    </linearGradient>
+    <filter id="markShadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#082A86" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+
+  <!-- Full-bleed artwork: Apple and Google apply the final platform mask. -->
+  <rect width="1024" height="1024" fill="url(#background)"/>
+  <circle cx="512" cy="494" r="310" fill="url(#focusGlow)"/>
+
+  <g filter="url(#markShadow)">
+    <g fill="none" stroke="#FFFFFF" stroke-width="58" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M332 246h-64c-42 0-76 34-76 76v64"/>
+      <path d="M692 246h64c42 0 76 34 76 76v64"/>
+      <path d="M332 778h-64c-42 0-76-34-76-76v-64"/>
+      <path d="M692 778h64c42 0 76-34 76-76v-64"/>
+    </g>
+    <path d="M512 742C407 657 312 573 312 456c0-78 58-136 132-136 42 0 80 19 104 52 24-33 62-52 104-52 74 0 132 58 132 136 0 117-95 201-272 286Z" fill="url(#heart)"/>
+  </g>
+</svg>

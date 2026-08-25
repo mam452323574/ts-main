@@ -385,10 +385,10 @@ describe('ScannerScreen', () => {
       await waitFor(() => {
         expect(screen.getByText(/Nous avons besoin d'acc/)).toBeTruthy();
       });
-      expect(screen.getByText('Autoriser la caméra')).toBeTruthy();
+      expect(screen.getByText('Suivant')).toBeTruthy();
     });
 
-    it('calls requestPermission when Autoriser button is pressed', async () => {
+    it('calls requestPermission when the camera pre-permission CTA is pressed', async () => {
       const mockRequestPermission = jest.fn();
       mockUseCameraPermissions.mockReturnValue([
         { granted: false },
@@ -398,10 +398,10 @@ describe('ScannerScreen', () => {
       render(<ScannerScreen />);
 
       await waitFor(() => {
-        expect(screen.getByText('Autoriser la caméra')).toBeTruthy();
+        expect(screen.getByText('Suivant')).toBeTruthy();
       });
 
-      fireEvent.press(screen.getByText('Autoriser la caméra'));
+      fireEvent.press(screen.getByText('Suivant'));
 
       expect(mockRequestPermission).toHaveBeenCalled();
     });

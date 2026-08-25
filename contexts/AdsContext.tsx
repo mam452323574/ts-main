@@ -7,22 +7,31 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import type { RewardedAd } from 'react-native-google-mobile-ads';
+import type {
+  AdDisplayFailedInfo,
+  AdInfo,
+  AdLoadFailedInfo,
+  AdRewardInfo,
+} from 'react-native-applovin-max';
 
+import { RewardedAdOptInModal } from '@/components/ads/RewardedAdOptInModal';
+import { PUBLIC_PRIVACY_POLICY_URL } from '@/constants/privacyPolicy';
+import {
+  getAppLovinSdkKey,
+  getRewardedAdUnitId,
+} from '@/constants/ads';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { RewardedAdOptInModal } from '@/components/ads/RewardedAdOptInModal';
 import { loadAdsModule } from '@/services/adsRuntime';
-import { getRewardedAdUnitId } from '@/constants/ads';
 import { trackEvent } from '@/services/analytics';
-import { hasPremiumAccessFromProfile } from '@/utils/subscription';
+import { logOperationalError } from '@/utils/observability';
 import {
   getRuntimeCapabilities,
   logRuntimeDecision,
+  logRuntimeDecisionOnce,
 } from '@/utils/runtimeCapabilities';
-import { logOperationalError } from '@/utils/observability';
+import { hasPremiumAccessFromProfile } from '@/utils/subscription';
 
 type AdsModule = NonNullable<Awaited<ReturnType<typeof loadAdsModule>>>;
 
@@ -34,24 +43,24 @@ interface AdsContextValue {
   isReady: boolean;
   /**
    * Point d'entrée unique réutilisable par le scan et le coach.
-   * - premium/admin, web ou Expo Go → résout `'rewarded'` immédiatement (aucune
-   *   pub, flux inchangé) ;
-   * - gratuit → affiche l'opt-in ; selon le choix : `'rewarded'` (pub regardée),
-   *   `'skipped'` (refus) ou `'unavailable'` (aucune pub dispo / échec).
+   * - premium/admin, web ou Expo Go -> résout `'rewarded'` immédiatement ;
+   * - gratuit -> affiche l'opt-in ; selon le choix : `'rewarded'`,
+   *   `'skipped'` ou `'unavailable'`.
    *
-   * Ne bloque JAMAIS l'utilisateur : en cas de souci pub, retourne
-   * `'unavailable'` pour laisser l'appelant poursuivre son flux normal.
+   * Ne bloque jamais l'utilisateur : si AppLovin n'est pas configuré ou si la
+   * pub échoue, retourne `'unavailable'` pour laisser le flux normal continuer.
    */
   presentRewardedAdGate: (surface: AdGateSurface) => Promise<AdGateOutcome>;
 }
+
+const MAX_REWARDED_LOAD_RETRY_COUNT = 6;
+const REWARDED_SHOW_WATCHDOG_MS = 120_000;
 
 const AdsContext = createContext<AdsContextValue | null>(null);
 
 export function useAdsGate(): AdsContextValue {
   const context = useContext(AdsContext);
   if (!context) {
-    // Fail-open : si le provider n'est pas monté (tests, web, etc.), on ne
-    // bloque jamais le scan/coach.
     return {
       isReady: false,
       presentRewardedAdGate: async () => 'rewarded',
@@ -73,79 +82,160 @@ export function AdsProvider({ children }: { children: React.ReactNode }) {
   const [optInVisible, setOptInVisible] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
-  // --- Refs de cycle de vie (toujours à jour, évitent les closures périmées) ---
   const adsModuleRef = useRef<AdsModule | null>(null);
-  const rewardedAdRef = useRef<RewardedAd | null>(null);
-  const unsubscribersRef = useRef<Array<() => void>>([]);
   const adLoadedRef = useRef(false);
   const adLoadingRef = useRef(false);
   const adShownRef = useRef(false);
   const rewardEarnedRef = useRef(false);
-  const nonPersonalizedRef = useRef(false);
+  const retryAttemptRef = useRef(0);
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const gateResolverRef = useRef<((outcome: AdGateOutcome) => void) | null>(null);
   const currentSurfaceRef = useRef<AdGateSurface>('scan');
-
-  // adsEnabled est lu dans des callbacks stables → on en garde une version ref.
   const adsEnabledRef = useRef(adsEnabled);
   adsEnabledRef.current = adsEnabled;
 
-  // Référence vers la dernière version de preload (casse la dépendance
-  // circulaire handleAdClosed ↔ preloadRewardedAd).
   const preloadRef = useRef<() => void>(() => {});
 
-  const resolveGate = useCallback((outcome: AdGateOutcome) => {
-    const resolver = gateResolverRef.current;
-    gateResolverRef.current = null;
-    resolver?.(outcome);
+  const clearRetryTimeout = useCallback(() => {
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
   }, []);
 
-  const cleanupAdListeners = useCallback(() => {
-    unsubscribersRef.current.forEach((unsubscribe) => {
-      try {
-        unsubscribe();
-      } catch {
-        // listener déjà détaché — sans conséquence
-      }
-    });
-    unsubscribersRef.current = [];
+  const clearShowWatchdog = useCallback(() => {
+    if (showWatchdogRef.current) {
+      clearTimeout(showWatchdogRef.current);
+      showWatchdogRef.current = null;
+    }
+  }, []);
+
+  const resolveGate = useCallback(
+    (outcome: AdGateOutcome) => {
+      clearShowWatchdog();
+      setOptInVisible(false);
+      const resolver = gateResolverRef.current;
+      gateResolverRef.current = null;
+      resolver?.(outcome);
+    },
+    [clearShowWatchdog],
+  );
+
+  const resetLoadedState = useCallback(() => {
+    adLoadedRef.current = false;
+    adLoadingRef.current = false;
+    setIsReady(false);
+  }, []);
+
+  const scheduleLoadRetry = useCallback(() => {
+    clearRetryTimeout();
+    if (!adsEnabledRef.current) {
+      return;
+    }
+
+    retryAttemptRef.current += 1;
+    if (retryAttemptRef.current > MAX_REWARDED_LOAD_RETRY_COUNT) {
+      return;
+    }
+
+    const retryDelaySeconds = Math.pow(
+      2,
+      Math.min(MAX_REWARDED_LOAD_RETRY_COUNT, retryAttemptRef.current),
+    );
+    retryTimeoutRef.current = setTimeout(() => {
+      retryTimeoutRef.current = null;
+      preloadRef.current();
+    }, retryDelaySeconds * 1000);
+  }, [clearRetryTimeout]);
+
+  const cleanupRewardedListeners = useCallback(() => {
+    const module = adsModuleRef.current;
+    if (!module) {
+      return;
+    }
+
+    try {
+      module.RewardedAd.removeAdLoadedEventListener();
+      module.RewardedAd.removeAdLoadFailedEventListener();
+      module.RewardedAd.removeAdDisplayedEventListener();
+      module.RewardedAd.removeAdFailedToDisplayEventListener();
+      module.RewardedAd.removeAdHiddenEventListener();
+      module.RewardedAd.removeAdReceivedRewardEventListener();
+    } catch (error) {
+      logOperationalError('[Ads] Failed to remove AppLovin listeners', error);
+    }
   }, []);
 
   const handleAdClosed = useCallback(() => {
     const earned = rewardEarnedRef.current;
-    cleanupAdListeners();
-    rewardedAdRef.current = null;
-    adLoadedRef.current = false;
-    adLoadingRef.current = false;
+    resetLoadedState();
     adShownRef.current = false;
     rewardEarnedRef.current = false;
-    setIsReady(false);
     resolveGate(earned ? 'rewarded' : 'skipped');
-    // Précharge la suivante pour le prochain scan/coach.
     preloadRef.current();
-  }, [cleanupAdListeners, resolveGate]);
+  }, [resetLoadedState, resolveGate]);
 
-  const handleAdError = useCallback(
-    (error: unknown) => {
-      cleanupAdListeners();
-      rewardedAdRef.current = null;
-      adLoadedRef.current = false;
-      adLoadingRef.current = false;
-      setIsReady(false);
-      logOperationalError('[Ads] Rewarded ad error', error);
-      // Erreur pendant l'affichage d'une pub déjà acceptée → on débloque.
-      if (adShownRef.current) {
-        adShownRef.current = false;
-        trackEvent('ad_failed', { surface: currentSurfaceRef.current });
-        resolveGate('unavailable');
-      }
+  const handleDisplayFailure = useCallback(
+    (error: AdDisplayFailedInfo | unknown) => {
+      logOperationalError('[Ads] AppLovin rewarded ad failed to display', error);
+      trackEvent('ad_failed', { surface: currentSurfaceRef.current });
+      resetLoadedState();
+      adShownRef.current = false;
+      rewardEarnedRef.current = false;
+      resolveGate('unavailable');
+      preloadRef.current();
     },
-    [cleanupAdListeners, resolveGate],
+    [resetLoadedState, resolveGate],
+  );
+
+  const handleLoadFailure = useCallback(
+    (error: AdLoadFailedInfo | unknown) => {
+      logOperationalError('[Ads] AppLovin rewarded ad failed to load', error);
+      resetLoadedState();
+      scheduleLoadRetry();
+    },
+    [resetLoadedState, scheduleLoadRetry],
+  );
+
+  const registerRewardedListeners = useCallback(
+    (module: AdsModule) => {
+      cleanupRewardedListeners();
+
+      module.RewardedAd.addAdLoadedEventListener((_adInfo: AdInfo) => {
+        retryAttemptRef.current = 0;
+        adLoadedRef.current = true;
+        adLoadingRef.current = false;
+        setIsReady(true);
+      });
+
+      module.RewardedAd.addAdLoadFailedEventListener(handleLoadFailure);
+
+      module.RewardedAd.addAdDisplayedEventListener((_adInfo: AdInfo) => {
+        adShownRef.current = true;
+      });
+
+      module.RewardedAd.addAdFailedToDisplayEventListener(handleDisplayFailure);
+
+      module.RewardedAd.addAdHiddenEventListener((_adInfo: AdInfo) => {
+        handleAdClosed();
+      });
+
+      module.RewardedAd.addAdReceivedRewardEventListener(
+        (_rewardInfo: AdRewardInfo) => {
+          rewardEarnedRef.current = true;
+          trackEvent('ad_rewarded_earned', { surface: currentSurfaceRef.current });
+        },
+      );
+    },
+    [cleanupRewardedListeners, handleAdClosed, handleDisplayFailure, handleLoadFailure],
   );
 
   const preloadRewardedAd = useCallback(() => {
-    const adsModule = adsModuleRef.current;
-    if (!adsModule || !adsEnabledRef.current) {
+    const module = adsModuleRef.current;
+    const adUnitId = getRewardedAdUnitId();
+    if (!module || !adsEnabledRef.current || !initialized || !adUnitId) {
       return;
     }
     if (adLoadingRef.current || adLoadedRef.current) {
@@ -153,70 +243,67 @@ export function AdsProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      cleanupAdListeners();
+      clearRetryTimeout();
       rewardEarnedRef.current = false;
-
-      const { RewardedAd, RewardedAdEventType, AdEventType } = adsModule;
-      const ad = RewardedAd.createForAdRequest(getRewardedAdUnitId(), {
-        requestNonPersonalizedAdsOnly: nonPersonalizedRef.current,
-      });
-
-      const subscriptions: Array<() => void> = [
-        ad.addAdEventListener(RewardedAdEventType.LOADED, () => {
-          adLoadedRef.current = true;
-          adLoadingRef.current = false;
-          setIsReady(true);
-        }),
-        ad.addAdEventListener(RewardedAdEventType.EARNED_REWARD, () => {
-          rewardEarnedRef.current = true;
-          trackEvent('ad_rewarded_earned', { surface: currentSurfaceRef.current });
-        }),
-        ad.addAdEventListener(AdEventType.CLOSED, () => {
-          handleAdClosed();
-        }),
-        ad.addAdEventListener(AdEventType.ERROR, (error) => {
-          handleAdError(error);
-        }),
-      ];
-
-      unsubscribersRef.current = subscriptions;
-      rewardedAdRef.current = ad;
       adLoadingRef.current = true;
       adLoadedRef.current = false;
       setIsReady(false);
-      ad.load();
+      module.RewardedAd.loadAd(adUnitId);
     } catch (error) {
-      adLoadingRef.current = false;
-      logOperationalError('[Ads] Failed to preload rewarded ad', error);
+      logOperationalError('[Ads] Failed to start AppLovin rewarded load', error);
+      resetLoadedState();
+      scheduleLoadRetry();
     }
-  }, [cleanupAdListeners, handleAdClosed, handleAdError]);
+  }, [clearRetryTimeout, initialized, resetLoadedState, scheduleLoadRetry]);
 
   useEffect(() => {
     preloadRef.current = preloadRewardedAd;
   }, [preloadRewardedAd]);
 
-  // --- Handlers de l'opt-in (CustomAlert appelle onDismiss PUIS onPress) ------
   const handleOptInWatch = useCallback(async () => {
     trackEvent('ad_optin_accepted', { surface: currentSurfaceRef.current });
-    const ad = rewardedAdRef.current;
-    if (adsEnabledRef.current && ad && adLoadedRef.current) {
-      try {
-        adShownRef.current = true;
-        rewardEarnedRef.current = false;
-        await ad.show(); // la résolution se fait via le listener CLOSED
-        return;
-      } catch (error) {
-        logOperationalError('[Ads] Failed to show rewarded ad', error);
-        trackEvent('ad_failed', { surface: currentSurfaceRef.current });
-        adShownRef.current = false;
-      }
-    } else {
+
+    const module = adsModuleRef.current;
+    const adUnitId = getRewardedAdUnitId();
+    if (!adsEnabledRef.current || !module || !adUnitId || !initialized) {
       trackEvent('ad_unavailable', { surface: currentSurfaceRef.current });
+      resolveGate('unavailable');
+      return;
     }
-    // Pas de pub dispo / échec → ne pas bloquer, l'appelant poursuit.
-    preloadRef.current();
-    resolveGate('unavailable');
-  }, [resolveGate]);
+
+    try {
+      const isAdReady = await module.RewardedAd.isAdReady(adUnitId);
+      if (!isAdReady) {
+        trackEvent('ad_unavailable', { surface: currentSurfaceRef.current });
+        preloadRef.current();
+        resolveGate('unavailable');
+        return;
+      }
+
+      adShownRef.current = true;
+      rewardEarnedRef.current = false;
+      clearShowWatchdog();
+      showWatchdogRef.current = setTimeout(() => {
+        logOperationalError('[Ads] AppLovin rewarded ad show watchdog expired', {
+          surface: currentSurfaceRef.current,
+        });
+        resetLoadedState();
+        adShownRef.current = false;
+        rewardEarnedRef.current = false;
+        resolveGate('unavailable');
+        preloadRef.current();
+      }, REWARDED_SHOW_WATCHDOG_MS);
+      module.RewardedAd.showAd(adUnitId, currentSurfaceRef.current);
+    } catch (error) {
+      handleDisplayFailure(error);
+    }
+  }, [
+    clearShowWatchdog,
+    handleDisplayFailure,
+    initialized,
+    resetLoadedState,
+    resolveGate,
+  ]);
 
   const handleOptInLater = useCallback(() => {
     trackEvent('ad_optin_declined', { surface: currentSurfaceRef.current });
@@ -234,11 +321,24 @@ export function AdsProvider({ children }: { children: React.ReactNode }) {
 
   const presentRewardedAdGate = useCallback(
     (surface: AdGateSurface): Promise<AdGateOutcome> => {
-      // Premium/admin, web ou Expo Go → jamais de pub.
       if (!adsEnabled) {
         return Promise.resolve('rewarded');
       }
-      // Sécurité : une seule pub à la fois.
+
+      const adUnitId = getRewardedAdUnitId();
+      if (!initialized || !adsModuleRef.current || !adUnitId) {
+        trackEvent('ad_unavailable', { surface });
+        logRuntimeDecisionOnce(
+          'AppLovin MAX rewarded gate unavailable',
+          {
+            reason: !adUnitId ? 'missing-rewarded-ad-unit' : 'sdk-not-ready',
+            surface,
+          },
+          `applovin-gate-unavailable-${surface}-${adUnitId ? 'sdk' : 'unit'}`,
+        );
+        return Promise.resolve('unavailable');
+      }
+
       if (gateResolverRef.current) {
         return Promise.resolve('unavailable');
       }
@@ -248,107 +348,87 @@ export function AdsProvider({ children }: { children: React.ReactNode }) {
 
       return new Promise<AdGateOutcome>((resolve) => {
         gateResolverRef.current = resolve;
-        // Tente un préchargement pendant que l'utilisateur lit l'opt-in.
         if (!adLoadedRef.current) {
           preloadRewardedAd();
         }
         setOptInVisible(true);
       });
     },
-    [adsEnabled, preloadRewardedAd],
+    [adsEnabled, initialized, preloadRewardedAd],
   );
 
-  // --- Initialisation unique : UMP (RGPD) → ATT iOS → SDK AdMob --------------
   useEffect(() => {
     if (!getRuntimeCapabilities().canUseAds) {
+      return;
+    }
+
+    const sdkKey = getAppLovinSdkKey();
+    const adUnitId = getRewardedAdUnitId();
+    if (!sdkKey || !adUnitId) {
+      logRuntimeDecisionOnce(
+        'AppLovin MAX init skipped',
+        {
+          reason: !sdkKey ? 'missing-sdk-key' : 'missing-rewarded-ad-unit',
+        },
+        !sdkKey ? 'applovin-missing-sdk-key' : 'applovin-missing-rewarded-unit',
+      );
       return;
     }
 
     let cancelled = false;
 
     (async () => {
-      const adsModule = await loadAdsModule();
-      if (!adsModule || cancelled) {
+      const module = await loadAdsModule();
+      if (!module || cancelled) {
         return;
       }
-      adsModuleRef.current = adsModule;
 
-      // 1. Consentement RGPD via le SDK UMP de Google.
-      try {
-        const { AdsConsent, AdsConsentStatus } = adsModule;
-        const consentInfo = await AdsConsent.requestInfoUpdate();
-        if (
-          consentInfo.isConsentFormAvailable &&
-          consentInfo.status === AdsConsentStatus.REQUIRED
-        ) {
-          await AdsConsent.loadAndShowConsentFormIfRequired();
-        }
-      } catch (error) {
-        logOperationalError('[Ads] UMP consent flow failed', error);
-      }
+      adsModuleRef.current = module;
+      registerRewardedListeners(module);
 
-      // 2. App Tracking Transparency (iOS). Le refus → pubs non personnalisées.
       try {
-        if (Platform.OS === 'ios') {
-          const tracking = require('expo-tracking-transparency');
-          const current = await tracking.getTrackingPermissionsAsync();
-          let status = current.status;
-          if (status === 'undetermined') {
-            const requested = await tracking.requestTrackingPermissionsAsync();
-            status = requested.status;
-          }
-          nonPersonalizedRef.current = status !== 'granted';
-        }
-      } catch (error) {
-        logOperationalError('[Ads] ATT request failed', error);
-      }
-
-      // 3. Initialisation du SDK AdMob.
-      try {
-        const mobileAds = adsModule.default;
-        if (__DEV__) {
-          try {
-            await mobileAds().setRequestConfiguration({
-              testDeviceIdentifiers: ['EMULATOR'],
-            });
-          } catch (error) {
-            logOperationalError('[Ads] setRequestConfiguration failed', error);
-          }
-        }
-        await mobileAds().initialize();
+        module.AppLovinMAX.setTermsAndPrivacyPolicyFlowEnabled(true);
+        module.AppLovinMAX.setPrivacyPolicyUrl(PUBLIC_PRIVACY_POLICY_URL);
+        module.AppLovinMAX.setInitializationAdUnitIds([adUnitId]);
+        await module.AppLovinMAX.initialize(sdkKey);
         if (!cancelled) {
-          logRuntimeDecision('AdMob initialized');
+          logRuntimeDecision('AppLovin MAX initialized');
           setInitialized(true);
         }
       } catch (error) {
-        logOperationalError('[Ads] mobileAds initialize failed', error);
+        logOperationalError('[Ads] AppLovin MAX initialize failed', error);
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [registerRewardedListeners]);
 
-  // Précharge dès que le SDK est prêt et que l'utilisateur est éligible (gratuit).
   useEffect(() => {
     if (initialized && adsEnabled) {
       preloadRewardedAd();
     }
   }, [initialized, adsEnabled, preloadRewardedAd]);
 
-  // Utilisateur premium/admin (ou capacité perdue) → on libère la pub préchargée.
   useEffect(() => {
     if (!adsEnabled) {
-      cleanupAdListeners();
-      rewardedAdRef.current = null;
-      adLoadedRef.current = false;
-      adLoadingRef.current = false;
-      setIsReady(false);
+      clearRetryTimeout();
+      clearShowWatchdog();
+      resetLoadedState();
+      adShownRef.current = false;
+      rewardEarnedRef.current = false;
     }
-  }, [adsEnabled, cleanupAdListeners]);
+  }, [adsEnabled, clearRetryTimeout, clearShowWatchdog, resetLoadedState]);
 
-  useEffect(() => () => cleanupAdListeners(), [cleanupAdListeners]);
+  useEffect(
+    () => () => {
+      clearRetryTimeout();
+      clearShowWatchdog();
+      cleanupRewardedListeners();
+    },
+    [cleanupRewardedListeners, clearRetryTimeout, clearShowWatchdog],
+  );
 
   const value = useMemo<AdsContextValue>(
     () => ({ isReady, presentRewardedAdGate }),

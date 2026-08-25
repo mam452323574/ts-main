@@ -114,11 +114,7 @@ export default function LoginScreen() {
       // Annulation volontaire (l'utilisateur a fermé l'onglet Google) : on ne
       // montre pas de bandeau d'erreur, on retombe juste sur le formulaire.
       if (!isOAuthCancellationError(err)) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : t('auth.errors.oauth_login', { provider: 'google' }),
-        );
+        setError(t('auth.errors.oauth_login', { provider: 'google' }));
       }
     } finally {
       setGoogleLoading(false);
@@ -138,11 +134,7 @@ export default function LoginScreen() {
       // Annulation volontaire (l'utilisateur a fermé l'onglet Apple) : on ne
       // montre pas de bandeau d'erreur, on retombe juste sur le formulaire.
       if (!isOAuthCancellationError(err)) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : t('auth.errors.oauth_login', { provider: 'apple' }),
-        );
+        setError(t('auth.errors.oauth_login', { provider: 'apple' }));
       }
     } finally {
       setAppleLoading(false);
@@ -168,6 +160,7 @@ export default function LoginScreen() {
         {Platform.OS === 'ios' ? (
           <OAuthButton
             provider="apple"
+            appleButtonType="signIn"
             onPress={handleAppleLogin}
             loading={appleLoading}
             disabled={googleLoading || appleLoading || loading}

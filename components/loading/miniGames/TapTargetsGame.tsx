@@ -158,7 +158,7 @@ export function TapTargetsGame({
   );
   const { styles, gradients } = chrome;
   const [score, setScore] = useState(0);
-  const [streak, setStreak] = useState(0);
+  const [, setStreak] = useState(0);
   const [targets, setTargets] = useState<Target[]>([]);
   const nextTargetIdRef = useRef(0);
   const targetTimeoutsRef = useRef<Map<number, TimeoutHandle>>(new Map());

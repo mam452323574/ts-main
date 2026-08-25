@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 
 import { useTheme } from '@/contexts/ThemeContext';
 import { withAlpha } from '@/constants/theme';
@@ -86,7 +85,6 @@ export function MazeRunnerGame({
     if (!active) return undefined;
     const interval = setInterval(() => {
       tickRef.current += 1;
-      const t = tickRef.current / 30;
       setObstacles((current) =>
         current.map((o) => ({ ...o, phase: o.phase + 0.08 * o.speed })),
       );

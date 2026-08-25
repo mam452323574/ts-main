@@ -6,6 +6,11 @@
 # === re-list .gitignore ===
 node_modules/
 .expo/
+/.expo/
+.expo/**
+.bolt/
+.claude/
+.codex-validation/
 dist/
 web-build/
 expo-env.d.ts
@@ -18,6 +23,8 @@ recipe-artifacts/
 *.key
 *.mobileprovision
 credentials.json
+credentials*.json
+AuthKey_*.p8
 .metro-health-check*
 npm-debug.*
 yarn-debug.*
@@ -27,11 +34,17 @@ yarn-error.*
 *_output.txt
 test-results*.json
 .env
-.env*.local
+.env*
+*.env
+*.env.*
+*.cloud-backup
+*.backup
+*.bak
 .DS_Store
 *.pem
 .idea
 .vscode
+.vscode/
 ios/Pods/
 ios/build/
 android/app/build/
@@ -86,3 +99,13 @@ android/.cxx/
 android/.kotlin/
 android/app/.gradle/
 android/app/.cxx/
+STAGING_SOURCE.txt
+backups/
+
+# Store-delivery artwork and local analysis outputs are versioned separately;
+# they are never read by the native application at build or runtime.
+store-assets/
+output/
+graphify-out/
+website/
+assets/_backup_png/

@@ -19,6 +19,7 @@ import { useStartupDiagnostics } from '@/contexts/StartupDiagnosticsContext';
 import { loadPurchasesModule } from '@/services/purchasesRuntime';
 import { tryGetRuntimeConfig, getSupabaseFunctionUrl } from '@/services/runtimeConfig';
 import { clearAvatarUrlCache } from '@/services/avatar';
+import { secureStorage } from '@/services/secureStorage';
 import { trackFailureEvent } from '@/services/analytics';
 import {
   DEFAULT_COACH_PERSONA_KEY,
@@ -40,6 +41,7 @@ import {
 } from '@/utils/runtimeCapabilities';
 import { queryClient } from '@/services/queryClient';
 import { createOAuthState } from '@/utils/oauthState';
+import { createAppleNonceHash } from '@/utils/appleNonce';
 import {
   createOAuthCancelledError,
   isOAuthCancellationError,
@@ -96,6 +98,14 @@ interface AuthContextType {
   sendVerificationEmail: () => Promise<void>;
   verifyEmailCode: (code: string) => Promise<boolean>;
   cleanupOrphanUser: (userId: string) => Promise<void>;
+  deleteAccount: () => Promise<void>;
+}
+
+class OAuthUserVisibleError extends Error {
+  constructor(message = 'oauth_login_failed') {
+    super(message);
+    this.name = 'OAuthUserVisibleError';
+  }
 }
 
 type SafeProfileMutationInput = {
@@ -125,6 +135,9 @@ const DEFAULT_NOTIFICATION_SETTINGS: UserProfile['notification_settings'] = {
   achievements: true,
   newContent: true,
 };
+
+const APPLE_AUTHORIZATION_CODE_STORAGE_KEY =
+  'selflens.apple.authorization_code.v1';
 
 const SUBSCRIPTION_SYNC_DEDUPE_WINDOW_MS = 60 * 1000;
 
@@ -198,11 +211,56 @@ function logOAuthDebugError(
   error: unknown,
   properties?: SafeObservabilityProperties,
 ) {
-  if (!__DEV__) {
-    return;
-  }
-
   logOperationalError(message, error, properties);
+}
+
+async function persistAppleAuthorizationCode(authorizationCode: unknown) {
+  if (typeof authorizationCode !== 'string') return;
+
+  const trimmedCode = authorizationCode.trim();
+  if (!trimmedCode) return;
+
+  try {
+    await secureStorage.setItem(
+      APPLE_AUTHORIZATION_CODE_STORAGE_KEY,
+      trimmedCode,
+    );
+  } catch (error) {
+    logOperationalError('[OAuth] Failed to store Apple authorization code', error, {
+      provider: 'apple',
+    });
+  }
+}
+
+async function readAppleAuthorizationCodeForRevocation() {
+  try {
+    const code = await secureStorage.getItem(APPLE_AUTHORIZATION_CODE_STORAGE_KEY);
+    return typeof code === 'string' && code.trim().length > 0 ? code.trim() : null;
+  } catch (error) {
+    logOperationalError('[DeleteAccount] Failed to read Apple authorization code', error, {
+      provider: 'apple',
+    });
+    return null;
+  }
+}
+
+async function clearAppleAuthorizationCode() {
+  try {
+    await secureStorage.removeItem(APPLE_AUTHORIZATION_CODE_STORAGE_KEY);
+  } catch (error) {
+    logOperationalError('[Auth] Failed to clear Apple authorization code', error, {
+      provider: 'apple',
+    });
+  }
+}
+
+function isIpLimitError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.name === 'IpLimitError' ||
+      error.message.includes('limit reached') ||
+      (error.message.includes('limite') && error.message.includes('atteinte')))
+  );
 }
 
 const normalizeLoadedUserProfile = (
@@ -1397,12 +1455,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
       }
     } catch (error) {
-      if (
-        error instanceof Error &&
-        (error.name === 'IpLimitError' ||
-          error.message.includes('limit reached') ||
-          (error.message.includes('limite') && error.message.includes('atteinte')))
-      ) {
+      if (isIpLimitError(error)) {
         throw error;
       }
 
@@ -1666,22 +1719,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithAppleNative = async () => {
     try {
       const AppleAuthentication = require('expo-apple-authentication');
+      const appleRawNonce = createOAuthState();
+      const appleNonceHash = await createAppleNonceHash(appleRawNonce);
+      const appleState = createOAuthState();
       const credential = await AppleAuthentication.signInAsync({
         requestedScopes: [
           AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
           AppleAuthentication.AppleAuthenticationScope.EMAIL,
         ],
+        nonce: appleNonceHash,
+        state: appleState,
       });
 
       const identityToken = credential?.identityToken;
       if (!identityToken) {
         throw new Error('Apple identity token is missing');
       }
+      if (credential?.state !== appleState) {
+        throw new Error('Apple OAuth state mismatch');
+      }
 
       const { data: sessionData, error: sessionError } =
         await supabase.auth.signInWithIdToken({
           provider: 'apple',
           token: identityToken,
+          nonce: appleRawNonce,
         });
 
       if (sessionError) {
@@ -1693,6 +1755,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (sessionData.user) {
         await handleOAuthUserSetup(sessionData.user, 'apple');
+        await persistAppleAuthorizationCode(credential?.authorizationCode);
       }
     } catch (error) {
       const code = (error as { code?: string })?.code;
@@ -1713,6 +1776,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (provider === 'apple' && Platform.OS === 'ios') {
       await signInWithAppleNative();
       return;
+    }
+    if (provider === 'apple') {
+      throw new OAuthUserVisibleError('apple_native_auth_unavailable');
     }
     await signInWithOAuthProvider(provider);
   };
@@ -1738,11 +1804,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         await checkIpEligibility();
       } catch (error) {
-        logOperationalError('[OAuth] IP eligibility blocked signup', error, {
-          provider,
-        });
-        await cleanupOrphanUser(oauthUser.id);
-        throw error;
+        if ((provider === 'apple' || provider === 'google') && isIpLimitError(error)) {
+          logOperationalError('[OAuth] IP eligibility rate limit soft-allowed', error, {
+            provider,
+          });
+        } else {
+          logOperationalError('[OAuth] IP eligibility blocked signup', error, {
+            provider,
+          });
+          await cleanupOrphanUser(oauthUser.id);
+          throw error;
+        }
       }
 
       const isDisposable = await checkDisposableEmail(email);
@@ -2054,6 +2126,73 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const clearDeletedAccountLocalState = async () => {
+    authVersionRef.current += 1;
+    lastAuthHydrationSignatureRef.current = buildAuthHydrationSignature(null);
+    setCurrentUserProfile(null);
+    setCurrentUser(null);
+    setCurrentSession(null);
+    subscriptionSyncAttemptedAtRef.current.clear();
+    invalidateCoachProfileMemoryCache();
+
+    await syncRevenueCatIdentity(null);
+
+    try {
+      queryClient.clear();
+    } catch (queryError) {
+      logOperationalError('[DeleteAccount] Failed to clear React Query cache', queryError);
+    }
+
+    try {
+      await AsyncStorage.multiRemove([
+        'supabase.auth.token',
+        '@supabase.auth.token',
+        'healthscan_badges',
+      ]);
+    } catch (storageError) {
+      logOperationalError('[DeleteAccount] Failed to clear AsyncStorage', storageError);
+    }
+    await clearAppleAuthorizationCode();
+
+    try {
+      await supabase.auth.signOut();
+    } catch (signOutError) {
+      logOperationalError('[DeleteAccount] Local sign out after deletion failed', signOutError);
+    }
+  };
+
+  const deleteAccount = async (): Promise<void> => {
+    const accessToken = await resolveFunctionAccessToken();
+    if (!accessToken) {
+      throw new Error('Authentication required');
+    }
+
+    const appleAuthorizationCode = await readAppleAuthorizationCodeForRevocation();
+    const deleteAccountPayload: {
+      confirmation: 'DELETE_ACCOUNT';
+      apple_authorization_code?: string;
+    } = {
+      confirmation: 'DELETE_ACCOUNT',
+    };
+
+    if (appleAuthorizationCode) {
+      deleteAccountPayload.apple_authorization_code = appleAuthorizationCode;
+    }
+
+    const response = await fetch(getSupabaseFunctionUrl('delete-account'), {
+      method: 'POST',
+      headers: getFunctionHeaders(accessToken),
+      body: JSON.stringify(deleteAccountPayload),
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw buildFunctionError('delete-account', response.status, data);
+    }
+
+    await clearDeletedAccountLocalState();
+  };
+
   const signOut = async () => {
     try {
       // S-14 — Avant tout teardown, on tente de purger les reservations
@@ -2104,6 +2243,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (storageError) {
         logOperationalError('[SignOut] Failed to clear AsyncStorage', storageError);
       }
+      await clearAppleAuthorizationCode();
 
       // scope:'global' invalide tous les refresh tokens de l'utilisateur,
       // y compris sur les autres devices. Indispensable pour qu'une
@@ -2150,6 +2290,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         sendVerificationEmail,
         verifyEmailCode,
         cleanupOrphanUser,
+        deleteAccount,
       }}
     >
       {children}

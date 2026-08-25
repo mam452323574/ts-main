@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="SelfLens heart scan app icon">
+  <defs>
+    <radialGradient id="bg" cx="34%" cy="20%" r="88%">
+      <stop offset="0%" stop-color="#DDF8FF"/>
+      <stop offset="38%" stop-color="#62B8FF"/>
+      <stop offset="72%" stop-color="#2464C8"/>
+      <stop offset="100%" stop-color="#0D2A64"/>
+    </radialGradient>
+    <radialGradient id="innerGlow" cx="50%" cy="42%" r="58%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.92"/>
+      <stop offset="58%" stop-color="#E6F9FF" stop-opacity="0.58"/>
+      <stop offset="100%" stop-color="#BDE8FF" stop-opacity="0.12"/>
+    </radialGradient>
+    <linearGradient id="heart" x1="312" y1="300" x2="724" y2="734" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="48%" stop-color="#DDF8FF"/>
+      <stop offset="100%" stop-color="#9DE7D7"/>
+    </linearGradient>
+    <linearGradient id="heartShade" x1="390" y1="360" x2="610" y2="710" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.0"/>
+      <stop offset="100%" stop-color="#1C7ADB" stop-opacity="0.22"/>
+    </linearGradient>
+    <linearGradient id="bracket" x1="256" y1="258" x2="768" y2="766" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#BFF8FF"/>
+    </linearGradient>
+    <filter id="softShadow" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="26" stdDeviation="34" flood-color="#06255D" flood-opacity="0.36"/>
+    </filter>
+    <filter id="heartShadow" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#063070" flood-opacity="0.24"/>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" rx="224" fill="#0D2A64"/>
+  <rect width="1024" height="1024" rx="224" fill="url(#bg)"/>
+  <circle cx="220" cy="184" r="210" fill="#FFFFFF" opacity="0.18"/>
+  <circle cx="810" cy="824" r="250" fill="#8FEAD8" opacity="0.18"/>
+  <circle cx="512" cy="512" r="360" fill="url(#innerGlow)"/>
+
+  <g filter="url(#softShadow)">
+    <rect x="178" y="178" width="668" height="668" rx="196" fill="#FFFFFF" opacity="0.16"/>
+    <rect x="218" y="218" width="588" height="588" rx="168" fill="#FFFFFF" opacity="0.14"/>
+  </g>
+
+  <g fill="none" stroke="url(#bracket)" stroke-width="54" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M300 250h-60c-38 0-70 32-70 70v60"/>
+    <path d="M724 250h60c38 0 70 32 70 70v60"/>
+    <path d="M300 774h-60c-38 0-70-32-70-70v-60"/>
+    <path d="M724 774h60c38 0 70-32 70-70v-60"/>
+  </g>
+
+  <g opacity="0.26" fill="none" stroke="#FFFFFF" stroke-width="9" stroke-linecap="round">
+    <path d="M312 512h400"/>
+    <path d="M512 312v400"/>
+    <circle cx="512" cy="512" r="204"/>
+  </g>
+
+  <g filter="url(#heartShadow)">
+    <path d="M512 738C406 650 306 566 306 444c0-78 59-136 133-136 44 0 82 20 106 54 24-34 62-54 106-54 74 0 133 58 133 136 0 122-100 206-272 294Z" fill="url(#heart)"/>
+    <path d="M512 738C406 650 306 566 306 444c0-78 59-136 133-136 44 0 82 20 106 54 24-34 62-54 106-54 74 0 133 58 133 136 0 122-100 206-272 294Z" fill="url(#heartShade)"/>
+    <path d="M396 414c12-28 37-46 69-46" fill="none" stroke="#FFFFFF" stroke-width="22" stroke-linecap="round" opacity="0.7"/>
+  </g>
+</svg>

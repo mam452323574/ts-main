@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Pressable, View } from 'react-native';
+import { Animated, Pressable } from 'react-native';
 
 import { useTheme } from '@/contexts/ThemeContext';
 import { withAlpha } from '@/constants/theme';

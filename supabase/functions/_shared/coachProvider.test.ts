@@ -186,7 +186,7 @@ Deno.test('requireCoachGenerateWebhookEndpoints keeps the primary env mandatory'
 Deno.test('coach response generation exposes the extended webhook timeout', () => {
   assertEquals(
     COACH_GENERATE_RESPONSE_WEBHOOK_TIMEOUT_MS,
-    45_000,
+    75_000,
     'Coach response generation should allow long-running webhook calls',
   );
 });

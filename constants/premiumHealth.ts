@@ -34,9 +34,49 @@ export interface PremiumHealthPalette {
   secondaryActionText: string;
   scrim: string;
   shadowColor: string;
+  paywall: PremiumHealthPaywallPalette;
 }
 
 export type PremiumHealthModuleTone = 'trust' | 'premium';
+
+export interface PremiumHealthPaywallPalette {
+  screenGradient: [string, string, string];
+  heroGradient: [string, string, string];
+  heroBorder: string;
+  heroIconBackground: string;
+  heroIconBorder: string;
+  heroBadgeBackground: string;
+  heroBadgeBorder: string;
+  proofTileBackground: string;
+  proofTileBorder: string;
+  proofTileIconBackground: string;
+  proofTileIconBorder: string;
+  benefitsBackground: string;
+  benefitsBorder: string;
+  benefitIconBackground: string;
+  benefitIconBorder: string;
+  planPanelBackground: string;
+  planPanelBorder: string;
+  planOptionBackground: string;
+  planOptionBorder: string;
+  planOptionSelectedBackground: string;
+  planOptionSelectedBorder: string;
+  planOptionMutedBackground: string;
+  planBadgeBackground: string;
+  planBadgeBorder: string;
+  planBadgeText: string;
+  selectionBackground: string;
+  selectionBorder: string;
+  selectionText: string;
+  footerBackground: string;
+  footerBorder: string;
+  ctaBackground: string;
+  ctaBorder: string;
+  ctaText: string;
+  ctaShadow: string;
+  softText: string;
+  shadowColor: string;
+}
 
 export interface PremiumHealthModulePalette {
   accent: string;
@@ -111,6 +151,24 @@ export function buildPremiumHealthPalette(
   const surfaceGlass = isDark
     ? withAlpha('#101B24', 0.94)
     : withAlpha('#FFFCF8', 0.94);
+  const paywallHeroStart = isDark
+    ? mixColors(surfaceRaised, trustAccent, 0.1)
+    : mixColors(surfaceRaised, trustAccent, 0.055);
+  const paywallHeroMiddle = isDark
+    ? mixColors(surfaceBase, premiumAccent, 0.08)
+    : mixColors(surfaceRaised, premiumAccent, 0.07);
+  const paywallHeroEnd = isDark
+    ? mixColors(surfaceBase, colors.white, 0.025)
+    : mixColors(surfaceRaised, colors.goldLight, 0.12);
+  const paywallPlanBase = isDark
+    ? mixColors(surfaceRaised, colors.white, 0.018)
+    : mixColors(surfaceRaised, colors.background, 0.08);
+  const paywallPlanSelected = isDark
+    ? mixColors(surfaceRaised, premiumAccent, 0.095)
+    : mixColors(surfaceRaised, premiumAccent, 0.065);
+  const paywallTrustSurface = isDark
+    ? mixColors(surfaceRaised, trustAccent, 0.055)
+    : mixColors(surfaceRaised, trustAccent, 0.03);
 
   return {
     canvas,
@@ -194,6 +252,91 @@ export function buildPremiumHealthPalette(
     shadowColor: isDark
       ? '#02070C'
       : mixColors(colors.gray, trustAccent, 0.12),
+    paywall: {
+      screenGradient: isDark
+        ? [
+            mixColors(canvasElevated, trustAccent, 0.05),
+            canvas,
+            mixColors(canvas, premiumAccent, 0.035),
+          ]
+        : [
+            mixColors(canvasElevated, colors.white, 0.24),
+            canvas,
+            mixColors(canvas, trustAccent, 0.018),
+          ],
+      heroGradient: [paywallHeroStart, paywallHeroMiddle, paywallHeroEnd],
+      heroBorder: withAlpha(
+        mixColors(trustAccent, premiumAccent, 0.24),
+        isDark ? 0.22 : 0.14,
+      ),
+      heroIconBackground: isDark
+        ? withAlpha(premiumAccent, 0.13)
+        : mixColors(surfaceRaised, premiumAccent, 0.08),
+      heroIconBorder: withAlpha(premiumAccent, isDark ? 0.26 : 0.2),
+      heroBadgeBackground: isDark
+        ? withAlpha(colors.white, 0.055)
+        : withAlpha(colors.white, 0.76),
+      heroBadgeBorder: isDark
+        ? withAlpha(colors.white, 0.1)
+        : withAlpha(colors.primaryText, 0.065),
+      proofTileBackground: isDark
+        ? withAlpha(colors.white, 0.045)
+        : withAlpha(colors.white, 0.64),
+      proofTileBorder: isDark
+        ? withAlpha(colors.white, 0.09)
+        : withAlpha(colors.primaryText, 0.06),
+      proofTileIconBackground: withAlpha(trustAccent, isDark ? 0.12 : 0.075),
+      proofTileIconBorder: withAlpha(trustAccent, isDark ? 0.18 : 0.12),
+      benefitsBackground: paywallTrustSurface,
+      benefitsBorder: withAlpha(trustAccent, isDark ? 0.14 : 0.095),
+      benefitIconBackground: withAlpha(trustAccent, isDark ? 0.11 : 0.07),
+      benefitIconBorder: withAlpha(trustAccent, isDark ? 0.16 : 0.11),
+      planPanelBackground: isDark
+        ? mixColors(surfaceRaised, colors.white, 0.018)
+        : mixColors(surfaceRaised, colors.white, 0.12),
+      planPanelBorder: isDark
+        ? withAlpha(colors.white, 0.1)
+        : withAlpha(colors.primaryText, 0.075),
+      planOptionBackground: paywallPlanBase,
+      planOptionBorder: isDark
+        ? withAlpha(colors.white, 0.09)
+        : withAlpha(colors.primaryText, 0.07),
+      planOptionSelectedBackground: paywallPlanSelected,
+      planOptionSelectedBorder: withAlpha(premiumAccent, isDark ? 0.34 : 0.24),
+      planOptionMutedBackground: isDark
+        ? withAlpha(colors.white, 0.03)
+        : mixColors(surfaceBase, colors.primaryText, 0.018),
+      planBadgeBackground: isDark
+        ? withAlpha(premiumAccent, 0.13)
+        : withAlpha(premiumAccent, 0.09),
+      planBadgeBorder: withAlpha(premiumAccent, isDark ? 0.24 : 0.17),
+      planBadgeText: isDark
+        ? mixColors(colors.primaryText, premiumAccent, 0.18)
+        : mixColors(colors.primaryText, premiumAccent, 0.28),
+      selectionBackground: isDark ? colors.primaryText : colors.primaryText,
+      selectionBorder: isDark
+        ? withAlpha(colors.white, 0.16)
+        : withAlpha(colors.primaryText, 0.08),
+      selectionText: colors.background,
+      footerBackground: isDark
+        ? withAlpha(colors.white, 0.025)
+        : withAlpha(colors.white, 0.42),
+      footerBorder: isDark
+        ? withAlpha(colors.white, 0.07)
+        : withAlpha(colors.primaryText, 0.055),
+      ctaBackground: isDark ? colors.primaryText : colors.primaryText,
+      ctaBorder: isDark
+        ? withAlpha(colors.white, 0.16)
+        : withAlpha(colors.primaryText, 0.08),
+      ctaText: colors.background,
+      ctaShadow: isDark
+        ? mixColors(premiumAccent, colors.background, 0.35)
+        : mixColors(colors.gray, premiumAccent, 0.2),
+      softText: isDark ? colors.secondaryText : withAlpha(colors.primaryText, 0.68),
+      shadowColor: isDark
+        ? mixColors(colors.background, premiumAccent, 0.12)
+        : mixColors(colors.gray, trustAccent, 0.16),
+    },
   };
 }
 

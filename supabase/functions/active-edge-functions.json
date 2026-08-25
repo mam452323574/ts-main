@@ -48,6 +48,7 @@
     "send-verification-email",
     "verify-email-code",
     "cleanup-orphan-user",
+    "delete-account",
     "social-admin-moderate-user",
     "social-admin-eradicate-user",
     "social-admin-adjust-post-reactions",

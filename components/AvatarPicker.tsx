@@ -30,10 +30,6 @@ interface AvatarPickerProps {
 
 const PICKER_LAUNCH_DELAY_MS = 60;
 
-function hasMediaLibraryAccess(permission: ImagePicker.MediaLibraryPermissionResponse) {
-  return permission.granted || permission.accessPrivileges === 'limited';
-}
-
 export function AvatarPicker({ userId, currentAvatarUrl, onAvatarSelected, size = 120 }: AvatarPickerProps) {
   const [uploading, setUploading] = useState(false);
   const [localUri, setLocalUri] = useState<string | null>(null);
@@ -112,26 +108,6 @@ export function AvatarPicker({ userId, currentAvatarUrl, onAvatarSelected, size 
     });
   };
 
-  const ensureMediaLibraryPermission = async () => {
-    if (Platform.OS === 'web') {
-      return { granted: true, canAskAgain: true };
-    }
-
-    const currentPermission = await ImagePicker.getMediaLibraryPermissionsAsync();
-    if (hasMediaLibraryAccess(currentPermission)) {
-      return {
-        granted: true,
-        canAskAgain: currentPermission.canAskAgain,
-      };
-    }
-
-    const requestedPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    return {
-      granted: hasMediaLibraryAccess(requestedPermission),
-      canAskAgain: requestedPermission.canAskAgain,
-    };
-  };
-
   const ensureCameraPermission = async () => {
     if (Platform.OS === 'web') {
       return { granted: true, canAskAgain: true };
@@ -188,15 +164,6 @@ export function AvatarPicker({ userId, currentAvatarUrl, onAvatarSelected, size 
 
   const pickImageFromLibrary = async () => {
     try {
-      const permission = await ensureMediaLibraryPermission();
-      if (!permission.granted) {
-        showPermissionAlert(
-          t('components.avatar.perm_gallery'),
-          permission.canAskAgain,
-        );
-        return;
-      }
-
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsEditing: false,

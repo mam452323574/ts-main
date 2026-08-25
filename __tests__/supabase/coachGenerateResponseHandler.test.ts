@@ -29,7 +29,7 @@ jest.mock('@/supabase/functions/_shared/cors.ts', () => ({
 }));
 
 jest.mock('@/supabase/functions/_shared/coachProvider.ts', () => ({
-  COACH_GENERATE_RESPONSE_WEBHOOK_TIMEOUT_MS: 45_000,
+  COACH_GENERATE_RESPONSE_WEBHOOK_TIMEOUT_MS: 75_000,
   COACH_RESPONSE_TOO_LARGE_ERROR_CODE: 'coach_response_too_large',
   postCoachGenerateWebhook: (...args: unknown[]) =>
     mockPostCoachGenerateWebhook(...args),

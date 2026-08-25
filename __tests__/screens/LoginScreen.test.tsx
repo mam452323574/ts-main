@@ -185,6 +185,19 @@ describe('LoginScreen', () => {
     });
   });
 
+  it('maps internal Apple OAuth failures to a generic user-facing error', async () => {
+    mockSignInWithOAuth.mockRejectedValueOnce(new Error('Invalid OAuth state'));
+
+    render(<LoginScreen />);
+
+    fireEvent.press(screen.getByTestId('oauth-apple-button'));
+
+    expect(
+      await screen.findByText('Erreur lors de la connexion avec apple'),
+    ).toBeTruthy();
+    expect(screen.queryByText('Invalid OAuth state')).toBeNull();
+  });
+
   it('does not apply an abandoned signup intent during Google login', async () => {
     await updatePreAuthOnboardingDraft({
       username: 'draftuser',
