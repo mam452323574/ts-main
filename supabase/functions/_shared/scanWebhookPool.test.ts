@@ -1,20 +1,25 @@
 import { Phase2HttpError } from './phase2Errors.ts';
 import {
   type ResolvedScanWebhookPool,
+  N8N_SCAN_ANALYZE_FALLBACK_WEBHOOK_URL_ENV_NAME,
   N8N_SCAN_ANALYZE_SUPER_WEBHOOK_URL_ENV_NAME,
   N8N_SCAN_ANALYZE_SUPER_WEBHOOK_URLS_ENV_NAME,
   N8N_SCAN_ANALYZE_WEBHOOK_URL_ENV_NAME,
   N8N_SCAN_ANALYZE_WEBHOOK_URLS_ENV_NAME,
   resolveScanWebhookPool,
+  resolveScanWebhookFallback,
   selectScanWebhookEndpoint,
 } from './scanWebhookPool.ts';
 import { sha256Hex } from './phase2Utils.ts';
+import { WEBHOOK_ALLOWED_HOSTS_ENV_NAME } from './webhookHostAllowlist.ts';
 
 const SCAN_WEBHOOK_ENV_NAMES = [
   N8N_SCAN_ANALYZE_WEBHOOK_URL_ENV_NAME,
   N8N_SCAN_ANALYZE_WEBHOOK_URLS_ENV_NAME,
+  N8N_SCAN_ANALYZE_FALLBACK_WEBHOOK_URL_ENV_NAME,
   N8N_SCAN_ANALYZE_SUPER_WEBHOOK_URL_ENV_NAME,
   N8N_SCAN_ANALYZE_SUPER_WEBHOOK_URLS_ENV_NAME,
+  WEBHOOK_ALLOWED_HOSTS_ENV_NAME,
 ] as const;
 
 function assert(
@@ -82,7 +87,10 @@ async function withScanWebhookEnv(
     if (Object.prototype.hasOwnProperty.call(overrides, envName)) {
       Deno.env.set(envName, overrides[envName] ?? '');
     } else {
-      Deno.env.set(envName, '');
+      Deno.env.set(
+        envName,
+        envName === WEBHOOK_ALLOWED_HOSTS_ENV_NAME ? '*.example' : '',
+      );
     }
   }
 
@@ -246,6 +254,75 @@ Deno.test('resolveScanWebhookPool fails closed when the chosen env has no usable
   }, async () => {
     await assertRejectsPhase2HttpError(
       () => resolveScanWebhookPool('health'),
+      'scan_webhook_not_configured',
+      'Scan analysis provider is not configured',
+    );
+  });
+});
+
+Deno.test('resolveScanWebhookFallback returns a validated fallback for standard scans', async () => {
+  await withScanWebhookEnv({
+    N8N_SCAN_ANALYZE_WEBHOOK_URL: 'https://primary.example/webhook',
+    N8N_SCAN_ANALYZE_FALLBACK_WEBHOOK_URL: 'https://fallback.example/webhook',
+  }, () => {
+    const fallback = resolveScanWebhookFallback('health', [
+      'https://primary.example/webhook',
+    ]);
+
+    assert(fallback !== null, 'Expected a configured fallback');
+    assertEquals(
+      fallback.envName,
+      N8N_SCAN_ANALYZE_FALLBACK_WEBHOOK_URL_ENV_NAME,
+      'Unexpected fallback env name',
+    );
+    assertEquals(
+      fallback.url,
+      'https://fallback.example/webhook',
+      'Unexpected fallback url',
+    );
+  });
+});
+
+Deno.test('resolveScanWebhookFallback stays disabled for super scans', async () => {
+  await withScanWebhookEnv({
+    N8N_SCAN_ANALYZE_WEBHOOK_URL: 'https://primary.example/webhook',
+    N8N_SCAN_ANALYZE_FALLBACK_WEBHOOK_URL: 'https://fallback.example/webhook',
+  }, () => {
+    assertEquals(
+      resolveScanWebhookFallback('super', ['https://primary.example/webhook']),
+      null,
+      'Super scans must keep their dedicated workflow',
+    );
+  });
+});
+
+Deno.test('resolveScanWebhookFallback rejects a fallback identical to any primary url', async () => {
+  await withScanWebhookEnv({
+    N8N_SCAN_ANALYZE_WEBHOOK_URLS:
+      'https://primary-a.example/webhook,https://primary-b.example/webhook',
+    N8N_SCAN_ANALYZE_FALLBACK_WEBHOOK_URL:
+      'https://primary-b.example/webhook',
+  }, async () => {
+    await assertRejectsPhase2HttpError(
+      () => resolveScanWebhookFallback('body', [
+        'https://primary-a.example/webhook',
+        'https://primary-b.example/webhook',
+      ]),
+      'scan_webhook_not_configured',
+      'Scan analysis provider is not configured',
+    );
+  });
+});
+
+Deno.test('resolveScanWebhookFallback rejects an invalid fallback url', async () => {
+  await withScanWebhookEnv({
+    N8N_SCAN_ANALYZE_WEBHOOK_URL: 'https://primary.example/webhook',
+    N8N_SCAN_ANALYZE_FALLBACK_WEBHOOK_URL: 'not-a-url',
+  }, async () => {
+    await assertRejectsPhase2HttpError(
+      () => resolveScanWebhookFallback('nutrition', [
+        'https://primary.example/webhook',
+      ]),
       'scan_webhook_not_configured',
       'Scan analysis provider is not configured',
     );

@@ -1,10 +1,10 @@
 {
-  "name": "analyse_1",
+  "name": "analyse_deepseek",
   "nodes": [
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "analyse_1",
+        "path": "analyse_deepseek",
         "responseMode": "responseNode",
         "options": {}
       },
@@ -16,7 +16,7 @@
       ],
       "id": "58cddc74-d38e-4448-90e1-46f61234a575",
       "name": "Webhook",
-      "webhookId": "a9b4a85b-23f6-448e-ab78-9e69e32e05fe"
+      "webhookId": "7989cb75-8749-4bb4-839a-fc91732b9899"
     },
     {
       "parameters": {
@@ -30,49 +30,6 @@
       ],
       "id": "8a75fa68-a3d8-4ebd-a536-20fa83a4f201",
       "name": "Normalize Analyse Input"
-    },
-    {
-      "parameters": {
-        "jsCode": "const root = $json ?? {};\nconst body = root.body && typeof root.body === \"object\" && !Array.isArray(root.body)\n  ? { ...root.body }\n  : undefined;\n\nif (body && Object.prototype.hasOwnProperty.call(body, \"imageBase64\")) {\n  delete body.imageBase64;\n}\n\nreturn [\n  {\n    json: {\n      ...root,\n      ...(body ? { body } : {}),\n    },\n  },\n];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        512,
-        -160
-      ],
-      "id": "1f0cf4f4-f7a6-45a9-9f4b-7df47f34d56c",
-      "name": "Snapshot Analyse Context"
-    },
-    {
-      "parameters": {
-        "operation": "toBinary",
-        "sourceProperty": "body.imageBase64",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.convertToFile",
-      "typeVersion": 1.1,
-      "position": [
-        512,
-        16
-      ],
-      "id": "217552fe-a1e6-4739-90e3-d2907f639a7b",
-      "name": "Convert to File"
-    },
-    {
-      "parameters": {
-        "mode": "combine",
-        "combineBy": "combineByPosition",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3,
-      "position": [
-        720,
-        16
-      ],
-      "id": "b3ad2a6c-d0f0-4f79-aedb-c72c0d2576b3",
-      "name": "Merge Image + Analyse Context"
     },
     {
       "parameters": {
@@ -184,24 +141,29 @@
     },
     {
       "parameters": {
-        "resource": "image",
-        "operation": "analyze",
-        "modelId": {
-          "__rl": true,
-          "value": "models/gemini-2.5-flash",
-          "mode": "list",
-          "cachedResultName": "Gemini 2.5 Flash"
+        "method": "POST",
+        "url": "https://api.deepseek.com/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "deepSeekApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
         },
-        "text": "=You are an AI specialized in human face image analysis for wellness coaching insights.\n\nRequested language code for ALL textual values: {{$json.language_code}}\n\nLanguage rules:\n- If the code starts with \"fr\", all textual VALUES must be in French.\n- If the code starts with \"en\", all textual VALUES must be in English.\n- If the code starts with \"es\", all textual VALUES must be in Spanish.\n- If the code starts with \"de\", all textual VALUES must be in German.\n- If the code starts with \"it\", all textual VALUES must be in Italian.\n- If the code starts with \"pt\", all textual VALUES must be in Portuguese.\n- For any other value, use English.\n- JSON KEYS must always stay in English and in snake_case.\n- Only textual VALUES change with the requested language.\n\nEstimation rules:\n- For every numeric field below, produce your best visual estimate from the image.\n- Only use null as a last resort when there is genuinely no visual cue at all for that field.\n- The downstream coaching system tolerates approximation. It does NOT tolerate empty responses.\n- All scores below are visual heuristics for wellness coaching purposes, not medical assessments. Still produce your best visual estimate for each field.\n\nOutput rules:\n1. Return exactly one valid JSON object.\n2. Return no markdown, no code fences, no comments, and no text outside JSON.\n3. Never omit a field from the chosen schema.\n4. Never add extra keys outside the chosen schema.\n5. If the image does not clearly show an analyzable human face, return the ERROR schema.\n6. Keep the response short, stable, and strictly JSON.\n\nAllowed schemas for this node: face, error.\n\nTask rules:\n- Analyze only a human face image.\n- If the image is blurry, off-topic, unusable, or does not primarily show a clearly visible human face, return ERROR.\n- Never return BODY or NUTRITION from this node.\n- analysis_meta is internal scan quality metadata used by downstream coach and analytics systems.\n- analysis_meta.confidence_score, image_quality_score, and metric_coverage_score must be numbers from 0 to 100.\n- analysis_meta.limitation_flags may only contain: blur, low_light, partial_subject, occlusion, portion_uncertain.\n\nFACE schema:\n{\n  \"schema_version\": 4,\n  \"scan_type\": \"face\",\n  \"face_score\": null,\n  \"perceived_age\": null,\n  \"skin_quality_score\": null,\n  \"symmetry_percentage\": null,\n  \"fatigue_level\": null,\n  \"glow_index\": null,\n  \"face_shape\": null,\n  \"collagen_level\": null,\n  \"hydration_level\": null,\n  \"photogenic_score\": null,\n  \"skin_clarity_score\": null,\n  \"under_eye_shadow_score\": null,\n  \"under_eye_volume_score\": null,\n  \"eye_openness_score\": null,\n  \"complexion_redness_score\": null,\n  \"pore_visibility_score\": null,\n  \"skin_evenness_score\": null,\n  \"skin_radiance_score\": null,\n  \"lip_dryness_score\": null,\n  \"forehead_smoothness_score\": null,\n  \"t_zone_oiliness_score\": null,\n  \"perceived_sex_key\": null,\n  \"perceived_age_range_key\": null,\n  \"perceived_stress_level\": null,\n  \"perceived_sleep_quality\": null,\n  \"analysis_meta\": {\n    \"confidence_score\": null,\n    \"image_quality_score\": null,\n    \"metric_coverage_score\": null,\n    \"limitation_flags\": []\n  }\n}\n\nFace metric constraints:\n- schema_version must be 4.\n- face_score: number from 0 to 100.\n- perceived_age: number.\n- skin_quality_score: number from 0 to 100.\n- symmetry_percentage: number from 0 to 100.\n- fatigue_level: number from 0 to 100.\n- glow_index: number from 0 to 10.\n- face_shape: short localized text.\n- collagen_level: number from 0 to 100, visible firmness estimate.\n- hydration_level: number from 0 to 100, visible hydration estimate.\n- photogenic_score: number from 0 to 10.\n- skin_clarity_score: number from 0 to 100, visible imperfections estimate.\n- under_eye_shadow_score: number from 0 to 100, visible shadowing estimate.\n- under_eye_volume_score: number from 0 to 100, visible puffiness/volume estimate.\n- eye_openness_score: number from 0 to 100, geometric estimate.\n- complexion_redness_score: number from 0 to 100, visible redness estimate.\n- pore_visibility_score: number from 0 to 100, visible pore prominence estimate.\n- skin_evenness_score: number from 0 to 100, pigmentation uniformity estimate.\n- skin_radiance_score: number from 0 to 100, general luminosity estimate (distinct from glow_index).\n- lip_dryness_score: number from 0 to 100, visible lip dryness estimate.\n- forehead_smoothness_score: number from 0 to 100, fine line visibility estimate.\n- t_zone_oiliness_score: number from 0 to 100, visible T-zone shine estimate.\n- perceived_sex_key: one of \"male_presenting\", \"female_presenting\", \"neutral_or_unclear\". Visual presentation cue for coaching personalization.\n- perceived_age_range_key: one of \"under_18\", \"18_24\", \"25_34\", \"35_44\", \"45_54\", \"55_64\", \"65_plus\". Approximate visual age bracket.\n- perceived_stress_level: number from 0 to 100, visible facial tension estimate.\n- perceived_sleep_quality: number from 0 to 100, visible sleep quality estimate from face cues.\n\nERROR schema:\n{\n  \"scan_type\": \"error\",\n  \"message\": null\n}\n\nError rules:\n- message must be a short localized error message.\n\nFinal reminder: return only the raw minified JSON object, with no indentation and no unnecessary whitespace.",
-        "inputType": "binary",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ model: \"deepseek-v4-flash-vision-exp\", messages: [{ role: \"user\", content: [{ type: \"text\", text: \"You are an AI specialized in human face image analysis for wellness coaching insights.\\n\\nRequested language code for ALL textual values: \" + String($json.language_code || \"en\") + \"\\n\\nLanguage rules:\\n- If the code starts with \\\"fr\\\", all textual VALUES must be in French.\\n- If the code starts with \\\"en\\\", all textual VALUES must be in English.\\n- If the code starts with \\\"es\\\", all textual VALUES must be in Spanish.\\n- If the code starts with \\\"de\\\", all textual VALUES must be in German.\\n- If the code starts with \\\"it\\\", all textual VALUES must be in Italian.\\n- If the code starts with \\\"pt\\\", all textual VALUES must be in Portuguese.\\n- For any other value, use English.\\n- JSON KEYS must always stay in English and in snake_case.\\n- Only textual VALUES change with the requested language.\\n\\nEstimation rules:\\n- For every numeric field below, produce your best visual estimate from the image.\\n- Only use null as a last resort when there is genuinely no visual cue at all for that field.\\n- The downstream coaching system tolerates approximation. It does NOT tolerate empty responses.\\n- All scores below are visual heuristics for wellness coaching purposes, not medical assessments. Still produce your best visual estimate for each field.\\n\\nOutput rules:\\n1. Return exactly one valid JSON object.\\n2. Return no markdown, no code fences, no comments, and no text outside JSON.\\n3. Never omit a field from the chosen schema.\\n4. Never add extra keys outside the chosen schema.\\n5. If the image does not clearly show an analyzable human face, return the ERROR schema.\\n6. Keep the response short, stable, and strictly JSON.\\n\\nAllowed schemas for this node: face, error.\\n\\nTask rules:\\n- Analyze only a human face image.\\n- If the image is blurry, off-topic, unusable, or does not primarily show a clearly visible human face, return ERROR.\\n- Never return BODY or NUTRITION from this node.\\n- analysis_meta is internal scan quality metadata used by downstream coach and analytics systems.\\n- analysis_meta.confidence_score, image_quality_score, and metric_coverage_score must be numbers from 0 to 100.\\n- analysis_meta.limitation_flags may only contain: blur, low_light, partial_subject, occlusion, portion_uncertain.\\n\\nFACE schema:\\n{\\n  \\\"schema_version\\\": 4,\\n  \\\"scan_type\\\": \\\"face\\\",\\n  \\\"face_score\\\": null,\\n  \\\"perceived_age\\\": null,\\n  \\\"skin_quality_score\\\": null,\\n  \\\"symmetry_percentage\\\": null,\\n  \\\"fatigue_level\\\": null,\\n  \\\"glow_index\\\": null,\\n  \\\"face_shape\\\": null,\\n  \\\"collagen_level\\\": null,\\n  \\\"hydration_level\\\": null,\\n  \\\"photogenic_score\\\": null,\\n  \\\"skin_clarity_score\\\": null,\\n  \\\"under_eye_shadow_score\\\": null,\\n  \\\"under_eye_volume_score\\\": null,\\n  \\\"eye_openness_score\\\": null,\\n  \\\"complexion_redness_score\\\": null,\\n  \\\"pore_visibility_score\\\": null,\\n  \\\"skin_evenness_score\\\": null,\\n  \\\"skin_radiance_score\\\": null,\\n  \\\"lip_dryness_score\\\": null,\\n  \\\"forehead_smoothness_score\\\": null,\\n  \\\"t_zone_oiliness_score\\\": null,\\n  \\\"perceived_sex_key\\\": null,\\n  \\\"perceived_age_range_key\\\": null,\\n  \\\"perceived_stress_level\\\": null,\\n  \\\"perceived_sleep_quality\\\": null,\\n  \\\"analysis_meta\\\": {\\n    \\\"confidence_score\\\": null,\\n    \\\"image_quality_score\\\": null,\\n    \\\"metric_coverage_score\\\": null,\\n    \\\"limitation_flags\\\": []\\n  }\\n}\\n\\nFace metric constraints:\\n- schema_version must be 4.\\n- face_score: number from 0 to 100.\\n- perceived_age: number.\\n- skin_quality_score: number from 0 to 100.\\n- symmetry_percentage: number from 0 to 100.\\n- fatigue_level: number from 0 to 100.\\n- glow_index: number from 0 to 10.\\n- face_shape: short localized text.\\n- collagen_level: number from 0 to 100, visible firmness estimate.\\n- hydration_level: number from 0 to 100, visible hydration estimate.\\n- photogenic_score: number from 0 to 10.\\n- skin_clarity_score: number from 0 to 100, visible imperfections estimate.\\n- under_eye_shadow_score: number from 0 to 100, visible shadowing estimate.\\n- under_eye_volume_score: number from 0 to 100, visible puffiness/volume estimate.\\n- eye_openness_score: number from 0 to 100, geometric estimate.\\n- complexion_redness_score: number from 0 to 100, visible redness estimate.\\n- pore_visibility_score: number from 0 to 100, visible pore prominence estimate.\\n- skin_evenness_score: number from 0 to 100, pigmentation uniformity estimate.\\n- skin_radiance_score: number from 0 to 100, general luminosity estimate (distinct from glow_index).\\n- lip_dryness_score: number from 0 to 100, visible lip dryness estimate.\\n- forehead_smoothness_score: number from 0 to 100, fine line visibility estimate.\\n- t_zone_oiliness_score: number from 0 to 100, visible T-zone shine estimate.\\n- perceived_sex_key: one of \\\"male_presenting\\\", \\\"female_presenting\\\", \\\"neutral_or_unclear\\\". Visual presentation cue for coaching personalization.\\n- perceived_age_range_key: one of \\\"under_18\\\", \\\"18_24\\\", \\\"25_34\\\", \\\"35_44\\\", \\\"45_54\\\", \\\"55_64\\\", \\\"65_plus\\\". Approximate visual age bracket.\\n- perceived_stress_level: number from 0 to 100, visible facial tension estimate.\\n- perceived_sleep_quality: number from 0 to 100, visible sleep quality estimate from face cues.\\n\\nERROR schema:\\n{\\n  \\\"scan_type\\\": \\\"error\\\",\\n  \\\"message\\\": null\\n}\\n\\nError rules:\\n- message must be a short localized error message.\\n\\nFinal reminder: return only the raw minified JSON object, with no indentation and no unnecessary whitespace.\" }, { type: \"image_url\", image_url: { url: \"data:image/jpeg;base64,\" + $json.body.imageBase64, detail: \"original\" } }] }], response_format: { type: \"json_object\" }, max_tokens: 8192, temperature: 0.1 }) }}",
         "options": {
-          "maxOutputTokens": 8192
-        },
-        "binaryPropertyName": "data",
-        "simplify": true
+          "timeout": 60000
+        }
       },
-      "type": "@n8n/n8n-nodes-langchain.googleGemini",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
         1264,
         -240
@@ -209,31 +171,36 @@
       "id": "4b4ee17a-bca0-47ff-ad3a-876fc258b88a",
       "name": "Analyze Face Image",
       "credentials": {
-        "googlePalmApi": {
-          "name": "Google Gemini(PaLM) Api account"
+        "deepSeekApi": {
+          "name": "DeepSeek account"
         }
       }
     },
     {
       "parameters": {
-        "resource": "image",
-        "operation": "analyze",
-        "modelId": {
-          "__rl": true,
-          "value": "models/gemini-2.5-flash",
-          "mode": "list",
-          "cachedResultName": "Gemini 2.5 Flash"
+        "method": "POST",
+        "url": "https://api.deepseek.com/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "deepSeekApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
         },
-        "text": "=You are an AI specialized in body, silhouette, posture, and fitness-oriented image analysis for wellness coaching insights.\n\nRequested language code for ALL textual values: {{$json.language_code}}\n\nLanguage rules:\n- If the code starts with \"fr\", all textual VALUES must be in French.\n- If the code starts with \"en\", all textual VALUES must be in English.\n- If the code starts with \"es\", all textual VALUES must be in Spanish.\n- If the code starts with \"de\", all textual VALUES must be in German.\n- If the code starts with \"it\", all textual VALUES must be in Italian.\n- If the code starts with \"pt\", all textual VALUES must be in Portuguese.\n- For any other value, use English.\n- JSON KEYS must always stay in English and in snake_case.\n- Only textual VALUES change with the requested language.\n\nEstimation rules:\n- For every numeric field below, produce your best visual estimate from the image.\n- Only use null as a last resort when there is genuinely no visual cue at all for that field.\n- The downstream coaching system tolerates approximation. It does NOT tolerate empty responses.\n- All scores below are visual heuristics for wellness coaching purposes, not medical assessments. Stay neutral, useful, and non-judgmental. Do not sexualize the person. Do not comment on attractiveness. Still produce your best visual estimate for each field.\n- For advanced body fields (muscle_definition_score, midsection_definition_score, shoulder_alignment_score, recovery_readiness_score, upper_body_definition_score, lower_body_definition_score, arm_definition_score, v_taper_score, body_tension_indicator_score), fill a visual estimate whenever framing, clothing, pose, lighting, and visible body areas provide usable cues.\n- Use null for an advanced body field only when the relevant body area is hidden, cropped, or genuinely not inferable; never fabricate hidden body areas.\n\nOutput rules:\n1. Return exactly one valid JSON object.\n2. Return no markdown, no code fences, no comments, and no text outside JSON.\n3. Never omit a field from the chosen schema.\n4. Never add extra keys outside the chosen schema.\n5. If the image does not clearly show an analyzable body or silhouette, return the ERROR schema.\n6. Keep the response short, stable, and strictly JSON.\n\nAllowed schemas for this node: body, error.\n\nTask rules:\n- Analyze only a human body, silhouette, posture, or overall physical form.\n- If the image is blurry, off-topic, unusable, or does not primarily show a clearly visible body or silhouette, return ERROR.\n- Never return FACE or NUTRITION from this node.\n- body_score is a neutral overall estimate of visible form, silhouette, and posture, not an attractiveness score.\n- analysis_meta is internal scan quality metadata used by downstream coach and analytics systems.\n- analysis_meta.confidence_score, image_quality_score, and metric_coverage_score must be numbers from 0 to 100.\n- analysis_meta.limitation_flags may only contain: blur, low_light, partial_subject, occlusion, portion_uncertain.\n\nBODY schema:\n{\n  \"schema_version\": 4,\n  \"scan_type\": \"body\",\n  \"body_score\": null,\n  \"body_fat_percentage\": null,\n  \"muscle_mass_label\": null,\n  \"body_type\": null,\n  \"posture_score\": null,\n  \"waist_estimation_cm\": null,\n  \"strength_index\": null,\n  \"body_symmetry\": null,\n  \"bmi_estimate\": null,\n  \"metabolic_age\": null,\n  \"muscle_definition_score\": null,\n  \"midsection_definition_score\": null,\n  \"shoulder_alignment_score\": null,\n  \"recovery_readiness_score\": null,\n  \"upper_body_definition_score\": null,\n  \"lower_body_definition_score\": null,\n  \"arm_definition_score\": null,\n  \"v_taper_score\": null,\n  \"body_tension_indicator_score\": null,\n  \"perceived_sex_key\": null,\n  \"perceived_age_range_key\": null,\n  \"estimated_height_range_key\": null,\n  \"estimated_weight_range_key\": null,\n  \"body_frame_key\": null,\n  \"perceived_fitness_level_key\": null,\n  \"analysis_meta\": {\n    \"confidence_score\": null,\n    \"image_quality_score\": null,\n    \"metric_coverage_score\": null,\n    \"limitation_flags\": []\n  }\n}\n\nBody metric constraints:\n- schema_version must be 4.\n- body_score: number from 0 to 100.\n- body_fat_percentage: number, approximate visual estimate.\n- muscle_mass_label: short localized text.\n- body_type: short localized text.\n- posture_score: number from 0 to 10.\n- waist_estimation_cm: number.\n- strength_index: number from 0 to 100.\n- body_symmetry: number from 0 to 100.\n- bmi_estimate: number, approximate visual estimate.\n- metabolic_age: number, approximate visual estimate.\n- muscle_definition_score: number from 0 to 100, visible muscle tone estimate.\n- midsection_definition_score: number from 0 to 100, visible abdominal definition estimate.\n- shoulder_alignment_score: number from 0 to 100, visual shoulder symmetry estimate.\n- recovery_readiness_score: number from 0 to 100, visual recovery heuristic.\n- upper_body_definition_score: number from 0 to 100, visible chest and shoulder definition estimate.\n- lower_body_definition_score: number from 0 to 100, visible leg and glute definition estimate.\n- arm_definition_score: number from 0 to 100, visible arm muscle definition estimate.\n- v_taper_score: number from 0 to 100, visible shoulder-to-waist ratio estimate.\n- body_tension_indicator_score: number from 0 to 100, visible postural tension estimate.\n- perceived_sex_key: one of \"male_presenting\", \"female_presenting\", \"neutral_or_unclear\". Visual presentation cue for coaching personalization.\n- perceived_age_range_key: one of \"under_18\", \"18_24\", \"25_34\", \"35_44\", \"45_54\", \"55_64\", \"65_plus\". Approximate visual age bracket.\n- estimated_height_range_key: one of \"under_150cm\", \"150_160cm\", \"160_170cm\", \"170_180cm\", \"180_190cm\", \"190_plus\". Approximate range from visible body proportions and reference cues.\n- estimated_weight_range_key: one of \"under_50kg\", \"50_60kg\", \"60_70kg\", \"70_80kg\", \"80_90kg\", \"90_100kg\", \"100_plus\". Approximate range from visible body proportions.\n- body_frame_key: one of \"small\", \"medium\", \"large\". Visual skeletal frame estimate.\n- perceived_fitness_level_key: one of \"sedentary\", \"lightly_active\", \"moderately_active\", \"very_active\", \"athletic\". Visual fitness level estimate from muscle definition and posture.\n\nERROR schema:\n{\n  \"scan_type\": \"error\",\n  \"message\": null\n}\n\nError rules:\n- message must be a short localized error message.\n\nFinal reminder: return only the raw minified JSON object, with no indentation and no unnecessary whitespace.",
-        "inputType": "binary",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ model: \"deepseek-v4-flash-vision-exp\", messages: [{ role: \"user\", content: [{ type: \"text\", text: \"You are an AI specialized in body, silhouette, posture, and fitness-oriented image analysis for wellness coaching insights.\\n\\nRequested language code for ALL textual values: \" + String($json.language_code || \"en\") + \"\\n\\nLanguage rules:\\n- If the code starts with \\\"fr\\\", all textual VALUES must be in French.\\n- If the code starts with \\\"en\\\", all textual VALUES must be in English.\\n- If the code starts with \\\"es\\\", all textual VALUES must be in Spanish.\\n- If the code starts with \\\"de\\\", all textual VALUES must be in German.\\n- If the code starts with \\\"it\\\", all textual VALUES must be in Italian.\\n- If the code starts with \\\"pt\\\", all textual VALUES must be in Portuguese.\\n- For any other value, use English.\\n- JSON KEYS must always stay in English and in snake_case.\\n- Only textual VALUES change with the requested language.\\n\\nEstimation rules:\\n- For every numeric field below, produce your best visual estimate from the image.\\n- Only use null as a last resort when there is genuinely no visual cue at all for that field.\\n- The downstream coaching system tolerates approximation. It does NOT tolerate empty responses.\\n- All scores below are visual heuristics for wellness coaching purposes, not medical assessments. Stay neutral, useful, and non-judgmental. Do not sexualize the person. Do not comment on attractiveness. Still produce your best visual estimate for each field.\\n- For advanced body fields (muscle_definition_score, midsection_definition_score, shoulder_alignment_score, recovery_readiness_score, upper_body_definition_score, lower_body_definition_score, arm_definition_score, v_taper_score, body_tension_indicator_score), fill a visual estimate whenever framing, clothing, pose, lighting, and visible body areas provide usable cues.\\n- Use null for an advanced body field only when the relevant body area is hidden, cropped, or genuinely not inferable; never fabricate hidden body areas.\\n\\nOutput rules:\\n1. Return exactly one valid JSON object.\\n2. Return no markdown, no code fences, no comments, and no text outside JSON.\\n3. Never omit a field from the chosen schema.\\n4. Never add extra keys outside the chosen schema.\\n5. If the image does not clearly show an analyzable body or silhouette, return the ERROR schema.\\n6. Keep the response short, stable, and strictly JSON.\\n\\nAllowed schemas for this node: body, error.\\n\\nTask rules:\\n- Analyze only a human body, silhouette, posture, or overall physical form.\\n- If the image is blurry, off-topic, unusable, or does not primarily show a clearly visible body or silhouette, return ERROR.\\n- Never return FACE or NUTRITION from this node.\\n- body_score is a neutral overall estimate of visible form, silhouette, and posture, not an attractiveness score.\\n- analysis_meta is internal scan quality metadata used by downstream coach and analytics systems.\\n- analysis_meta.confidence_score, image_quality_score, and metric_coverage_score must be numbers from 0 to 100.\\n- analysis_meta.limitation_flags may only contain: blur, low_light, partial_subject, occlusion, portion_uncertain.\\n\\nBODY schema:\\n{\\n  \\\"schema_version\\\": 4,\\n  \\\"scan_type\\\": \\\"body\\\",\\n  \\\"body_score\\\": null,\\n  \\\"body_fat_percentage\\\": null,\\n  \\\"muscle_mass_label\\\": null,\\n  \\\"body_type\\\": null,\\n  \\\"posture_score\\\": null,\\n  \\\"waist_estimation_cm\\\": null,\\n  \\\"strength_index\\\": null,\\n  \\\"body_symmetry\\\": null,\\n  \\\"bmi_estimate\\\": null,\\n  \\\"metabolic_age\\\": null,\\n  \\\"muscle_definition_score\\\": null,\\n  \\\"midsection_definition_score\\\": null,\\n  \\\"shoulder_alignment_score\\\": null,\\n  \\\"recovery_readiness_score\\\": null,\\n  \\\"upper_body_definition_score\\\": null,\\n  \\\"lower_body_definition_score\\\": null,\\n  \\\"arm_definition_score\\\": null,\\n  \\\"v_taper_score\\\": null,\\n  \\\"body_tension_indicator_score\\\": null,\\n  \\\"perceived_sex_key\\\": null,\\n  \\\"perceived_age_range_key\\\": null,\\n  \\\"estimated_height_range_key\\\": null,\\n  \\\"estimated_weight_range_key\\\": null,\\n  \\\"body_frame_key\\\": null,\\n  \\\"perceived_fitness_level_key\\\": null,\\n  \\\"analysis_meta\\\": {\\n    \\\"confidence_score\\\": null,\\n    \\\"image_quality_score\\\": null,\\n    \\\"metric_coverage_score\\\": null,\\n    \\\"limitation_flags\\\": []\\n  }\\n}\\n\\nBody metric constraints:\\n- schema_version must be 4.\\n- body_score: number from 0 to 100.\\n- body_fat_percentage: number, approximate visual estimate.\\n- muscle_mass_label: short localized text.\\n- body_type: short localized text.\\n- posture_score: number from 0 to 10.\\n- waist_estimation_cm: number.\\n- strength_index: number from 0 to 100.\\n- body_symmetry: number from 0 to 100.\\n- bmi_estimate: number, approximate visual estimate.\\n- metabolic_age: number, approximate visual estimate.\\n- muscle_definition_score: number from 0 to 100, visible muscle tone estimate.\\n- midsection_definition_score: number from 0 to 100, visible abdominal definition estimate.\\n- shoulder_alignment_score: number from 0 to 100, visual shoulder symmetry estimate.\\n- recovery_readiness_score: number from 0 to 100, visual recovery heuristic.\\n- upper_body_definition_score: number from 0 to 100, visible chest and shoulder definition estimate.\\n- lower_body_definition_score: number from 0 to 100, visible leg and glute definition estimate.\\n- arm_definition_score: number from 0 to 100, visible arm muscle definition estimate.\\n- v_taper_score: number from 0 to 100, visible shoulder-to-waist ratio estimate.\\n- body_tension_indicator_score: number from 0 to 100, visible postural tension estimate.\\n- perceived_sex_key: one of \\\"male_presenting\\\", \\\"female_presenting\\\", \\\"neutral_or_unclear\\\". Visual presentation cue for coaching personalization.\\n- perceived_age_range_key: one of \\\"under_18\\\", \\\"18_24\\\", \\\"25_34\\\", \\\"35_44\\\", \\\"45_54\\\", \\\"55_64\\\", \\\"65_plus\\\". Approximate visual age bracket.\\n- estimated_height_range_key: one of \\\"under_150cm\\\", \\\"150_160cm\\\", \\\"160_170cm\\\", \\\"170_180cm\\\", \\\"180_190cm\\\", \\\"190_plus\\\". Approximate range from visible body proportions and reference cues.\\n- estimated_weight_range_key: one of \\\"under_50kg\\\", \\\"50_60kg\\\", \\\"60_70kg\\\", \\\"70_80kg\\\", \\\"80_90kg\\\", \\\"90_100kg\\\", \\\"100_plus\\\". Approximate range from visible body proportions.\\n- body_frame_key: one of \\\"small\\\", \\\"medium\\\", \\\"large\\\". Visual skeletal frame estimate.\\n- perceived_fitness_level_key: one of \\\"sedentary\\\", \\\"lightly_active\\\", \\\"moderately_active\\\", \\\"very_active\\\", \\\"athletic\\\". Visual fitness level estimate from muscle definition and posture.\\n\\nERROR schema:\\n{\\n  \\\"scan_type\\\": \\\"error\\\",\\n  \\\"message\\\": null\\n}\\n\\nError rules:\\n- message must be a short localized error message.\\n\\nFinal reminder: return only the raw minified JSON object, with no indentation and no unnecessary whitespace.\" }, { type: \"image_url\", image_url: { url: \"data:image/jpeg;base64,\" + $json.body.imageBase64, detail: \"original\" } }] }], response_format: { type: \"json_object\" }, max_tokens: 8192, temperature: 0.1 }) }}",
         "options": {
-          "maxOutputTokens": 8192
-        },
-        "binaryPropertyName": "data",
-        "simplify": true
+          "timeout": 60000
+        }
       },
-      "type": "@n8n/n8n-nodes-langchain.googleGemini",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
         1264,
         -80
@@ -241,31 +208,36 @@
       "id": "a8975a68-4c06-48ad-b448-3d6c72af87d1",
       "name": "Analyze Body Image",
       "credentials": {
-        "googlePalmApi": {
-          "name": "Google Gemini(PaLM) Api account"
+        "deepSeekApi": {
+          "name": "DeepSeek account"
         }
       }
     },
     {
       "parameters": {
-        "resource": "image",
-        "operation": "analyze",
-        "modelId": {
-          "__rl": true,
-          "value": "models/gemini-2.5-flash",
-          "mode": "list",
-          "cachedResultName": "Gemini 2.5 Flash"
+        "method": "POST",
+        "url": "https://api.deepseek.com/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "deepSeekApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
         },
-        "text": "=You are an AI specialized in meal, food, and nutrition image analysis for wellness coaching insights.\n\nRequested language code for ALL textual values: {{$json.language_code}}\n\nLanguage rules:\n- If the code starts with \"fr\", all textual VALUES must be in French.\n- If the code starts with \"en\", all textual VALUES must be in English.\n- If the code starts with \"es\", all textual VALUES must be in Spanish.\n- If the code starts with \"de\", all textual VALUES must be in German.\n- If the code starts with \"it\", all textual VALUES must be in Italian.\n- If the code starts with \"pt\", all textual VALUES must be in Portuguese.\n- For any other value, use English.\n- JSON KEYS must always stay in English and in snake_case.\n- Only textual VALUES change with the requested language.\n\nEstimation rules:\n- For every numeric field below, produce your best visual estimate from the image.\n- Only use null as a last resort when there is genuinely no visual cue at all for that field.\n- The downstream coaching system tolerates approximation. It does NOT tolerate empty responses.\n- All scores below are visual heuristics for wellness coaching purposes, not medical assessments. Calories and macros are visual approximations. Still produce your best visual estimate for each field.\n\nOutput rules:\n1. Return exactly one valid JSON object.\n2. Return no markdown, no code fences, no comments, and no text outside JSON.\n3. Never omit a field from the chosen schema.\n4. Never add extra keys outside the chosen schema.\n5. If the image does not clearly show analyzable food or a meal, return the ERROR schema.\n6. Keep the response short, stable, and strictly JSON.\n\nAllowed schemas for this node: nutrition, error.\n\nTask rules:\n- Analyze only a meal, dish, plate, or visible food items.\n- If the image is blurry, off-topic, unusable, or does not primarily show clearly visible food, return ERROR.\n- Never return FACE or BODY from this node.\n- analysis_meta is internal scan quality metadata used by downstream coach and analytics systems.\n- analysis_meta.confidence_score, image_quality_score, and metric_coverage_score must be numbers from 0 to 100.\n- analysis_meta.limitation_flags may only contain: blur, low_light, partial_subject, occlusion, portion_uncertain.\n\nNUTRITION schema:\n{\n  \"schema_version\": 4,\n  \"scan_type\": \"nutrition\",\n  \"verdict_key\": null,\n  \"plate_health_score\": null,\n  \"calories_estimate\": null,\n  \"protein_grams\": null,\n  \"carbs_grams\": null,\n  \"fat_grams\": null,\n  \"glycemic_index_label\": null,\n  \"satiety_index\": null,\n  \"ingredient_quality\": null,\n  \"main_vitamins\": null,\n  \"short_verdict\": null,\n  \"fiber_grams_estimate\": null,\n  \"sugar_grams_estimate\": null,\n  \"processing_level_score\": null,\n  \"hydration_contribution_score\": null,\n  \"sodium_level_score\": null,\n  \"meal_balance_score\": null,\n  \"inflammation_index_score\": null,\n  \"meal_type_key\": null,\n  \"portion_size_key\": null,\n  \"color_diversity_score\": null,\n  \"vegetable_portion_ratio\": null,\n  \"protein_visibility_score\": null,\n  \"whole_grain_indicator_score\": null,\n  \"meal_freshness_score\": null,\n  \"cuisine_type_key\": null,\n  \"meat_type_key\": null,\n  \"cooking_method_key\": null,\n  \"meal_dietary_pattern_key\": null,\n  \"allergen_visibility_keys\": [],\n  \"analysis_meta\": {\n    \"confidence_score\": null,\n    \"image_quality_score\": null,\n    \"metric_coverage_score\": null,\n    \"limitation_flags\": []\n  }\n}\n\nNutrition metric constraints:\n- schema_version must be 4.\n- verdict_key: one of \"balanced\", \"smoothie_ideal\", \"protein_dense\", \"light\", \"processed\", \"sugary\", \"indulgent\". Always use this exact English canonical key; never localize it and never return \"unknown\" for an analyzable food image.\n- plate_health_score: number from 0 to 100.\n- calories_estimate: number.\n- protein_grams: number.\n- carbs_grams: number.\n- fat_grams: number.\n- glycemic_index_label: short localized text.\n- satiety_index: number from 0 to 10.\n- ingredient_quality: short localized text.\n- main_vitamins: short localized text.\n- short_verdict: maximum 5 localized words, localized companion text for verdict_key.\n- fiber_grams_estimate: number from 0 to 100.\n- sugar_grams_estimate: number from 0 to 300.\n- processing_level_score: number from 0 to 100, NOVA-style ultra-processing estimate.\n- hydration_contribution_score: number from 0 to 10.\n- sodium_level_score: number from 0 to 10, heuristic from visible food type.\n- meal_balance_score: number from 0 to 100, balance of protein, vegetables, and carbs visible on the plate.\n- inflammation_index_score: number from 0 to 100, visual pro/anti-inflammatory food heuristic.\n- meal_type_key: one of \"breakfast\", \"lunch\", \"dinner\", \"snack\", \"dessert\", \"other\".\n- portion_size_key: one of \"small\", \"medium\", \"large\", \"oversized\".\n- color_diversity_score: number from 0 to 10, count of distinct food colors visible.\n- vegetable_portion_ratio: number from 0 to 100, percentage of plate occupied by vegetables.\n- protein_visibility_score: number from 0 to 100, visible protein adequacy estimate.\n- whole_grain_indicator_score: number from 0 to 100, ratio of whole vs refined carbs visible.\n- meal_freshness_score: number from 0 to 100, visible freshness vs processed.\n- cuisine_type_key: one of \"mediterranean\", \"asian\", \"western\", \"middle_eastern\", \"latin\", \"african\", \"mixed\", \"other\".\n- meat_type_key: one of \"red_meat\", \"poultry\", \"fish\", \"seafood\", \"plant_protein\", \"dairy\", \"none\".\n- cooking_method_key: one of \"fried\", \"baked\", \"grilled\", \"raw\", \"steamed\", \"boiled\", \"sauteed\", \"other\".\n- meal_dietary_pattern_key: one of \"omnivore\", \"vegetarian_compatible\", \"vegan_compatible\", \"pescetarian_compatible\", \"keto_compatible\", \"mediterranean_compatible\", \"unclear\". The dietary pattern that this single meal is consistent with.\n- allergen_visibility_keys: array of strings (may be empty []) listing visible likely allergens. Allowed values: \"gluten_likely\", \"dairy_likely\", \"nuts_likely\", \"shellfish_likely\", \"eggs_likely\", \"soy_likely\", \"seafood_likely\". Include only with high visual confidence.\n\nERROR schema:\n{\n  \"scan_type\": \"error\",\n  \"message\": null\n}\n\nError rules:\n- message must be a short localized error message.\n\nFinal reminder: return only the raw minified JSON object, with no indentation and no unnecessary whitespace.",
-        "inputType": "binary",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ model: \"deepseek-v4-flash-vision-exp\", messages: [{ role: \"user\", content: [{ type: \"text\", text: \"You are an AI specialized in meal, food, and nutrition image analysis for wellness coaching insights.\\n\\nRequested language code for ALL textual values: \" + String($json.language_code || \"en\") + \"\\n\\nLanguage rules:\\n- If the code starts with \\\"fr\\\", all textual VALUES must be in French.\\n- If the code starts with \\\"en\\\", all textual VALUES must be in English.\\n- If the code starts with \\\"es\\\", all textual VALUES must be in Spanish.\\n- If the code starts with \\\"de\\\", all textual VALUES must be in German.\\n- If the code starts with \\\"it\\\", all textual VALUES must be in Italian.\\n- If the code starts with \\\"pt\\\", all textual VALUES must be in Portuguese.\\n- For any other value, use English.\\n- JSON KEYS must always stay in English and in snake_case.\\n- Only textual VALUES change with the requested language.\\n\\nEstimation rules:\\n- For every numeric field below, produce your best visual estimate from the image.\\n- Only use null as a last resort when there is genuinely no visual cue at all for that field.\\n- The downstream coaching system tolerates approximation. It does NOT tolerate empty responses.\\n- All scores below are visual heuristics for wellness coaching purposes, not medical assessments. Calories and macros are visual approximations. Still produce your best visual estimate for each field.\\n\\nOutput rules:\\n1. Return exactly one valid JSON object.\\n2. Return no markdown, no code fences, no comments, and no text outside JSON.\\n3. Never omit a field from the chosen schema.\\n4. Never add extra keys outside the chosen schema.\\n5. If the image does not clearly show analyzable food or a meal, return the ERROR schema.\\n6. Keep the response short, stable, and strictly JSON.\\n\\nAllowed schemas for this node: nutrition, error.\\n\\nTask rules:\\n- Analyze only a meal, dish, plate, or visible food items.\\n- If the image is blurry, off-topic, unusable, or does not primarily show clearly visible food, return ERROR.\\n- Never return FACE or BODY from this node.\\n- analysis_meta is internal scan quality metadata used by downstream coach and analytics systems.\\n- analysis_meta.confidence_score, image_quality_score, and metric_coverage_score must be numbers from 0 to 100.\\n- analysis_meta.limitation_flags may only contain: blur, low_light, partial_subject, occlusion, portion_uncertain.\\n\\nNUTRITION schema:\\n{\\n  \\\"schema_version\\\": 4,\\n  \\\"scan_type\\\": \\\"nutrition\\\",\\n  \\\"verdict_key\\\": null,\\n  \\\"plate_health_score\\\": null,\\n  \\\"calories_estimate\\\": null,\\n  \\\"protein_grams\\\": null,\\n  \\\"carbs_grams\\\": null,\\n  \\\"fat_grams\\\": null,\\n  \\\"glycemic_index_label\\\": null,\\n  \\\"satiety_index\\\": null,\\n  \\\"ingredient_quality\\\": null,\\n  \\\"main_vitamins\\\": null,\\n  \\\"short_verdict\\\": null,\\n  \\\"fiber_grams_estimate\\\": null,\\n  \\\"sugar_grams_estimate\\\": null,\\n  \\\"processing_level_score\\\": null,\\n  \\\"hydration_contribution_score\\\": null,\\n  \\\"sodium_level_score\\\": null,\\n  \\\"meal_balance_score\\\": null,\\n  \\\"inflammation_index_score\\\": null,\\n  \\\"meal_type_key\\\": null,\\n  \\\"portion_size_key\\\": null,\\n  \\\"color_diversity_score\\\": null,\\n  \\\"vegetable_portion_ratio\\\": null,\\n  \\\"protein_visibility_score\\\": null,\\n  \\\"whole_grain_indicator_score\\\": null,\\n  \\\"meal_freshness_score\\\": null,\\n  \\\"cuisine_type_key\\\": null,\\n  \\\"meat_type_key\\\": null,\\n  \\\"cooking_method_key\\\": null,\\n  \\\"meal_dietary_pattern_key\\\": null,\\n  \\\"allergen_visibility_keys\\\": [],\\n  \\\"analysis_meta\\\": {\\n    \\\"confidence_score\\\": null,\\n    \\\"image_quality_score\\\": null,\\n    \\\"metric_coverage_score\\\": null,\\n    \\\"limitation_flags\\\": []\\n  }\\n}\\n\\nNutrition metric constraints:\\n- schema_version must be 4.\\n- verdict_key: one of \\\"balanced\\\", \\\"smoothie_ideal\\\", \\\"protein_dense\\\", \\\"light\\\", \\\"processed\\\", \\\"sugary\\\", \\\"indulgent\\\". Always use this exact English canonical key; never localize it and never return \\\"unknown\\\" for an analyzable food image.\\n- plate_health_score: number from 0 to 100.\\n- calories_estimate: number.\\n- protein_grams: number.\\n- carbs_grams: number.\\n- fat_grams: number.\\n- glycemic_index_label: short localized text.\\n- satiety_index: number from 0 to 10.\\n- ingredient_quality: short localized text.\\n- main_vitamins: short localized text.\\n- short_verdict: maximum 5 localized words, localized companion text for verdict_key.\\n- fiber_grams_estimate: number from 0 to 100.\\n- sugar_grams_estimate: number from 0 to 300.\\n- processing_level_score: number from 0 to 100, NOVA-style ultra-processing estimate.\\n- hydration_contribution_score: number from 0 to 10.\\n- sodium_level_score: number from 0 to 10, heuristic from visible food type.\\n- meal_balance_score: number from 0 to 100, balance of protein, vegetables, and carbs visible on the plate.\\n- inflammation_index_score: number from 0 to 100, visual pro/anti-inflammatory food heuristic.\\n- meal_type_key: one of \\\"breakfast\\\", \\\"lunch\\\", \\\"dinner\\\", \\\"snack\\\", \\\"dessert\\\", \\\"other\\\".\\n- portion_size_key: one of \\\"small\\\", \\\"medium\\\", \\\"large\\\", \\\"oversized\\\".\\n- color_diversity_score: number from 0 to 10, count of distinct food colors visible.\\n- vegetable_portion_ratio: number from 0 to 100, percentage of plate occupied by vegetables.\\n- protein_visibility_score: number from 0 to 100, visible protein adequacy estimate.\\n- whole_grain_indicator_score: number from 0 to 100, ratio of whole vs refined carbs visible.\\n- meal_freshness_score: number from 0 to 100, visible freshness vs processed.\\n- cuisine_type_key: one of \\\"mediterranean\\\", \\\"asian\\\", \\\"western\\\", \\\"middle_eastern\\\", \\\"latin\\\", \\\"african\\\", \\\"mixed\\\", \\\"other\\\".\\n- meat_type_key: one of \\\"red_meat\\\", \\\"poultry\\\", \\\"fish\\\", \\\"seafood\\\", \\\"plant_protein\\\", \\\"dairy\\\", \\\"none\\\".\\n- cooking_method_key: one of \\\"fried\\\", \\\"baked\\\", \\\"grilled\\\", \\\"raw\\\", \\\"steamed\\\", \\\"boiled\\\", \\\"sauteed\\\", \\\"other\\\".\\n- meal_dietary_pattern_key: one of \\\"omnivore\\\", \\\"vegetarian_compatible\\\", \\\"vegan_compatible\\\", \\\"pescetarian_compatible\\\", \\\"keto_compatible\\\", \\\"mediterranean_compatible\\\", \\\"unclear\\\". The dietary pattern that this single meal is consistent with.\\n- allergen_visibility_keys: array of strings (may be empty []) listing visible likely allergens. Allowed values: \\\"gluten_likely\\\", \\\"dairy_likely\\\", \\\"nuts_likely\\\", \\\"shellfish_likely\\\", \\\"eggs_likely\\\", \\\"soy_likely\\\", \\\"seafood_likely\\\". Include only with high visual confidence.\\n\\nERROR schema:\\n{\\n  \\\"scan_type\\\": \\\"error\\\",\\n  \\\"message\\\": null\\n}\\n\\nError rules:\\n- message must be a short localized error message.\\n\\nFinal reminder: return only the raw minified JSON object, with no indentation and no unnecessary whitespace.\" }, { type: \"image_url\", image_url: { url: \"data:image/jpeg;base64,\" + $json.body.imageBase64, detail: \"original\" } }] }], response_format: { type: \"json_object\" }, max_tokens: 8192, temperature: 0.1 }) }}",
         "options": {
-          "maxOutputTokens": 8192
-        },
-        "binaryPropertyName": "data",
-        "simplify": true
+          "timeout": 60000
+        }
       },
-      "type": "@n8n/n8n-nodes-langchain.googleGemini",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
         1264,
         80
@@ -273,31 +245,36 @@
       "id": "9f293bd9-0e6e-487d-96cd-c8270f69c503",
       "name": "Analyze Nutrition Image",
       "credentials": {
-        "googlePalmApi": {
-          "name": "Google Gemini(PaLM) Api account"
+        "deepSeekApi": {
+          "name": "DeepSeek account"
         }
       }
     },
     {
       "parameters": {
-        "resource": "image",
-        "operation": "analyze",
-        "modelId": {
-          "__rl": true,
-          "value": "models/gemini-2.5-flash",
-          "mode": "list",
-          "cachedResultName": "Gemini 2.5 Flash"
+        "method": "POST",
+        "url": "https://api.deepseek.com/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "deepSeekApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
         },
-        "text": "=You are an AI specialized in face, body, and nutrition image analysis for wellness coaching insights. Use this node only when no reliable scan type was provided. Detect the best supported category for the image, then return only the matching raw JSON object.\n\nRequested language code for ALL textual values: {{$json.language_code}}\n\nLanguage rules:\n- If the code starts with \"fr\", all textual VALUES must be in French.\n- If the code starts with \"en\", all textual VALUES must be in English.\n- If the code starts with \"es\", all textual VALUES must be in Spanish.\n- If the code starts with \"de\", all textual VALUES must be in German.\n- If the code starts with \"it\", all textual VALUES must be in Italian.\n- If the code starts with \"pt\", all textual VALUES must be in Portuguese.\n- For any other value, use English.\n- JSON KEYS must always stay in English and in snake_case.\n- Only textual VALUES change with the requested language.\n\nEstimation rules:\n- For every numeric field below, produce your best visual estimate from the image.\n- Only use null as a last resort when there is genuinely no visual cue at all for that field.\n- The downstream coaching system tolerates approximation. It does NOT tolerate empty responses.\n- All scores below are visual heuristics for wellness coaching purposes, not medical assessments. Stay neutral and non-judgmental. Still produce your best visual estimate for each field.\n- For advanced body fields (muscle_definition_score, midsection_definition_score, shoulder_alignment_score, recovery_readiness_score, upper_body_definition_score, lower_body_definition_score, arm_definition_score, v_taper_score, body_tension_indicator_score), fill a visual estimate whenever framing, clothing, pose, lighting, and visible body areas provide usable cues.\n- Use null for an advanced body field only when the relevant body area is hidden, cropped, or genuinely not inferable; never fabricate hidden body areas.\n\nOutput rules:\n1. Return exactly one valid JSON object.\n2. Return no markdown, no code fences, no comments, and no text outside JSON.\n3. Never omit a field from the chosen schema.\n4. Never add extra keys outside the chosen schema.\n5. Choose exactly one schema.\n6. If the image is ambiguous, return ERROR.\n7. Never return any type other than face, body, nutrition, or error.\n\nSupported schemas: face, body, nutrition, error.\n\nRouting rules:\n- Return FACE when the image primarily shows a clearly visible human face.\n- Return BODY when the image primarily shows a clearly visible human body, silhouette, posture, or physique.\n- Return NUTRITION when the image primarily shows a meal, plate, dish, ingredients, or edible items.\n- If both face and body are visible, choose the most tightly framed main subject.\n- If the subject is a meal, choose NUTRITION.\n- If the image is blurry, off-topic, unusable, or ambiguous, return ERROR.\n- Never return health, super_health, or super_scan.\n- analysis_meta is internal scan quality metadata used by downstream coach and analytics systems.\n\nFACE schema:\n{\n  \"schema_version\": 4,\n  \"scan_type\": \"face\",\n  \"face_score\": null,\n  \"perceived_age\": null,\n  \"skin_quality_score\": null,\n  \"symmetry_percentage\": null,\n  \"fatigue_level\": null,\n  \"glow_index\": null,\n  \"face_shape\": null,\n  \"collagen_level\": null,\n  \"hydration_level\": null,\n  \"photogenic_score\": null,\n  \"skin_clarity_score\": null,\n  \"under_eye_shadow_score\": null,\n  \"under_eye_volume_score\": null,\n  \"eye_openness_score\": null,\n  \"complexion_redness_score\": null,\n  \"pore_visibility_score\": null,\n  \"skin_evenness_score\": null,\n  \"skin_radiance_score\": null,\n  \"lip_dryness_score\": null,\n  \"forehead_smoothness_score\": null,\n  \"t_zone_oiliness_score\": null,\n  \"perceived_sex_key\": null,\n  \"perceived_age_range_key\": null,\n  \"perceived_stress_level\": null,\n  \"perceived_sleep_quality\": null,\n  \"analysis_meta\": {\n    \"confidence_score\": null,\n    \"image_quality_score\": null,\n    \"metric_coverage_score\": null,\n    \"limitation_flags\": []\n  }\n}\n\nBODY schema:\n{\n  \"schema_version\": 4,\n  \"scan_type\": \"body\",\n  \"body_score\": null,\n  \"body_fat_percentage\": null,\n  \"muscle_mass_label\": null,\n  \"body_type\": null,\n  \"posture_score\": null,\n  \"waist_estimation_cm\": null,\n  \"strength_index\": null,\n  \"body_symmetry\": null,\n  \"bmi_estimate\": null,\n  \"metabolic_age\": null,\n  \"muscle_definition_score\": null,\n  \"midsection_definition_score\": null,\n  \"shoulder_alignment_score\": null,\n  \"recovery_readiness_score\": null,\n  \"upper_body_definition_score\": null,\n  \"lower_body_definition_score\": null,\n  \"arm_definition_score\": null,\n  \"v_taper_score\": null,\n  \"body_tension_indicator_score\": null,\n  \"perceived_sex_key\": null,\n  \"perceived_age_range_key\": null,\n  \"estimated_height_range_key\": null,\n  \"estimated_weight_range_key\": null,\n  \"body_frame_key\": null,\n  \"perceived_fitness_level_key\": null,\n  \"analysis_meta\": {\n    \"confidence_score\": null,\n    \"image_quality_score\": null,\n    \"metric_coverage_score\": null,\n    \"limitation_flags\": []\n  }\n}\n\nNUTRITION schema:\n{\n  \"schema_version\": 4,\n  \"scan_type\": \"nutrition\",\n  \"verdict_key\": null,\n  \"plate_health_score\": null,\n  \"calories_estimate\": null,\n  \"protein_grams\": null,\n  \"carbs_grams\": null,\n  \"fat_grams\": null,\n  \"glycemic_index_label\": null,\n  \"satiety_index\": null,\n  \"ingredient_quality\": null,\n  \"main_vitamins\": null,\n  \"short_verdict\": null,\n  \"fiber_grams_estimate\": null,\n  \"sugar_grams_estimate\": null,\n  \"processing_level_score\": null,\n  \"hydration_contribution_score\": null,\n  \"sodium_level_score\": null,\n  \"meal_balance_score\": null,\n  \"inflammation_index_score\": null,\n  \"meal_type_key\": null,\n  \"portion_size_key\": null,\n  \"color_diversity_score\": null,\n  \"vegetable_portion_ratio\": null,\n  \"protein_visibility_score\": null,\n  \"whole_grain_indicator_score\": null,\n  \"meal_freshness_score\": null,\n  \"cuisine_type_key\": null,\n  \"meat_type_key\": null,\n  \"cooking_method_key\": null,\n  \"meal_dietary_pattern_key\": null,\n  \"allergen_visibility_keys\": [],\n  \"analysis_meta\": {\n    \"confidence_score\": null,\n    \"image_quality_score\": null,\n    \"metric_coverage_score\": null,\n    \"limitation_flags\": []\n  }\n}\n\nERROR schema:\n{\n  \"scan_type\": \"error\",\n  \"message\": null\n}\n\nGeneral metric constraints:\n- schema_version must be 4 for face, body, and nutrition.\n- 0-100 fields: face_score, skin_quality_score, symmetry_percentage, fatigue_level, collagen_level, hydration_level, skin_clarity_score, under_eye_shadow_score, under_eye_volume_score, eye_openness_score, complexion_redness_score, pore_visibility_score, skin_evenness_score, skin_radiance_score, lip_dryness_score, forehead_smoothness_score, t_zone_oiliness_score, perceived_stress_level, perceived_sleep_quality, body_score, strength_index, body_symmetry, muscle_definition_score, midsection_definition_score, shoulder_alignment_score, recovery_readiness_score, upper_body_definition_score, lower_body_definition_score, arm_definition_score, v_taper_score, body_tension_indicator_score, plate_health_score, fiber_grams_estimate, processing_level_score, meal_balance_score, inflammation_index_score, vegetable_portion_ratio, protein_visibility_score, whole_grain_indicator_score, meal_freshness_score.\n- 0-10 fields: glow_index, photogenic_score, posture_score, satiety_index, hydration_contribution_score, sodium_level_score, color_diversity_score.\n- sugar_grams_estimate: 0-300.\n- analysis_meta.confidence_score, image_quality_score, and metric_coverage_score: number from 0 to 100.\n- analysis_meta.limitation_flags may only contain: blur, low_light, partial_subject, occlusion, portion_uncertain.\n- Use concise localized labels for face_shape, muscle_mass_label, body_type, glycemic_index_label, ingredient_quality, and short_verdict.\n- For nutrition, verdict_key must be one of \"balanced\", \"smoothie_ideal\", \"protein_dense\", \"light\", \"processed\", \"sugary\", \"indulgent\". Always use this exact English canonical key; never localize it and never return \"unknown\" for an analyzable food image.\n- meal_type_key: \"breakfast\"/\"lunch\"/\"dinner\"/\"snack\"/\"dessert\"/\"other\".\n- portion_size_key: \"small\"/\"medium\"/\"large\"/\"oversized\".\n- cuisine_type_key: \"mediterranean\"/\"asian\"/\"western\"/\"middle_eastern\"/\"latin\"/\"african\"/\"mixed\"/\"other\".\n- meat_type_key: \"red_meat\"/\"poultry\"/\"fish\"/\"seafood\"/\"plant_protein\"/\"dairy\"/\"none\".\n- cooking_method_key: \"fried\"/\"baked\"/\"grilled\"/\"raw\"/\"steamed\"/\"boiled\"/\"sauteed\"/\"other\".\n- Persona inference (face): perceived_sex_key (\"male_presenting\"/\"female_presenting\"/\"neutral_or_unclear\"), perceived_age_range_key (\"under_18\"/\"18_24\"/\"25_34\"/\"35_44\"/\"45_54\"/\"55_64\"/\"65_plus\"). Visual presentation cues for coaching personalization.\n- Persona inference (body): perceived_sex_key (same), perceived_age_range_key (same), estimated_height_range_key (\"under_150cm\"/\"150_160cm\"/\"160_170cm\"/\"170_180cm\"/\"180_190cm\"/\"190_plus\"), estimated_weight_range_key (\"under_50kg\"/\"50_60kg\"/\"60_70kg\"/\"70_80kg\"/\"80_90kg\"/\"90_100kg\"/\"100_plus\"), body_frame_key (\"small\"/\"medium\"/\"large\"), perceived_fitness_level_key (\"sedentary\"/\"lightly_active\"/\"moderately_active\"/\"very_active\"/\"athletic\"). Approximate visual ranges.\n- Persona inference (nutrition): meal_dietary_pattern_key (\"omnivore\"/\"vegetarian_compatible\"/\"vegan_compatible\"/\"pescetarian_compatible\"/\"keto_compatible\"/\"mediterranean_compatible\"/\"unclear\"), allergen_visibility_keys (array, possibly empty, of \"gluten_likely\"/\"dairy_likely\"/\"nuts_likely\"/\"shellfish_likely\"/\"eggs_likely\"/\"soy_likely\"/\"seafood_likely\").\n\nError rules:\n- message must be a short localized error message.\n\nFinal reminder: return only the raw minified JSON object, with no indentation and no unnecessary whitespace.",
-        "inputType": "binary",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ model: \"deepseek-v4-flash-vision-exp\", messages: [{ role: \"user\", content: [{ type: \"text\", text: \"You are an AI specialized in face, body, and nutrition image analysis for wellness coaching insights. Use this node only when no reliable scan type was provided. Detect the best supported category for the image, then return only the matching raw JSON object.\\n\\nRequested language code for ALL textual values: \" + String($json.language_code || \"en\") + \"\\n\\nLanguage rules:\\n- If the code starts with \\\"fr\\\", all textual VALUES must be in French.\\n- If the code starts with \\\"en\\\", all textual VALUES must be in English.\\n- If the code starts with \\\"es\\\", all textual VALUES must be in Spanish.\\n- If the code starts with \\\"de\\\", all textual VALUES must be in German.\\n- If the code starts with \\\"it\\\", all textual VALUES must be in Italian.\\n- If the code starts with \\\"pt\\\", all textual VALUES must be in Portuguese.\\n- For any other value, use English.\\n- JSON KEYS must always stay in English and in snake_case.\\n- Only textual VALUES change with the requested language.\\n\\nEstimation rules:\\n- For every numeric field below, produce your best visual estimate from the image.\\n- Only use null as a last resort when there is genuinely no visual cue at all for that field.\\n- The downstream coaching system tolerates approximation. It does NOT tolerate empty responses.\\n- All scores below are visual heuristics for wellness coaching purposes, not medical assessments. Stay neutral and non-judgmental. Still produce your best visual estimate for each field.\\n- For advanced body fields (muscle_definition_score, midsection_definition_score, shoulder_alignment_score, recovery_readiness_score, upper_body_definition_score, lower_body_definition_score, arm_definition_score, v_taper_score, body_tension_indicator_score), fill a visual estimate whenever framing, clothing, pose, lighting, and visible body areas provide usable cues.\\n- Use null for an advanced body field only when the relevant body area is hidden, cropped, or genuinely not inferable; never fabricate hidden body areas.\\n\\nOutput rules:\\n1. Return exactly one valid JSON object.\\n2. Return no markdown, no code fences, no comments, and no text outside JSON.\\n3. Never omit a field from the chosen schema.\\n4. Never add extra keys outside the chosen schema.\\n5. Choose exactly one schema.\\n6. If the image is ambiguous, return ERROR.\\n7. Never return any type other than face, body, nutrition, or error.\\n\\nSupported schemas: face, body, nutrition, error.\\n\\nRouting rules:\\n- Return FACE when the image primarily shows a clearly visible human face.\\n- Return BODY when the image primarily shows a clearly visible human body, silhouette, posture, or physique.\\n- Return NUTRITION when the image primarily shows a meal, plate, dish, ingredients, or edible items.\\n- If both face and body are visible, choose the most tightly framed main subject.\\n- If the subject is a meal, choose NUTRITION.\\n- If the image is blurry, off-topic, unusable, or ambiguous, return ERROR.\\n- Never return health, super_health, or super_scan.\\n- analysis_meta is internal scan quality metadata used by downstream coach and analytics systems.\\n\\nFACE schema:\\n{\\n  \\\"schema_version\\\": 4,\\n  \\\"scan_type\\\": \\\"face\\\",\\n  \\\"face_score\\\": null,\\n  \\\"perceived_age\\\": null,\\n  \\\"skin_quality_score\\\": null,\\n  \\\"symmetry_percentage\\\": null,\\n  \\\"fatigue_level\\\": null,\\n  \\\"glow_index\\\": null,\\n  \\\"face_shape\\\": null,\\n  \\\"collagen_level\\\": null,\\n  \\\"hydration_level\\\": null,\\n  \\\"photogenic_score\\\": null,\\n  \\\"skin_clarity_score\\\": null,\\n  \\\"under_eye_shadow_score\\\": null,\\n  \\\"under_eye_volume_score\\\": null,\\n  \\\"eye_openness_score\\\": null,\\n  \\\"complexion_redness_score\\\": null,\\n  \\\"pore_visibility_score\\\": null,\\n  \\\"skin_evenness_score\\\": null,\\n  \\\"skin_radiance_score\\\": null,\\n  \\\"lip_dryness_score\\\": null,\\n  \\\"forehead_smoothness_score\\\": null,\\n  \\\"t_zone_oiliness_score\\\": null,\\n  \\\"perceived_sex_key\\\": null,\\n  \\\"perceived_age_range_key\\\": null,\\n  \\\"perceived_stress_level\\\": null,\\n  \\\"perceived_sleep_quality\\\": null,\\n  \\\"analysis_meta\\\": {\\n    \\\"confidence_score\\\": null,\\n    \\\"image_quality_score\\\": null,\\n    \\\"metric_coverage_score\\\": null,\\n    \\\"limitation_flags\\\": []\\n  }\\n}\\n\\nBODY schema:\\n{\\n  \\\"schema_version\\\": 4,\\n  \\\"scan_type\\\": \\\"body\\\",\\n  \\\"body_score\\\": null,\\n  \\\"body_fat_percentage\\\": null,\\n  \\\"muscle_mass_label\\\": null,\\n  \\\"body_type\\\": null,\\n  \\\"posture_score\\\": null,\\n  \\\"waist_estimation_cm\\\": null,\\n  \\\"strength_index\\\": null,\\n  \\\"body_symmetry\\\": null,\\n  \\\"bmi_estimate\\\": null,\\n  \\\"metabolic_age\\\": null,\\n  \\\"muscle_definition_score\\\": null,\\n  \\\"midsection_definition_score\\\": null,\\n  \\\"shoulder_alignment_score\\\": null,\\n  \\\"recovery_readiness_score\\\": null,\\n  \\\"upper_body_definition_score\\\": null,\\n  \\\"lower_body_definition_score\\\": null,\\n  \\\"arm_definition_score\\\": null,\\n  \\\"v_taper_score\\\": null,\\n  \\\"body_tension_indicator_score\\\": null,\\n  \\\"perceived_sex_key\\\": null,\\n  \\\"perceived_age_range_key\\\": null,\\n  \\\"estimated_height_range_key\\\": null,\\n  \\\"estimated_weight_range_key\\\": null,\\n  \\\"body_frame_key\\\": null,\\n  \\\"perceived_fitness_level_key\\\": null,\\n  \\\"analysis_meta\\\": {\\n    \\\"confidence_score\\\": null,\\n    \\\"image_quality_score\\\": null,\\n    \\\"metric_coverage_score\\\": null,\\n    \\\"limitation_flags\\\": []\\n  }\\n}\\n\\nNUTRITION schema:\\n{\\n  \\\"schema_version\\\": 4,\\n  \\\"scan_type\\\": \\\"nutrition\\\",\\n  \\\"verdict_key\\\": null,\\n  \\\"plate_health_score\\\": null,\\n  \\\"calories_estimate\\\": null,\\n  \\\"protein_grams\\\": null,\\n  \\\"carbs_grams\\\": null,\\n  \\\"fat_grams\\\": null,\\n  \\\"glycemic_index_label\\\": null,\\n  \\\"satiety_index\\\": null,\\n  \\\"ingredient_quality\\\": null,\\n  \\\"main_vitamins\\\": null,\\n  \\\"short_verdict\\\": null,\\n  \\\"fiber_grams_estimate\\\": null,\\n  \\\"sugar_grams_estimate\\\": null,\\n  \\\"processing_level_score\\\": null,\\n  \\\"hydration_contribution_score\\\": null,\\n  \\\"sodium_level_score\\\": null,\\n  \\\"meal_balance_score\\\": null,\\n  \\\"inflammation_index_score\\\": null,\\n  \\\"meal_type_key\\\": null,\\n  \\\"portion_size_key\\\": null,\\n  \\\"color_diversity_score\\\": null,\\n  \\\"vegetable_portion_ratio\\\": null,\\n  \\\"protein_visibility_score\\\": null,\\n  \\\"whole_grain_indicator_score\\\": null,\\n  \\\"meal_freshness_score\\\": null,\\n  \\\"cuisine_type_key\\\": null,\\n  \\\"meat_type_key\\\": null,\\n  \\\"cooking_method_key\\\": null,\\n  \\\"meal_dietary_pattern_key\\\": null,\\n  \\\"allergen_visibility_keys\\\": [],\\n  \\\"analysis_meta\\\": {\\n    \\\"confidence_score\\\": null,\\n    \\\"image_quality_score\\\": null,\\n    \\\"metric_coverage_score\\\": null,\\n    \\\"limitation_flags\\\": []\\n  }\\n}\\n\\nERROR schema:\\n{\\n  \\\"scan_type\\\": \\\"error\\\",\\n  \\\"message\\\": null\\n}\\n\\nGeneral metric constraints:\\n- schema_version must be 4 for face, body, and nutrition.\\n- 0-100 fields: face_score, skin_quality_score, symmetry_percentage, fatigue_level, collagen_level, hydration_level, skin_clarity_score, under_eye_shadow_score, under_eye_volume_score, eye_openness_score, complexion_redness_score, pore_visibility_score, skin_evenness_score, skin_radiance_score, lip_dryness_score, forehead_smoothness_score, t_zone_oiliness_score, perceived_stress_level, perceived_sleep_quality, body_score, strength_index, body_symmetry, muscle_definition_score, midsection_definition_score, shoulder_alignment_score, recovery_readiness_score, upper_body_definition_score, lower_body_definition_score, arm_definition_score, v_taper_score, body_tension_indicator_score, plate_health_score, fiber_grams_estimate, processing_level_score, meal_balance_score, inflammation_index_score, vegetable_portion_ratio, protein_visibility_score, whole_grain_indicator_score, meal_freshness_score.\\n- 0-10 fields: glow_index, photogenic_score, posture_score, satiety_index, hydration_contribution_score, sodium_level_score, color_diversity_score.\\n- sugar_grams_estimate: 0-300.\\n- analysis_meta.confidence_score, image_quality_score, and metric_coverage_score: number from 0 to 100.\\n- analysis_meta.limitation_flags may only contain: blur, low_light, partial_subject, occlusion, portion_uncertain.\\n- Use concise localized labels for face_shape, muscle_mass_label, body_type, glycemic_index_label, ingredient_quality, and short_verdict.\\n- For nutrition, verdict_key must be one of \\\"balanced\\\", \\\"smoothie_ideal\\\", \\\"protein_dense\\\", \\\"light\\\", \\\"processed\\\", \\\"sugary\\\", \\\"indulgent\\\". Always use this exact English canonical key; never localize it and never return \\\"unknown\\\" for an analyzable food image.\\n- meal_type_key: \\\"breakfast\\\"/\\\"lunch\\\"/\\\"dinner\\\"/\\\"snack\\\"/\\\"dessert\\\"/\\\"other\\\".\\n- portion_size_key: \\\"small\\\"/\\\"medium\\\"/\\\"large\\\"/\\\"oversized\\\".\\n- cuisine_type_key: \\\"mediterranean\\\"/\\\"asian\\\"/\\\"western\\\"/\\\"middle_eastern\\\"/\\\"latin\\\"/\\\"african\\\"/\\\"mixed\\\"/\\\"other\\\".\\n- meat_type_key: \\\"red_meat\\\"/\\\"poultry\\\"/\\\"fish\\\"/\\\"seafood\\\"/\\\"plant_protein\\\"/\\\"dairy\\\"/\\\"none\\\".\\n- cooking_method_key: \\\"fried\\\"/\\\"baked\\\"/\\\"grilled\\\"/\\\"raw\\\"/\\\"steamed\\\"/\\\"boiled\\\"/\\\"sauteed\\\"/\\\"other\\\".\\n- Persona inference (face): perceived_sex_key (\\\"male_presenting\\\"/\\\"female_presenting\\\"/\\\"neutral_or_unclear\\\"), perceived_age_range_key (\\\"under_18\\\"/\\\"18_24\\\"/\\\"25_34\\\"/\\\"35_44\\\"/\\\"45_54\\\"/\\\"55_64\\\"/\\\"65_plus\\\"). Visual presentation cues for coaching personalization.\\n- Persona inference (body): perceived_sex_key (same), perceived_age_range_key (same), estimated_height_range_key (\\\"under_150cm\\\"/\\\"150_160cm\\\"/\\\"160_170cm\\\"/\\\"170_180cm\\\"/\\\"180_190cm\\\"/\\\"190_plus\\\"), estimated_weight_range_key (\\\"under_50kg\\\"/\\\"50_60kg\\\"/\\\"60_70kg\\\"/\\\"70_80kg\\\"/\\\"80_90kg\\\"/\\\"90_100kg\\\"/\\\"100_plus\\\"), body_frame_key (\\\"small\\\"/\\\"medium\\\"/\\\"large\\\"), perceived_fitness_level_key (\\\"sedentary\\\"/\\\"lightly_active\\\"/\\\"moderately_active\\\"/\\\"very_active\\\"/\\\"athletic\\\"). Approximate visual ranges.\\n- Persona inference (nutrition): meal_dietary_pattern_key (\\\"omnivore\\\"/\\\"vegetarian_compatible\\\"/\\\"vegan_compatible\\\"/\\\"pescetarian_compatible\\\"/\\\"keto_compatible\\\"/\\\"mediterranean_compatible\\\"/\\\"unclear\\\"), allergen_visibility_keys (array, possibly empty, of \\\"gluten_likely\\\"/\\\"dairy_likely\\\"/\\\"nuts_likely\\\"/\\\"shellfish_likely\\\"/\\\"eggs_likely\\\"/\\\"soy_likely\\\"/\\\"seafood_likely\\\").\\n\\nError rules:\\n- message must be a short localized error message.\\n\\nFinal reminder: return only the raw minified JSON object, with no indentation and no unnecessary whitespace.\" }, { type: \"image_url\", image_url: { url: \"data:image/jpeg;base64,\" + $json.body.imageBase64, detail: \"original\" } }] }], response_format: { type: \"json_object\" }, max_tokens: 8192, temperature: 0.1 }) }}",
         "options": {
-          "maxOutputTokens": 8192
-        },
-        "binaryPropertyName": "data",
-        "simplify": true
+          "timeout": 60000
+        }
       },
-      "type": "@n8n/n8n-nodes-langchain.googleGemini",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
         1264,
         240
@@ -305,8 +282,8 @@
       "id": "4e1a262c-c1f8-4d73-b60b-0ea61a1858be",
       "name": "Analyze Image Auto Detect Fallback",
       "credentials": {
-        "googlePalmApi": {
-          "name": "Google Gemini(PaLM) Api account"
+        "deepSeekApi": {
+          "name": "DeepSeek account"
         }
       }
     },
@@ -367,7 +344,7 @@
         16
       ],
       "id": "69275ebf-5bc5-4809-b3a2-ec178251f9ad",
-      "name": "Sign Webhook Response (analyse_1)"
+      "name": "Sign Webhook Response (analyse_deepseek)"
     },
     {
       "parameters": {
@@ -380,7 +357,7 @@
         -150
       ],
       "id": "8d816b9b-19a7-43ad-9cb1-95e0ee753373",
-      "name": "Verify Coach Webhook HMAC (analyse_1)"
+      "name": "Verify Coach Webhook HMAC (analyse_deepseek)"
     },
     {
       "parameters": {
@@ -408,7 +385,7 @@
         "options": {}
       },
       "id": "7cc4cc86-d716-400c-b8a2-c18deb0d531d",
-      "name": "Smoke Switch (analyse_1)",
+      "name": "Smoke Switch (analyse_deepseek)",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
@@ -423,7 +400,7 @@
       "main": [
         [
           {
-            "node": "Verify Coach Webhook HMAC (analyse_1)",
+            "node": "Verify Coach Webhook HMAC (analyse_deepseek)",
             "type": "main",
             "index": 0
           }
@@ -431,44 +408,6 @@
       ]
     },
     "Normalize Analyse Input": {
-      "main": [
-        [
-          {
-            "node": "Convert to File",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Snapshot Analyse Context",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Convert to File": {
-      "main": [
-        [
-          {
-            "node": "Merge Image + Analyse Context",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Snapshot Analyse Context": {
-      "main": [
-        [
-          {
-            "node": "Merge Image + Analyse Context",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Merge Image + Analyse Context": {
       "main": [
         [
           {
@@ -570,14 +509,14 @@
       "main": [
         [
           {
-            "node": "Sign Webhook Response (analyse_1)",
+            "node": "Sign Webhook Response (analyse_deepseek)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Sign Webhook Response (analyse_1)": {
+    "Sign Webhook Response (analyse_deepseek)": {
       "main": [
         [
           {
@@ -588,22 +527,22 @@
         ]
       ]
     },
-    "Verify Coach Webhook HMAC (analyse_1)": {
+    "Verify Coach Webhook HMAC (analyse_deepseek)": {
       "main": [
         [
           {
-            "node": "Smoke Switch (analyse_1)",
+            "node": "Smoke Switch (analyse_deepseek)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Smoke Switch (analyse_1)": {
+    "Smoke Switch (analyse_deepseek)": {
       "main": [
         [
           {
-            "node": "Sign Webhook Response (analyse_1)",
+            "node": "Sign Webhook Response (analyse_deepseek)",
             "type": "main",
             "index": 0
           }
@@ -618,17 +557,12 @@
       ]
     }
   },
-  "active": true,
+  "active": false,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
-    "availableInMCP": false
+    "availableInMCP": false,
+    "timezone": "Europe/Paris"
   },
-  "versionId": "021fc42f-5e55-46b4-ab05-94e0b88303d4",
-  "meta": {
-    "templateCredsSetupCompleted": true,
-    "instanceId": "00431bea7c112c6c03ed10860af49e6e791fd93819e027c15313a8e313bdaff9"
-  },
-  "id": "1-iAvuaAS6G39AtQyqukh",
   "tags": []
 }

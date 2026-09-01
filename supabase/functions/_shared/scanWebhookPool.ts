@@ -8,6 +8,8 @@ export const N8N_SCAN_ANALYZE_WEBHOOK_URL_ENV_NAME =
   'N8N_SCAN_ANALYZE_WEBHOOK_URL';
 export const N8N_SCAN_ANALYZE_WEBHOOK_URLS_ENV_NAME =
   'N8N_SCAN_ANALYZE_WEBHOOK_URLS';
+export const N8N_SCAN_ANALYZE_FALLBACK_WEBHOOK_URL_ENV_NAME =
+  'N8N_SCAN_ANALYZE_FALLBACK_WEBHOOK_URL';
 export const N8N_SCAN_ANALYZE_SUPER_WEBHOOK_URL_ENV_NAME =
   'N8N_SCAN_ANALYZE_SUPER_WEBHOOK_URL';
 export const N8N_SCAN_ANALYZE_SUPER_WEBHOOK_URLS_ENV_NAME =
@@ -28,6 +30,11 @@ export interface SelectedScanWebhookEndpoint extends ResolvedScanWebhookPool {
   url: string;
 }
 
+export interface ResolvedScanWebhookFallback {
+  envName: typeof N8N_SCAN_ANALYZE_FALLBACK_WEBHOOK_URL_ENV_NAME;
+  url: string;
+}
+
 function createScanWebhookNotConfiguredError() {
   return new Phase2HttpError(
     503,
@@ -41,6 +48,10 @@ function assertValidWebhookUrl(url: string) {
   if (!result.ok) {
     throw createScanWebhookNotConfiguredError();
   }
+}
+
+function normalizeComparableWebhookUrl(url: string) {
+  return new URL(url).href;
 }
 
 function normalizeWebhookPool(urls: string[], envName: string): ResolvedScanWebhookPool {
@@ -95,6 +106,40 @@ export function resolveScanWebhookPool(
     N8N_SCAN_ANALYZE_SUPER_WEBHOOK_URLS_ENV_NAME,
     N8N_SCAN_ANALYZE_SUPER_WEBHOOK_URL_ENV_NAME,
   ) ?? defaultPool;
+}
+
+export function resolveScanWebhookFallback(
+  scanType: SupportedScanType,
+  primaryUrls: readonly string[],
+): ResolvedScanWebhookFallback | null {
+  // Super scans already use their dedicated Gemini workflow and must never be
+  // rerouted through the standard-scan fallback.
+  if (scanType === 'super') {
+    return null;
+  }
+
+  const fallbackUrl = readOptionalServerEnv(
+    N8N_SCAN_ANALYZE_FALLBACK_WEBHOOK_URL_ENV_NAME,
+  );
+  if (fallbackUrl === null) {
+    return null;
+  }
+
+  assertValidWebhookUrl(fallbackUrl);
+  const comparableFallbackUrl = normalizeComparableWebhookUrl(fallbackUrl);
+  if (
+    primaryUrls.some(
+      (primaryUrl) =>
+        normalizeComparableWebhookUrl(primaryUrl) === comparableFallbackUrl,
+    )
+  ) {
+    throw createScanWebhookNotConfiguredError();
+  }
+
+  return {
+    envName: N8N_SCAN_ANALYZE_FALLBACK_WEBHOOK_URL_ENV_NAME,
+    url: fallbackUrl,
+  };
 }
 
 export async function selectScanWebhookEndpoint(options: {

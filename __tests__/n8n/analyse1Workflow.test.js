@@ -165,7 +165,7 @@ describe('analyse_1 n8n workflow export', () => {
     expect(incoming).toHaveLength(4);
   });
 
-  it('configures image analysis branches with Google Gemini 2.5 Flash Image', () => {
+  it('configures fallback image analysis branches with Google Gemini 2.5 Flash', () => {
     const workflow = readWorkflow();
     const rawWorkflow = fs.readFileSync(workflowPath, 'utf8');
     const forbiddenProviderMarkers = [
@@ -197,8 +197,8 @@ describe('analyse_1 n8n workflow export', () => {
         binaryPropertyName: 'data',
         simplify: true,
         modelId: {
-          value: 'models/gemini-2.5-flash-image',
-          cachedResultName: 'Gemini 2.5 Flash Image',
+          value: 'models/gemini-2.5-flash',
+          cachedResultName: 'Gemini 2.5 Flash',
         },
         options: {
           maxOutputTokens: 8192,

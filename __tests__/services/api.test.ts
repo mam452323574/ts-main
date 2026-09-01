@@ -1,4 +1,8 @@
-import { ApiService } from '@/services/api';
+import {
+  ANALYZE_SCAN_TIMEOUT_MS_BY_SCAN_TYPE,
+  ApiService,
+} from '@/services/api';
+import { SCAN_IMAGE_MAX_BYTES } from '@/shared/scanContract';
 
 // Mock expo-file-system/next
 const mockBase64 = jest.fn();
@@ -1038,6 +1042,15 @@ describe('ApiService', () => {
       });
     });
 
+    it('uses a 120 second client timeout for every scan type', () => {
+      expect(ANALYZE_SCAN_TIMEOUT_MS_BY_SCAN_TYPE).toEqual({
+        body: 120_000,
+        health: 120_000,
+        nutrition: 120_000,
+        super: 120_000,
+      });
+    });
+
     it('delegates scan analysis to the authenticated backend function', async () => {
       const backendScan = {
         id: 'scan-123',
@@ -1280,6 +1293,71 @@ describe('ApiService', () => {
       mockGetSession.mockResolvedValue({
         data: { session: { access_token: 'test-token' } },
       });
+    });
+
+    it.each([
+      ['just below', SCAN_IMAGE_MAX_BYTES - 1],
+      ['exactly at', SCAN_IMAGE_MAX_BYTES],
+    ])('accepts a scan image %s the shared 10 MiB limit', async (_label, size) => {
+      mockDecode.mockReturnValueOnce(new ArrayBuffer(size));
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          allowed: true,
+          scan_id: `scan-size-${size}`,
+          welcome_credits: 0,
+        }),
+      });
+
+      const scan = await ApiService.createScan(
+        'file:///camera/size-boundary.jpg',
+        'health',
+      );
+
+      expect(scan.id).toBe(`scan-size-${size}`);
+      expect(mockStorageUpload).toHaveBeenCalledWith(
+        `user-123/scans/scan-size-${size}.jpg`,
+        expect.objectContaining({ byteLength: size }),
+        expect.objectContaining({ contentType: 'image/jpeg' }),
+      );
+    });
+
+    it('rejects and rolls back a scan image above the shared 10 MiB limit', async () => {
+      mockDecode.mockReturnValueOnce(
+        new ArrayBuffer(SCAN_IMAGE_MAX_BYTES + 1),
+      );
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({
+            allowed: true,
+            scan_id: 'scan-size-too-large',
+            welcome_credits: 0,
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ success: true }),
+        });
+
+      await expect(
+        ApiService.createScan(
+          'file:///camera/size-too-large.jpg',
+          'health',
+        ),
+      ).rejects.toThrow('api_errors.image_too_large');
+
+      expect(mockStorageUpload).not.toHaveBeenCalled();
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        2,
+        'https://test.supabase.co/functions/v1/cancel-scan-reservation',
+        expect.objectContaining({
+          body: JSON.stringify({
+            scan_id: 'scan-size-too-large',
+            scan_type: 'health',
+          }),
+        }),
+      );
     });
 
     it('returns the reserved scan and analysis error when backend analysis fails', async () => {

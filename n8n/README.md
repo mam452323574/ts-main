@@ -1,5 +1,46 @@
 # n8n Workflow Setup
 
+## Scan analysis workflows
+
+Standard scans (`health`, `body`, and `nutrition`) use two independent n8n
+workflows:
+
+- Primary: `analyse_deepseek.json`, generated from the hardened scan contract
+  with `scripts/build-scan-deepseek-workflow.mjs`. It calls
+  `deepseek-v4-flash-vision-exp` through the n8n `DeepSeek account` credential.
+- Fallback: `analyse_1.json`, using `gemini-2.5-flash` with the existing
+  normalizer and signed response contract.
+- `super` scans keep their dedicated Gemini workflow and never use the standard
+  fallback.
+
+Configure the Edge Function with:
+
+```text
+N8N_SCAN_ANALYZE_WEBHOOK_URL=https://<your-n8n>/webhook/analyse_deepseek
+N8N_SCAN_ANALYZE_FALLBACK_WEBHOOK_URL=https://<your-n8n>/webhook/analyse_1
+```
+
+If `N8N_SCAN_ANALYZE_WEBHOOK_URLS` is set, it remains authoritative over the
+singular primary URL. The fallback URL must be valid, allowed by
+`WEBHOOK_ALLOWED_HOSTS`, and different from every primary URL.
+
+The Edge Function limits the primary attempt to 65 seconds and the complete
+primary-plus-fallback operation to 100 seconds. A single fallback is allowed on
+network/timeout failures, invalid analysis responses, and HTTP
+`402/408/429/500/502/503/504`; authentication and request errors
+`400/401/403` fail without fallback.
+
+Generate or verify the DeepSeek workflow deterministically:
+
+```powershell
+node scripts/build-scan-deepseek-workflow.mjs
+node scripts/build-scan-deepseek-workflow.mjs --check
+```
+
+Import `scan-provider-canary.json` and activate it after a manual run. It checks
+DeepSeek and Gemini every day at 06:00 Europe/Paris with one output token and
+writes status-only records to n8n execution logs. It sends no notification.
+
 ## Coach workflow
 
 `n8n/workflows/coach.json` is an import template, not a ready-to-run workflow.

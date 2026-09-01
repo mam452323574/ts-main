@@ -9,10 +9,16 @@ import {
   createRequestId,
   logPhase2Error,
   logPhase2Info,
-  summarizeWebhookResult,
 } from '../_shared/phase2Observability.ts';
 import { postWebhookJson } from '../_shared/phase2Webhook.ts';
-import { selectScanWebhookEndpoint } from '../_shared/scanWebhookPool.ts';
+import {
+  resolveScanWebhookFallback,
+  selectScanWebhookEndpoint,
+} from '../_shared/scanWebhookPool.ts';
+import {
+  dispatchScanWebhookWithFallback,
+  toScanWebhookDispatchLogFields,
+} from '../_shared/scanWebhookDispatch.ts';
 import {
   isPendingScanRollback,
   rollbackScanCharge,
@@ -53,9 +59,6 @@ import {
   type ScanResultTier,
 } from '../_shared/scanResultSanitizer.ts';
 
-const OBSERVABILITY_CONTROL_CHARS_PATTERN =
-  /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g;
-
 function requirePostMethod(req: Request) {
   if (req.method !== 'POST') {
     throw new Phase2HttpError(405, 'method_not_allowed', 'Method not allowed');
@@ -76,24 +79,6 @@ function readNonEmptyString(value: unknown) {
     : null;
 }
 
-function sanitizeObservabilityExcerpt(value: unknown, maxLength = 180) {
-  const text = readNonEmptyString(value);
-  if (!text) {
-    return null;
-  }
-
-  const normalized = text
-    .replace(OBSERVABILITY_CONTROL_CHARS_PATTERN, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  if (!normalized) {
-    return null;
-  }
-
-  return normalized.slice(0, maxLength);
-}
-
 function resolveProviderContentDiagnostic(
   payload: Record<string, unknown> | null,
   rawText?: string | null,
@@ -112,8 +97,36 @@ function resolveProviderContentDiagnostic(
 
   return {
     provider_content_length: contentCandidate?.length,
-    provider_content_excerpt:
-      sanitizeObservabilityExcerpt(contentCandidate) ?? undefined,
+  };
+}
+
+function buildScanWebhookFailureLogFields(error: unknown) {
+  const details = error instanceof Phase2HttpError ? error.details : undefined;
+  return {
+    primary_status:
+      typeof details?.primary_status === 'number'
+        ? details.primary_status
+        : undefined,
+    primary_duration_ms:
+      typeof details?.primary_duration_ms === 'number'
+        ? details.primary_duration_ms
+        : undefined,
+    fallback_used:
+      typeof details?.fallback_used === 'boolean'
+        ? details.fallback_used
+        : undefined,
+    fallback_status:
+      typeof details?.fallback_status === 'number'
+        ? details.fallback_status
+        : undefined,
+    fallback_duration_ms:
+      typeof details?.fallback_duration_ms === 'number'
+        ? details.fallback_duration_ms
+        : undefined,
+    terminal_error:
+      typeof details?.terminal_error === 'string'
+        ? details.terminal_error
+        : undefined,
   };
 }
 
@@ -511,16 +524,17 @@ Deno.serve(async (req: Request) => {
       canonicalPath,
     };
 
+    const scanStorageClient = client;
     const resolvedStoredObject = await resolveStoredScanObject({
       scanRow,
       canonicalPath,
       requestId,
       lookupObjectByPath: (candidate) =>
-        lookupStoredScanObjectByPath(client, candidate),
+        lookupStoredScanObjectByPath(scanStorageClient, candidate),
       downloadObjectByPath: (candidate) =>
-        downloadStoredScanImageByPath(client, candidate),
+        downloadStoredScanImageByPath(scanStorageClient, candidate),
       inferLegacyStoredScanObject: () =>
-        inferLegacyStoredScanObject(client, {
+        inferLegacyStoredScanObject(scanStorageClient, {
           scanRow,
           requestId,
         }),
@@ -591,6 +605,10 @@ Deno.serve(async (req: Request) => {
     });
     webhookEnvNameForLog = webhookEndpoint.envName;
     webhookIndexForLog = webhookEndpoint.selectedIndex;
+    const fallbackEndpoint = resolveScanWebhookFallback(
+      requestedScanType,
+      webhookEndpoint.urls,
+    );
 
     console.info('[analyze-scan] Dispatching scan analysis webhook', {
       request_id: requestId,
@@ -602,72 +620,65 @@ Deno.serve(async (req: Request) => {
       output_language: outputLanguage,
       webhook_env_name: webhookEndpoint.envName,
       webhook_index: webhookEndpoint.selectedIndex,
+      fallback_configured: fallbackEndpoint !== null,
+      fallback_env_name: fallbackEndpoint?.envName,
     });
 
-    const webhookResult = await postWebhookJson(
-      webhookEndpoint.url,
-      {
-        scanId: scanRow.id,
-        userId: user.id,
-        scanType: requestedScanType,
-        language,
-        locale,
-        outputLanguage,
-        imageBase64,
+    const webhookPayload = {
+      scanId: scanRow.id,
+      userId: user.id,
+      scanType: requestedScanType,
+      language,
+      locale,
+      outputLanguage,
+      imageBase64,
+    };
+
+    const dispatchResult = await dispatchScanWebhookWithFallback({
+      primaryUrl: webhookEndpoint.url,
+      fallbackUrl: fallbackEndpoint?.url,
+      payload: webhookPayload,
+      invoke: (url, payload, timeoutMs) =>
+        postWebhookJson(url, payload, timeoutMs),
+      normalize: (webhookResult, attempt) => {
+        try {
+          return resolveNormalizedScanAnalysisPayload(
+            webhookResult.payload,
+            requestedScanType,
+            webhookResult.rawText,
+          );
+        } catch (error) {
+          if (
+            error instanceof Phase2HttpError &&
+            (
+              error.code === 'analysis_failed' ||
+              error.code === 'invalid_analysis_response' ||
+              error.code === 'analysis_type_mismatch'
+            )
+          ) {
+            logPhase2Info(
+              '[analyze-scan] Analysis normalization diagnostics',
+              {
+                request_id: requestId,
+                scan_id: scanRow.id,
+                provider_attempt: attempt,
+                ...buildAnalysisNormalizationDiagnostics(
+                  webhookResult.payload,
+                  webhookResult.rawText,
+                  requestedScanType,
+                ),
+              },
+            );
+          }
+
+          throw error;
+        }
       },
-      100_000,
+    });
+    const { analysisResult, webhookResult } = dispatchResult;
+    const dispatchLogFields = toScanWebhookDispatchLogFields(
+      dispatchResult.telemetry,
     );
-
-    if (!webhookResult.ok) {
-      throw new Phase2HttpError(
-        502,
-        'analysis_provider_failed',
-        'Scan analysis provider returned an error',
-        summarizeWebhookResult(webhookResult, {
-          provider: 'scan_analysis',
-          path_source: resolvedPathSource,
-          scan_type: requestedScanType,
-          language_received: languageReceivedForLog ?? undefined,
-          language_normalized: language,
-          output_language: outputLanguage,
-          webhook_env_name: webhookEndpoint.envName,
-          webhook_index: webhookEndpoint.selectedIndex,
-        }),
-      );
-    }
-
-    let analysisResult: ReturnType<typeof resolveNormalizedScanAnalysisPayload>;
-    try {
-      analysisResult = resolveNormalizedScanAnalysisPayload(
-        webhookResult.payload,
-        requestedScanType,
-        webhookResult.rawText,
-      );
-    } catch (error) {
-      if (
-        error instanceof Phase2HttpError &&
-        (
-          error.code === 'analysis_failed' ||
-          error.code === 'invalid_analysis_response' ||
-          error.code === 'analysis_type_mismatch'
-        )
-      ) {
-        logPhase2Info(
-          '[analyze-scan] Analysis normalization diagnostics',
-          {
-            request_id: requestId,
-            scan_id: scanRow.id,
-            ...buildAnalysisNormalizationDiagnostics(
-              webhookResult.payload,
-              webhookResult.rawText,
-              requestedScanType,
-            ),
-          },
-        );
-      }
-
-      throw error;
-    }
 
     console.info('[analyze-scan] Scan analysis response parsed', {
       request_id: requestId,
@@ -684,6 +695,9 @@ Deno.serve(async (req: Request) => {
       webhook_env_name: webhookEndpoint.envName,
       webhook_index: webhookEndpoint.selectedIndex,
       webhook_status: webhookResult.status,
+      selected_provider_path:
+        dispatchResult.telemetry.fallbackUsed ? 'fallback' : 'primary',
+      ...dispatchLogFields,
     });
 
     const analyzedAt = new Date().toISOString();
@@ -771,6 +785,7 @@ Deno.serve(async (req: Request) => {
         webhook_index: webhookIndexForLog ?? undefined,
         path_source: resolvedPathSource ?? undefined,
         image_path: resolvedImagePath ?? undefined,
+        ...buildScanWebhookFailureLogFields(error),
       });
       return jsonResponse(
         req,

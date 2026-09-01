@@ -3,7 +3,7 @@
 > **Audit source :** [SOCIAL_SECURITY_AUDIT.md](../SOCIAL_SECURITY_AUDIT.md) §S-01.
 > **À configurer avant** de retirer `WEBHOOK_VERIFY_RESPONSE=false` côté Supabase.
 > **Workflows concernés :** **TOUS** les callers de `postWebhookJson` dans `supabase/functions/` quand `PHASE2_WEBHOOK_AUTH_MODE` contient `hmac`. Source de vérité : [RESPONSE_SIGNING_REGISTRY.md](RESPONSE_SIGNING_REGISTRY.md). Au 2026-05-19, ce sont :
-> - `analyze-scan` (scan health/pro) — pool `N8N_SCAN_ANALYZE_WEBHOOK_URLS`
+> - `analyze-scan` (scan health/pro) — primary pool `N8N_SCAN_ANALYZE_WEBHOOK_URLS` (or singular `N8N_SCAN_ANALYZE_WEBHOOK_URL`) plus optional `N8N_SCAN_ANALYZE_FALLBACK_WEBHOOK_URL`
 > - `social-report-content` — endpoint report
 > - `coach-generate-response`
 > - `coach-send-message` (coach conversation)

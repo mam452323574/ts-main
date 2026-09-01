@@ -113,10 +113,10 @@ const checks = [
     },
   },
   {
-    label: 'n8n health',
+    label: 'n8n transport health (AI providers checked by daily canary)',
     run: async () => {
       const response = await request(
-        'n8n health',
+        'n8n transport health',
         'https://n8n.basedjew.com/healthz',
         {},
         [200],

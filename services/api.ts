@@ -14,6 +14,7 @@ import {
   buildAnalyzeScanRequest,
   buildCanonicalScanImagePath,
   buildCheckAndRecordScanRequest,
+  SCAN_IMAGE_MAX_BYTES,
 } from '@/shared/scanContract';
 import {
   getAnalysisResultScanType,
@@ -749,10 +750,10 @@ const ANALYZE_SCAN_IN_PROGRESS_MAX_POLLS = 30; // 30 × 1.5 s = 45 s max
 // Timeout client par scan_type. Doit rester > timeout Edge→n8n (100s côté
 // supabase/functions/analyze-scan/index.ts) pour qu'un dépassement côté n8n
 // produise une 502 propre plutôt qu'un AbortController opaque côté client.
-const ANALYZE_SCAN_TIMEOUT_MS_BY_SCAN_TYPE: Record<ScanType, number> = {
-  body: 60_000,
-  health: 60_000,
-  nutrition: 60_000,
+export const ANALYZE_SCAN_TIMEOUT_MS_BY_SCAN_TYPE: Record<ScanType, number> = {
+  body: 120_000,
+  health: 120_000,
+  nutrition: 120_000,
   super: 120_000,
 };
 
@@ -1726,12 +1727,11 @@ export class ApiService {
 
     const fileName = buildCanonicalScanImagePath(user.id, eligibility.scan_id);
 
-    // P2-I Phase 2 — limite taille post-compression (12 MB) pour empêcher
+    // P2-I Phase 2 — limite partagée post-compression (10 MiB) pour empêcher
     // l'envoi d'une image gigantesque qui DoS la bande passante de l'utilisateur
     // ou qui sature le bucket. compression 0.95 conservée pour la qualité IA.
-    const MAX_SCAN_IMAGE_SIZE_BYTES = 12 * 1024 * 1024;
     const decodedBuffer = decode(base64);
-    if (decodedBuffer.byteLength > MAX_SCAN_IMAGE_SIZE_BYTES) {
+    if (decodedBuffer.byteLength > SCAN_IMAGE_MAX_BYTES) {
       await rollbackReservedScanAfterUploadFailure(eligibility.scan_id, scanType);
       throw new Error('api_errors.image_too_large');
     }

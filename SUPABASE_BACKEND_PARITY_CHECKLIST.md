@@ -173,7 +173,9 @@ Always required for the active server surface:
 
 Required for scan analysis:
 
-- `N8N_SCAN_ANALYZE_WEBHOOK_URL`
+- `N8N_SCAN_ANALYZE_WEBHOOK_URL` or `N8N_SCAN_ANALYZE_WEBHOOK_URLS` - DeepSeek
+  Vision primary workflow
+- `N8N_SCAN_ANALYZE_FALLBACK_WEBHOOK_URL` - Gemini fallback workflow
 
 Required for RevenueCat-backed subscription sync:
 
@@ -349,7 +351,8 @@ npx.cmd supabase db push --linked
 npx.cmd supabase secrets set `
   SUPABASE_URL="https://<your-project-ref>.supabase.co" `
   SUPABASE_SERVICE_ROLE_KEY="<your-service-role-key>" `
-  N8N_SCAN_ANALYZE_WEBHOOK_URL="https://<your-n8n>/webhook/scan-analyze"
+  N8N_SCAN_ANALYZE_WEBHOOK_URL="https://<your-n8n>/webhook/analyse_deepseek" `
+  N8N_SCAN_ANALYZE_FALLBACK_WEBHOOK_URL="https://<your-n8n>/webhook/analyse_1"
 ```
 
 ### 4. Set social and coach secrets
@@ -478,6 +481,8 @@ If comments still spin forever and the client surfaces `social_comments_schema_m
 
 - Sign in and trigger scan eligibility from the app; confirm `check-and-record-scan` returns an allowed response for an eligible user.
 - Complete a scan upload and analysis; confirm `analyze-scan` finishes and the related `scans` row contains `analysis_result` and `analyzed_at`.
+- Force a retryable primary failure and confirm the same scan succeeds through Gemini with `fallback_used=true` in Edge logs.
+- Confirm the daily `scan-provider-canary` execution logs one status-only result for both DeepSeek and Gemini.
 - Confirm scan history still reads from `scan_metrics`, `user_current_global_score`, and `get_premium_potential_data`.
 
 ### Coach smoke checks

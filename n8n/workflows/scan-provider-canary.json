@@ -1,0 +1,216 @@
+{
+  "name": "scan-provider-canary",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -520,
+        0
+      ],
+      "id": "3110ed39-4bd4-47c7-9797-8e5708820b2e",
+      "name": "Daily 06:00 Europe Paris"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -520,
+        240
+      ],
+      "id": "bb42234a-dbac-4e81-a752-c62e20ff40ed",
+      "name": "Manual Canary Trigger"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.deepseek.com/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "deepSeekApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ model: \"deepseek-v4-flash\", messages: [{ role: \"user\", content: \"OK\" }], max_tokens: 1, temperature: 0 }) }}",
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -280,
+        -120
+      ],
+      "id": "c73070a6-8e85-40ae-bc58-37f21bc07775",
+      "name": "Canary DeepSeek",
+      "credentials": {
+        "deepSeekApi": {
+          "name": "DeepSeek account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ contents: [{ parts: [{ text: \"OK\" }] }], generationConfig: { maxOutputTokens: 1, temperature: 0 } }) }}",
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -280,
+        120
+      ],
+      "id": "8741c00e-f0ac-4d42-b048-5740363ea3e2",
+      "name": "Canary Gemini",
+      "credentials": {
+        "googlePalmApi": {
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const status = Number($json?.statusCode) || 0;\nconst ok = status >= 200 && status < 300;\nconst terminal_error = ok ? null : ($json?.error ? \"request_failed\" : `http_${status || \"unknown\"}`);\nconst result = { provider: \"deepseek\", ok, status, terminal_error, checked_at: new Date().toISOString() };\nconsole.log(\"[scan-provider-canary]\", result);\nreturn [{ json: result }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        -120
+      ],
+      "id": "1e42c35a-13d8-4c30-86b0-4709ed6fb972",
+      "name": "Log DeepSeek Canary"
+    },
+    {
+      "parameters": {
+        "jsCode": "const status = Number($json?.statusCode) || 0;\nconst ok = status >= 200 && status < 300;\nconst terminal_error = ok ? null : ($json?.error ? \"request_failed\" : `http_${status || \"unknown\"}`);\nconst result = { provider: \"gemini\", ok, status, terminal_error, checked_at: new Date().toISOString() };\nconsole.log(\"[scan-provider-canary]\", result);\nreturn [{ json: result }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        120
+      ],
+      "id": "35104830-ee0b-4790-927e-693037694dfa",
+      "name": "Log Gemini Canary"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Daily 06:00 Europe Paris": {
+      "main": [
+        [
+          {
+            "node": "Canary DeepSeek",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Canary Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Canary Trigger": {
+      "main": [
+        [
+          {
+            "node": "Canary DeepSeek",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Canary Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Canary DeepSeek": {
+      "main": [
+        [
+          {
+            "node": "Log DeepSeek Canary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Canary Gemini": {
+      "main": [
+        [
+          {
+            "node": "Log Gemini Canary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Paris",
+    "availableInMCP": false
+  },
+  "tags": []
+}
